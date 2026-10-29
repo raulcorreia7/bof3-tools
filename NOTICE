@@ -1,0 +1,7 @@
+The MIT license in LICENSE covers the first-party code only. It does not cover third-party
+material. Each third-party item keeps its own terms:
+
+| Path | Owner | Terms |
+| --- | --- | --- |
+| `third_party/references/psx-spx.txt` | Martin Korth (nocash) | No explicit grant; reference only |
+| Submodules under `rebof3/third_party/` | their authors | the license in each submodule; references with no license are citations only |
