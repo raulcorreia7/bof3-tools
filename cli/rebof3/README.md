@@ -1,15 +1,15 @@
 # rebof3
 
-The *Breath of Fire III* toolchain command line: one binary with `player`, `disc`, `emi` and
+The *Breath of Fire III* toolchain command line: one binary with `disc`, `emi` and
 `assets`. The subcommands parse arguments and print; the libraries hold the logic.
 
 ```sh
 cargo build --release -p rebof3
 cargo test -p rebof3
-bin/rebof3 --help
+target/release/rebof3 --help
 ```
 
-Commands, flags and `extract-all` steps: [the rebof3 command line](../../wiki/src/tools/cli.md).
+Commands, flags and `extract-all` steps: [the rebof3 command line](https://github.com/raulcorreia7/bof3-monorepo/blob/main/wiki/src/tools/cli.md).
 
 ## Notice
 

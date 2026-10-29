@@ -9,7 +9,7 @@ license.workspace = true
 [dependencies]
 rebof3-emi = { workspace = true, features = ["std"] }
 rebof3-audio = { workspace = true, features = ["std"] }
-rebof3-audio-names.workspace = true
+bof3-names.workspace = true
 psx-cd.workspace = true
 psx-formats = { workspace = true, features = ["std"] }
 serde.workspace = true
