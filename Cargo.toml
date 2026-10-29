@@ -22,13 +22,13 @@ license = "MIT"
 [workspace.dependencies]
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
 rebof3-emi = { path = "crates/rebof3-emi", version = "0.2.0", default-features = false }
-emi = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
-bof3player = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
-bof3-names = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1" }
-rebof3-audio = { package = "bof3player", git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
-psx-audio = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1" }
-psx-cd = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1" }
-psx-formats = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
+emi = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+bof3player = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+bof3-names = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2" }
+rebof3-audio = { package = "bof3player", git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+psx-audio = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2" }
+psx-cd = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2" }
+psx-formats = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
 clap = { version = "4.6.7", features = ["derive", "wrap_help"] }
 claxon = "0.4.3"
 cpal = "0.18.2"
