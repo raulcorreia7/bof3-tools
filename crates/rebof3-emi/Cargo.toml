@@ -1,0 +1,30 @@
+[package]
+name = "rebof3-emi"
+description = "The Breath of Fire III EMI container and the game formats stored in it"
+version = "0.2.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["std"]
+# Archives on disk, packing, manifests, LZ77, area bundles, classification and coverage.
+# Without it the crate is `no_std + alloc` and keeps the container table and the cue table.
+std = ["psx-formats/std", "emi/std", "dep:serde", "dep:serde_json"]
+# A tiny archive builder for the tests of the crates built on this one.
+fixtures = []
+
+[dependencies]
+emi.workspace = true
+psx-formats.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+# The crate's own integration tests need the archive builder, which the `fixtures`
+# feature gates; a self dev-dependency turns it on for the test build.
+rebof3-emi = { path = ".", features = ["fixtures"] }
+psx-formats = { workspace = true, features = ["std", "fixtures"] }
+
+[lints]
+workspace = true
