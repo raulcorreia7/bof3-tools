@@ -1,0 +1,30 @@
+[package]
+name = "rebof3"
+description = "The Breath of Fire III toolchain: audio player, disc, EMI and assets commands"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "rebof3"
+path = "src/main.rs"
+
+[dependencies]
+rebof3-assets.workspace = true
+bof3player = { workspace = true, features = ["std", "ogg", "cli"] }
+rebof3-audio-names.workspace = true
+rebof3-emi = { workspace = true, features = ["std"] }
+psx-cd.workspace = true
+psx-formats = { workspace = true, features = ["std"] }
+clap.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+rebof3-emi = { workspace = true, features = ["std", "fixtures"] }
+psx-formats = { workspace = true, features = ["std", "fixtures"] }
+
+[lints]
+workspace = true
