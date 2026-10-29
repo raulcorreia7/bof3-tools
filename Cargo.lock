@@ -197,16 +197,16 @@ dependencies = [
 
 [[package]]
 name = "bof3-names"
-version = "0.1.1"
-source = "git+https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a#618650ebc7ea01b7c576381ea5eba328709b114a"
+version = "0.1.2"
+source = "git+https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2#7a5e40ee30aa960ad4cd1e7c19cd82462cd1f1ae"
 dependencies = [
  "bof3player",
 ]
 
 [[package]]
 name = "bof3player"
-version = "0.1.1"
-source = "git+https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a#618650ebc7ea01b7c576381ea5eba328709b114a"
+version = "0.1.2"
+source = "git+https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2#7a5e40ee30aa960ad4cd1e7c19cd82462cd1f1ae"
 dependencies = [
  "clap",
  "claxon",
@@ -219,6 +219,7 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
 ]
 
 [[package]]
@@ -665,8 +666,8 @@ checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
 
 [[package]]
 name = "emi"
-version = "0.1.1"
-source = "git+https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a#618650ebc7ea01b7c576381ea5eba328709b114a"
+version = "0.1.2"
+source = "git+https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2#7a5e40ee30aa960ad4cd1e7c19cd82462cd1f1ae"
 dependencies = [
  "psx-formats",
  "serde",
@@ -1690,8 +1691,8 @@ dependencies = [
 
 [[package]]
 name = "psx-audio"
-version = "0.1.1"
-source = "git+https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a#618650ebc7ea01b7c576381ea5eba328709b114a"
+version = "0.1.2"
+source = "git+https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2#7a5e40ee30aa960ad4cd1e7c19cd82462cd1f1ae"
 dependencies = [
  "flacenc",
  "psx-cd",
@@ -1701,8 +1702,8 @@ dependencies = [
 
 [[package]]
 name = "psx-cd"
-version = "0.1.1"
-source = "git+https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a#618650ebc7ea01b7c576381ea5eba328709b114a"
+version = "0.1.2"
+source = "git+https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2#7a5e40ee30aa960ad4cd1e7c19cd82462cd1f1ae"
 dependencies = [
  "md-5 0.11.0",
  "psx-formats",
@@ -1714,8 +1715,8 @@ dependencies = [
 
 [[package]]
 name = "psx-formats"
-version = "0.1.1"
-source = "git+https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a#618650ebc7ea01b7c576381ea5eba328709b114a"
+version = "0.1.2"
+source = "git+https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2#7a5e40ee30aa960ad4cd1e7c19cd82462cd1f1ae"
 dependencies = [
  "png",
  "serde",

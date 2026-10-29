@@ -23,4 +23,4 @@ unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 
-allow-git = ["https://github.com/raulcorreia7/bof3player.git?rev=618650ebc7ea01b7c576381ea5eba328709b114a"]
+allow-git = ["https://github.com/raulcorreia7/bof3player.git?tag=v0.1.2"]
