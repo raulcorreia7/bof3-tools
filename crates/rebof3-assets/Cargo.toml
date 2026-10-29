@@ -1,0 +1,22 @@
+[package]
+name = "rebof3-assets"
+description = "Extract every asset of the Breath of Fire III disc into one tree"
+version = "0.2.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rebof3-emi = { workspace = true, features = ["std"] }
+rebof3-audio = { workspace = true, features = ["std"] }
+rebof3-audio-names.workspace = true
+psx-cd.workspace = true
+psx-formats = { workspace = true, features = ["std"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+psx-formats = { workspace = true, features = ["std", "fixtures"] }
+
+[lints]
+workspace = true
