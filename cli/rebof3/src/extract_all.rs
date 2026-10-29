@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //! `assets extract-all`: every asset of the disc, one folder per step, plus the `index.json`
-//! manifest that `rebof3 player extracted DIR` browses.
+//! manifest for the extracted assets.
 //!
 //! Steps (each writes `DIR/<step>/`): `disc` the disc's files, `emi` every archive of `disc`,
 //! `assets` the classified payloads (`assets.jsonl`), `assets-export` terrain glTF, message JSON,
@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::assets::{IMAGE_DIR, extract_command, find_disc_image};
-use crate::{disc, player};
+use crate::disc;
 
 const INDEX_JSON: &str = "index.json";
 const INDEX_MD: &str = "index.md";
@@ -64,8 +64,7 @@ Exit code: 0 success, 1 some step had failures, 2 an error.
 
 Examples:
   rebof3 assets extract-all -i \"Breath of Fire III (USA).cue\" -o build/extract
-  rebof3 assets extract-all emi assets-export -o build/extract
-  rebof3 player extracted build/extract";
+  rebof3 assets extract-all emi assets-export -o build/extract";
 
 /// What a step reports before its folder is scanned.
 #[derive(Default)]
@@ -406,7 +405,7 @@ fn audio_step(context: &Context) -> Outcome {
     let mut outcome = Outcome::default();
     let out = context.folder("audio");
     for query in AUDIO_QUERIES {
-        match player::render_matching(&context.image, query, &out) {
+        match bof3player::cli::render_matching(&context.image, query, &out, bof3_names::game_names()) {
             Ok(0) => {}
             Ok(count) => outcome.errors.push(format!("{query}: {count} items failed to render")),
             Err(error) => outcome.errors.push(format!("{query}: {error}")),

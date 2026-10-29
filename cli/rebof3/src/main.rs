@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 //! `rebof3`: the Breath of Fire III toolchain.
 //!
-//! One binary, four subcommands: `player`, `disc`, `emi` and `assets`. Each keeps the flags and
+//! One binary, three subcommands: `disc`, `emi` and `assets`. Each keeps the flags and
 //! help of the command it replaced.
 
 mod assets;
 mod disc;
 mod emi;
 mod extract_all;
-mod player;
 
 use std::env;
 use std::ffi::OsString;
@@ -21,7 +20,6 @@ Usage: rebof3 <COMMAND> [ARGS...]
        rebof3 <COMMAND> --help
 
 Commands:
-  player  browse, search, play, render, export and verify the game's audio
   disc    extract, checksum, verify and rebuild a PlayStation disc image
   emi     list, extract, pack and inspect EMI archives
   assets  extract every disc asset, or convert one asset to and from its open form
@@ -31,7 +29,6 @@ Options:
   -V, --version  print the version
 
 Examples:
-  rebof3 player music
   rebof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
   rebof3 emi list \"BIN/BGM/BGM000.EMI\"
 
@@ -48,7 +45,6 @@ fn main() -> ExitCode {
     };
     let rest = args.collect::<Vec<OsString>>();
     match command.to_str() {
-        Some("player") => player::main(rest),
         Some("disc") => disc::main(rest),
         Some("emi") => emi::main(rest),
         Some("assets") => assets::main(rest),
