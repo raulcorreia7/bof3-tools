@@ -1,0 +1,81 @@
+# The Rust side of the monorepo: shared libraries and thin command lines.
+#
+#   crates/  shared libraries
+#   cli/     command lines: argument parsing and printing only
+#
+# Every first-party crate is MIT (LICENSE). `cargo deny check` keeps dependencies permissive.
+[workspace]
+resolver = "3"
+members = [
+    "crates/rebof3-emi",
+    "crates/rebof3-assets",
+    "cli/rebof3",
+]
+# Nested repositories keep their own Rust packages (rebof3/tools/sym and its worktrees).
+
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+
+[workspace.dependencies]
+rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
+rebof3-emi = { path = "crates/rebof3-emi", version = "0.2.0", default-features = false }
+emi = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
+bof3player = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
+bof3-names = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1" }
+rebof3-audio = { package = "bof3player", git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
+psx-audio = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1" }
+psx-cd = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1" }
+psx-formats = { git = "https://github.com/raulcorreia7/bof3player.git", rev = "618650ebc7ea01b7c576381ea5eba328709b114a", version = "0.1.1", default-features = false }
+clap = { version = "4.6.7", features = ["derive", "wrap_help"] }
+claxon = "0.4.3"
+cpal = "0.18.2"
+flacenc = { version = "0.5.1", default-features = false, features = ["par"] }
+hound = "3.5.1"
+lewton = "0.10.2"
+md-5 = "0.11.0"
+png = "0.18.1"
+quick-xml = "0.42.0"
+ratatui = "0.30"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+vorbis_rs = "0.5.6"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
+# The slow tests decode and hash the whole disc. Unoptimized code runs them about ten times
+# slower, so dependencies and the library crates on the decode path build with optimizations
+# (`"*"` covers only non-workspace crates, so the workspace crates are named). Debug assertions
+# and overflow checks stay on, and the command lines keep fast debug builds.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.rebof3-assets]
+opt-level = 2
+
+[profile.dev.package.rebof3-emi]
+opt-level = 2
+
+[profile.dev.package.bof3player]
+opt-level = 2
+
+[profile.dev.package.psx-audio]
+opt-level = 2
+
+[profile.dev.package.psx-cd]
+opt-level = 2
+
+[profile.dev.package.psx-formats]
+opt-level = 2
