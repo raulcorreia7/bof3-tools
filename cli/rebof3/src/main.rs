@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: MIT
 //! `rebof3`: the Breath of Fire III toolchain.
 //!
-//! One binary, three subcommands: `disc`, `emi` and `assets`. Each keeps the flags and
-//! help of the command it replaced.
+//! Subcommands: `disc` and `emi`, plus `assets` in the default build. Each keeps
+//! the flags and help of the command it replaced.
 
+#[cfg(feature = "assets")]
 mod assets;
 mod disc;
 mod emi;
+#[cfg(feature = "assets")]
 mod extract_all;
 
 use std::env;
 use std::ffi::OsString;
 use std::process::ExitCode;
 
+#[cfg(feature = "assets")]
 const USAGE: &str = "\
 rebof3: the Breath of Fire III toolchain.
 
@@ -36,6 +39,24 @@ Every command prints its purpose, every switch with its default, and runnable
 examples: rebof3 <COMMAND> --help, then rebof3 <COMMAND> <VERB> --help.
 ";
 
+#[cfg(not(feature = "assets"))]
+const USAGE: &str = "\
+rebof3: disc and EMI tools for game setup.
+
+Usage: rebof3 <COMMAND> [ARGS...]
+
+Commands:
+  disc    extract, checksum, verify and rebuild a PlayStation disc image
+  emi     list, extract, pack and inspect EMI archives
+
+Options:
+  -h, --help     print this text
+  -V, --version  print the version
+
+Asset conversion requires the full build: cargo build --release -p rebof3 --features assets
+Run rebof3 <COMMAND> --help for command options.
+";
+
 fn main() -> ExitCode {
     let mut args = env::args_os();
     args.next();
@@ -47,6 +68,7 @@ fn main() -> ExitCode {
     match command.to_str() {
         Some("disc") => disc::main(rest),
         Some("emi") => emi::main(rest),
+        #[cfg(feature = "assets")]
         Some("assets") => assets::main(rest),
         Some("-h" | "--help" | "help") => {
             print!("{USAGE}");

@@ -1,10 +1,27 @@
 // SPDX-License-Identifier: MIT
-use crate::assets::find_disc_image;
 use psx_cd::{Entry, Image, checksum, metadata};
 use std::env;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+
+/// Where the disc image lives, relative to the repository root.
+pub(crate) const IMAGE_DIR: &str = "inputs/external";
+/// Folders searched for the disc image, in order, when no `-i` is given.
+pub(crate) const IMAGE_DIRS: [&str; 2] = [IMAGE_DIR, "disk"];
+
+/// The disc image in the first of `IMAGE_DIRS` below `base` that holds one; the error names every
+/// folder searched. Shared by `assets` and `disc` so both find the same image.
+pub(crate) fn find_disc_image(base: &Path) -> Result<PathBuf, String> {
+    let mut reasons = Vec::new();
+    for directory in IMAGE_DIRS {
+        match psx_cd::discover_image(&base.join(directory)) {
+            Ok(path) => return Ok(path),
+            Err(error) => reasons.push(format!("{directory}: {error}")),
+        }
+    }
+    Err(format!("no disc image found ({})", reasons.join("; ")))
+}
 
 #[derive(Default)]
 struct Options {
@@ -233,6 +250,7 @@ fn display_error(path: &Path) -> impl FnOnce(psx_cd::Error) -> String + '_ {
 }
 
 /// Extracts every file of `input` into `output` and writes the project XML beside them; returns the file count.
+#[cfg(feature = "assets")]
 pub(crate) fn extract_image(input: &Path, output: &Path) -> Result<usize, String> {
     let project = output.join(format!("{}.xml", file_stem(input)));
     let entries = open_walk_extract(input, output, &project)?;

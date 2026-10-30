@@ -1,7 +1,8 @@
-The MIT license in LICENSE covers the first-party code only. It does not cover third-party
-material. Each third-party item keeps its own terms:
+The MIT license in LICENSE covers the first-party tools and libraries only.
+It does not cover Breath of Fire III or third-party dependencies.
 
-| Path | Owner | Terms |
-| --- | --- | --- |
-| `third_party/references/psx-spx.txt` | Martin Korth (nocash) | No explicit grant; reference only |
-| Submodules under `rebof3/third_party/` | their authors | the license in each submodule; references with no license are citations only |
+No game data or third-party hardware reference text is included.
+Users supply their own disc. The hardware references are cited in the
+workspace sources at https://github.com/raulcorreia7/bof3-monorepo/blob/main/wiki/src/sources.md.
+
+Each dependency keeps its own license and terms.
