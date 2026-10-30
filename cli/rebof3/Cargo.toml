@@ -11,16 +11,20 @@ publish = false
 name = "rebof3"
 path = "src/main.rs"
 
+[features]
+default = ["assets"]
+assets = ["dep:rebof3-assets", "dep:bof3player", "dep:bof3-names", "dep:clap", "dep:sha2"]
+
 [dependencies]
-rebof3-assets.workspace = true
-bof3player = { workspace = true, features = ["std", "ogg", "cli"] }
-bof3-names.workspace = true
+rebof3-assets = { workspace = true, optional = true }
+bof3player = { workspace = true, features = ["std", "ogg", "cli"], optional = true }
+bof3-names = { workspace = true, optional = true }
 rebof3-emi = { workspace = true, features = ["std"] }
 psx-cd.workspace = true
 psx-formats = { workspace = true, features = ["std"] }
-clap.workspace = true
+clap = { workspace = true, optional = true }
 serde_json.workspace = true
-sha2.workspace = true
+sha2 = { workspace = true, optional = true }
 
 [dev-dependencies]
 rebof3-emi = { workspace = true, features = ["std", "fixtures"] }

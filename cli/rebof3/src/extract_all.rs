@@ -20,8 +20,9 @@ use rebof3_assets::decode;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-use crate::assets::{IMAGE_DIR, extract_command, find_disc_image};
+use crate::assets::extract_command;
 use crate::disc;
+use crate::disc::{IMAGE_DIR, find_disc_image};
 
 const INDEX_JSON: &str = "index.json";
 const INDEX_MD: &str = "index.md";

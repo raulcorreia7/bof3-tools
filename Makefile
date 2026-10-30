@@ -9,6 +9,7 @@ test:
 format:
 	cargo fmt --all $(if $(CHECK),--check)
 lint:
+	@command -v cargo-deny >/dev/null 2>&1 || { echo "cargo-deny missing: cargo install cargo-deny" >&2; exit 1; }
 	cargo clippy --workspace --all-targets --locked -- -D warnings
 	cargo deny check
 check:
