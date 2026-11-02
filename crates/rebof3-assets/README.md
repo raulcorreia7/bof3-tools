@@ -9,8 +9,8 @@ cargo test -p rebof3-assets
 ```
 
 Modules, output contract and tests:
-[rebof3-assets](https://github.com/raulcorreia7/bof3-monorepo/blob/main/wiki/src/tools/crates.md#rebof3-assets); the kind list, joins and coverage:
-[asset extraction](https://github.com/raulcorreia7/bof3-monorepo/blob/main/wiki/src/formats/assets.md).
+[rebof3-assets](../../docs/crates.md#rebof3-assets); the output layout and round trips:
+[asset output](../../docs/assets.md).
 
 ## Notice
 

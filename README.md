@@ -4,7 +4,7 @@ Rust tools for inspecting and extracting Breath of Fire III (US, PlayStation) di
 EMI archives and assets. Supply your own disc; this repository contains no game data.
 
 Run `make build` to build `target/release/rebof3`, and `make check` for the workspace checks.
-Run `rebof3 --help` for commands. The `bof3player` project provides the audio player.
+Run `rebof3 --help` for commands; the guides are [command line](docs/cli.md), [crates](docs/crates.md) and [asset output](docs/assets.md). The `bof3player` project provides the audio player.
 The workspace depends on the public bof3player repository and requires Rust and Cargo.
 
 The tools are MIT licensed. See [NOTICE](NOTICE).

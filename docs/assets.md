@@ -1,0 +1,153 @@
+# Asset output
+
+`rebof3 assets extract` writes every asset twice: the bytes the disc stores, in a file named by the
+format they are in, and the view a human opens. The commands are in [the command line](cli.md#assets);
+the formats are in the [wiki](https://raulcorreia7.github.io/bof3-wiki/formats/assets.html).
+
+## Output layout
+
+The original file is named by the real format: the game's VRAM upload is `img`, its CLUT bank `clut`,
+its map bundle `map`, the two halves of a sound bank `vh` and `vb` (the whole bank is `vab`), a
+sample's waveform data `vag`, a sequence package `seq`, an LZ77 blob `lz77`, and a type-8 cue table
+`emi8`. Other entries carry the EMI type tag `emi0`. `assets.jsonl` records the source and the SHA-256
+of every file.
+
+| Kind              | Original file                                                      | Viewable file                                                             |
+| ----------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `texture`         | `texture/<disc path>/<slot>.img`                                   | `<slot>.png` (16 bpp), `<slot>.clut-<x>-<y>.png` (an indexed row), `.tim` |
+| `palette`         | `palette/<disc path>/<slot>.clut`                                  | `<slot>.json`, `<slot>.png` (swatch strip)                                |
+| `audio-bank`      | `<slot>.vh`, `<slot>.vb`, `<slot>.vab`, `<sample>.vag`             | `<slot>.sf2`, `<sample>.wav`                                              |
+| `audio-sequence`  | `<slot>.seq`                                                       | `<music>.mid`                                                             |
+| `audio-cues`      | `<slot>.emi8`                                                      | `<slot>.json`                                                             |
+| `area-map`        | `<slot>.map`                                                       | `<slot>.obj`, `.mtl`, `.glb`, `.layout.json`                              |
+| `area-actor-defs` | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
+| `area-encounters` | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
+| `area-script`     | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
+| `character-bank`  | `<slot>.lz77` or `<slot>.emi0`                                     | the decoded blob `<slot>.bin` of an LZ77 bank                             |
+| `cdda`            | `cdda/track<NN>.pcm` (16-bit stereo, 44.1 kHz, no header)          | `track<NN>.wav`                                                           |
+| `data-table`      | `data-table/BIN/ETC/GAME/<name>.bin` (the table's span of entry 0) | `<name>.json`                                                             |
+| `xa-audio`        | the `.STR` file as stored                                          | `.wav`                                                                    |
+| `text`            | `text/<disc path>/<slot>.bin`                                      | `<slot>.json`, `<slot>.txt`, `text/index.jsonl`                           |
+
+`assets kinds` lists every kind with its handling: `decoded` (stored bytes and a derived file), `raw`
+(stored bytes only) or `none`.
+
+The `.vab` file is the sound bank as one file: the header followed by the body. The `.vag` file holds a
+sample's waveform data as the VAB body stores it; the 48-byte header of a standalone VAG file is not
+written, because the rate and the loop window of a sample live in the bank's tone table. The `.tim`
+file is the standard PS1 TIM holding the texture's words and the palette row's color words; the game
+stores no TIM of its own.
+
+## Modes
+
+`--mode raw` writes the bytes the disc stores. `--mode modern` writes the conversion to an open format.
+No flag writes both. A kind with no conversion has nothing to add in `modern`, so its stored bytes are
+its modern output too.
+
+| Kind                                                                                                                                               | `--mode raw`                 | `--mode modern`                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------- |
+| `texture`                                                                                                                                          | `.img`                       | `.png`, `.tim`                                     |
+| `palette`                                                                                                                                          | `.clut`                      | `.json`, `.png`                                    |
+| `audio-bank`                                                                                                                                       | `.vh`, `.vb`, `.vab`, `.vag` | `.sf2`, `.wav`                                     |
+| `audio-sequence`                                                                                                                                   | `.seq`                       | `.mid`                                             |
+| `audio-cues`, `area-actor-defs`, `area-encounters`, `area-script`                                                                                  | `.emi8`, `.emi0`             | `.json`                                            |
+| `character-bank`                                                                                                                                   | `.lz77` or `.emi0`           | `.bin` for an LZ77 bank; an unpacked bank has none |
+| `area-map`                                                                                                                                         | `.map`                       | `.obj`, `.mtl`, `.glb`, `.layout.json`             |
+| `cdda`                                                                                                                                             | `.pcm`                       | `.wav`                                             |
+| `data-table`                                                                                                                                       | `.bin`                       | `.json`                                            |
+| `xa-audio`                                                                                                                                         | the `.STR` file              | `.wav`                                             |
+| `executable`, `system`, `video`, `area-message`, `area-cells`, `battle-script`, `area-module`, `resource-table`, `bmagic-table`, `code`, `unknown` | the stored bytes             | the stored bytes                                   |
+| `text`                                                                                                                                             | `<slot>.bin`                 | `.json`, `.txt`, `index.jsonl`                     |
+
+## Catalog
+
+`assets.jsonl` has one object per output file with the keys `source`, `slot`, `offset`, `size`,
+`type`, `load_arg`, `format`, `kind`, `state`, `role`, `output`, `bytes`, `sha256`, `evidence` and
+`note`. `role` is `raw` for the stored bytes (`vab` and `vag` are also the disc's own bytes); a derived
+file names its format (`png`, `tim`, `json`, `obj`, `mtl`, `glb`, `sf2`, `wav` or `midi`). `kind` is the
+asset kind and `format` is the entry's format. `evidence` names the loader evidence behind a derived
+file. A derived file of one entry carries the same `source` and `slot` as that entry.
+
+## Text
+
+For every payload that holds text, the `text` kind writes three files below
+`text/<disc path without .EMI>/`:
+
+| File          | Contents                                                         |
+| ------------- | ---------------------------------------------------------------- |
+| `<slot>.bin`  | the entry's stored bytes (the message bank or name table)        |
+| `<slot>.json` | one row per string, with its source chain                        |
+| `<slot>.txt`  | one line per string: `offset<TAB>id<TAB>text`, the offset in hex |
+
+`text/index.jsonl` indexes the run with `source`, `kind`, `id`, `ram` and `text`. Its `source` is
+`<disc path>#<slot>+<offset>`, so a line found with `grep` names the bytes that produced it. The scan
+keeps a payload only when it holds text; `--list` prints each payload it drops. The string
+encoding and the tables are in the [text page](https://raulcorreia7.github.io/bof3-wiki/game/text.html).
+
+## Import
+
+Export and import are paired. Import takes the stored payload as `--payload` (or `--base`) and keeps
+every byte the open form does not name.
+
+- **Texture.** `export texture PAYLOAD --load-arg HEX` writes the view; `--depth 4|8 --palette BANK
+  --palette-offset WORDS` writes an indexed row. `import texture PNG [-o OUT] [--palette OUT]` reads a PNG
+  back to the stored payload; an indexed PNG also gives its color words, which `--palette` writes as
+  raw little-endian words.
+- **Palette.** `import palette` reads the `word` of each color. The `rgba` and `stp` fields are views and
+  are not read.
+- **Sound bank.** `soundfont HEADER BODY` writes a SoundFont 2 file. `import soundfont` reads it back to
+  the VAB header and body: each preset of bank 0 becomes a program, each zone a tone, and each sample
+  a VAG from the ADPCM encoder. Keys, root note, tuning, level, pan, loop and the volume envelope are
+  kept; the envelope becomes the ADSR registers whose timing matches (the nearest pair when none
+  matches). A loop ends at the last frame of its sample, and frames past it are cut. Priority,
+  reverb, vibrato, portamento, pitch bend, the program's volume and pan, and the bank id take their
+  defaults. The samples are ADPCM again, so no bank comes back byte for byte; an import of an export of
+  an imported bank gives that bank again.
+- **Sample.** `export vag HEADER BODY --index N` writes a mono 16-bit WAVE file at 44.1 kHz.
+  `import vag` encodes such a file back to a VAG. The encoder picks its own filter and shift for each
+  28-sample block, so a stored VAG does not return byte for byte; a second round trip is exact. The
+  import sets no loop flags, because a WAVE file carries none.
+- **Sequence.** `export sequence PACKAGE --index N` writes MIDI; `import sequence FILE.mid:ID...` writes a
+  package.
+- **Game tables.** `tables PAYLOAD -o DIR` writes one JSON file per table of `ETC/GAME.EMI` entry 0.
+  `import table NAME JSON --payload ENTRY` writes one table's span of bytes. A name keeps its stored
+  bytes while its text is unchanged, because the text drops color codes; a changed name is written in
+  the table encoding, and a backslash is written as `\x5C`. A growth stat must be a nibble (0 to 15).
+  Splice the output into entry 0 at the table's offset and use `import emi --entry 0=FILE`.
+- **Maps.** `terrain` and `export terrain` write glTF or OBJ; `import terrain MESH --payload BUNDLE` and
+  `import layout JSON --payload BUNDLE` rebuild the bundle. `import encounters JSON --base BLOCK`
+  rebuilds an encounter block.
+- **Text and characters.** `export message`, `export strings`, `export characters` and
+  `export character-bank` pair with the `import` verbs of the same name. `character-bank` imports palette
+  tables only.
+- **Archives and discs.** `import emi CONTAINER --entry INDEX=FILE` keeps every entry's type and load
+  address; a changed payload moves the entries after it. `import disc CUE --file PATH=FILE -o DIR` writes
+  a patched copy of the disc; a replacement file cannot grow past its last sector.
+
+Cue tables, area scripts, area cells, actor definitions, XA and STR streams and CDDA tracks have no
+import verb. An import verb that does not exist for a kind fails with a usage error.
+
+## Round-trip coverage
+
+`assets coverage` reads every EMI entry on the disc and prints one line per kind: the entries and
+bytes of the kind, and the part that exports and imports to its own bytes. It measures four kinds:
+`area-message`, `area-encounters`, `data-table` (the game tables and the characters) and `text` (the
+strings and the message banks together). A fifth line counts the palette tables of the sprite
+banks against their decoded bytes. Every other kind prints `no round trip yet` and zero; the note
+means the command does not measure the kind, not that the tool cannot write it back.
+
+The other kinds round trip through their own commands. Results over the retail disc:
+
+| Kind or path                                     | Result                                        | Verdict  |
+| ------------------------------------------------ | --------------------------------------------- | -------- |
+| EMI archive, `emi extract -J` then `emi pack -J` | 880 of 880 archives                           | lossless |
+| EMI archive, `emi pack` without `-J`             | entry types and load addresses are lost       | lossy    |
+| texture, 16 bpp view                             | every view reads back to the stored words     | lossless |
+| texture, indexed PNG                             | all 890 joined rows                           | lossless |
+| palette                                          | every palette reads back to its words         | lossless |
+| sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |
+| sound bank with `--mode raw`                     | 1,020 of 1,020 banks                          | lossless |
+| VAG sample through WAVE                          | no sample comes back byte for byte            | lossy    |
+
+`assets import vag` drops the end-marker block and the loop flags. The retail cases need the disc and
+skip without it.
