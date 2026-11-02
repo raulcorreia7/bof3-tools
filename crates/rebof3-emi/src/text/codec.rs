@@ -2,7 +2,7 @@
 //!
 //! `decode` never drops a byte. A code without a known meaning is `{RAW:xx}`, and `encode` writes that tag back as
 //! its byte, so `encode(decode(bytes)) == bytes` for every byte string. The meanings and the evidence for them are in
-//! `wiki: game/text`.
+//! `wiki: data/text`.
 
 use std::fmt::Write as _;
 

@@ -2,7 +2,7 @@
 //! shops, abilities and level growth.
 //!
 //! The entry's payload starts at archive offset [`PAYLOAD_START`]. Each table is a run of fixed-size
-//! records at a fixed archive offset (`wiki: game/records#gameemi-fixed-tables`, "Equipment and shop
+//! records at a fixed archive offset (`wiki: data/records#gameemi-fixed-tables`, "Equipment and shop
 //! data"). The runtime
 //! item base `0x801C8964` is the entry's load address `0x80195800` plus the items' payload offset.
 //!

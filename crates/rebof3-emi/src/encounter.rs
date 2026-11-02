@@ -2,7 +2,7 @@
 //!
 //! The block is 1,160 bytes. Eight encounters of 9 bytes come first: the enemy indexes of the encounter
 //! (`0xFF` is an empty slot) and its appearance rate. Eight enemies of 136 bytes (`0x88`) follow at
-//! payload offset `0x48`. The layout is in `wiki: game/records#area-data` ("Enemies (136 bytes)")
+//! payload offset `0x48`. The layout is in `wiki: data/records#area-data` ("Enemies (136 bytes)")
 //! and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`; the picker is
 //! `emi/etc/game/00@0x801C6A7C`.
 
@@ -55,7 +55,7 @@ pub struct ActionBlock {
 pub struct Enemy {
     #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
     pub name: [u8; NAME_BYTES],
-    /// The unique enemy id; some enemies have more than one (`wiki: game/records#area-data`,
+    /// The unique enemy id; some enemies have more than one (`wiki: data/records#area-data`,
     /// "Enemy IDs").
     pub enemy_id: u16,
     pub choice_ai: u8,

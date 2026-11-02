@@ -82,7 +82,7 @@ For every payload that holds text, the `text` kind writes three files below
 `text/index.jsonl` indexes the run with `source`, `kind`, `id`, `ram` and `text`. Its `source` is
 `<disc path>#<slot>+<offset>`, so a line found with `grep` names the bytes that produced it. The scan
 keeps a payload only when it holds text; `--list` prints each payload it drops. The string
-encoding and the tables are in the [text page](https://raulcorreia7.github.io/bof3-wiki/game/text.html).
+encoding and the tables are in the [text page](https://raulcorreia7.github.io/bof3-wiki/data/text.html).
 
 ## Import
 

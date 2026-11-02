@@ -5,7 +5,7 @@
 //! payload property, an all-zero body, which is the reserved-slot shape the
 //! asset census counts on its own. Names and addresses come from
 //! `wiki: formats/area`, `wiki: formats/audio`,
-//! `wiki: formats/graphics` and `wiki: game/text`.
+//! `wiki: formats/graphics` and `wiki: data/text`.
 
 use crate::emi::{Entry, TYPE_CUE, TYPE_LZ77};
 use psx_formats::vram;
@@ -222,7 +222,7 @@ impl Format {
             Self::AreaEncounterTable => "wiki: formats/area (`0x800E4000`); include/game/enemy.h models it",
             Self::AreaMapBundle => "wiki: formats/area (`0x80104000`)",
             Self::AreaAuxWindow => "wiki: formats/area (`0x80117000`); role open",
-            Self::SharedResourceTable => "wiki: game/text#references",
+            Self::SharedResourceTable => "wiki: data/text#references",
             Self::CueTable => "wiki: formats/audio#emi-type-8-cue-records",
             Self::MagicTable => "no owning doc; 42-3,148 B payloads in BMAGIC*",
             Self::CodeImage => "config/emi/**/target.toml load addresses; disc-census code rows",
@@ -255,7 +255,7 @@ pub fn extension(format: Format) -> &'static str {
 
 /// Area message bank (`wiki: formats/area`, `0x80010000`).
 const AREA_MESSAGE_BANK: u32 = 0x8001_0000;
-/// Shared resource table (`wiki: game/text#references`).
+/// Shared resource table (`wiki: data/text#references`).
 const SHARED_RESOURCE_TABLE: u32 = 0x8001_a000;
 /// Packed 4-bit cell grid (`wiki: formats/area`, `0x80032000`).
 const AREA_CELL_GRID: u32 = 0x8003_2000;
