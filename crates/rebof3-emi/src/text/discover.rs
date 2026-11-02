@@ -4,7 +4,7 @@
 //! A message bank holds its own offset table, and its records are its strings ([`bank_records`]). Any other payload
 //! holds two kinds of string. A fixed-width name table holds names at a stride, found by the lattice search. Other
 //! text is a record that ends at its terminator, or at the pointer table that reaches it ([`strings`]). The rules
-//! and the evidence for them are in `wiki: game/text`.
+//! and the evidence for them are in `wiki: data/text`.
 
 use std::collections::{BTreeMap, BTreeSet};
 

@@ -10,7 +10,7 @@
 //! plus one payload property, an all-zero body, which is the reserved-slot
 //! shape the asset census counts on its own. Names and addresses come from
 //! `wiki: formats/area`, `wiki: formats/audio`,
-//! `wiki: formats/graphics`, `wiki: game/text` and the `wiki: formats/assets` catalog.
+//! `wiki: formats/graphics`, `wiki: data/text` and the `wiki: formats/assets` catalog.
 
 use std::collections::BTreeMap;
 use std::fs;

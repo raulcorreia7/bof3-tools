@@ -3,8 +3,8 @@
 //! block.
 //!
 //! Each row carries its table and record index, so a string in the output can be read back as the
-//! game data that owns it. The layouts are in `wiki: game/records#gameemi-fixed-tables`,
-//! `wiki: game/records#character-and-master-data` and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`.
+//! game data that owns it. The layouts are in `wiki: data/records#gameemi-fixed-tables`,
+//! `wiki: data/records#character-and-master-data` and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`.
 
 use rebof3_emi::characters;
 use rebof3_emi::classify::Format;

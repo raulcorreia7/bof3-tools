@@ -33,12 +33,12 @@ pub const TABLE_FILE: &str = "assets.jsonl";
 /// The layout the terrain is read from, cited in the catalog's evidence column.
 const MAP_EVIDENCE: &str = "wiki: formats/area#0x80104000-map-bundle (tile and cell layout)";
 const VAB_EVIDENCE: &str = "wiki: formats/audio#bank-layout (header and body share a load argument)";
-/// The archive whose entry 0 holds the fixed game tables (`wiki: game/records#gameemi-fixed-tables`,
+/// The archive whose entry 0 holds the fixed game tables (`wiki: data/records#gameemi-fixed-tables`,
 /// "Equipment and shop data").
 const GAME_TABLES_SOURCE: &str = "BIN/ETC/GAME.EMI";
-const TABLE_EVIDENCE: &str = "wiki: game/records#gameemi-fixed-tables (fixed table locations and record layouts); \
+const TABLE_EVIDENCE: &str = "wiki: data/records#gameemi-fixed-tables (fixed table locations and record layouts); \
      C records: include/game/item.h, include/game/ability.h, include/game/character.h";
-const ENCOUNTER_EVIDENCE: &str = "wiki: game/records#area-data (enemy records); wiki: formats/area#0x800e4000-encounters-and-enemy-records (encounter block); \
+const ENCOUNTER_EVIDENCE: &str = "wiki: data/records#area-data (enemy records); wiki: formats/area#0x800e4000-encounters-and-enemy-records (encounter block); \
      C records: include/game/enemy.h";
 /// Name of the summary written next to the asset tree.
 pub const SUMMARY_FILE: &str = "summary.txt";

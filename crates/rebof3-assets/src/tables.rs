@@ -8,7 +8,7 @@
 //! # Cross-reference
 //!
 //! Every record here has one C counterpart, and both name the same fields
-//! (`wiki: game/records#gameemi-fixed-tables`):
+//! (`wiki: data/records#gameemi-fixed-tables`):
 //!
 //! | Table | C record (`rebof3/include`) |
 //! | --- | --- |
