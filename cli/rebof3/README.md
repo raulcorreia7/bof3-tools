@@ -9,7 +9,7 @@ cargo test -p rebof3
 target/release/rebof3 --help
 ```
 
-Commands, flags and `extract-all` steps: [the rebof3 command line](https://github.com/raulcorreia7/bof3-monorepo/blob/main/wiki/src/tools/cli.md).
+Commands, flags and `extract-all` steps: [the rebof3 command line](../../docs/cli.md).
 
 ## Notice
 

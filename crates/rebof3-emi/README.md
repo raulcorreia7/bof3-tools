@@ -9,7 +9,7 @@ cargo test -p rebof3-emi
 ```
 
 Container, manifest contract, module map and tests:
-[rebof3-emi](https://github.com/raulcorreia7/bof3-monorepo/blob/main/wiki/src/tools/crates.md#rebof3-emi).
+[rebof3-emi](../../docs/crates.md#rebof3-emi).
 
 ## Notice
 
