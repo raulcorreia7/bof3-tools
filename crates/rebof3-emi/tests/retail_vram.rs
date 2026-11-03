@@ -5,7 +5,7 @@
 //! anywhere; otherwise it walks up from the crate directory looking for the
 //! checkout's `raw/disc/BIN`.
 //!
-//! `bin/bof3 emi vram -o <page.png> <archive.EMI>` dumps one archive's page set as
+//! `bof3 emi vram -o <page.png> <archive.EMI>` dumps one archive's page set as
 //! a raw 16-bit PNG for a visual check.
 
 use std::fs;

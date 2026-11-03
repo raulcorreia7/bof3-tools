@@ -4,7 +4,7 @@
 //! Output layout: `<out>/<kind>/<disc path without .EMI>/<slot>.<ext>` for an EMI
 //! entry and `<out>/<kind>/<disc path>` for a whole disc file. Each EMI entry's
 //! stored bytes are written unchanged (`.img`, `.vh`, `.vb`, `.seq`, `.lz77`
-//! or `.bin`, the names `bin/bof3 emi extract -e` uses) next to any derived file.
+//! or `.bin`, the names `bof3 emi extract -e` uses) next to any derived file.
 
 use std::borrow::Cow;
 use std::fs;
