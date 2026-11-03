@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 (unreleased)
+## 1.0.0
 
 One `bof3` binary with `disc`, `emi` and `assets` subcommands. The audio player is `bof3player`.
 
@@ -18,4 +18,3 @@ One `bof3` binary with `disc`, `emi` and `assets` subcommands. The audio player 
 | `disc ...` (binary)                               | `bof3 disc ...`   |
 | `emi ...` (binary)                                | `bof3 emi ...`    |
 | `assets ...` (binary)                             | `bof3 assets ...` |
-| `bin/player`, `bin/disc`, `bin/emi`, `bin/assets` | `bin/bof3`        |
