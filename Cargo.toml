@@ -17,6 +17,11 @@ members = [
 edition = "2024"
 rust-version = "1.99"
 license = "MIT"
+repository = "https://github.com/raulcorreia7/bof3-tools"
+homepage = "https://github.com/raulcorreia7/bof3-tools"
+keywords = ["breath-of-fire", "playstation", "psx", "disc", "modding"]
+categories = ["command-line-utilities", "game-development", "parser-implementations"]
+publish = false
 
 [workspace.dependencies]
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
