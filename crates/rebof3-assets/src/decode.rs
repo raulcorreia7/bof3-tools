@@ -134,7 +134,7 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_emi::Resu
             data: rebof3_emi::scene::SceneTable::decode(payload)?.json().into_bytes(),
         }],
         Format::AreaScriptBank => vec![Derived {
-            // The reader is `Actor_BeginScript` in `decomp/src/slus/func_8014D6DC.c:43-45`;
+            // The reader is `Actor_BeginScript` in `decomp/src/engine/slus/Actor_BeginScript.c`;
             // the layout is `wiki: formats/area#0x800d3800-area-script-bank`.
             role: "json",
             extension: "json",

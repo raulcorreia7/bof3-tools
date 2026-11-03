@@ -3,7 +3,7 @@
 //! One archive's area script bank: a self-sizing directory, then its
 //! sections, each a `u16` record-offset table and the record bytes. The
 //! reader is `Actor_BeginScript`
-//! (`decomp/src/slus/func_8014D6DC.c:43-45`):
+//! (`decomp/src/engine/slus/Actor_BeginScript.c`):
 //!
 //! ```c
 //! table = (u8*)g_ScriptBank;
@@ -19,7 +19,7 @@
 //! Each section's first word is `2*M`, the size of its M offset words, and it
 //! doubles as the first offset word. No record size is stored: the engine
 //! copies from the record cursor with a length the bytecode supplies
-//! (`Actor_CopyScriptEntry`, `decomp/src/slus/func_8014D54C.c:22-26`), so the
+//! (`Actor_CopyScriptEntry`, `decomp/src/engine/slus/Actor_CopyScriptEntry.c`), so the
 //! table offsets are the only record boundaries. In all 200 retail payloads
 //! the distinct offsets of each section's table are strictly increasing and
 //! the spans between them tile from the table end to the section end
