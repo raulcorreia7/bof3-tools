@@ -7,11 +7,11 @@ repository's [MIT license](LICENSE).
 
 You need Git and Rust. `rust-toolchain.toml` pins the toolchain, and `rustup` installs it on the first
 build. Audio extraction needs the ALSA headers on Linux. The README shows how to build and run
-`rebof3`.
+`bof3`.
 
 ```sh
-git clone https://github.com/raulcorreia7/rebof3-tools.git
-cd rebof3-tools
+git clone https://github.com/raulcorreia7/bof3-tools.git
+cd bof3-tools
 make check
 ```
 

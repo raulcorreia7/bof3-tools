@@ -2,7 +2,7 @@
 
 The EMI container and the game formats stored in it: packing, `emi.json` manifests, LZ77, area
 bundles, type-8 cue tables, classification and coverage. The PlayStation formats inside the entries
-(VAB, SEP, VRAM, CLUT) are in `psx-formats`; the `rebof3` command line exposes the container verbs.
+(VAB, SEP, VRAM, CLUT) are in `psx-formats`; the `bof3` command line exposes the container verbs.
 
 ```sh
 cargo test -p rebof3-emi

@@ -20,7 +20,7 @@ pub fn main(args: Vec<OsString>) -> ExitCode {
     match run(args) {
         Ok(code) => ExitCode::from(code as u8),
         Err(message) => {
-            eprintln!("rebof3 emi: {message}");
+            eprintln!("bof3 emi: {message}");
             ExitCode::from(EXIT_ERROR as u8)
         }
     }
@@ -60,12 +60,12 @@ fn run(args: Vec<OsString>) -> Result<i32, String> {
             run_extract(&args_prefixed(&args, path))
         }
         unknown => Err(format!(
-            "unknown command {unknown:?}; run `rebof3 emi --help` for the commands, or name an .EMI \
+            "unknown command {unknown:?}; run `bof3 emi --help` for the commands, or name an .EMI \
              archive to extract it"
         )),
     };
     result.map_err(|message| {
-        if message.contains("--help") { message } else { format!("{message}; run `rebof3 emi {command} --help`") }
+        if message.contains("--help") { message } else { format!("{message}; run `bof3 emi {command} --help`") }
     })
 }
 
@@ -114,7 +114,7 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
                 options.manifest = Some(path.map(PathBuf::from));
             }
             Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `rebof3 emi --help`"));
+                return Err(format!("unknown option {value}; run `bof3 emi --help`"));
             }
             _ => options.positionals.push(args[index].clone()),
         }
@@ -125,13 +125,13 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
         (Some(_), 1) => Some(parse_num(&options.positionals[0], "extract index")?),
         (Some(_), _) => {
             return Err("extract takes one archive and one index: pass the index as INDEX or -n INDEX, \
-                        and drop the extra argument; run `rebof3 emi extract --help`."
+                        and drop the extra argument; run `bof3 emi extract --help`."
                 .into());
         }
         (None, 1 | 2) => options.positionals.get(1).map(|value| parse_num(value, "extract index")).transpose()?,
         (None, _) => {
             return Err("extract needs an archive: pass it with -i ARCHIVE or as the only positional; \
-                        run `rebof3 emi extract --help`."
+                        run `bof3 emi extract --help`."
                 .into());
         }
     };
@@ -148,7 +148,7 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
     }
     let archive = Archive::open(&source).map_err(|error| {
         format!(
-            "cannot read {}: {error}; check the path, or run `rebof3 emi list {}` first",
+            "cannot read {}: {error}; check the path, or run `bof3 emi list {}` first",
             source.display(),
             source.display()
         )
@@ -413,10 +413,10 @@ fn parse_num<T: FromStr>(value: &OsStr, label: &str) -> Result<T, String> {
 }
 
 const USAGE: &str = "\
-rebof3 emi: list, extract, pack and inspect EMI archives.
+bof3 emi: list, extract, pack and inspect EMI archives.
 
-Usage: rebof3 emi <COMMAND> [OPTIONS]
-       rebof3 emi ARCHIVE.EMI [OPTIONS]     extract it
+Usage: bof3 emi <COMMAND> [OPTIONS]
+       bof3 emi ARCHIVE.EMI [OPTIONS]     extract it
 
 Commands:
   extract   write every entry of an archive, or one entry, as files
@@ -428,19 +428,19 @@ Commands:
   sep       parse one sequence package entry
   coverage  check which formats rebuild their own bytes
 
-Every command has focused help: rebof3 emi <COMMAND> --help.
+Every command has focused help: bof3 emi <COMMAND> --help.
 Common switches: -i/--input PATH, -o/--output PATH, -q/--quiet.
 
 Examples:
-  rebof3 emi list \"BIN/BGM/BGM000.EMI\"
-  rebof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -o build/bgm000
-  rebof3 emi pack -o build/test.EMI build/src
+  bof3 emi list \"BIN/BGM/BGM000.EMI\"
+  bof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -o build/bgm000
+  bof3 emi pack -o build/test.EMI build/src
 ";
 
 const EXTRACT_HELP: &str = "\
-rebof3 emi extract: write every entry of an archive, or one entry, as files.
+bof3 emi extract: write every entry of an archive, or one entry, as files.
 
-Usage: rebof3 emi extract [-i ARCHIVE] [-o DIR|FILE] [-n INDEX] [-e] [-J [FILE]] [-d] [-q]
+Usage: bof3 emi extract [-i ARCHIVE] [-o DIR|FILE] [-n INDEX] [-e] [-J [FILE]] [-d] [-q]
 
   -i, --input ARCHIVE       archive to read (or pass it as the only positional)
   -o, --output PATH         DIR for every entry, FILE for one INDEX
@@ -454,15 +454,15 @@ Usage: rebof3 emi extract [-i ARCHIVE] [-o DIR|FILE] [-n INDEX] [-e] [-J [FILE]]
   -q, --quiet               no completion line (default: off)
 
 Examples:
-  rebof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -o build/bgm000
-  rebof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -n 3 -e -o build/one
-  rebof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -o build/bgm000 -J
+  bof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -o build/bgm000
+  bof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -n 3 -e -o build/one
+  bof3 emi extract -i \"BIN/BGM/BGM000.EMI\" -o build/bgm000 -J
 ";
 
 const PACK_HELP: &str = "\
-rebof3 emi pack: build an EMI archive from a folder, or from named files.
+bof3 emi pack: build an EMI archive from a folder, or from named files.
 
-Usage: rebof3 emi pack -o ARCHIVE.EMI [-i FILE...] | FOLDER [OPTIONS]
+Usage: bof3 emi pack -o ARCHIVE.EMI [-i FILE...] | FOLDER [OPTIONS]
 
   -i, --input FILE...       files to pack, in order (default: use FOLDER)
   -o, --output ARCHIVE.EMI  archive to write (required)
@@ -479,42 +479,42 @@ Usage: rebof3 emi pack -o ARCHIVE.EMI [-i FILE...] | FOLDER [OPTIONS]
   -q, --quiet               no completion line (default: off)
 
 Examples:
-  rebof3 emi pack -o build/test.EMI -i header.vh body.vb
-  rebof3 emi pack -o build/test.EMI -X '*.md' build/src
+  bof3 emi pack -o build/test.EMI -i header.vh body.vb
+  bof3 emi pack -o build/test.EMI -X '*.md' build/src
 ";
 
 const LIST_HELP: &str = "\
-rebof3 emi list: show an archive's entry table.
+bof3 emi list: show an archive's entry table.
 
-Usage: rebof3 emi list [-i ARCHIVE] [--json]
+Usage: bof3 emi list [-i ARCHIVE] [--json]
 
   -i, --input ARCHIVE  archive to read (or pass it as the only positional)
       --json           print one JSON object per entry, as a JSON array
                        (default: a text table)
 
 Examples:
-  rebof3 emi list \"BIN/BGM/BGM000.EMI\"
-  rebof3 emi list -i \"BIN/BGM/BGM000.EMI\" --json
+  bof3 emi list \"BIN/BGM/BGM000.EMI\"
+  bof3 emi list -i \"BIN/BGM/BGM000.EMI\" --json
 ";
 
 const VRAM_HELP: &str = "\
-rebof3 emi vram: decode an archive's type-3 VRAM uploads into one page set.
+bof3 emi vram: decode an archive's type-3 VRAM uploads into one page set.
 
-Usage: rebof3 emi vram [-i ARCHIVE] [-o PAGE.png]
+Usage: bof3 emi vram [-i ARCHIVE] [-o PAGE.png]
 
   -i, --input ARCHIVE  archive to read (or pass it as the only positional)
   -o, --output PAGE.png
                        also write the page set as a PNG (default: print only)
 
 Examples:
-  rebof3 emi vram \"BIN/BGM/BGM000.EMI\"
-  rebof3 emi vram -i \"BIN/BGM/BGM000.EMI\" -o build/page.png
+  bof3 emi vram \"BIN/BGM/BGM000.EMI\"
+  bof3 emi vram -i \"BIN/BGM/BGM000.EMI\" -o build/page.png
 ";
 
 const CLUT_HELP: &str = "\
-rebof3 emi clut: decode one CLUT palette entry.
+bof3 emi clut: decode one CLUT palette entry.
 
-Usage: rebof3 emi clut [-i ARCHIVE] INDEX [-j FILE.json] [-p FILE.png]
+Usage: bof3 emi clut [-i ARCHIVE] INDEX [-j FILE.json] [-p FILE.png]
 
   -i, --input ARCHIVE  archive to read (or pass it as the first positional)
   INDEX                entry index to decode (required)
@@ -522,38 +522,38 @@ Usage: rebof3 emi clut [-i ARCHIVE] INDEX [-j FILE.json] [-p FILE.png]
   -p, --png FILE       write the palette as a swatch strip (default: print only)
 
 Examples:
-  rebof3 emi clut \"BIN/BGM/BGM000.EMI\" 3
-  rebof3 emi clut -i \"BIN/BGM/BGM000.EMI\" 3 -j build/palette.json -p build/palette.png
+  bof3 emi clut \"BIN/BGM/BGM000.EMI\" 3
+  bof3 emi clut -i \"BIN/BGM/BGM000.EMI\" 3 -j build/palette.json -p build/palette.png
 ";
 
 const AUDIO_HELP: &str = "\
-rebof3 emi {vab|sep}: parse one sound bank or sequence package entry.
+bof3 emi {vab|sep}: parse one sound bank or sequence package entry.
 
-Usage: rebof3 emi vab [-i ARCHIVE] INDEX [--dump]
-       rebof3 emi sep [-i ARCHIVE] INDEX [--dump]
+Usage: bof3 emi vab [-i ARCHIVE] INDEX [--dump]
+       bof3 emi sep [-i ARCHIVE] INDEX [--dump]
 
   -i, --input ARCHIVE  archive to read (or pass it as the first positional)
   INDEX                entry index to parse (required)
       --dump           print every field of the entry (default: a summary)
 
 Examples:
-  rebof3 emi vab \"BIN/BGM/BGM000.EMI\" 1
-  rebof3 emi sep -i \"BIN/SEQ/SEQM00.EMI\" 0 --dump
+  bof3 emi vab \"BIN/BGM/BGM000.EMI\" 1
+  bof3 emi sep -i \"BIN/SEQ/SEQM00.EMI\" 0 --dump
 ";
 
 const COVERAGE_HELP: &str = "\
-rebof3 emi coverage: check which formats rebuild their own bytes.
+bof3 emi coverage: check which formats rebuild their own bytes.
 
-Usage: rebof3 emi coverage [-i DIR] [-o FILE] [--json]
+Usage: bof3 emi coverage [-i DIR] [-o FILE] [--json]
 
   -i, --input DIR    folder of .EMI archives to check (default: raw/disc/BIN)
   -o, --output FILE  write the JSONL table to FILE (default: print only)
       --json         print the JSONL table instead of the text table
 
 Examples:
-  rebof3 emi coverage
-  rebof3 emi coverage -i raw/disc/BIN -o build/coverage.jsonl
-  rebof3 emi coverage --json
+  bof3 emi coverage
+  bof3 emi coverage -i raw/disc/BIN -o build/coverage.jsonl
+  bof3 emi coverage --json
 ";
 
 /// The focused help for the command in `args`.
@@ -586,28 +586,28 @@ fn run_list(args: &[OsString]) -> Result<i32, String> {
                 let path = require_arg(args, index, value)?;
                 if source.replace(PathBuf::from(path)).is_some() {
                     return Err(
-                        "list takes one archive: drop the extra -i or positional; run `rebof3 emi list --help`.".into(),
+                        "list takes one archive: drop the extra -i or positional; run `bof3 emi list --help`.".into()
                     );
                 }
             }
             "--json" => json = true,
             value if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `rebof3 emi list --help`"));
+                return Err(format!("unknown option {value}; run `bof3 emi list --help`"));
             }
             _ => {
                 if source.replace(PathBuf::from(&args[index])).is_some() {
-                    return Err("list takes one archive: drop the extra argument; run `rebof3 emi list --help`.".into());
+                    return Err("list takes one archive: drop the extra argument; run `bof3 emi list --help`.".into());
                 }
             }
         }
         index += 1;
     }
     let source = source.ok_or_else(|| {
-        "list needs an archive: pass it with -i ARCHIVE or as the only positional; run `rebof3 emi list --help`."
+        "list needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi list --help`."
             .to_string()
     })?;
     let archive = Archive::open(&source).map_err(|error| {
-        format!("cannot read {}: {error}; check the path, or run `rebof3 emi list --help`", source.display())
+        format!("cannot read {}: {error}; check the path, or run `bof3 emi list --help`", source.display())
     })?;
     if json {
         let entries: Vec<serde_json::Value> = archive
@@ -649,7 +649,8 @@ struct VramOptions {
     source: Option<PathBuf>,
 }
 
-const VRAM_USAGE: &str = "rebof3 emi vram needs an archive: pass it with -i ARCHIVE or as the only positional; run `rebof3 emi vram --help`.";
+const VRAM_USAGE: &str =
+    "bof3 emi vram needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi vram --help`.";
 
 /// Decodes an archive's type-3 uploads into one page set, optionally as PNG.
 fn run_vram(args: &[OsString]) -> Result<i32, String> {
@@ -657,7 +658,7 @@ fn run_vram(args: &[OsString]) -> Result<i32, String> {
     let source = options.source.ok_or(VRAM_USAGE)?;
     let archive = Archive::open(&source).map_err(|error| {
         format!(
-            "cannot read {}: {error}; check the path, or run `rebof3 emi list {}`",
+            "cannot read {}: {error}; check the path, or run `bof3 emi list {}`",
             source.display(),
             source.display()
         )
@@ -687,7 +688,7 @@ fn vram_options(args: &[OsString]) -> Result<VramOptions, String> {
                 let path = PathBuf::from(require_arg(args, index, value.unwrap())?);
                 if options.source.replace(path).is_some() {
                     return Err(
-                        "vram takes one archive: drop the extra -i or positional; run `rebof3 emi vram --help`.".into(),
+                        "vram takes one archive: drop the extra -i or positional; run `bof3 emi vram --help`.".into()
                     );
                 }
             }
@@ -696,11 +697,11 @@ fn vram_options(args: &[OsString]) -> Result<VramOptions, String> {
                 options.output = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
             }
             Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `rebof3 emi vram --help`"));
+                return Err(format!("unknown option {value}; run `bof3 emi vram --help`"));
             }
             _ => {
                 if options.source.replace(PathBuf::from(&args[index])).is_some() {
-                    return Err("vram takes one archive: drop the extra argument; run `rebof3 emi vram --help`.".into());
+                    return Err("vram takes one archive: drop the extra argument; run `bof3 emi vram --help`.".into());
                 }
             }
         }
@@ -766,7 +767,7 @@ fn run_clut(args: &[OsString]) -> Result<i32, String> {
                 png = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
             }
             Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `rebof3 emi clut --help`"));
+                return Err(format!("unknown option {value}; run `bof3 emi clut --help`"));
             }
             _ => positionals.push(&args[index]),
         }
@@ -775,12 +776,12 @@ fn run_clut(args: &[OsString]) -> Result<i32, String> {
     let entry_index = match (&input, positionals.len()) {
         (Some(_), 1) => parse_num(positionals[0], "clut entry index")?,
         (Some(_), _) => {
-            return Err("clut takes one index: pass it as INDEX; run `rebof3 emi clut --help`.".into());
+            return Err("clut takes one index: pass it as INDEX; run `bof3 emi clut --help`.".into());
         }
         (None, 2) => parse_num(positionals[1], "clut entry index")?,
         (None, _) => {
             return Err(
-                "clut needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `rebof3 emi clut --help`."
+                "clut needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi clut --help`."
                     .into(),
             );
         }
@@ -791,7 +792,7 @@ fn run_clut(args: &[OsString]) -> Result<i32, String> {
     };
     let palette = rebof3_emi::entry::palette(&source, entry_index).map_err(|error| {
         format!(
-            "cannot read {}#{entry_index}: {error}; run `rebof3 emi list {}` to see the entry table",
+            "cannot read {}#{entry_index}: {error}; run `bof3 emi list {}` to see the entry table",
             source.display(),
             source.display()
         )
@@ -830,17 +831,17 @@ fn audio_args<'a>(args: &'a [OsString], command: &str) -> Result<(bool, Vec<&'a 
                 index += 1;
                 let value = args
                     .get(index)
-                    .ok_or_else(|| format!("-i/--input needs an archive; run `rebof3 emi {command} --help`."))?;
+                    .ok_or_else(|| format!("-i/--input needs an archive; run `bof3 emi {command} --help`."))?;
                 if positionals.is_empty() {
                     positionals.push(value);
                 } else {
                     return Err(format!(
-                        "{command} takes one archive: drop the extra -i or positional; run `rebof3 emi {command} --help`."
+                        "{command} takes one archive: drop the extra -i or positional; run `bof3 emi {command} --help`."
                     ));
                 }
             }
             Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `rebof3 emi {command} --help`"));
+                return Err(format!("unknown option {value}; run `bof3 emi {command} --help`"));
             }
             _ => positionals.push(arg),
         }
@@ -848,7 +849,7 @@ fn audio_args<'a>(args: &'a [OsString], command: &str) -> Result<(bool, Vec<&'a 
     }
     if positionals.len() != 2 {
         return Err(format!(
-            "{command} needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `rebof3 emi {command} --help`."
+            "{command} needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi {command} --help`."
         ));
     }
     Ok((dump, positionals))
@@ -946,11 +947,11 @@ fn run_coverage(args: &[OsString]) -> Result<i32, String> {
             }
             Some("--json") => json = true,
             Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `rebof3 emi coverage --help`"));
+                return Err(format!("unknown option {value}; run `bof3 emi coverage --help`"));
             }
             _ => {
                 return Err(
-                    "coverage takes no positional: pass the archive folder with -i DIR; run `rebof3 emi coverage --help`."
+                    "coverage takes no positional: pass the archive folder with -i DIR; run `bof3 emi coverage --help`."
                         .into(),
                 );
             }

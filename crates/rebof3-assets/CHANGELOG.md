@@ -26,7 +26,7 @@ or module name inside the crate moves.
 | ----------------------------- | ------------------- |
 | `bof3-assets` (Cargo package) | `rebof3-assets`     |
 | `bof3_assets` (Rust path)     | `rebof3_assets`     |
-| `assets ...` (command)        | `rebof3 assets ...` |
+| `assets ...` (command)        | `bof3 assets ...` |
 
 ## 0.1.0
 

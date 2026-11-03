@@ -48,7 +48,7 @@ pub fn main(args: Vec<OsString>) -> ExitCode {
     match run(args) {
         Ok(code) => ExitCode::from(code as u8),
         Err(message) => {
-            eprintln!("rebof3 disc: {message}");
+            eprintln!("bof3 disc: {message}");
             ExitCode::from(EXIT_ERROR as u8)
         }
     }
@@ -76,13 +76,13 @@ fn run(args: Vec<OsString>) -> Result<i32, String> {
         "checksum" => checksum(options),
         "rebuild" => rebuild(options),
         "verify" => verify(options),
-        value => Err(format!("unknown command {value:?}; run `rebof3 disc --help` for the commands")),
+        value => Err(format!("unknown command {value:?}; run `bof3 disc --help` for the commands")),
     };
     result.map_err(|message| {
         if message.contains("--help") || message.contains("help`") {
             message
         } else {
-            format!("{message}; run `rebof3 disc {command} --help`")
+            format!("{message}; run `bof3 disc {command} --help`")
         }
     })
 }
@@ -107,7 +107,7 @@ fn extract(options: Options) -> Result<i32, String> {
         None => find_disc_image(&current).map_err(|error| {
             format!(
                 "extract has no disc image: pass -i IMAGE.cue or put one in inputs/external ({error}); \
-                     run `rebof3 disc extract --help`"
+                     run `bof3 disc extract --help`"
             )
         })?,
     };
@@ -199,7 +199,7 @@ fn verify(options: Options) -> Result<i32, String> {
         for mismatch in &mismatches {
             eprintln!("{mismatch}");
         }
-        eprintln!("rebof3 disc: verify failed with {} mismatch(es)", mismatches.len());
+        eprintln!("bof3 disc: verify failed with {} mismatch(es)", mismatches.len());
         return Ok(EXIT_DIFFERS);
     }
     if !options.quiet {
@@ -219,7 +219,7 @@ fn parse_options(args: &[OsString]) -> Result<Options, String> {
                 index += 1;
                 let value = PathBuf::from(args.get(index).ok_or_else(|| {
                     format!(
-                        "option {flag} needs a value, for example -o build/disc; run `rebof3 disc help` for the options"
+                        "option {flag} needs a value, for example -o build/disc; run `bof3 disc help` for the options"
                     )
                 })?);
                 match flag {
@@ -231,7 +231,7 @@ fn parse_options(args: &[OsString]) -> Result<Options, String> {
                     _ => unreachable!(),
                 }
             }
-            value => return Err(format!("unknown option: {value}; run `rebof3 disc help` for the options")),
+            value => return Err(format!("unknown option: {value}; run `bof3 disc help` for the options")),
         }
         index += 1;
     }
@@ -240,7 +240,7 @@ fn parse_options(args: &[OsString]) -> Result<Options, String> {
 
 fn reject(_options: &Options, invalid: &[(char, bool)]) -> Result<(), String> {
     if let Some((flag, _)) = invalid.iter().find(|(_, present)| *present) {
-        return Err(format!("-{flag} is not valid with this command; run `rebof3 disc help` for its options"));
+        return Err(format!("-{flag} is not valid with this command; run `bof3 disc help` for its options"));
     }
     Ok(())
 }
@@ -271,10 +271,10 @@ fn open_walk_extract(input: &Path, output: &Path, project: &Path) -> Result<Vec<
 }
 
 const USAGE: &str = "\
-rebof3 disc: read, extract, checksum, rebuild and verify a PlayStation disc image.
+bof3 disc: read, extract, checksum, rebuild and verify a PlayStation disc image.
 
-Usage: rebof3 disc <COMMAND> [OPTIONS]
-       rebof3 disc <COMMAND> --help
+Usage: bof3 disc <COMMAND> [OPTIONS]
+       bof3 disc <COMMAND> --help
 
 Commands:
   extract   write every file of an image, plus its project XML
@@ -283,19 +283,19 @@ Commands:
   verify    compare a tree with its checksums; exit 1 on a mismatch
   rebuild   build a synthetic ISO from top-level files
 
-Every command has focused help: rebof3 disc <COMMAND> --help.
+Every command has focused help: bof3 disc <COMMAND> --help.
 Common switches: -i/--input PATH, -o/--output PATH, -q/--quiet.
 
 Examples:
-  rebof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
-  rebof3 disc checksum -i build/disc -o build/checksums.json
-  rebof3 disc verify -i build/disc -o build/checksums.json
+  bof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
+  bof3 disc checksum -i build/disc -o build/checksums.json
+  bof3 disc verify -i build/disc -o build/checksums.json
 ";
 
 const EXTRACT_HELP: &str = "\
-rebof3 disc extract: write every file of an image, plus its project XML.
+bof3 disc extract: write every file of an image, plus its project XML.
 
-Usage: rebof3 disc extract [-i IMAGE.cue] [-o DIR] [-p FILE.xml] [-q]
+Usage: bof3 disc extract [-i IMAGE.cue] [-o DIR] [-p FILE.xml] [-q]
 
   -i, --input PATH    disc image or .cue sheet (default: the image in
                       inputs/external, then ./disk)
@@ -304,14 +304,14 @@ Usage: rebof3 disc extract [-i IMAGE.cue] [-o DIR] [-p FILE.xml] [-q]
   -q, --quiet         no completion line (default: off)
 
 Examples:
-  rebof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
-  rebof3 disc extract -q
+  bof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
+  bof3 disc extract -q
 ";
 
 const LBA_JSON_HELP: &str = "\
-rebof3 disc lba-json: write the LBA table of an extracted tree.
+bof3 disc lba-json: write the LBA table of an extracted tree.
 
-Usage: rebof3 disc lba-json -i IMAGE -o FILE.json -x DIR -p FILE.xml [-r DIR] [-q]
+Usage: bof3 disc lba-json -i IMAGE -o FILE.json -x DIR -p FILE.xml [-r DIR] [-q]
 
   -i, --input PATH    disc image or .cue sheet (required)
   -o, --output FILE   JSON table to write (required)
@@ -321,26 +321,26 @@ Usage: rebof3 disc lba-json -i IMAGE -o FILE.json -x DIR -p FILE.xml [-r DIR] [-
   -q, --quiet         no completion line (default: off)
 
 Example:
-  rebof3 disc lba-json -i game.cue -o build/lba.json -x build/disc -p build/disc/game.xml
+  bof3 disc lba-json -i game.cue -o build/lba.json -x build/disc -p build/disc/game.xml
 ";
 
 const CHECKSUM_HELP: &str = "\
-rebof3 disc checksum: hash every file of an extracted tree.
+bof3 disc checksum: hash every file of an extracted tree.
 
-Usage: rebof3 disc checksum -i DIR -o FILE.json [-q]
+Usage: bof3 disc checksum -i DIR -o FILE.json [-q]
 
   -i, --input DIR     extracted folder to hash (required)
   -o, --output FILE   JSON checksums to write (required)
   -q, --quiet         no completion line (default: off)
 
 Example:
-  rebof3 disc checksum -i build/disc -o build/checksums.json
+  bof3 disc checksum -i build/disc -o build/checksums.json
 ";
 
 const VERIFY_HELP: &str = "\
-rebof3 disc verify: compare an extracted tree with its checksums.
+bof3 disc verify: compare an extracted tree with its checksums.
 
-Usage: rebof3 disc verify -i DIR -o FILE.json [-q]
+Usage: bof3 disc verify -i DIR -o FILE.json [-q]
 
   -i, --input DIR     extracted folder to check (required)
   -o, --output FILE   JSON checksums to compare against (required)
@@ -349,20 +349,20 @@ Usage: rebof3 disc verify -i DIR -o FILE.json [-q]
 Exit status: 0 every file matches, 1 a mismatch, 2 an error.
 
 Example:
-  rebof3 disc verify -i build/disc -o build/checksums.json
+  bof3 disc verify -i build/disc -o build/checksums.json
 ";
 
 const REBUILD_HELP: &str = "\
-rebof3 disc rebuild: build a synthetic ISO from top-level files.
+bof3 disc rebuild: build a synthetic ISO from top-level files.
 
-Usage: rebof3 disc rebuild -i DIR -o IMAGE.iso [-q]
+Usage: bof3 disc rebuild -i DIR -o IMAGE.iso [-q]
 
   -i, --input DIR     folder whose top-level files go in the image (required)
   -o, --output FILE   ISO to write (required)
   -q, --quiet         no completion line (default: off)
 
 Example:
-  rebof3 disc rebuild -i build/iso-files -o build/synthetic.iso
+  bof3 disc rebuild -i build/iso-files -o build/synthetic.iso
 ";
 
 fn print_usage() {

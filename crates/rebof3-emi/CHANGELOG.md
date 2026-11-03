@@ -17,7 +17,7 @@ module name inside the crate moves.
 | -------------------------- | ---------------- |
 | `bof3-emi` (Cargo package) | `rebof3-emi`     |
 | `bof3_emi` (Rust path)     | `rebof3_emi`     |
-| `emi ...` (command)        | `rebof3 emi ...` |
+| `emi ...` (command)        | `bof3 emi ...` |
 
 ## 0.1.0
 

@@ -1,4 +1,4 @@
-# rebof3 tools
+# bof3 tools
 
 Rust tools for inspecting and extracting Breath of Fire III (US, PlayStation) disc images,
 EMI archives and assets. This repository contains no game data. Dump your own US disc
@@ -10,16 +10,16 @@ You need Git and Rust. `rust-toolchain.toml` pins the toolchain, and `rustup` in
 build. On Linux, audio extraction needs the ALSA headers.
 
 ```sh
-git clone https://github.com/raulcorreia7/rebof3-tools.git
-cd rebof3-tools
-make build   # writes target/release/rebof3
+git clone https://github.com/raulcorreia7/bof3-tools.git
+cd bof3-tools
+make build   # writes target/release/bof3
 make check   # format, clippy, cargo deny and tests; needs cargo-deny
 ```
 
 ## First command
 
 ```sh
-target/release/rebof3 --help
+target/release/bof3 --help
 ```
 
 The command list and the guides are in [command line](docs/cli.md), [crates](docs/crates.md) and
@@ -32,17 +32,17 @@ The command list and the guides are in [command line](docs/cli.md), [crates](doc
 ```sh
 printf hello > a.bin
 printf world > b.bin
-target/release/rebof3 emi pack -o test.EMI -i a.bin b.bin
-target/release/rebof3 emi list test.EMI
+target/release/bof3 emi pack -o test.EMI -i a.bin b.bin
+target/release/bof3 emi list test.EMI
 ```
 
 ## With a disc
 
 ```sh
-target/release/rebof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+target/release/bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
 ```
 
-The `bof3player` project provides the audio player. The workspace depends on its public repository.
+The [bof3-player](https://github.com/raulcorreia7/bof3-player) project provides the audio player. The workspace depends on its public repository.
 See [CONTRIBUTING.md](CONTRIBUTING.md) to change the tools.
 
 The tools are MIT licensed. See [NOTICE](NOTICE).

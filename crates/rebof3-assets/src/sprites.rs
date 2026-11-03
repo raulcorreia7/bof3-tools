@@ -5,7 +5,7 @@
 //!
 //! # Cross-reference
 //!
-//! | Family | C record (`rebof3/include`) |
+//! | Family | C record (`decomp/include`) |
 //! | --- | --- |
 //! | sprite bank | none yet (no reader proves a runtime record) |
 //!

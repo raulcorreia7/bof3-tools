@@ -1,4 +1,4 @@
-# The Rust side of the monorepo: shared libraries and thin command lines.
+# The Rust tools for Breath of Fire III: shared libraries and a thin command line.
 #
 #   crates/  shared libraries
 #   cli/     command lines: argument parsing and printing only
@@ -11,7 +11,6 @@ members = [
     "crates/rebof3-assets",
     "cli/rebof3",
 ]
-# Nested repositories keep their own Rust packages (rebof3/tools/sym and its worktrees).
 
 
 [workspace.package]
@@ -22,12 +21,12 @@ license = "MIT"
 [workspace.dependencies]
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
 rebof3-emi = { path = "crates/rebof3-emi", version = "0.2.0", default-features = false }
-emi = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
-bof3player = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
-bof3-names = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2" }
-rebof3-audio = { package = "bof3player", git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
-psx-cd = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2" }
-psx-formats = { git = "https://github.com/raulcorreia7/bof3player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+emi = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+bof3player = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+bof3-names = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2" }
+rebof3-audio = { package = "bof3player", git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+psx-cd = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2" }
+psx-formats = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
 clap = { version = "4.6.7", features = ["derive", "wrap_help"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

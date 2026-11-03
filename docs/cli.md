@@ -1,27 +1,27 @@
-# The rebof3 command line
+# The bof3 command line
 
-`rebof3` provides the `disc`, `emi` and `assets` commands. The subcommands parse arguments and print; the
+`bof3` provides the `disc`, `emi` and `assets` commands. The subcommands parse arguments and print; the
 libraries hold the logic ([crates](crates.md)). `--help` lists each command's purpose, every switch with
 its default, and runnable examples. A command with verbs (`disc extract`, `emi pack`,
 `assets import texture`) has its own focused `--help`. Errors name what failed and the next safe action.
 
 ```sh
 make build
-target/release/rebof3 --help
-target/release/rebof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
-target/release/rebof3 emi list "BIN/BGM/BGM000.EMI"
-target/release/rebof3 assets extract-all -o build/extract
+target/release/bof3 --help
+target/release/bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+target/release/bof3 emi list "BIN/BGM/BGM000.EMI"
+target/release/bof3 assets extract-all -o build/extract
 ```
 
-`make build` writes `target/release/rebof3`. The build needs the Rust toolchain in
-`rust-toolchain.toml`. Audio extraction uses the bof3player libraries; on Linux they need the ALSA
+`make build` writes `target/release/bof3`. The build needs the Rust toolchain in
+`rust-toolchain.toml`. Audio extraction uses the bof3-player libraries; on Linux they need the ALSA
 headers. The examples run from the repository root and write below `build/`.
 
 | Command         | Does                                                           | Reference         |
 | --------------- | -------------------------------------------------------------- | ----------------- |
-| `rebof3 disc`   | Extract, checksum, verify and rebuild a PlayStation disc image | [Disc](#disc)     |
-| `rebof3 emi`    | List, extract, pack and inspect EMI archives                   | [EMI](#emi)       |
-| `rebof3 assets` | Extract the disc's assets or convert one asset                 | [Assets](#assets) |
+| `bof3 disc`   | Extract, checksum, verify and rebuild a PlayStation disc image | [Disc](#disc)     |
+| `bof3 emi`    | List, extract, pack and inspect EMI archives                   | [EMI](#emi)       |
+| `bof3 assets` | Extract the disc's assets or convert one asset                 | [Assets](#assets) |
 
 Switch names match across commands: `-i/--input`, `-o/--output`, `--list`, `--json`, `-q/--quiet`.
 `-i` for a disc image defaults to the image in `inputs/external`, then `./disk`.
@@ -31,9 +31,9 @@ Switch names match across commands: `-i/--input`, `-o/--output`, `--list`, `--js
 `disc` extracts, checksums, verifies and describes disc images.
 
 ```sh
-target/release/rebof3 disc extract -i inputs/external/disc.cue -o build/disc
-target/release/rebof3 disc checksum -i build/disc -o build/checksums.json
-target/release/rebof3 disc verify -i build/disc -o build/checksums.json
+target/release/bof3 disc extract -i inputs/external/disc.cue -o build/disc
+target/release/bof3 disc checksum -i build/disc -o build/checksums.json
+target/release/bof3 disc verify -i build/disc -o build/checksums.json
 ```
 
 | Verb       | Switches                                                                                                            |
@@ -54,13 +54,13 @@ palette, bank and sequence entries. The container layout is in the
 [EMI format](https://raulcorreia7.github.io/bof3-wiki/formats/emi.html).
 
 ```sh
-target/release/rebof3 emi list "BIN/BGM/BGM000.EMI"
-target/release/rebof3 emi extract "BIN/BGM/BGM000.EMI" -o build/bgm000
-target/release/rebof3 emi pack -o build/test.EMI build/src
-target/release/rebof3 emi vram -i "BIN/BGM/BGM000.EMI" -o build/page.png
+target/release/bof3 emi list "BIN/BGM/BGM000.EMI"
+target/release/bof3 emi extract "BIN/BGM/BGM000.EMI" -o build/bgm000
+target/release/bof3 emi pack -o build/test.EMI build/src
+target/release/bof3 emi vram -i "BIN/BGM/BGM000.EMI" -o build/page.png
 ```
 
-`rebof3 emi ARCHIVE.EMI` extracts the archive. Every verb takes the archive as `-i/--input` or as the
+`bof3 emi ARCHIVE.EMI` extracts the archive. Every verb takes the archive as `-i/--input` or as the
 first positional.
 
 | Verb         | Switches                                                                                                          |
@@ -105,10 +105,10 @@ Without `-J`, `pack` guesses the type from the extension and loses the load addr
 format. The kinds and the output layout are in [assets](assets.md).
 
 ```sh
-target/release/rebof3 assets extract --only texture,palette -o build/art
-target/release/rebof3 assets extract --only audio-sequence --audio-format ogg --mode modern -o build/music
-target/release/rebof3 assets extract-all -o build/extract
-target/release/rebof3 assets coverage -i "Breath of Fire III (USA).cue"
+target/release/bof3 assets extract --only texture,palette -o build/art
+target/release/bof3 assets extract --only audio-sequence --audio-format ogg --mode modern -o build/music
+target/release/bof3 assets extract-all -o build/extract
+target/release/bof3 assets coverage -i "Breath of Fire III (USA).cue"
 ```
 
 `assets extract` writes to `build/game-assets` by default.
@@ -140,14 +140,14 @@ payload that holds text writes `text/<disc path without .EMI>/<slot>.bin`, `<slo
 | Import    | `import` for `texture`, `palette`, `terrain`, `vag`, `table`, `encounters`, `layout`, `emi`, `sequence`, `disc`, `soundfont`, `message`, `strings`, `characters` or `character-bank`      |
 
 Each verb has focused help with its own switches and defaults, for example
-`rebof3 assets export texture --help` and `rebof3 assets import disc --help`. Common export switches are
+`bof3 assets export texture --help` and `bof3 assets import disc --help`. Common export switches are
 `-o/--output`, `--load-arg HEX`, `--depth 4|8`, `--palette BANK`, `--palette-offset WORDS` and
 `--index N`. Common import switches are `-o/--output`, `--payload PATH`, `--palette OUT`, `--base BLOCK`,
 `--entry INDEX=FILE` and `--file PATH=FILE`.
 
 ```sh
-target/release/rebof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
-target/release/rebof3 assets import texture 7.png -o payload.img
+target/release/bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+target/release/bof3 assets import texture 7.png -o payload.img
 ```
 
 `terrain` writes `.glb` for a `.glb` output path and OBJ plus MTL otherwise. `soundfont` takes the header

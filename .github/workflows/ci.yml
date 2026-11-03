@@ -38,11 +38,11 @@ jobs:
       - name: Build setup-only CLI
         run: |
           cargo build --locked --release -p rebof3 --no-default-features
-          ./target/release/rebof3 disc --help
-          ./target/release/rebof3 emi --help
+          ./target/release/bof3 disc --help
+          ./target/release/bof3 emi --help
       - name: Build full assets CLI
         run: |
           cargo build --locked --release -p rebof3
-          ./target/release/rebof3 disc --help
-          ./target/release/rebof3 emi --help
-          ./target/release/rebof3 assets --help
+          ./target/release/bof3 disc --help
+          ./target/release/bof3 emi --help
+          ./target/release/bof3 assets --help
