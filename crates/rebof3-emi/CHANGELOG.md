@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0
 
 The project prefix reaches the package: `bof3-emi` is now `rebof3-emi`. No type, function or
 module name inside the crate moves.
