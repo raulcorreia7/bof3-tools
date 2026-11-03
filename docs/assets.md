@@ -1,6 +1,6 @@
 # Asset output
 
-`rebof3 assets extract` writes every asset twice: the bytes the disc stores, in a file named by the
+`bof3 assets extract` writes every asset twice: the bytes the disc stores, in a file named by the
 format they are in, and the view a human opens. The commands are in [the command line](cli.md#assets);
 the formats are in the [wiki](https://raulcorreia7.github.io/bof3-wiki/formats/assets.html).
 

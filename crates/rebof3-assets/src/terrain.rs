@@ -1,6 +1,6 @@
 //! Area terrain as Wavefront OBJ, read from a map bundle.
 //!
-//! The bundle is `AreaMapBundle` in `rebof3/include/world/area.h`, the one C
+//! The bundle is `AreaMapBundle` in `decomp/include/world/area.h`, the one C
 //! definition of the map header, and its format is
 //! `wiki: formats/area#0x80104000-map-bundle`.
 //!
@@ -150,7 +150,7 @@ pub fn from_payload(payload: &[u8], mtl_name: &str) -> rebof3_emi::Result<Terrai
 /// byte codes and words keep their stored values. Their meanings are not decoded
 /// (`wiki: formats/area#0x80104000-map-bundle`, "Map bundle"). The field names follow the C record
 /// (`AreaMapBundle` in
-/// `rebof3/include/world/area.h`).
+/// `decomp/include/world/area.h`).
 pub fn layout_json(payload: &[u8]) -> rebof3_emi::Result<Vec<u8>> {
     let bundle = MapBundle::decode(payload)?;
     let width = usize::from(bundle.width).max(1);

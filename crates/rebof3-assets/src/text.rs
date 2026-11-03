@@ -106,7 +106,7 @@ pub fn extract(disc: &Path, out: &Path, write: bool) -> Result<Report> {
 pub fn extract_with(options: &Options) -> Result<Report> {
     if !options.disc.is_dir() {
         return Err(Error::Text(format!(
-            "no extracted disc at {}; pass --text-disc DIR with the tree `rebof3 disc extract` wrote",
+            "no extracted disc at {}; pass --text-disc DIR with the tree `bof3 disc extract` wrote",
             options.disc.display()
         )));
     }

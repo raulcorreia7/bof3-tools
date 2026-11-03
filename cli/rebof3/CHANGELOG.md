@@ -2,7 +2,7 @@
 
 ## 1.0.0 (unreleased)
 
-One `rebof3` binary with `disc`, `emi` and `assets` subcommands. The audio player is `bof3player`.
+One `bof3` binary with `disc`, `emi` and `assets` subcommands. The audio player is `bof3player`.
 
 ### Assets
 
@@ -12,10 +12,10 @@ One `rebof3` binary with `disc`, `emi` and `assets` subcommands. The audio playe
 
 ### Migration
 
-| Removed                  | Replacement          |
-| ------------------------ | -------------------- |
-| `rebof3 player ...`      | `bof3player ...`     |
-| `disc ...` (binary)      | `rebof3 disc ...`    |
-| `emi ...` (binary)       | `rebof3 emi ...`     |
-| `assets ...` (binary)    | `rebof3 assets ...`  |
-| `bin/player`, `bin/disc`, `bin/emi`, `bin/assets` | `bin/rebof3` |
+| Removed                                           | Replacement       |
+| ------------------------------------------------- | ----------------- |
+| `rebof3 player ...`                               | `bof3player ...`  |
+| `disc ...` (binary)                               | `bof3 disc ...`   |
+| `emi ...` (binary)                                | `bof3 emi ...`    |
+| `assets ...` (binary)                             | `bof3 assets ...` |
+| `bin/player`, `bin/disc`, `bin/emi`, `bin/assets` | `bin/bof3`        |

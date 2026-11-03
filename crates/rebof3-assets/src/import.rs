@@ -69,7 +69,7 @@ pub fn game_table_in_payload(table: &str, json: &[u8], payload: &[u8]) -> Result
 }
 
 /// The layout of a map bundle (`<slot>.layout.json`): the byte codes row by row, the objects, and the
-/// height table. The field names follow the C record (`AreaMapBundle` in `rebof3/include/world/area.h`)
+/// height table. The field names follow the C record (`AreaMapBundle` in `decomp/include/world/area.h`)
 /// and the map bundle format (`wiki: formats/area#0x80104000-map-bundle`).
 #[derive(serde::Deserialize)]
 struct Layout {

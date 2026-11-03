@@ -41,9 +41,9 @@ const SHOWN_ERRORS: usize = 5;
 const HASH_BLOCK: usize = 1 << 20;
 
 pub(crate) const USAGE: &str = "\
-rebof3 assets extract-all: every asset of the disc, one folder per step, plus index.json.
+bof3 assets extract-all: every asset of the disc, one folder per step, plus index.json.
 
-Usage: rebof3 assets extract-all [-i IMAGE] [-o DIR] [--jobs N] [-q] [STEP...]
+Usage: bof3 assets extract-all [-i IMAGE] [-o DIR] [--jobs N] [-q] [STEP...]
 
 Steps (default: all, in this order):
   disc           the disc's files, as they are on the disc
@@ -64,8 +64,8 @@ Naming STEPs reruns only those; the other steps keep their earlier files and ind
 Exit code: 0 success, 1 some step had failures, 2 an error.
 
 Examples:
-  rebof3 assets extract-all -i \"Breath of Fire III (USA).cue\" -o build/extract
-  rebof3 assets extract-all emi assets-export -o build/extract";
+  bof3 assets extract-all -i \"Breath of Fire III (USA).cue\" -o build/extract
+  bof3 assets extract-all emi assets-export -o build/extract";
 
 /// What a step reports before its folder is scanned.
 #[derive(Default)]
@@ -121,7 +121,7 @@ fn parse(args: &[String]) -> Result<Option<Arguments>, String> {
             step if STEPS.contains(&step) => parsed.steps.push(step.to_string()),
             other => {
                 return Err(format!(
-                    "unknown step or option {other:?}: choose from {}; run `rebof3 assets extract-all --help`.",
+                    "unknown step or option {other:?}: choose from {}; run `bof3 assets extract-all --help`.",
                     STEPS.join(", ")
                 ));
             }
@@ -257,7 +257,7 @@ fn assets_step(context: &Context) -> Outcome {
     if !disc.is_dir() {
         return Outcome {
             errors: vec![format!(
-                "text: no extracted disc at {}; run the disc step first: rebof3 assets extract-all disc -o {}",
+                "text: no extracted disc at {}; run the disc step first: bof3 assets extract-all disc -o {}",
                 disc.display(),
                 context.out.display()
             )],

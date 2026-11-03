@@ -28,10 +28,10 @@ const EXIT_ERROR: i32 = 2;
 /// Default output directory, relative to the repository root.
 const DEFAULT_OUT: &str = "build/game-assets";
 const USAGE: &str = "\
-rebof3 assets: extract the disc's assets, or convert one asset.
+bof3 assets: extract the disc's assets, or convert one asset.
 
-Usage: rebof3 assets <COMMAND> [OPTIONS]
-       rebof3 assets <COMMAND> --help
+Usage: bof3 assets <COMMAND> [OPTIONS]
+       bof3 assets <COMMAND> --help
 
 Commands:
   extract      write the disc's assets, one file per asset
@@ -54,15 +54,15 @@ Common switches:
   -q, --quiet         no summary on stdout
 
 Examples:
-  rebof3 assets extract --only texture,palette -o build/art
-  rebof3 assets extract-all -i \"Breath of Fire III (USA).cue\" -o build/extract
-  rebof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+  bof3 assets extract --only texture,palette -o build/art
+  bof3 assets extract-all -i \"Breath of Fire III (USA).cue\" -o build/extract
+  bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
 ";
 
 const EXTRACT_HELP: &str = "\
-rebof3 assets extract: write the disc's assets, one file per asset.
+bof3 assets extract: write the disc's assets, one file per asset.
 
-Usage: rebof3 assets extract [-i IMAGE] [-o DIR] [--only KINDS] [--mode MODE]
+Usage: bof3 assets extract [-i IMAGE] [-o DIR] [--only KINDS] [--mode MODE]
                              [--audio-format FMT] [--list] [--jobs N]
                              [--text-disc DIR] [-q]
 
@@ -79,35 +79,35 @@ Usage: rebof3 assets extract [-i IMAGE] [-o DIR] [--only KINDS] [--mode MODE]
   -q, --quiet             skip the summary on stdout (default: off)
 
 Examples:
-  rebof3 assets extract --only texture,palette -o build/art
-  rebof3 assets extract --only audio-sequence --audio-format ogg --mode modern -o build/music
-  rebof3 assets extract --list --only texture
+  bof3 assets extract --only texture,palette -o build/art
+  bof3 assets extract --only audio-sequence --audio-format ogg --mode modern -o build/music
+  bof3 assets extract --list --only texture
 ";
 
 const COVERAGE_HELP: &str = "\
-rebof3 assets coverage: report which kinds rebuild their own bytes.
+bof3 assets coverage: report which kinds rebuild their own bytes.
 
-Usage: rebof3 assets coverage [-i IMAGE]
+Usage: bof3 assets coverage [-i IMAGE]
 
   -i, --input IMAGE  CUE sheet or image (default: the one in inputs/external, then ./disk)
 
 Example:
-  rebof3 assets coverage -i \"Breath of Fire III (USA).cue\"
+  bof3 assets coverage -i \"Breath of Fire III (USA).cue\"
 ";
 
 const KINDS_HELP: &str = "\
-rebof3 assets kinds: list the asset kinds and what each writes.
+bof3 assets kinds: list the asset kinds and what each writes.
 
-Usage: rebof3 assets kinds
+Usage: bof3 assets kinds
 
 Example:
-  rebof3 assets kinds
+  bof3 assets kinds
 ";
 
 const TERRAIN_HELP: &str = "\
-rebof3 assets terrain: write one map bundle's terrain.
+bof3 assets terrain: write one map bundle's terrain.
 
-Usage: rebof3 assets terrain BUNDLE [-o OUT]
+Usage: bof3 assets terrain BUNDLE [-o OUT]
 
   BUNDLE      stored map bundle (the area-map payload)
   -o, --output OUT
@@ -115,13 +115,13 @@ Usage: rebof3 assets terrain BUNDLE [-o OUT]
               beside it (default: BUNDLE.glb)
 
 Example:
-  rebof3 assets terrain map.bin -o map.glb
+  bof3 assets terrain map.bin -o map.glb
 ";
 
 const SOUNDFONT_HELP: &str = "\
-rebof3 assets soundfont: write one VAB bank as a SoundFont 2 file.
+bof3 assets soundfont: write one VAB bank as a SoundFont 2 file.
 
-Usage: rebof3 assets soundfont HEADER BODY [-o OUT]
+Usage: bof3 assets soundfont HEADER BODY [-o OUT]
 
   HEADER      the bank's .vh bytes
   BODY        the bank's .vb bytes
@@ -129,39 +129,39 @@ Usage: rebof3 assets soundfont HEADER BODY [-o OUT]
               SoundFont to write (default: HEADER.sf2)
 
 Example:
-  rebof3 assets soundfont BGM001.vh BGM001.vb -o BGM001.sf2
+  bof3 assets soundfont BGM001.vh BGM001.vb -o BGM001.sf2
 ";
 
 const TABLES_HELP: &str = "\
-rebof3 assets tables: write the game tables of ETC/GAME.EMI entry 0 as JSON.
+bof3 assets tables: write the game tables of ETC/GAME.EMI entry 0 as JSON.
 
-Usage: rebof3 assets tables PAYLOAD [-o DIR]
+Usage: bof3 assets tables PAYLOAD [-o DIR]
 
   PAYLOAD     stored bytes of ETC/GAME.EMI entry 0
   -o, --output DIR
               folder for one JSON file per table (default: game-tables)
 
 Example:
-  rebof3 assets tables GAME0.bin -o build/tables
+  bof3 assets tables GAME0.bin -o build/tables
 ";
 
 const ENCOUNTERS_HELP: &str = "\
-rebof3 assets encounters: write one area's encounter block as JSON.
+bof3 assets encounters: write one area's encounter block as JSON.
 
-Usage: rebof3 assets encounters PAYLOAD [-o OUT]
+Usage: bof3 assets encounters PAYLOAD [-o OUT]
 
   PAYLOAD     stored area-encounters payload
   -o, --output OUT
               JSON to write (default: PAYLOAD.json)
 
 Example:
-  rebof3 assets encounters encounters.bin -o encounters.json
+  bof3 assets encounters encounters.bin -o encounters.json
 ";
 
 const EXPORT_HELP: &str = "\
-rebof3 assets export: write one asset's open form from its stored bytes.
+bof3 assets export: write one asset's open form from its stored bytes.
 
-Usage: rebof3 assets export <KIND> ...
+Usage: bof3 assets export <KIND> ...
 
 Kinds:
   texture         PNG view, or an indexed PNG in one palette row
@@ -174,18 +174,18 @@ Kinds:
   characters      the eight playable characters as JSON
   character-bank  a sprite bank's palette tables as JSON
 
-Every kind has focused help: rebof3 assets export <KIND> --help.
+Every kind has focused help: bof3 assets export <KIND> --help.
 Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette BANK,
 --palette-offset WORDS, --index N.
 
 Example:
-  rebof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+  bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
 ";
 
 const IMPORT_HELP: &str = "\
-rebof3 assets import: read one asset's open form back into its stored bytes.
+bof3 assets import: read one asset's open form back into its stored bytes.
 
-Usage: rebof3 assets import <KIND> ...
+Usage: bof3 assets import <KIND> ...
 
 Kinds:
   texture         a PNG view or indexed PNG back into a payload
@@ -204,19 +204,19 @@ Kinds:
   characters      character JSON back into ETC/START.EMI entry 8
   character-bank  palette JSON back into a sprite bank
 
-Every kind has focused help: rebof3 assets import <KIND> --help.
+Every kind has focused help: bof3 assets import <KIND> --help.
 Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
 --entry INDEX=FILE, --file PATH=FILE.
 
 Example:
-  rebof3 assets import texture 7.png -o payload.img
+  bof3 assets import texture 7.png -o payload.img
 ";
 
 const EXPORT_TEXTURE_HELP: &str = "\
-rebof3 assets export texture: write a texture's stored payload as a PNG.
+bof3 assets export texture: write a texture's stored payload as a PNG.
 
-Usage: rebof3 assets export texture PAYLOAD --load-arg HEX [-o OUT]
-       rebof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette BANK
+Usage: bof3 assets export texture PAYLOAD --load-arg HEX [-o OUT]
+       bof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette BANK
                                            [--palette-offset WORDS] [-o OUT]
 
   PAYLOAD                  stored texture payload
@@ -227,39 +227,39 @@ Usage: rebof3 assets export texture PAYLOAD --load-arg HEX [-o OUT]
   -o, --output OUT         PNG to write (default: PAYLOAD.png)
 
 Examples:
-  rebof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
-  rebof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette bank.clut -o 7.png
+  bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+  bof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette bank.clut -o 7.png
 ";
 
 const EXPORT_TERRAIN_HELP: &str = "\
-rebof3 assets export terrain: write one map bundle's terrain.
+bof3 assets export terrain: write one map bundle's terrain.
 
-Usage: rebof3 assets export terrain BUNDLE [-o OUT]
+Usage: bof3 assets export terrain BUNDLE [-o OUT]
 
   BUNDLE              stored map bundle (the area-map payload)
   -o, --output OUT    .glb writes binary glTF; any other path writes an OBJ with
                       its MTL beside it (default: BUNDLE.glb)
 
 Example:
-  rebof3 assets export terrain map.bin -o map.glb
+  bof3 assets export terrain map.bin -o map.glb
 ";
 
 const EXPORT_PALETTE_HELP: &str = "\
-rebof3 assets export palette: write a CLUT bank as JSON.
+bof3 assets export palette: write a CLUT bank as JSON.
 
-Usage: rebof3 assets export palette BANK [-o OUT]
+Usage: bof3 assets export palette BANK [-o OUT]
 
   BANK                raw color words
   -o, --output OUT    JSON to write (default: BANK.json)
 
 Example:
-  rebof3 assets export palette palette.clut -o palette.json
+  bof3 assets export palette palette.clut -o palette.json
 ";
 
 const EXPORT_VAG_HELP: &str = "\
-rebof3 assets export vag: write one sample of a VAB bank as a WAVE file.
+bof3 assets export vag: write one sample of a VAB bank as a WAVE file.
 
-Usage: rebof3 assets export vag HEADER BODY --index N [-o OUT]
+Usage: bof3 assets export vag HEADER BODY --index N [-o OUT]
 
   HEADER              the bank's .vh bytes
   BODY                the bank's .vb bytes
@@ -267,38 +267,38 @@ Usage: rebof3 assets export vag HEADER BODY --index N [-o OUT]
   -o, --output OUT    WAVE to write (default: HEADER-N.wav)
 
 Example:
-  rebof3 assets export vag BGM001.vh BGM001.vb --index 1 -o sample.wav
+  bof3 assets export vag BGM001.vh BGM001.vb --index 1 -o sample.wav
 ";
 
 const EXPORT_SEQUENCE_HELP: &str = "\
-rebof3 assets export sequence: write one sequence of a package as MIDI.
+bof3 assets export sequence: write one sequence of a package as MIDI.
 
-Usage: rebof3 assets export sequence PACKAGE [--index N] [-o OUT]
+Usage: bof3 assets export sequence PACKAGE [--index N] [-o OUT]
 
   PACKAGE             sequence package (.seq payload)
       --index N       sequence to write (default: 0)
   -o, --output OUT    MIDI to write (default: PACKAGE.mid)
 
 Example:
-  rebof3 assets export sequence package.seq --index 1 -o song.mid
+  bof3 assets export sequence package.seq --index 1 -o song.mid
 ";
 
 const EXPORT_MESSAGE_HELP: &str = "\
-rebof3 assets export message: write a message bank as JSON.
+bof3 assets export message: write a message bank as JSON.
 
-Usage: rebof3 assets export message PAYLOAD [-o OUT]
+Usage: bof3 assets export message PAYLOAD [-o OUT]
 
   PAYLOAD             message-bank payload
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  rebof3 assets export message bank.bin -o bank.json
+  bof3 assets export message bank.bin -o bank.json
 ";
 
 const EXPORT_STRINGS_HELP: &str = "\
-rebof3 assets export strings: write the strings of a payload as JSON.
+bof3 assets export strings: write the strings of a payload as JSON.
 
-Usage: rebof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]
+Usage: bof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]
 
   PAYLOAD             payload that holds strings
       --load-arg HEX  the entry's load address, for type 0-2 payloads
@@ -306,63 +306,63 @@ Usage: rebof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  rebof3 assets export strings payload.bin --load-arg 0x80100000 -o strings.json
+  bof3 assets export strings payload.bin --load-arg 0x80100000 -o strings.json
 ";
 
 const EXPORT_CHARACTERS_HELP: &str = "\
-rebof3 assets export characters: write the eight playable characters as JSON.
+bof3 assets export characters: write the eight playable characters as JSON.
 
-Usage: rebof3 assets export characters PAYLOAD [-o OUT]
+Usage: bof3 assets export characters PAYLOAD [-o OUT]
 
   PAYLOAD             ETC/START.EMI entry 8
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  rebof3 assets export characters START8.bin -o characters.json
+  bof3 assets export characters START8.bin -o characters.json
 ";
 
 const EXPORT_CHARACTER_BANK_HELP: &str = "\
-rebof3 assets export character-bank: write a sprite bank's palettes as JSON.
+bof3 assets export character-bank: write a sprite bank's palettes as JSON.
 
-Usage: rebof3 assets export character-bank PAYLOAD [-o OUT]
+Usage: bof3 assets export character-bank PAYLOAD [-o OUT]
 
   PAYLOAD             decoded sprite bank, container or one section
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  rebof3 assets export character-bank bank.bin -o palettes.json
+  bof3 assets export character-bank bank.bin -o palettes.json
 ";
 
 const IMPORT_TEXTURE_HELP: &str = "\
-rebof3 assets import texture: read a texture PNG back into its stored payload.
+bof3 assets import texture: read a texture PNG back into its stored payload.
 
-Usage: rebof3 assets import texture PNG [-o OUT] [--palette OUT]
+Usage: bof3 assets import texture PNG [-o OUT] [--palette OUT]
 
   PNG                 a PNG that export texture wrote
   -o, --output OUT    payload to write (default: PNG.img)
       --palette OUT   also write an indexed PNG's color words
 
 Examples:
-  rebof3 assets import texture 7.png -o payload.img
-  rebof3 assets import texture 7.png --palette bank.clut -o payload.img
+  bof3 assets import texture 7.png -o payload.img
+  bof3 assets import texture 7.png --palette bank.clut -o payload.img
 ";
 
 const IMPORT_PALETTE_HELP: &str = "\
-rebof3 assets import palette: read palette JSON back into color words.
+bof3 assets import palette: read palette JSON back into color words.
 
-Usage: rebof3 assets import palette JSON [-o OUT]
+Usage: bof3 assets import palette JSON [-o OUT]
 
   JSON                palette JSON from export palette
   -o, --output OUT    raw color words to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import palette palette.json -o palette.clut
+  bof3 assets import palette palette.json -o palette.clut
 ";
 
 const IMPORT_TERRAIN_HELP: &str = "\
-rebof3 assets import terrain: read a mesh back into its map bundle.
+bof3 assets import terrain: read a mesh back into its map bundle.
 
-Usage: rebof3 assets import terrain MESH --payload BUNDLE [-o OUT]
+Usage: bof3 assets import terrain MESH --payload BUNDLE [-o OUT]
 
   MESH                .glb or OBJ mesh from export terrain
       --payload BUNDLE
@@ -371,25 +371,25 @@ Usage: rebof3 assets import terrain MESH --payload BUNDLE [-o OUT]
   -o, --output OUT    bundle to write (default: MESH.bin)
 
 Example:
-  rebof3 assets import terrain map.glb --payload map.bin -o rebuilt.bin
+  bof3 assets import terrain map.glb --payload map.bin -o rebuilt.bin
 ";
 
 const IMPORT_VAG_HELP: &str = "\
-rebof3 assets import vag: read a WAVE file back into a sample.
+bof3 assets import vag: read a WAVE file back into a sample.
 
-Usage: rebof3 assets import vag WAV [-o OUT]
+Usage: bof3 assets import vag WAV [-o OUT]
 
   WAV                 44.1 kHz mono 16-bit WAVE
   -o, --output OUT    VAG to write (default: WAV.vag)
 
 Example:
-  rebof3 assets import vag sample.wav -o sample.vag
+  bof3 assets import vag sample.wav -o sample.vag
 ";
 
 const IMPORT_TABLE_HELP: &str = "\
-rebof3 assets import table: read one game table back into GAME.EMI entry 0.
+bof3 assets import table: read one game table back into GAME.EMI entry 0.
 
-Usage: rebof3 assets import table NAME JSON --payload ENTRY [-o OUT]
+Usage: bof3 assets import table NAME JSON --payload ENTRY [-o OUT]
 
   NAME                table name, as its JSON file is named
   JSON                table JSON from `assets tables`
@@ -398,26 +398,26 @@ Usage: rebof3 assets import table NAME JSON --payload ENTRY [-o OUT]
   -o, --output OUT    entry to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import table items items.json --payload GAME0.bin -o GAME0.new.bin
+  bof3 assets import table items items.json --payload GAME0.bin -o GAME0.new.bin
 ";
 
 const IMPORT_ENCOUNTERS_HELP: &str = "\
-rebof3 assets import encounters: read encounter JSON back into its block.
+bof3 assets import encounters: read encounter JSON back into its block.
 
-Usage: rebof3 assets import encounters JSON --base BLOCK [-o OUT]
+Usage: bof3 assets import encounters JSON --base BLOCK [-o OUT]
 
   JSON                encounter JSON from `assets encounters`
       --base BLOCK    the stored block (required); unnamed bytes are kept
   -o, --output OUT    block to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import encounters encounters.json --base encounters.bin -o rebuilt.bin
+  bof3 assets import encounters encounters.json --base encounters.bin -o rebuilt.bin
 ";
 
 const IMPORT_LAYOUT_HELP: &str = "\
-rebof3 assets import layout: read map layout JSON back into a bundle.
+bof3 assets import layout: read map layout JSON back into a bundle.
 
-Usage: rebof3 assets import layout JSON --payload BUNDLE [-o OUT]
+Usage: bof3 assets import layout JSON --payload BUNDLE [-o OUT]
 
   JSON                layout JSON from `assets extract`
       --payload BUNDLE
@@ -425,13 +425,13 @@ Usage: rebof3 assets import layout JSON --payload BUNDLE [-o OUT]
   -o, --output OUT    bundle to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import layout map.layout.json --payload map.bin -o rebuilt.bin
+  bof3 assets import layout map.layout.json --payload map.bin -o rebuilt.bin
 ";
 
 const IMPORT_EMI_HELP: &str = "\
-rebof3 assets import emi: rebuild a container with named entries replaced.
+bof3 assets import emi: rebuild a container with named entries replaced.
 
-Usage: rebof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]
+Usage: bof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]
 
   CONTAINER           the original .EMI bytes
       --entry INDEX=FILE
@@ -439,25 +439,25 @@ Usage: rebof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]
   -o, --output OUT    archive to write (default: CONTAINER.rebuilt.EMI)
 
 Example:
-  rebof3 assets import emi BGM000.EMI --entry 2=new.bin -o BGM000.new.EMI
+  bof3 assets import emi BGM000.EMI --entry 2=new.bin -o BGM000.new.EMI
 ";
 
 const IMPORT_SEQUENCE_HELP: &str = "\
-rebof3 assets import sequence: write a sequence package from MIDI files.
+bof3 assets import sequence: write a sequence package from MIDI files.
 
-Usage: rebof3 assets import sequence FILE.mid:ID... [-o OUT]
+Usage: bof3 assets import sequence FILE.mid:ID... [-o OUT]
 
   FILE.mid:ID         one file per sequence, in order; ID is its package id
   -o, --output OUT    package to write (default: first file with .seq)
 
 Example:
-  rebof3 assets import sequence song.mid:1 other.mid:2 -o package.seq
+  bof3 assets import sequence song.mid:1 other.mid:2 -o package.seq
 ";
 
 const IMPORT_DISC_HELP: &str = "\
-rebof3 assets import disc: write a patched copy of the whole disc.
+bof3 assets import disc: write a patched copy of the whole disc.
 
-Usage: rebof3 assets import disc CUE [--file PATH=FILE]... -o DIR
+Usage: bof3 assets import disc CUE [--file PATH=FILE]... -o DIR
 
   CUE                 the disc's cue sheet
       --file PATH=FILE
@@ -466,70 +466,70 @@ Usage: rebof3 assets import disc CUE [--file PATH=FILE]... -o DIR
   -o, --output DIR    folder for the patched disc (required)
 
 Example:
-  rebof3 assets import disc game.cue --file BIN/ETC/GAME.EMI=GAME.EMI -o build/patched
+  bof3 assets import disc game.cue --file BIN/ETC/GAME.EMI=GAME.EMI -o build/patched
 ";
 
 const IMPORT_SOUNDFONT_HELP: &str = "\
-rebof3 assets import soundfont: read a SoundFont 2 file back into a VAB bank.
+bof3 assets import soundfont: read a SoundFont 2 file back into a VAB bank.
 
-Usage: rebof3 assets import soundfont BANK.sf2 [-o PREFIX]
+Usage: bof3 assets import soundfont BANK.sf2 [-o PREFIX]
 
   BANK.sf2            the SoundFont
   -o, --output PREFIX writes PREFIX.vh and PREFIX.vb (default: BANK)
 
 Example:
-  rebof3 assets import soundfont BGM001.sf2 -o BGM001
+  bof3 assets import soundfont BGM001.sf2 -o BGM001
 ";
 
 const IMPORT_MESSAGE_HELP: &str = "\
-rebof3 assets import message: read message JSON back into a bank.
+bof3 assets import message: read message JSON back into a bank.
 
-Usage: rebof3 assets import message JSON [-o OUT]
+Usage: bof3 assets import message JSON [-o OUT]
 
   JSON                message JSON from export message
   -o, --output OUT    bank to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import message bank.json -o bank.bin
+  bof3 assets import message bank.json -o bank.bin
 ";
 
 const IMPORT_STRINGS_HELP: &str = "\
-rebof3 assets import strings: read strings JSON back into its payload.
+bof3 assets import strings: read strings JSON back into its payload.
 
-Usage: rebof3 assets import strings JSON --payload PAYLOAD [-o OUT]
+Usage: bof3 assets import strings JSON --payload PAYLOAD [-o OUT]
 
   JSON                strings JSON from export strings
       --payload PATH  the payload the JSON came from (required)
   -o, --output OUT    payload to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import strings strings.json --payload payload.bin -o rebuilt.bin
+  bof3 assets import strings strings.json --payload payload.bin -o rebuilt.bin
 ";
 
 const IMPORT_CHARACTERS_HELP: &str = "\
-rebof3 assets import characters: read character JSON back into START.EMI entry 8.
+bof3 assets import characters: read character JSON back into START.EMI entry 8.
 
-Usage: rebof3 assets import characters JSON --payload PAYLOAD [-o OUT]
+Usage: bof3 assets import characters JSON --payload PAYLOAD [-o OUT]
 
   JSON                character JSON from export characters
       --payload PATH  the stored entry 8 (required)
   -o, --output OUT    entry to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import characters characters.json --payload START8.bin -o START8.new.bin
+  bof3 assets import characters characters.json --payload START8.bin -o START8.new.bin
 ";
 
 const IMPORT_CHARACTER_BANK_HELP: &str = "\
-rebof3 assets import character-bank: read palette JSON back into a sprite bank.
+bof3 assets import character-bank: read palette JSON back into a sprite bank.
 
-Usage: rebof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]
+Usage: bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]
 
   JSON                palette JSON from export character-bank
       --payload PATH  the decoded bank (required)
   -o, --output OUT    bank to write (default: JSON.bin)
 
 Example:
-  rebof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
+  bof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
 ";
 
 fn export_help(kind: &str) -> &'static str {
@@ -572,7 +572,7 @@ pub fn main(args: Vec<OsString>) -> ExitCode {
     match run(args) {
         Ok(code) => ExitCode::from(code as u8),
         Err(error) => {
-            eprintln!("rebof3 assets: {error}");
+            eprintln!("bof3 assets: {error}");
             ExitCode::from(EXIT_ERROR as u8)
         }
     }
@@ -611,7 +611,7 @@ fn run(args: Vec<OsString>) -> Result<i32> {
         "encounters" => encounters_command(&rest),
         "export" => export_command(&rest),
         "import" => import_command(&rest),
-        other => Err(Error::Usage(format!("unknown command {other:?}; run `rebof3 assets --help` for the commands"))),
+        other => Err(Error::Usage(format!("unknown command {other:?}; run `bof3 assets --help` for the commands"))),
     };
     result.map_err(|error| {
         let message = error.to_string();
@@ -624,9 +624,9 @@ fn help_hint(verb: &str, rest: &[String]) -> String {
     if matches!(verb, "export" | "import")
         && let Some(kind) = rest.iter().find(|argument| !argument.starts_with('-'))
     {
-        return format!("rebof3 assets {verb} {kind}");
+        return format!("bof3 assets {verb} {kind}");
     }
-    format!("rebof3 assets {verb}")
+    format!("bof3 assets {verb}")
 }
 
 /// The focused help for the command in `args`: a verb, or an export/import
@@ -653,7 +653,7 @@ fn help_for(args: &[String]) -> String {
     }
 }
 
-/// `rebof3 assets encounters PAYLOAD [-o OUT]`: writes one area's encounter block as JSON. PAYLOAD is the
+/// `bof3 assets encounters PAYLOAD [-o OUT]`: writes one area's encounter block as JSON. PAYLOAD is the
 /// stored bytes of an `area-encounters` entry. The output defaults to PAYLOAD with a `.json` extension.
 fn encounters_command(args: &[String]) -> Result<i32> {
     let mut payload = None;
@@ -679,7 +679,7 @@ fn encounters_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets tables PAYLOAD [-o DIR]`: writes the fixed game tables of `ETC/GAME.EMI` entry 0 as one
+/// `bof3 assets tables PAYLOAD [-o DIR]`: writes the fixed game tables of `ETC/GAME.EMI` entry 0 as one
 /// JSON file per table. PAYLOAD is the stored bytes of that entry.
 fn tables_command(args: &[String]) -> Result<i32> {
     let mut payload = None;
@@ -741,7 +741,7 @@ fn color_words(bytes: &[u8]) -> Result<Vec<u16>> {
     Ok(bytes.as_chunks::<2>().0.iter().map(|&pair| u16::from_le_bytes(pair)).collect())
 }
 
-/// `rebof3 assets export KIND ...`: writes an asset's open form from its stored bytes. Only `texture` has an
+/// `bof3 assets export KIND ...`: writes an asset's open form from its stored bytes. Only `texture` has an
 /// export so far.
 fn export_command(args: &[String]) -> Result<i32> {
     match args.split_first() {
@@ -755,13 +755,13 @@ fn export_command(args: &[String]) -> Result<i32> {
         Some((kind, rest)) if kind.as_str() == "characters" => export_characters(rest),
         Some((kind, rest)) if kind.as_str() == "character-bank" => export_character_bank(rest),
         Some((kind, _)) => Err(Error::Usage(format!(
-            "export has no {kind:?} direction; run `rebof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters and character-bank"
+            "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters and character-bank"
         ))),
-        None => Err(Error::Usage("export needs a kind, for example texture; run `rebof3 assets export --help`".into())),
+        None => Err(Error::Usage("export needs a kind, for example texture; run `bof3 assets export --help`".into())),
     }
 }
 
-/// `rebof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette BANK [--palette-offset WORDS]] [-o OUT]`:
+/// `bof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette BANK [--palette-offset WORDS]] [-o OUT]`:
 /// writes a texture's stored payload as a PNG. Without `--depth` the PNG is the 16 bpp view. With it, the
 /// payload is drawn with the palette row that starts at word WORDS of BANK, a file of raw color words.
 fn export_texture(args: &[String]) -> Result<i32> {
@@ -808,7 +808,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import KIND ...`: reads an asset's open form back into its stored bytes. Only `texture` has
+/// `bof3 assets import KIND ...`: reads an asset's open form back into its stored bytes. Only `texture` has
 /// an import so far.
 fn import_command(args: &[String]) -> Result<i32> {
     match args.split_first() {
@@ -828,13 +828,13 @@ fn import_command(args: &[String]) -> Result<i32> {
         Some((kind, rest)) if kind.as_str() == "characters" => import_characters(rest),
         Some((kind, rest)) if kind.as_str() == "character-bank" => import_character_bank(rest),
         Some((kind, _)) => Err(Error::Usage(format!(
-            "import has no {kind:?} direction; run `rebof3 assets import --help` for the supported kinds"
+            "import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds"
         ))),
-        None => Err(Error::Usage("import needs a kind, for example texture; run `rebof3 assets import --help`".into())),
+        None => Err(Error::Usage("import needs a kind, for example texture; run `bof3 assets import --help`".into())),
     }
 }
 
-/// `rebof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back
+/// `bof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back
 /// into its stored payload (default: the PNG with a `.img` extension). An indexed PNG also has color words,
 /// which `--palette` writes as raw little-endian words.
 fn import_texture(args: &[String]) -> Result<i32> {
@@ -891,7 +891,7 @@ fn write_output(out: &Path, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-/// `rebof3 assets export palette BANK [-o OUT]`: writes one palette bank's color words as JSON (default: BANK
+/// `bof3 assets export palette BANK [-o OUT]`: writes one palette bank's color words as JSON (default: BANK
 /// with a `.json` extension).
 fn export_palette(args: &[String]) -> Result<i32> {
     let (input, out) = input_and_out(args, "export palette needs a palette bank file")?;
@@ -900,7 +900,7 @@ fn export_palette(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import palette JSON [-o OUT]`: reads a palette's JSON back to its color words, as raw
+/// `bof3 assets import palette JSON [-o OUT]`: reads a palette's JSON back to its color words, as raw
 /// little-endian words (default: JSON with a `.bin` extension).
 fn import_palette(args: &[String]) -> Result<i32> {
     let (input, out) = input_and_out(args, "import palette needs a palette JSON file")?;
@@ -909,7 +909,7 @@ fn import_palette(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets export vag HEADER BODY --index N [-o OUT]`: writes VAG N of one VAB bank as a 44.1 kHz mono
+/// `bof3 assets export vag HEADER BODY --index N [-o OUT]`: writes VAG N of one VAB bank as a 44.1 kHz mono
 /// WAVE file (default: HEADER with the index and a `.wav` extension).
 fn export_vag(args: &[String]) -> Result<i32> {
     let (mut files, mut index, mut out) = (Vec::new(), None, None);
@@ -930,7 +930,7 @@ fn export_vag(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets export message PAYLOAD [-o OUT]`: writes one message bank as JSON. Each message is its text with the
+/// `bof3 assets export message PAYLOAD [-o OUT]`: writes one message bank as JSON. Each message is its text with the
 /// control codes kept as `{TAG}` markers (default: PAYLOAD with a `.json` extension).
 fn export_message(args: &[String]) -> Result<i32> {
     let (input, out) = input_and_out(args, "export message needs a message bank payload")?;
@@ -939,7 +939,7 @@ fn export_message(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import message JSON [-o OUT]`: encodes a message bank's JSON from `export message` back into its
+/// `bof3 assets import message JSON [-o OUT]`: encodes a message bank's JSON from `export message` back into its
 /// bytes (default: JSON with a `.bin` extension). Each message is encoded again from its text.
 fn import_message(args: &[String]) -> Result<i32> {
     let (input, out) = input_and_out(args, "import message needs a JSON file from export message")?;
@@ -948,7 +948,7 @@ fn import_message(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]`: writes the strings of a payload that is not a message
+/// `bof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]`: writes the strings of a payload that is not a message
 /// bank as JSON (default: PAYLOAD with a `.json` extension). `--load-arg` is the entry's load address when the entry is a
 /// type 0 to 2 payload: a pointer table is recognised against it.
 fn export_strings(args: &[String]) -> Result<i32> {
@@ -968,7 +968,7 @@ fn export_strings(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import strings JSON --payload PAYLOAD [-o OUT]`: writes the payload with each string encoded again
+/// `bof3 assets import strings JSON --payload PAYLOAD [-o OUT]`: writes the payload with each string encoded again
 /// from the JSON of `export strings` (default: JSON with a `.bin` extension). PAYLOAD is the file the JSON came from.
 fn import_strings(args: &[String]) -> Result<i32> {
     let (mut input, mut payload, mut out) = (None, None, None);
@@ -989,7 +989,7 @@ fn import_strings(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets export characters PAYLOAD [-o OUT]`: writes the eight playable characters of `ETC/START.EMI` entry 8 as
+/// `bof3 assets export characters PAYLOAD [-o OUT]`: writes the eight playable characters of `ETC/START.EMI` entry 8 as
 /// JSON: each name, and the rest of its base-stat record as hex (default: PAYLOAD with a `.json` extension).
 fn export_characters(args: &[String]) -> Result<i32> {
     let (input, out) = input_and_out(args, "export characters needs the payload of ETC/START.EMI entry 8")?;
@@ -998,7 +998,7 @@ fn export_characters(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import characters JSON --payload PAYLOAD [-o OUT]`: writes the payload of `ETC/START.EMI` entry 8 with its
+/// `bof3 assets import characters JSON --payload PAYLOAD [-o OUT]`: writes the payload of `ETC/START.EMI` entry 8 with its
 /// characters replaced by the JSON of `export characters` (default: JSON with a `.bin` extension).
 fn import_characters(args: &[String]) -> Result<i32> {
     let (mut input, mut payload, mut out) = (None, None, None);
@@ -1020,7 +1020,7 @@ fn import_characters(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets export character-bank PAYLOAD [-o OUT]`: writes the palettes of one sprite bank as JSON: each section's
+/// `bof3 assets export character-bank PAYLOAD [-o OUT]`: writes the palettes of one sprite bank as JSON: each section's
 /// palettes, and each colour as four hex digits. PAYLOAD is the decoded bank, a whole container or one section
 /// (default: PAYLOAD with a `.json` extension).
 fn export_character_bank(args: &[String]) -> Result<i32> {
@@ -1030,7 +1030,7 @@ fn export_character_bank(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]`: writes the decoded sprite bank with its palettes
+/// `bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]`: writes the decoded sprite bank with its palettes
 /// replaced by the JSON of `export character-bank` (default: JSON with a `.bin` extension).
 fn import_character_bank(args: &[String]) -> Result<i32> {
     let (mut input, mut payload, mut out) = (None, None, None);
@@ -1053,7 +1053,7 @@ fn import_character_bank(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import vag WAV [-o OUT]`: encodes a 44.1 kHz mono 16-bit WAVE file as a VAG (default: WAV with
+/// `bof3 assets import vag WAV [-o OUT]`: encodes a 44.1 kHz mono 16-bit WAVE file as a VAG (default: WAV with
 /// a `.vag` extension). ADPCM is lossy for samples that no block reproduces, and encoding the decoded samples
 /// again is exact.
 fn import_vag(args: &[String]) -> Result<i32> {
@@ -1063,7 +1063,7 @@ fn import_vag(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import table NAME JSON --payload ENTRY [-o OUT]`: writes one fixed table of `ETC/GAME.EMI` entry 0
+/// `bof3 assets import table NAME JSON --payload ENTRY [-o OUT]`: writes one fixed table of `ETC/GAME.EMI` entry 0
 /// from its JSON records (`NAME` is the table's name, as its JSON file is named). ENTRY is the stored entry 0. The
 /// bytes no field names keep their values from ENTRY. The output defaults to JSON with a `.bin` extension.
 fn import_table(args: &[String]) -> Result<i32> {
@@ -1086,7 +1086,7 @@ fn import_table(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import encounters JSON --base BLOCK [-o OUT]`: writes one area's encounter block from its JSON.
+/// `bof3 assets import encounters JSON --base BLOCK [-o OUT]`: writes one area's encounter block from its JSON.
 /// BLOCK is the stored block (`area-encounters`), whose bytes no field names keep. The output defaults to JSON with
 /// a `.bin` extension.
 fn import_encounters(args: &[String]) -> Result<i32> {
@@ -1108,7 +1108,7 @@ fn import_encounters(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets export sequence PACKAGE [--index N] [-o OUT]`: writes sequence N of a sequence package (`.seq`) as a
+/// `bof3 assets export sequence PACKAGE [--index N] [-o OUT]`: writes sequence N of a sequence package (`.seq`) as a
 /// format 0 Standard MIDI File (default: PACKAGE with a `.mid` extension, and N 0).
 fn export_sequence(args: &[String]) -> Result<i32> {
     let (mut files, mut index, mut out) = (Vec::new(), 0, None);
@@ -1128,7 +1128,7 @@ fn export_sequence(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import sequence FILE.mid:ID... [-o OUT]`: writes a sequence package (`.seq`) from Standard MIDI
+/// `bof3 assets import sequence FILE.mid:ID... [-o OUT]`: writes a sequence package (`.seq`) from Standard MIDI
 /// Files, one sequence per argument and in order. ID is the sequence's id in the package. The output defaults to
 /// the first file's name with a `.seq` extension.
 fn import_sequence(args: &[String]) -> Result<i32> {
@@ -1158,7 +1158,7 @@ fn import_sequence(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]`: rebuilds an EMI container with the entries
+/// `bof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]`: rebuilds an EMI container with the entries
 /// named by `--entry` replaced by the files' bytes. Without `--entry` the output is the container as its entries
 /// pack. The output defaults to CONTAINER with a `.rebuilt.EMI` extension.
 fn import_emi(args: &[String]) -> Result<i32> {
@@ -1190,7 +1190,7 @@ fn import_emi(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import disc CUE [--file PATH=FILE]... -o DIR`: writes a patched copy of the disc into the new directory
+/// `bof3 assets import disc CUE [--file PATH=FILE]... -o DIR`: writes a patched copy of the disc into the new directory
 /// DIR. Each `--file` replaces the disc file PATH with the bytes of FILE, keeping its sectors. The copy keeps the cue
 /// sheet and every track file under its own name.
 fn import_disc(args: &[String]) -> Result<i32> {
@@ -1223,7 +1223,7 @@ fn import_disc(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import soundfont BANK.sf2 [-o PREFIX]`: writes the VAB bank a SoundFont 2 file describes as
+/// `bof3 assets import soundfont BANK.sf2 [-o PREFIX]`: writes the VAB bank a SoundFont 2 file describes as
 /// PREFIX.vh and PREFIX.vb. The default prefix is the SoundFont's path without its extension.
 fn import_soundfont(args: &[String]) -> Result<i32> {
     let (input, out) = input_and_out(args, "import soundfont needs a SoundFont 2 file")?;
@@ -1234,7 +1234,7 @@ fn import_soundfont(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import layout JSON --payload BUNDLE [-o OUT]`: writes a map bundle from its layout JSON. The codes,
+/// `bof3 assets import layout JSON --payload BUNDLE [-o OUT]`: writes a map bundle from its layout JSON. The codes,
 /// objects and height table come from JSON, and BUNDLE, the stored bundle, supplies every other section. The output
 /// defaults to JSON with a `.bin` extension.
 fn import_layout(args: &[String]) -> Result<i32> {
@@ -1256,7 +1256,7 @@ fn import_layout(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets import terrain MESH --payload BUNDLE [-o OUT]`: writes a map bundle with the corner heights of
+/// `bof3 assets import terrain MESH --payload BUNDLE [-o OUT]`: writes a map bundle with the corner heights of
 /// MESH, a `.glb` or an OBJ from `export terrain`. BUNDLE is the stored bundle the mesh came from, and it
 /// supplies every other section. The output defaults to MESH with a `.bin` extension.
 fn import_terrain(args: &[String]) -> Result<i32> {
@@ -1277,7 +1277,7 @@ fn import_terrain(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets soundfont HEADER BODY [-o OUT]`: writes one VAB bank as a SoundFont 2 file. HEADER is
+/// `bof3 assets soundfont HEADER BODY [-o OUT]`: writes one VAB bank as a SoundFont 2 file. HEADER is
 /// the `.vh` and BODY the `.vb`. The output defaults to HEADER with a `.sf2` extension.
 fn soundfont_command(args: &[String]) -> Result<i32> {
     let mut files = Vec::new();
@@ -1305,7 +1305,7 @@ fn soundfont_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `rebof3 assets terrain BUNDLE [-o OUT]`: writes one map bundle's terrain. A `.glb` output is a
+/// `bof3 assets terrain BUNDLE [-o OUT]`: writes one map bundle's terrain. A `.glb` output is a
 /// binary glTF. Any other output is an OBJ, and its MTL goes beside it.
 fn terrain_command(args: &[String]) -> Result<i32> {
     let mut bundle = None;
@@ -1392,7 +1392,7 @@ fn parse(args: &[String]) -> Result<Arguments> {
             "-h" | "--help" => return Err(Error::Usage(USAGE.into())),
             other => {
                 return Err(Error::Usage(format!(
-                    "unknown option {other:?} for `assets extract`; run `rebof3 assets extract --help`"
+                    "unknown option {other:?} for `assets extract`; run `bof3 assets extract --help`"
                 )));
             }
         }
@@ -1401,7 +1401,7 @@ fn parse(args: &[String]) -> Result<Arguments> {
     Ok(parsed)
 }
 
-/// `rebof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per kind, the entries and bytes that
+/// `bof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per kind, the entries and bytes that
 /// export and import to their own bytes, against the kind's total. Kinds without a round trip report zero.
 fn coverage_command(args: &[String]) -> Result<i32> {
     let mut image = None;
@@ -1411,7 +1411,7 @@ fn coverage_command(args: &[String]) -> Result<i32> {
             "-i" | "--input" | "--image" => image = Some(PathBuf::from(value_of(&mut rest, arg)?)),
             other => {
                 return Err(Error::Usage(format!(
-                    "unexpected argument {other:?} for `assets coverage`; run `rebof3 assets coverage --help`"
+                    "unexpected argument {other:?} for `assets coverage`; run `bof3 assets coverage --help`"
                 )));
             }
         }

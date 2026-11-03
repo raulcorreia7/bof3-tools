@@ -118,7 +118,7 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_emi::Resu
             ]
         }
         Format::CueTable => vec![Derived {
-            // The record is `EmiCue` in `rebof3/include/audio/cue.h`, the one C
+            // The record is `EmiCue` in `decomp/include/audio/cue.h`, the one C
             // definition of a cue record; its format is
             // `wiki: formats/audio#emi-type-8-cue-records`.
             role: "json",
@@ -126,7 +126,7 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_emi::Resu
             data: rebof3_emi::cue::CueTable::decode(payload)?.json().into_bytes(),
         }],
         Format::AreaActorDefsTable => vec![Derived {
-            // The record is `AreaActorDef` in `rebof3/include/world/area.h`, the one C
+            // The record is `AreaActorDef` in `decomp/include/world/area.h`, the one C
             // definition of a scene record; its format is
             // `wiki: formats/area#0x800e3800-scenestep-table`.
             role: "json",
@@ -134,7 +134,7 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_emi::Resu
             data: rebof3_emi::scene::SceneTable::decode(payload)?.json().into_bytes(),
         }],
         Format::AreaScriptBank => vec![Derived {
-            // The reader is `Actor_BeginScript` in `rebof3/src/slus/func_8014D6DC.c:43-45`;
+            // The reader is `Actor_BeginScript` in `decomp/src/slus/func_8014D6DC.c:43-45`;
             // the layout is `wiki: formats/area#0x800d3800-area-script-bank`.
             role: "json",
             extension: "json",

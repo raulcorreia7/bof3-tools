@@ -10,7 +10,7 @@
 //! Every record here has one C counterpart, and both name the same fields
 //! (`wiki: data/records#gameemi-fixed-tables`):
 //!
-//! | Table | C record (`rebof3/include`) |
+//! | Table | C record (`decomp/include`) |
 //! | --- | --- |
 //! | items | `game/item.h` `ItemObject` |
 //! | vital items | `game/item.h` `VitalItem` |

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! `rebof3`: the Breath of Fire III toolchain.
+//! `bof3`: the Breath of Fire III toolchain.
 //!
 //! Subcommands: `disc` and `emi`, plus `assets` in the default build. Each keeps
 //! the flags and help of the command it replaced.
@@ -17,10 +17,10 @@ use std::process::ExitCode;
 
 #[cfg(feature = "assets")]
 const USAGE: &str = "\
-rebof3: the Breath of Fire III toolchain.
+bof3: the Breath of Fire III toolchain.
 
-Usage: rebof3 <COMMAND> [ARGS...]
-       rebof3 <COMMAND> --help
+Usage: bof3 <COMMAND> [ARGS...]
+       bof3 <COMMAND> --help
 
 Commands:
   disc    extract, checksum, verify and rebuild a PlayStation disc image
@@ -32,18 +32,18 @@ Options:
   -V, --version  print the version
 
 Examples:
-  rebof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
-  rebof3 emi list \"BIN/BGM/BGM000.EMI\"
+  bof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
+  bof3 emi list \"BIN/BGM/BGM000.EMI\"
 
 Every command prints its purpose, every switch with its default, and runnable
-examples: rebof3 <COMMAND> --help, then rebof3 <COMMAND> <VERB> --help.
+examples: bof3 <COMMAND> --help, then bof3 <COMMAND> <VERB> --help.
 ";
 
 #[cfg(not(feature = "assets"))]
 const USAGE: &str = "\
-rebof3: disc and EMI tools for game setup.
+bof3: disc and EMI tools for game setup.
 
-Usage: rebof3 <COMMAND> [ARGS...]
+Usage: bof3 <COMMAND> [ARGS...]
 
 Commands:
   disc    extract, checksum, verify and rebuild a PlayStation disc image
@@ -54,7 +54,7 @@ Options:
   -V, --version  print the version
 
 Asset conversion requires the full build: cargo build --release -p rebof3 --features assets
-Run rebof3 <COMMAND> --help for command options.
+Run bof3 <COMMAND> --help for command options.
 ";
 
 fn main() -> ExitCode {
@@ -75,13 +75,13 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("-V" | "--version") => {
-            println!("rebof3 {}", env!("CARGO_PKG_VERSION"));
+            println!("bof3 {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
         _ => {
             eprintln!(
-                "rebof3: unknown command {command:?}; run `rebof3 --help` for the commands, or \
-                 `rebof3 <COMMAND> --help` for one command\n\n{USAGE}"
+                "bof3: unknown command {command:?}; run `bof3 --help` for the commands, or \
+                 `bof3 <COMMAND> --help` for one command\n\n{USAGE}"
             );
             ExitCode::from(2)
         }
