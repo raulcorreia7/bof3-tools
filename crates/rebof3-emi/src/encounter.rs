@@ -167,7 +167,7 @@ fn deserialize_name<'de, D: serde::Deserializer<'de>>(
     Ok(bytes.try_into().expect("an enemy name is NAME_BYTES long"))
 }
 
-/// Writes a name into an enemy record: its stored bytes, colour codes included.
+/// Writes a name into an enemy record: its stored bytes, color codes included.
 fn put_name(record: &mut [u8], name: &[u8; NAME_BYTES]) {
     record[..NAME_BYTES].copy_from_slice(name);
 }
