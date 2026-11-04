@@ -12,9 +12,9 @@ One `bof3` binary with `disc`, `emi` and `assets` subcommands. The audio player 
 
 ### Migration
 
-| Removed                                           | Replacement       |
-| ------------------------------------------------- | ----------------- |
-| `rebof3 player ...`                               | `bof3player ...`  |
-| `disc ...` (binary)                               | `bof3 disc ...`   |
-| `emi ...` (binary)                                | `bof3 emi ...`    |
-| `assets ...` (binary)                             | `bof3 assets ...` |
+| Removed               | Replacement       |
+| --------------------- | ----------------- |
+| `rebof3 player ...`   | `bof3player ...`  |
+| `disc ...` (binary)   | `bof3 disc ...`   |
+| `emi ...` (binary)    | `bof3 emi ...`    |
+| `assets ...` (binary) | `bof3 assets ...` |

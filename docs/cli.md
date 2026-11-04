@@ -1,9 +1,10 @@
 # The bof3 command line
 
-`bof3` provides the `disc`, `emi` and `assets` commands. The subcommands parse arguments and print; the
-libraries hold the logic ([crates](crates.md)). `--help` lists each command's purpose, every switch with
-its default, and runnable examples. A command with verbs (`disc extract`, `emi pack`,
-`assets import texture`) has its own focused `--help`. Errors name what failed and the next safe action.
+`bof3` provides the `disc`, `emi` and `assets` commands. The subcommands parse arguments and
+print; the libraries hold the logic ([crates](crates.md)). `--help` lists each command's purpose,
+every switch with its default, and runnable examples. A command with verbs (`disc extract`,
+`emi pack`, `assets import texture`) has its own focused `--help`. Errors name what failed and the
+next safe action.
 
 ```sh
 make build
@@ -14,11 +15,11 @@ target/release/bof3 assets extract-all -o build/extract
 ```
 
 `make build` writes `target/release/bof3`. The build needs the Rust toolchain in
-`rust-toolchain.toml`. Audio extraction uses the bof3-player libraries; on Linux they need the ALSA
-headers. The examples run from the repository root and write below `build/`.
+`rust-toolchain.toml`. Audio extraction uses the [bof3-player](https://github.com/raulcorreia7/bof3-player) libraries;
+on Linux they need the ALSA headers. The examples run from the repository root and write below `build/`.
 
-| Command         | Does                                                           | Reference         |
-| --------------- | -------------------------------------------------------------- | ----------------- |
+| Command       | Does                                                           | Reference         |
+| ------------- | -------------------------------------------------------------- | ----------------- |
 | `bof3 disc`   | Extract, checksum, verify and rebuild a PlayStation disc image | [Disc](#disc)     |
 | `bof3 emi`    | List, extract, pack and inspect EMI archives                   | [EMI](#emi)       |
 | `bof3 assets` | Extract the disc's assets or convert one asset                 | [Assets](#assets) |
@@ -153,7 +154,7 @@ target/release/bof3 assets import texture 7.png -o payload.img
 `terrain` writes `.glb` for a `.glb` output path and OBJ plus MTL otherwise. `soundfont` takes the header
 and body that share a load argument. `import disc` replaces files of the disc by path
 (`--file PATH=FILE`); a file cannot grow past its last sector. `import encounters` requires `--base`.
-Import behaviour and round-trip results are in [assets](assets.md#import).
+Import behavior and round-trip results are in [assets](assets.md#import).
 
 ### extract-all
 
