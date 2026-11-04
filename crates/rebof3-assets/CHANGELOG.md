@@ -22,10 +22,10 @@ or module name inside the crate moves.
 
 ### Migration
 
-| Removed                       | Replacement         |
-| ----------------------------- | ------------------- |
-| `bof3-assets` (Cargo package) | `rebof3-assets`     |
-| `bof3_assets` (Rust path)     | `rebof3_assets`     |
+| Removed                       | Replacement       |
+| ----------------------------- | ----------------- |
+| `bof3-assets` (Cargo package) | `rebof3-assets`   |
+| `bof3_assets` (Rust path)     | `rebof3_assets`   |
 | `assets ...` (command)        | `bof3 assets ...` |
 
 ## 0.1.0
