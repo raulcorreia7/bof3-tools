@@ -2,15 +2,12 @@ name: CI
 
 # A pull request that changes only docs runs the format check and nothing heavier. Every job still
 # runs and reports, because the main ruleset requires each check by name; the `changes` step gates
-# the steps. cargo-deny runs on a pull request only when a manifest, the lockfile, deny.toml or a
-# workflow changes, and weekly, so new advisories surface.
+# the steps. cargo-deny runs on every pull request.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: "17 5 * * 1"
 
 permissions:
   contents: read
@@ -106,29 +103,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
           persist-credentials: false
-      # Lists the files of this pull request (the checkout is the merge commit). Only docs: code=false.
-      - id: changes
-        name: Changes
-        shell: bash
-        run: |
-          code=true
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
-            code=false
-            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
-            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
-          fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          deps=true
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            deps=false
-            if printf '%s\n' "$files" | grep -qE '^(Cargo\.toml|Cargo\.lock|deny\.toml|.*/Cargo\.toml|\.github/workflows/.*|unknown)$'; then deps=true; fi
-          fi
-          echo "deps=$deps" >> "$GITHUB_OUTPUT"
-      - if: steps.changes.outputs.deps == 'true'
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
 
   build-cli:
     runs-on: ubuntu-latest
