@@ -1,8 +1,7 @@
 name: CI
 
-# A pull request that changes only docs runs the format check and nothing heavier. Every job still
-# runs and reports, because the main ruleset requires each check by name; the `changes` step gates
-# the steps. cargo-deny runs on every pull request.
+# Format, lint, test, minimum Rust version, dependency and CLI build checks.
+
 on:
   push:
     branches: [main]
@@ -34,7 +33,7 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      # Lists the files of this pull request (the checkout is the merge commit). Only docs: code=false.
+      # Docs-only pull requests skip the build steps.
       - id: changes
         name: Changes
         shell: bash
@@ -52,7 +51,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      # The format check needs rustfmt on the pinned toolchain, so it installs for docs-only runs too.
       - run: rustup component add rustfmt
       - run: cargo fmt --all --check
       - if: steps.changes.outputs.code == 'true'
@@ -70,7 +68,7 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      # Lists the files of this pull request (the checkout is the merge commit). Only docs: code=false.
+      # Docs-only pull requests skip the build steps.
       - id: changes
         name: Changes
         shell: bash
@@ -114,7 +112,7 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      # Lists the files of this pull request (the checkout is the merge commit). Only docs: code=false.
+      # Docs-only pull requests skip the build steps.
       - id: changes
         name: Changes
         shell: bash
