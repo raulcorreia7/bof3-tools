@@ -1,5 +1,7 @@
 name: CI
 
+# Format, lint, test, minimum Rust version, dependency and CLI build checks.
+
 on:
   push:
     branches: [main]
@@ -11,7 +13,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_INCREMENTAL: 0
@@ -29,15 +31,34 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
+      # Docs-only pull requests skip the build steps.
+      - id: changes
+        name: Changes
+        shell: bash
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
+            code=false
+            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
+            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
-        if: runner.os == 'Linux'
+        if: steps.changes.outputs.code == 'true' && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - run: rustup component add rustfmt clippy
+      - if: steps.changes.outputs.code == 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: rustup component add rustfmt
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
+      - if: steps.changes.outputs.code == 'true'
+        run: rustup component add clippy
+      - if: steps.changes.outputs.code == 'true'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - if: steps.changes.outputs.code == 'true'
+        run: cargo test --workspace --locked
 
   msrv:
     runs-on: ubuntu-latest
@@ -45,16 +66,34 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
+      # Docs-only pull requests skip the build steps.
+      - id: changes
+        name: Changes
+        shell: bash
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
+            code=false
+            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
+            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
+        if: steps.changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - name: Install the minimum supported Rust version
+        if: steps.changes.outputs.code == 'true'
         run: |
           msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
           rustup toolchain install "$msrv" --profile minimal
           echo "RUSTUP_TOOLCHAIN=$msrv" >> "$GITHUB_ENV"
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - run: cargo check --workspace --locked
+      - if: steps.changes.outputs.code == 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - if: steps.changes.outputs.code == 'true'
+        run: cargo check --workspace --locked
 
   dependencies:
     runs-on: ubuntu-latest
@@ -71,16 +110,34 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
+      # Docs-only pull requests skip the build steps.
+      - id: changes
+        name: Changes
+        shell: bash
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
+            code=false
+            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
+            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
+        if: steps.changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - if: steps.changes.outputs.code == 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Build setup-only CLI
+        if: steps.changes.outputs.code == 'true'
         run: |
           cargo build --locked --release -p rebof3 --no-default-features
           ./target/release/bof3 disc --help
           ./target/release/bof3 emi --help
       - name: Build full assets CLI
+        if: steps.changes.outputs.code == 'true'
         run: |
           cargo build --locked --release -p rebof3
           ./target/release/bof3 disc --help
