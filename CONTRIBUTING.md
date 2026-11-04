@@ -20,8 +20,8 @@ make check
 
 `make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. Install
 `cargo-deny` once with `cargo install cargo-deny --locked`. CI runs the same checks on Linux
-and Windows, the release workflow also builds for macOS, and CI builds with the minimum supported Rust version (`rust-version` in
-`Cargo.toml`).
+and Windows and builds with the minimum supported Rust version (`rust-version` in `Cargo.toml`).
+The release workflow also builds for macOS.
 
 ## Test data
 
