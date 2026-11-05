@@ -33,6 +33,16 @@ make check
   `fix(emi): reject a short header`. Add no AI attribution. Never amend, force-push or rewrite
   history.
 
+## Index
+
+- Skills: none; this guide is the entry point.
+- Tools: `bof3 --help` and [docs/cli.md](docs/cli.md); `make help`.
+- Docs: [docs/](docs/) (table above).
+- CI: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs `make check`;
+  [release.yml](.github/workflows/release.yml) builds the release archives.
+- Wiki (game and format facts): [site](https://raulcorreia7.github.io/bof3-wiki/). For a model: [llms.txt](https://raulcorreia7.github.io/bof3-wiki/llms.txt) (index), [llms-small.txt](https://raulcorreia7.github.io/bof3-wiki/llms-small.txt) (compact, for a small context), [llms-full.txt](https://raulcorreia7.github.io/bof3-wiki/llms-full.txt) (everything).
+- Project standard: [docs/standard.md](https://github.com/raulcorreia7/bof3/blob/main/docs/standard.md).
+
 ## Writing
 
 Docs, comments, commit messages and pull requests follow one standard.
