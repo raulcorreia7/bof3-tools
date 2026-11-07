@@ -613,11 +613,12 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
             return Ok(());
         }
     };
-    let failures = sound::render(
+    let failures = sound::render_with_jobs(
         &library,
         |kind| options.selection.contains(kind),
         options.selection.mode(),
         options.selection.audio(),
+        options.jobs,
         |clip| {
             let base = Row {
                 source: clip.source,
