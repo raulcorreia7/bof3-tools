@@ -24,7 +24,7 @@ unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 
-allow-git = ["https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.2"]
+allow-git = ["https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3"]
 
 [advisories]
 # The editor's screen-reader support (egui's AccessKit on Linux) reaches D-Bus through zbus, whose

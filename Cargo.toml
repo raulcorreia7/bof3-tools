@@ -28,11 +28,10 @@ publish = false
 [workspace.dependencies]
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
 rebof3-emi = { path = "crates/rebof3-emi", version = "0.2.0", default-features = false }
-emi = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
-bof3player = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
-bof3-names = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2" }
-psx-cd = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2" }
-psx-formats = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.2", version = "0.1.2", default-features = false }
+emi = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
+bof3player = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
+psx-cd = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3" }
+psx-formats = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"

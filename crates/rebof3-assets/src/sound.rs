@@ -55,7 +55,7 @@ pub struct Original {
 
 /// Opens the disc image as a `bof3player` library. An image too small to be a game disc fails here.
 pub fn open(image: &Path) -> Result<Library<'static>> {
-    discover::open_with(SourceKind::Disc, image, bof3_names::game_names()).map_err(audio)
+    discover::open_with(SourceKind::Disc, image, bof3player::names::game_names()).map_err(audio)
 }
 
 /// Renders every playable music, sample and XA item of `library` whose kind `wanted` selects.
@@ -315,7 +315,7 @@ impl Sounds {
     /// read callbacks. A `.cue` sheet's audio track is not available this way.
     pub fn open_reader(reader: Box<dyn ReadSeek>) -> Result<Self> {
         let source = DiscSource::from_reader(reader).map_err(audio)?;
-        Ok(Self { library: Library::open_with(source, bof3_names::game_names()).map_err(audio)? })
+        Ok(Self { library: Library::open_with(source, bof3player::names::game_names()).map_err(audio)? })
     }
 
     /// The number of catalog items, playable or not.

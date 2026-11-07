@@ -1,13 +1,12 @@
 # Library crates
 
-The libraries behind the `bof3` command: three crates in this workspace and one, `bof3-names`, from
-the public [bof3-player](https://github.com/raulcorreia7/bof3-player) repository, which also
-supplies the audio and disc libraries.
+The libraries behind the `bof3` command: three crates in this workspace and the public
+[bof3-player](https://github.com/raulcorreia7/bof3-player) repository, which supplies the audio,
+disc and bundled-names libraries.
 
 | Crate           | What it is                                                                |
 | --------------- | ------------------------------------------------------------------------- |
 | `rebof3-emi`    | EMI container, game records and area formats, LZ77, cue tables, coverage. |
-| `bof3-names`    | The bundled game names; from bof3-player.                     |
 | `rebof3-assets` | The all-assets extractor: classify every file and EMI slot, write a tree. |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 
@@ -25,13 +24,6 @@ extractor validates the header, the table bounds, the payload bounds and the ent
 writes. The packer reproduces the retail fill bytes
 ([padding](https://raulcorreia7.github.io/bof3-wiki/formats/emi.html#padding)). The packing
 contract is in [the command line](cli.md#manifest-packing-contract).
-
-## bof3-names
-
-Embeds the names file the `bof3player` crate reads, as a
-[`Naming`](https://github.com/raulcorreia7/bof3-player/blob/main/docs/rust-api.md#names-and-titles)
-implementation for the tools. The file maps archive paths and ids to display names, soundtrack
-titles, magical abilities, enemy banks and duplicate groups.
 
 ## rebof3-assets
 
