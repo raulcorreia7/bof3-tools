@@ -18,8 +18,7 @@ rebof3-assets.workspace = true
 psx-formats = { workspace = true, features = ["std"] }
 serde.workspace = true
 serde_json.workspace = true
-eframe = { version = "0.37.0", default-features = false, features = ["glow", "wayland", "x11", "accesskit"] }
-rfd = "0.18.0"
+gpui.workspace = true
 cpal = "0.18.2"
 
 [lints]

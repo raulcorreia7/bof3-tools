@@ -27,7 +27,8 @@ jobs:
         # Linux covers Unix and Windows covers its paths; the release workflow builds macOS.
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # gpui, the editor's toolkit, makes a cold build long; the player's CI allows the same.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,7 +49,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
         if: steps.changes.outputs.code == 'true' && runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libvulkan-dev
       - if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: rustup component add rustfmt
@@ -62,7 +63,7 @@ jobs:
 
   msrv:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -83,7 +84,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
         if: steps.changes.outputs.code == 'true'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libvulkan-dev
       - name: Install the minimum supported Rust version
         if: steps.changes.outputs.code == 'true'
         run: |

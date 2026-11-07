@@ -1,143 +1,118 @@
-//! The editor's look: a dark theme with one warm accent, its window icon, and the short colored tag
-//! each entry format wears in the lists.
+//! The editor's look: a dark theme with one warm accent, its icon, and the short colored tag each
+//! entry format wears in the lists. Each color is a 24-bit `0xRRGGBB` value.
 
-use eframe::egui::{self, Color32, CornerRadius, IconData, Stroke, Visuals};
+use gpui::{Div, Hsla, div, prelude::*, px, rgb};
 use rebof3_emi::classify::Format;
 
 /// The accent: selection, focus and the active tab.
-pub const ACCENT: Color32 = Color32::from_rgb(232, 142, 66);
+pub const ACCENT: u32 = 0xe88e42;
 
-const BACKGROUND: Color32 = Color32::from_rgb(22, 24, 30);
-const PANEL: Color32 = Color32::from_rgb(28, 31, 38);
-const RAISED: Color32 = Color32::from_rgb(38, 42, 52);
-const HOVER: Color32 = Color32::from_rgb(50, 55, 68);
-const TEXT: Color32 = Color32::from_rgb(222, 224, 230);
-const CORNER: u8 = 6;
-/// How strongly the accent tints a selection and a pressed widget.
+/// The window backdrop and the inside of text fields.
+pub const BACKGROUND: u32 = 0x16181e;
+/// Panels and lists.
+pub const PANEL: u32 = 0x1c1f26;
+/// Buttons, tabs and the tracks of sliders.
+pub const RAISED: u32 = 0x262a34;
+/// The fill under the pointer.
+pub const HOVER: u32 = 0x323744;
+/// Panel borders and dividers.
+pub const BORDER: u32 = 0x2c303b;
+/// Body text.
+pub const TEXT: u32 = 0xdee0e6;
+/// Secondary text: hints, offsets and unclassified entries.
+pub const MUTED: u32 = 0x8a8f9c;
+/// Controls that cannot be used.
+pub const DISABLED: u32 = 0x5a5f6c;
+
+/// An edited entry, byte or cell.
+pub const EDITED: u32 = 0xe6aa3c;
+/// A value the view cannot write back.
+pub const READ_ONLY: u32 = 0x9696a0;
+/// The outline of the selected texel, byte or color.
+pub const SELECTION: u32 = 0xffe650;
+/// Text drawn on a [`SELECTION`] fill.
+pub const ON_SELECTION: u32 = 0x000000;
+
+/// How strongly the accent tints a selected row and a pressed control.
 const SELECTION_TINT: f32 = 0.45;
 const PRESSED_TINT: f32 = 0.6;
-/// Outline of a selection, in points.
-const SELECTION_OUTLINE: f32 = 1.0;
-/// Spacing between widgets, inside buttons, and the height of a control row, in points.
-const ITEM_SPACING: [f32; 2] = [8.0, 6.0];
-const BUTTON_PADDING: [f32; 2] = [10.0, 4.0];
-const CONTROL_HEIGHT: f32 = 24.0;
-/// Gap between two cells of the icon's grid, in pixels.
-const ICON_GAP: usize = 2;
-const OPAQUE: u8 = 255;
 
-pub fn apply(context: &egui::Context) {
-    let mut visuals = Visuals::dark();
-    visuals.panel_fill = PANEL;
-    visuals.window_fill = PANEL;
-    visuals.extreme_bg_color = BACKGROUND;
-    visuals.faint_bg_color = RAISED;
-    visuals.override_text_color = Some(TEXT);
-    visuals.selection.bg_fill = ACCENT.linear_multiply(SELECTION_TINT);
-    visuals.selection.stroke = Stroke::new(SELECTION_OUTLINE, ACCENT);
-    visuals.hyperlink_color = ACCENT;
+/// Corner radius of controls, rows and fields, in pixels.
+pub const CORNER: f32 = 6.0;
 
-    let corner = CornerRadius::same(CORNER);
-    for widget in [
-        &mut visuals.widgets.inactive,
-        &mut visuals.widgets.hovered,
-        &mut visuals.widgets.active,
-        &mut visuals.widgets.open,
-    ] {
-        widget.corner_radius = corner;
-    }
-    visuals.widgets.inactive.weak_bg_fill = RAISED;
-    visuals.widgets.hovered.weak_bg_fill = HOVER;
-    visuals.widgets.active.weak_bg_fill = ACCENT.linear_multiply(PRESSED_TINT);
-    visuals.window_corner_radius = corner;
-    context.set_visuals(visuals);
+/// A theme color as a gpui color.
+pub fn color(value: u32) -> Hsla {
+    rgb(value).into()
+}
 
-    context.global_style_mut(|style| {
-        style.spacing.item_spacing = ITEM_SPACING.into();
-        style.spacing.button_padding = BUTTON_PADDING.into();
-        style.spacing.interact_size.y = CONTROL_HEIGHT;
-    });
+/// The fill of a selected row or tab: the accent, see-through.
+pub fn selected_fill() -> Hsla {
+    Hsla { a: SELECTION_TINT, ..color(ACCENT) }
+}
+
+/// The fill of a pressed control.
+pub fn pressed_fill() -> Hsla {
+    Hsla { a: PRESSED_TINT, ..color(ACCENT) }
 }
 
 /// A short tag and color for an entry format.
-pub fn tag(format: Format) -> (&'static str, Color32) {
+pub fn tag(format: Format) -> (&'static str, u32) {
     match format {
-        Format::VramUpload => ("TEX", Color32::from_rgb(90, 170, 240)),
-        Format::ClutBank => ("PAL", Color32::from_rgb(210, 110, 200)),
-        Format::VabHeader | Format::VabBody => ("VAB", Color32::from_rgb(110, 200, 130)),
-        Format::SepPackage => ("SEQ", Color32::from_rgb(80, 200, 180)),
-        Format::CueTable => ("CUE", Color32::from_rgb(150, 210, 90)),
-        Format::AreaMessageBank => ("TXT", Color32::from_rgb(240, 200, 90)),
-        Format::Lz77Blob => ("LZ", Color32::from_rgb(170, 150, 230)),
-        Format::CharacterBlob => ("CHR", Color32::from_rgb(240, 120, 110)),
-        Format::AreaCellGrid | Format::AreaMapBundle | Format::AreaAuxWindow => {
-            ("MAP", Color32::from_rgb(120, 180, 110))
-        }
-        Format::AreaScriptBank | Format::BattleScriptBank => ("SCR", Color32::from_rgb(230, 160, 90)),
+        Format::VramUpload => ("TEX", 0x5aaaf0),
+        Format::ClutBank => ("PAL", 0xd26ec8),
+        Format::VabHeader | Format::VabBody => ("VAB", 0x6ec882),
+        Format::SepPackage => ("SEQ", 0x50c8b4),
+        Format::CueTable => ("CUE", 0x96d25a),
+        Format::AreaMessageBank => ("TXT", 0xf0c85a),
+        Format::Lz77Blob => ("LZ", 0xaa96e6),
+        Format::CharacterBlob => ("CHR", 0xf0786e),
+        Format::AreaCellGrid | Format::AreaMapBundle | Format::AreaAuxWindow => ("MAP", 0x78b46e),
+        Format::AreaScriptBank | Format::BattleScriptBank => ("SCR", 0xe6a05a),
         Format::AreaActorDefsTable | Format::AreaEncounterTable | Format::SharedResourceTable | Format::MagicTable => {
-            ("TAB", Color32::from_rgb(200, 190, 120))
+            ("TAB", 0xc8be78)
         }
-        Format::CodeImage => ("EXE", Color32::from_rgb(150, 155, 170)),
-        Format::Reserve => ("RES", Color32::from_rgb(110, 115, 130)),
-        Format::Unclassified => ("???", Color32::from_rgb(110, 115, 130)),
+        Format::CodeImage => ("EXE", 0x969baa),
+        Format::Reserve => ("RES", 0x6e7382),
+        Format::Unclassified => ("???", 0x6e7382),
     }
 }
 
-/// Side of the window icon, in pixels.
-const ICON_SIDE: usize = 64;
 /// Cells across the icon's palette grid.
 const ICON_CELLS: usize = 4;
-/// Margin around the grid, in pixels.
-const ICON_MARGIN: usize = 8;
+/// The colors of the icon's grid, row by row.
+const ICON_COLORS: [u32; ICON_CELLS * ICON_CELLS] = [
+    0xe88e42, 0xf0c85a, 0xd26ec8, 0x5aaaf0, //
+    0x6ec882, 0xf0786e, 0x50c8b4, 0xaa96e6, //
+    0x96d25a, 0xe6a05a, 0x78b46e, 0xc8be78, //
+    0x5a78c8, 0xf0a0a0, 0xa0dcf0, 0xdee0e6,
+];
+/// The icon's margin and the gap between two cells, as fractions of its side.
+const ICON_MARGIN: f32 = 0.125;
+const ICON_GAP: f32 = 0.03;
+/// The icon tile's corner radius, as a fraction of its side.
+const ICON_CORNER: f32 = 0.125;
 
-/// The window icon: a 4×4 palette grid, the editor's subject, on a rounded dark tile.
-pub fn icon() -> IconData {
-    let colors = [
-        [232, 142, 66],
-        [240, 200, 90],
-        [210, 110, 200],
-        [90, 170, 240],
-        [110, 200, 130],
-        [240, 120, 110],
-        [80, 200, 180],
-        [170, 150, 230],
-        [150, 210, 90],
-        [230, 160, 90],
-        [120, 180, 110],
-        [200, 190, 120],
-        [90, 120, 200],
-        [240, 160, 160],
-        [160, 220, 240],
-        [222, 224, 230],
-    ];
-    let cell = (ICON_SIDE - 2 * ICON_MARGIN) / ICON_CELLS;
-    let mut rgba = Vec::with_capacity(ICON_SIDE * ICON_SIDE * 4);
+/// The editor's icon: a 4×4 palette grid, the editor's subject, on a rounded dark tile. gpui sets
+/// no window icon, so the window draws it in its menu bar and on the welcome screen.
+pub fn icon(side: f32) -> Div {
+    let margin = side * ICON_MARGIN;
+    let gap = side * ICON_GAP;
+    let mut grid = div().flex().flex_col().gap(px(gap));
 
-    for y in 0..ICON_SIDE {
-        for x in 0..ICON_SIDE {
-            let inside = rounded(x, y, ICON_SIDE, ICON_MARGIN);
-            let pixel = match grid_cell(x, y, cell, ICON_GAP) {
-                Some(index) => [colors[index][0], colors[index][1], colors[index][2], OPAQUE],
-                None if inside => [BACKGROUND.r(), BACKGROUND.g(), BACKGROUND.b(), OPAQUE],
-                None => [0, 0, 0, 0],
-            };
-            rgba.extend_from_slice(&pixel);
+    for row in ICON_COLORS.chunks(ICON_CELLS) {
+        let mut cells = div().flex().flex_1().gap(px(gap));
+        for &cell in row {
+            cells = cells.child(div().flex_1().bg(color(cell)));
         }
+        grid = grid.child(cells);
     }
-    IconData { rgba, width: ICON_SIDE as u32, height: ICON_SIDE as u32 }
-}
 
-/// The palette cell under pixel (`x`, `y`), or `None` in a margin or gap.
-fn grid_cell(x: usize, y: usize, cell: usize, gap: usize) -> Option<usize> {
-    let (gx, gy) = (x.checked_sub(ICON_MARGIN)?, y.checked_sub(ICON_MARGIN)?);
-    let (column, row) = (gx / cell, gy / cell);
-    let inner = gx % cell >= gap && gy % cell >= gap;
-    (column < ICON_CELLS && row < ICON_CELLS && inner).then_some(row * ICON_CELLS + column)
-}
-
-/// True inside a square of `side` pixels with corners rounded by `radius`.
-fn rounded(x: usize, y: usize, side: usize, radius: usize) -> bool {
-    let clamp = |value: usize| value.clamp(radius, side - 1 - radius);
-    let (dx, dy) = (x.abs_diff(clamp(x)), y.abs_diff(clamp(y)));
-    dx * dx + dy * dy <= radius * radius
+    div()
+        .flex()
+        .flex_none()
+        .size(px(side))
+        .p(px(margin))
+        .rounded(px(side * ICON_CORNER))
+        .bg(color(BACKGROUND))
+        .child(grid.size_full())
 }

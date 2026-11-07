@@ -1,42 +1,70 @@
-//! The editor window: a menu bar, the archive browser on the left, the entry views in the middle and a
-//! status line at the bottom.
+//! The editor's state and what the user can do with it: open a project, pick an archive and an
+//! entry, edit, undo, save and export. `window` draws it.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
-use eframe::egui::{self, RichText};
-use rebof3_emi::classify::Format;
+use gpui::{Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, UniformListScrollHandle, Window};
 
+use crate::edit::{LineEdit, Outcome};
 use crate::project::{ArchivePath, Loaded, Project};
-use crate::view::{self, Tab, Views, style};
+use crate::view::{self, Entry, Tab, Views};
 
-/// Default width of the archive list, in points.
-const ARCHIVES_WIDTH: f32 = 220.0;
-/// Default width of the entry list, in points.
-const ENTRIES_WIDTH: f32 = 300.0;
-/// Width of the folder fields on the welcome screen, in points.
-const PATH_WIDTH: f32 = 520.0;
-/// Space above the welcome heading and below its text, in points.
-const WELCOME_TOP: f32 = 40.0;
-const WELCOME_GAP: f32 = 24.0;
+/// The project folder made next to the disc folder when none is named.
+const PROJECT_FOLDER: &str = "bof3-project";
+/// How often the window checks for a change it did not cause, such as a sound that ends.
+const TICK: Duration = Duration::from_millis(100);
 
-pub struct App {
-    project: Option<Project>,
-    disc_field: String,
-    folder_field: String,
-    filter: String,
-    archive: Option<Arc<Loaded>>,
-    entry: Option<usize>,
-    tab: Tab,
-    views: Views,
-    status: String,
+/// A text field of the window.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Field {
+    Disc,
+    Folder,
+    ArchiveFilter,
+    View(view::Field),
 }
 
-impl App {
-    pub fn new(disc: Option<PathBuf>, folder: Option<PathBuf>) -> Self {
+/// An open menu or chooser.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Menu {
+    Project,
+    Edit,
+    View(view::Menu),
+}
+
+/// One line of the archive browser.
+pub enum BrowserRow {
+    Folder { name: String, open: bool },
+    Archive { path: ArchivePath, edited: bool },
+}
+
+pub struct Editor {
+    pub project: Option<Project>,
+    pub disc_field: String,
+    pub folder_field: String,
+    pub filter: String,
+    pub archive: Option<Arc<Loaded>>,
+    pub entry: Option<usize>,
+    pub tab: Tab,
+    pub views: Views,
+    pub status: String,
+    /// The field that has the keyboard, and its text.
+    pub editing: Option<(Field, LineEdit)>,
+    pub menu: Option<Menu>,
+    /// The folders of the archive browser that are open.
+    pub open_folders: HashSet<String>,
+    pub focus: FocusHandle,
+    pub archive_scroll: UniformListScrollHandle,
+    pub entry_scroll: UniformListScrollHandle,
+}
+
+impl Editor {
+    pub fn new(disc: Option<PathBuf>, folder: Option<PathBuf>, cx: &mut Context<Self>) -> Self {
         let folder =
-            folder.or_else(|| disc.as_ref().and_then(|disc| disc.parent()).map(|parent| parent.join("bof3-project")));
-        let mut app = Self {
+            folder.or_else(|| disc.as_ref().and_then(|disc| disc.parent()).map(|parent| parent.join(PROJECT_FOLDER)));
+        let mut editor = Self {
             project: None,
             disc_field: disc.as_ref().map(|path| path.display().to_string()).unwrap_or_default(),
             folder_field: folder.as_ref().map(|path| path.display().to_string()).unwrap_or_default(),
@@ -46,14 +74,34 @@ impl App {
             tab: Tab::Info,
             views: Views::default(),
             status: "Open an extracted disc folder (the one that holds BIN/).".into(),
+            editing: None,
+            menu: None,
+            open_folders: HashSet::new(),
+            focus: cx.focus_handle(),
+            archive_scroll: UniformListScrollHandle::new(),
+            entry_scroll: UniformListScrollHandle::new(),
         };
         if disc.is_some() {
-            app.open();
+            editor.open();
         }
-        app
+
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(TICK).await;
+                let Ok(()) = this.update(cx, |editor, cx| {
+                    if editor.views.tick() {
+                        cx.notify();
+                    }
+                }) else {
+                    break;
+                };
+            }
+        })
+        .detach();
+        editor
     }
 
-    fn open(&mut self) {
+    pub fn open(&mut self) {
         match Project::open(self.disc_field.trim().as_ref(), self.folder_field.trim().as_ref()) {
             Ok(project) => {
                 self.status = format!(
@@ -70,7 +118,13 @@ impl App {
         }
     }
 
-    fn select_archive(&mut self, path: &ArchivePath) {
+    pub fn close(&mut self) {
+        self.project = None;
+        self.archive = None;
+        self.entry = None;
+    }
+
+    pub fn select_archive(&mut self, path: &ArchivePath) {
         let Some(project) = self.project.as_mut() else { return };
         match project.load(path) {
             Ok(loaded) => {
@@ -82,70 +136,58 @@ impl App {
         }
     }
 
-    fn menu(&mut self, ui: &mut egui::Ui) {
-        egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("Project", |ui| {
-                let open = self.project.is_some();
-                if ui.add_enabled(open, egui::Button::new("Save edits  (Ctrl+S)")).clicked() {
-                    self.save();
-                    ui.close();
-                }
-                if ui.add_enabled(open, egui::Button::new("Export rebuilt archives  (Ctrl+E)")).clicked() {
-                    self.export();
-                    ui.close();
-                }
-                ui.separator();
-                if ui.button("Close project").clicked() {
-                    self.project = None;
-                    self.archive = None;
-                    self.entry = None;
-                    ui.close();
-                }
-            });
-            ui.menu_button("Edit", |ui| {
-                let (undo, redo) = self.project.as_ref().map_or((false, false), |p| (p.can_undo(), p.can_redo()));
-                if ui.add_enabled(undo, egui::Button::new("Undo  (Ctrl+Z)")).clicked() {
-                    self.with_project(Project::undo);
-                    ui.close();
-                }
-                if ui.add_enabled(redo, egui::Button::new("Redo  (Ctrl+Y)")).clicked() {
-                    self.with_project(Project::redo);
-                    ui.close();
-                }
-                let key = self.archive.as_ref().zip(self.entry).map(|(archive, index)| (archive.path.clone(), index));
-                let edited = key.as_ref().is_some_and(|key| self.project.as_ref().is_some_and(|p| p.is_edited(key)));
-                if ui.add_enabled(edited, egui::Button::new("Revert entry to disc")).clicked() {
-                    if let (Some(project), Some(key)) = (self.project.as_mut(), key) {
-                        project.revert(&key);
-                    }
-                    ui.close();
-                }
-            });
-            ui.menu_button("Go", |ui| {
-                if ui.button("Game tables (ETC/GAME.EMI)").clicked() {
-                    self.jump("BIN/ETC/GAME.EMI", 0, Tab::Tables);
-                    ui.close();
-                }
-            });
-        });
-    }
-
-    fn jump(&mut self, archive: &str, entry: usize, tab: Tab) {
-        let path = ArchivePath(archive.into());
-        self.select_archive(&path);
-        if self.archive.is_some() {
-            self.entry = Some(entry);
-            self.tab = tab;
+    /// Selects entry `index` of the open archive, and keeps the tab when the entry has it.
+    pub fn select_entry(&mut self, index: usize) {
+        self.entry = Some(index);
+        let Some(entry) = self.current() else { return };
+        let tabs = view::tabs(&entry);
+        if !tabs.contains(&self.tab) {
+            self.tab = tabs.get(1).copied().unwrap_or(Tab::Info);
         }
     }
 
-    fn with_project(&mut self, action: impl FnOnce(&mut Project)) {
+    /// The entry the views show.
+    pub fn current(&self) -> Option<Entry<'_>> {
+        let (project, archive, index) = (self.project.as_ref()?, self.archive.as_deref()?, self.entry?);
+        Some(Entry { project, archive, index })
+    }
+
+    /// Replaces the payload of the shown entry; undo, save and export see the change.
+    pub fn set_payload(&mut self, bytes: Vec<u8>) {
+        if let (Some(project), Some(archive), Some(index)) =
+            (self.project.as_mut(), self.archive.as_deref(), self.entry)
+            && project.payload(archive, index) != bytes.as_slice()
+        {
+            project.set(archive, index, bytes);
+        }
+    }
+
+    pub fn is_entry_edited(&self) -> bool {
+        let (Some(project), Some(archive), Some(index)) = (&self.project, &self.archive, self.entry) else {
+            return false;
+        };
+        project.is_edited(&(archive.path.clone(), index))
+    }
+
+    pub fn revert_entry(&mut self) {
+        if let (Some(project), Some(archive), Some(index)) = (self.project.as_mut(), &self.archive, self.entry) {
+            project.revert(&(archive.path.clone(), index));
+        }
+    }
+
+    pub fn undo(&mut self) {
         if let Some(project) = self.project.as_mut() {
-            action(project);
+            project.undo();
         }
     }
 
-    fn save(&mut self) {
+    pub fn redo(&mut self) {
+        if let Some(project) = self.project.as_mut() {
+            project.redo();
+        }
+    }
+
+    pub fn save(&mut self) {
         if let Some(project) = self.project.as_mut() {
             self.status = match project.save() {
                 Ok(count) => format!("Saved {count} edited entries to {}", project.folder.join("edits").display()),
@@ -154,7 +196,7 @@ impl App {
         }
     }
 
-    fn export(&mut self) {
+    pub fn export(&mut self) {
         if let Some(project) = self.project.as_mut() {
             self.status = match project.export() {
                 Ok(files) if files.is_empty() => "Nothing to export: no entry is edited.".into(),
@@ -168,181 +210,154 @@ impl App {
         }
     }
 
-    fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (save, export, undo, redo) = ctx.input_mut(|input| {
-            (
-                input.consume_key(egui::Modifiers::COMMAND, egui::Key::S),
-                input.consume_key(egui::Modifiers::COMMAND, egui::Key::E),
-                input.consume_key(egui::Modifiers::COMMAND, egui::Key::Z),
-                input.consume_key(egui::Modifiers::COMMAND, egui::Key::Y),
-            )
-        });
-        if save {
-            self.save();
-        }
-        if export {
-            self.export();
-        }
-        if undo {
-            self.with_project(Project::undo);
-        }
-        if redo {
-            self.with_project(Project::redo);
-        }
-    }
-
-    fn welcome(&mut self, ui: &mut egui::Ui) {
-        ui.add_space(WELCOME_TOP);
-        ui.vertical_centered(|ui| {
-            ui.heading("BOF3 Asset Editor");
-            ui.label("Browse, view and edit every entry of the game's EMI archives.");
-            ui.label("The disc files are never written: edits and rebuilt archives go to the project folder.");
-        });
-        ui.add_space(WELCOME_GAP);
-        egui::Grid::new("open").num_columns(3).spacing([style::GAP, style::GAP]).show(ui, |ui| {
-            ui.label("Disc folder");
-            ui.add(egui::TextEdit::singleline(&mut self.disc_field).desired_width(PATH_WIDTH));
-            if ui.button("Browse…").clicked()
-                && let Some(folder) = rfd::FileDialog::new().set_title("Extracted disc folder").pick_folder()
-            {
-                if self.folder_field.is_empty()
-                    && let Some(parent) = folder.parent()
-                {
-                    self.folder_field = parent.join("bof3-project").display().to_string();
-                }
-                self.disc_field = folder.display().to_string();
-            }
-            ui.end_row();
-            ui.label("Project folder");
-            ui.add(egui::TextEdit::singleline(&mut self.folder_field).desired_width(PATH_WIDTH));
-            if ui.button("Browse…").clicked()
-                && let Some(folder) = rfd::FileDialog::new().set_title("Project folder for edits").pick_folder()
-            {
-                self.folder_field = folder.display().to_string();
-            }
-            ui.end_row();
-        });
-        ui.add_space(style::GAP);
-        if ui.button(RichText::new("Open").strong()).clicked() {
-            self.open();
-        }
-    }
-
-    fn browser(&mut self, ui: &mut egui::Ui) {
-        let Some(project) = self.project.as_ref() else { return };
-        ui.add(egui::TextEdit::singleline(&mut self.filter).hint_text("Filter archives").desired_width(f32::INFINITY));
+    /// The archive browser's lines: folders, and the archives of each open folder. A filter opens
+    /// every folder that has a match.
+    pub fn browser_rows(&self) -> Vec<BrowserRow> {
+        let Some(project) = self.project.as_ref() else { return Vec::new() };
         let filter = self.filter.to_ascii_uppercase();
-        let mut clicked = None;
-        let selected = self.archive.as_ref().map(|archive| archive.path.clone());
-        egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-            let mut folder = "";
-            let mut open = true;
-            for path in project.archives.iter().filter(|path| path.0.to_ascii_uppercase().contains(&filter)) {
-                let (parent, file) = path.split();
-                if parent != folder {
-                    folder = parent;
-                    let id = ui.make_persistent_id(parent);
-                    let state = egui::collapsing_header::CollapsingState::load_with_default_open(
-                        ui.ctx(),
-                        id,
-                        !filter.is_empty(),
-                    );
-                    open = state.is_open();
-                    let response = ui.selectable_label(false, format!("{} {parent}", if open { "▾" } else { "▸" }));
-                    if response.clicked() {
-                        let mut state = state;
-                        state.toggle(ui);
-                        state.store(ui.ctx());
-                    }
-                }
-                if open {
-                    let edited = project.archive_is_edited(path);
-                    let text = if edited {
-                        RichText::new(format!("   ● {file}")).color(style::EDITED)
-                    } else {
-                        RichText::new(format!("     {file}"))
-                    };
-                    if ui.selectable_label(selected.as_ref() == Some(path), text).clicked() {
-                        clicked = Some(path.clone());
-                    }
-                }
+        let mut rows = Vec::new();
+        let mut folder = "";
+        let mut open = true;
+
+        for path in project.archives.iter().filter(|path| path.0.to_ascii_uppercase().contains(&filter)) {
+            let (parent, _) = path.split();
+            if parent != folder {
+                folder = parent;
+                open = !filter.is_empty() || self.open_folders.contains(parent);
+                rows.push(BrowserRow::Folder { name: parent.to_string(), open });
             }
-        });
-        if let Some(path) = clicked {
-            self.select_archive(&path);
+            if open {
+                rows.push(BrowserRow::Archive { path: path.clone(), edited: project.archive_is_edited(path) });
+            }
+        }
+        rows
+    }
+
+    pub fn toggle_folder(&mut self, name: &str) {
+        if !self.open_folders.remove(name) {
+            self.open_folders.insert(name.to_string());
         }
     }
 
-    fn entries(&mut self, ui: &mut egui::Ui) {
-        let (Some(project), Some(archive)) = (self.project.as_ref(), self.archive.as_ref()) else { return };
-        ui.strong(&archive.path.0);
-        let mut clicked = None;
-        egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-            for (index, entry) in archive.entries().iter().enumerate() {
-                let format = archive.formats[index];
-                let edited = project.is_edited(&(archive.path.clone(), index));
-                let (tag, color) = crate::theme::tag(format);
-                let mut response = None;
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(format!("{tag:<3}")).monospace().strong().color(color));
-                    let label =
-                        format!("{index:>3}  {:<20} {:>8}", format.name(), project.payload(archive, index).len());
-                    let mut text = RichText::new(label).monospace();
-                    if edited {
-                        text = text.color(style::EDITED);
-                    } else if format == Format::Unclassified {
-                        text = text.weak();
-                    }
-                    response = Some(ui.selectable_label(self.entry == Some(index), text));
-                });
-                let Some(response) = response else { continue };
-                if response.clicked() {
-                    clicked = Some(index);
-                }
-                response.on_hover_text(format!("type {}  load {:#010X}", entry.file_type, entry.ram_ptr));
-            }
-        });
-        if let Some(index) = clicked {
-            self.entry = Some(index);
-            let tabs = view::tabs(archive, index, project.payload(archive, index));
-            if !tabs.contains(&self.tab) {
-                self.tab = tabs.get(1).copied().unwrap_or(Tab::Info);
-            }
-        }
+    /// Gives `field` the keyboard, starting from `text`.
+    pub fn start_editing(&mut self, field: Field, text: String) {
+        self.menu = None;
+        self.editing = Some((field, LineEdit::new(text)));
     }
-}
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.shortcuts(&ui.ctx().clone());
-        egui::Panel::top("menu").show(ui, |ui| self.menu(ui));
-        egui::Panel::bottom("status").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                if let Some(project) = self.project.as_ref() {
-                    let dirty = if project.is_dirty() { "unsaved" } else { "saved" };
-                    ui.label(RichText::new(format!("{} edits ({dirty})", project.edit_count())).monospace());
-                    ui.separator();
+    /// Asks for a folder and puts it in `field`. The disc folder also names a project folder next
+    /// to it when none is set.
+    pub fn browse(&mut self, field: Field, cx: &mut Context<Self>) {
+        let prompt = match field {
+            Field::Disc => "Extracted disc folder",
+            _ => "Project folder for edits",
+        };
+        let picked = cx.prompt_for_paths(PathPromptOptions {
+            files: false,
+            directories: true,
+            multiple: false,
+            prompt: Some(prompt.into()),
+        });
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(paths))) = picked.await else { return };
+            let Some(folder) = paths.into_iter().next() else { return };
+            let _ = this.update(cx, |editor, cx| {
+                if field == Field::Disc {
+                    if editor.folder_field.is_empty()
+                        && let Some(parent) = folder.parent()
+                    {
+                        editor.folder_field = parent.join(PROJECT_FOLDER).display().to_string();
+                    }
+                    editor.disc_field = folder.display().to_string();
+                } else {
+                    editor.folder_field = folder.display().to_string();
                 }
-                ui.label(&self.status);
+                cx.notify();
             });
-        });
-        if self.project.is_none() {
-            egui::CentralPanel::default().show(ui, |ui| self.welcome(ui));
-            return;
+        })
+        .detach();
+    }
+
+    /// The key map: the shortcuts, then the field that has the keyboard, then the shown view.
+    pub fn on_key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let keystroke = &event.keystroke;
+        if self.shortcut(keystroke) || self.edit_key(keystroke, cx) || self.view_key(keystroke) {
+            cx.stop_propagation();
+            cx.notify();
         }
-        egui::Panel::left("archives").default_size(ARCHIVES_WIDTH).show(ui, |ui| self.browser(ui));
-        if self.archive.is_some() {
-            egui::Panel::left("entries").default_size(ENTRIES_WIDTH).show(ui, |ui| self.entries(ui));
+    }
+
+    fn shortcut(&mut self, keystroke: &Keystroke) -> bool {
+        let command = keystroke.modifiers.control || keystroke.modifiers.platform;
+        if !command {
+            return false;
         }
-        egui::CentralPanel::default().show(ui, |ui| {
-            let (Some(project), Some(archive), Some(index)) = (self.project.as_mut(), self.archive.clone(), self.entry)
-            else {
-                ui.label("Pick an archive, then an entry.");
-                return;
-            };
-            if let Some(message) = view::show(ui, project, &archive, index, &mut self.tab, &mut self.views) {
-                self.status = message;
+        match keystroke.key.as_str() {
+            "s" => self.save(),
+            "e" => self.export(),
+            "z" => self.undo(),
+            "y" => self.redo(),
+            _ => return false,
+        }
+        true
+    }
+
+    fn edit_key(&mut self, keystroke: &Keystroke, cx: &mut Context<Self>) -> bool {
+        let Some((field, edit)) = self.editing.as_mut() else {
+            if keystroke.key == "escape" && self.menu.take().is_some() {
+                return true;
             }
-        });
+            return false;
+        };
+        let field = *field;
+        let multiline = matches!(field, Field::View(field) if field.is_multiline());
+        let pasted = cx.read_from_clipboard().and_then(|item| item.text());
+
+        match edit.key(keystroke, multiline, pasted) {
+            Outcome::Kept => {}
+            Outcome::Changed => {
+                let text = edit.text.clone();
+                self.field_changed(field, text);
+            }
+            Outcome::Submit => {
+                let text = edit.text.clone();
+                self.editing = None;
+                self.field_submitted(field, &text);
+            }
+            Outcome::Cancel => self.editing = None,
+        }
+        true
+    }
+
+    fn field_changed(&mut self, field: Field, text: String) {
+        match field {
+            Field::Disc => self.disc_field = text,
+            Field::Folder => self.folder_field = text,
+            Field::ArchiveFilter => self.filter = text,
+            Field::View(field) => {
+                if let Some(message) = view::field_changed(self, field, &text) {
+                    self.status = message;
+                }
+            }
+        }
+    }
+
+    fn field_submitted(&mut self, field: Field, text: &str) {
+        match field {
+            Field::Disc | Field::Folder => self.open(),
+            Field::ArchiveFilter => {}
+            Field::View(field) => {
+                if let Some(message) = view::field_submitted(self, field, text) {
+                    self.status = message;
+                }
+            }
+        }
+    }
+
+    fn view_key(&mut self, keystroke: &Keystroke) -> bool {
+        if self.current().is_none() {
+            return false;
+        }
+        view::key(self, keystroke)
     }
 }

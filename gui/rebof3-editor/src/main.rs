@@ -10,40 +10,81 @@
 #![forbid(unsafe_code)]
 
 mod app;
-mod audio;
+mod edit;
 mod fonts;
 mod theme;
 mod view;
+mod widgets;
+mod window;
 
+use std::cell::Cell;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::process::ExitCode;
+use std::rc::Rc;
+
+use gpui::{App, AppContext, Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 
 pub use rebof3_editor::{project, schema};
 
-/// The window's first size and its smallest size, in points.
-const WINDOW_SIZE: [f32; 2] = [1400.0, 860.0];
-const WINDOW_MIN_SIZE: [f32; 2] = [800.0, 500.0];
+/// The window's title and the application id desktops group it by.
+const TITLE: &str = "BOF3 Asset Editor";
+const APP_ID: &str = "bof3-edit";
+/// The window's first size and its smallest size, in pixels.
+const WINDOW_SIZE: (f32, f32) = (1400.0, 860.0);
+const WINDOW_MIN_SIZE: (f32, f32) = (800.0, 500.0);
 
-fn main() -> eframe::Result<()> {
+fn main() -> ExitCode {
     let mut args = std::env::args_os().skip(1).map(PathBuf::from);
     let disc = args.next();
     let folder = args.next();
-    let options = eframe::NativeOptions {
-        viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("BOF3 Asset Editor")
-            .with_app_id("bof3-edit")
-            .with_icon(Arc::new(theme::icon()))
-            .with_inner_size(WINDOW_SIZE)
-            .with_min_inner_size(WINDOW_MIN_SIZE),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "BOF3 Asset Editor",
-        options,
-        Box::new(move |cc| {
-            fonts::install(&cc.egui_ctx);
-            theme::apply(&cc.egui_ctx);
-            Ok(Box::new(app::App::new(disc, folder)))
-        }),
-    )
+    let failed = Rc::new(Cell::new(false));
+    let opened = Rc::clone(&failed);
+    let Some(application) = start() else { return ExitCode::FAILURE };
+
+    application.run(move |cx: &mut App| {
+        fonts::install(cx);
+        let bounds = Bounds::centered(None, size(px(WINDOW_SIZE.0), px(WINDOW_SIZE.1)), cx);
+        let options = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            window_min_size: Some(size(px(WINDOW_MIN_SIZE.0), px(WINDOW_MIN_SIZE.1))),
+            titlebar: Some(TitlebarOptions { title: Some(TITLE.into()), ..Default::default() }),
+            app_id: Some(APP_ID.into()),
+            ..Default::default()
+        };
+        let window = cx.open_window(options, |window, cx| {
+            let editor = cx.new(|cx| app::Editor::new(disc, folder, cx));
+            editor.read(cx).focus.focus(window);
+            editor
+        });
+        match window {
+            Ok(_) => cx.activate(true),
+            Err(error) => {
+                eprintln!("bof3-edit: cannot open a window: {error}");
+                opened.set(true);
+                cx.quit();
+            }
+        }
+    });
+    if failed.get() { ExitCode::FAILURE } else { ExitCode::SUCCESS }
+}
+
+/// Starts the toolkit, or explains why it cannot start. gpui panics when the system gives it no GPU
+/// context (it has no software renderer), so the panic is caught and reported as an error.
+fn start() -> Option<Application> {
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let started = std::panic::catch_unwind(Application::new);
+    std::panic::set_hook(hook);
+    started
+        .map_err(|panic| {
+            let reason = panic
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| panic.downcast_ref::<&str>().copied())
+                .unwrap_or("unknown error");
+            eprintln!(
+                "bof3-edit: cannot start the window: {reason}.\nCheck that a Vulkan graphics driver is installed and the display is reachable."
+            );
+        })
+        .ok()
 }

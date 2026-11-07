@@ -1,22 +1,37 @@
 //! A texture upload as a paintable image.
 //!
 //! The upload's VRAM words read at 4, 8 or 16 bits per texel. A 4- or 8-bit texture is drawn with a
-//! palette row: one the draw sites join to it (`rebof3_assets::decode::joined_rows`), a row of a palette
-//! bank in the same archive, or a grey ramp. Painting writes texel indices (or 16-bit colors) back into
-//! the words and the words back into the upload's rectangles.
+//! palette row: one the draw sites join to it (`rebof3_assets::decode::joined_rows`), a row of a
+//! palette bank in the same archive, or a grey ramp. Painting writes texel indices (or 16-bit colors)
+//! back into the words and the words back into the upload's rectangles.
 
-use eframe::egui::{self, Color32, RichText, TextureHandle, TextureOptions, Vec2};
+use std::cell::Cell;
+use std::rc::Rc;
+
+use gpui::{
+    AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, anchored, canvas,
+    deferred, div, fill, point, prelude::*, px, rgba, size,
+};
 use psx_formats::gfx::texture::{Depth, texel_indices, texel_words};
 use psx_formats::gfx::vram;
-use rebof3_assets::decode::{RowUse, color_rgba, joined_rows, texture_words};
+use rebof3_assets::decode::{RowUse, TextureWords, color_rgba, joined_rows, texture_words};
 use rebof3_emi::classify::Format;
 
-use super::{Entry, style};
+use super::palette::{SWATCH, SWATCH_GAP, words as words_of};
+use super::{Entry, Menu, editing_menu};
+use crate::app::{Editor, Menu as WindowMenu};
+use crate::theme::{BACKGROUND, MUTED, color};
+use crate::widgets::{GAP, button, menu_item, menu_panel, mono, muted, outline, separator, slider, swatch, tab, tip};
 
-const ZOOM_MIN: f32 = 1.0;
-const ZOOM_MAX: f32 = 16.0;
-const ZOOM_DEFAULT: f32 = 2.0;
-const ZOOM_STEP: f64 = 1.0;
+const ZOOM_MIN: u32 = 1;
+const ZOOM_MAX: u32 = 16;
+const ZOOM_DEFAULT: u32 = 2;
+/// The brightest level of a 5-bit color channel.
+const CHANNEL_MAX: usize = 31;
+const GREEN_SHIFT: u32 = 5;
+const BLUE_SHIFT: u32 = 10;
+/// The alpha of a pixel that draws nothing.
+const TRANSPARENT: u8 = 0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Bits {
@@ -26,6 +41,8 @@ enum Bits {
 }
 
 impl Bits {
+    const ALL: [(Bits, &'static str); 3] = [(Bits::Four, "4-bit"), (Bits::Eight, "8-bit"), (Bits::Sixteen, "16-bit")];
+
     fn depth(self) -> Option<Depth> {
         match self {
             Bits::Four => Some(Depth::Four),
@@ -52,12 +69,14 @@ pub struct State {
     key: Option<(String, usize)>,
     bits: Bits,
     source: Source,
-    zoom: f32,
+    zoom: u32,
     /// The palette index (4/8 bit) or color word (16 bit) the pencil paints.
     ink: u16,
     joined: Vec<RowUse>,
-    image: Option<TextureHandle>,
-    drawn: Vec<u8>,
+    /// The texel under the pointer and its value.
+    hover: Option<(usize, usize, u16)>,
+    zoom_slider: Rc<Cell<Bounds<Pixels>>>,
+    image: Rc<Cell<Bounds<Pixels>>>,
 }
 
 impl Default for State {
@@ -69,9 +88,37 @@ impl Default for State {
             zoom: ZOOM_DEFAULT,
             ink: 0,
             joined: Vec::new(),
-            image: None,
-            drawn: Vec::new(),
+            hover: None,
+            zoom_slider: Rc::default(),
+            image: Rc::default(),
         }
+    }
+}
+
+impl State {
+    /// Picks the depth and colors the first time an entry is shown: a joined row when there is one.
+    pub fn prepare(&mut self, entry: &Entry<'_>) {
+        let key = (entry.archive.path.0.clone(), entry.index);
+        if self.key.as_ref() == Some(&key) {
+            return;
+        }
+        let payloads: Vec<&[u8]> = (0..entry.archive.entries().len()).map(|index| entry.sibling(index)).collect();
+        let rows = joined_rows(&entry.archive.path.0, entry.archive.entries(), &payloads);
+        self.joined = rows.get(&entry.index).cloned().unwrap_or_default();
+        self.zoom = ZOOM_DEFAULT;
+        self.ink = 0;
+        self.hover = None;
+        match self.joined.first() {
+            Some(row) => {
+                self.bits = if row.depth == Depth::Four { Bits::Four } else { Bits::Eight };
+                self.source = Source::Joined(0);
+            }
+            None => {
+                self.bits = Bits::Sixteen;
+                self.source = Source::Grey;
+            }
+        }
+        self.key = Some(key);
     }
 }
 
@@ -81,8 +128,7 @@ fn palette(entry: &Entry<'_>, state: &State, depth: Depth) -> Vec<u16> {
     match &state.source {
         Source::Joined(at) => state.joined.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Bank { bank, row } => {
-            let words = words_of(entry.sibling(*bank));
-            words.chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
+            words_of(entry.sibling(*bank)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
         }
         Source::Grey => (0..colors).map(|index| grey(index, colors)).collect(),
     }
@@ -90,105 +136,158 @@ fn palette(entry: &Entry<'_>, state: &State, depth: Depth) -> Vec<u16> {
 
 /// A 15-bit grey word for palette index `index` of `colors`.
 fn grey(index: usize, colors: usize) -> u16 {
-    const CHANNEL_MAX: usize = 31;
     let level = (index * CHANNEL_MAX / (colors - 1)) as u16;
-    level | level << 5 | level << 10
+    level | level << GREEN_SHIFT | level << BLUE_SHIFT
 }
 
-fn words_of(bytes: &[u8]) -> Vec<u16> {
-    bytes.as_chunks::<2>().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect()
-}
-
-/// Picks the depth and colors the first time an entry is shown: a joined row when there is one.
-fn reset(entry: &Entry<'_>, state: &mut State) {
-    let payloads: Vec<&[u8]> = (0..entry.archive.entries().len()).map(|index| entry.sibling(index)).collect();
-    let rows = joined_rows(&entry.archive.path.0, entry.archive.entries(), &payloads);
-    state.joined = rows.get(&entry.index).cloned().unwrap_or_default();
-    state.zoom = ZOOM_DEFAULT;
-    state.ink = 0;
-    match state.joined.first() {
-        Some(row) => {
-            state.bits = if row.depth == Depth::Four { Bits::Four } else { Bits::Eight };
-            state.source = Source::Joined(0);
-        }
-        None => {
-            state.bits = Bits::Sixteen;
-            state.source = Source::Grey;
-        }
-    }
-}
-
-pub fn show(ui: &mut egui::Ui, entry: &mut Entry<'_>, state: &mut State) -> Option<String> {
-    let key = (entry.archive.path.0.clone(), entry.index);
-    if state.key.as_ref() != Some(&key) {
-        reset(entry, state);
-        state.key = Some(key);
-        state.image = None;
-    }
-
+pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
+    let state = &editor.views.texture;
     let words = match texture_words(entry.load_arg(), entry.payload()) {
         Ok(words) => words,
-        Err(error) => return Some(format!("The upload does not decode: {error}")),
+        Err(error) => return muted(format!("The upload does not decode: {error}")).into_any_element(),
     };
-    let round_trips =
-        vram::payload_from_grid(words.width, words.height, &words.words).is_ok_and(|bytes| bytes == entry.payload());
-
-    controls(ui, entry, state, &words);
-    ui.separator();
 
     let texels_per_word = state.bits.depth().map_or(1, Depth::texels_per_word);
     let width = words.width * texels_per_word;
     let height = words.height;
-    let (pixels, values) = render(entry, state, &words.words);
+    let pixels = render(entry, state, &words.words).0;
+    let zoom = state.zoom as f32;
 
-    if state.image.is_none() || state.drawn != pixels {
-        let image = egui::ColorImage::from_rgba_unmultiplied([width, height], &pixels);
-        state.image = Some(ui.ctx().load_texture("texture", image, TextureOptions::NEAREST));
-        state.drawn = pixels;
+    let measure = Rc::clone(&state.image);
+    let image = canvas(
+        move |area, _, _| measure.set(area),
+        move |area, (), window, _| paint_pixels(window, area, &pixels, width, zoom),
+    )
+    .w(px(width as f32 * zoom))
+    .h(px(height as f32 * zoom))
+    .flex_none();
+
+    let hover = match state.hover {
+        Some((x, y, value)) => format!("x {x}  y {y}  value {value:#X}"),
+        None => "Left-click or drag paints; right-click picks the ink.".into(),
+    };
+
+    let canvas_area = div()
+        .id("texture")
+        .flex_1()
+        .min_h_0()
+        .overflow_scroll()
+        .bg(color(BACKGROUND))
+        .child(image)
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(|editor, event: &MouseDownEvent, _, cx| {
+                pointer(editor, event.position, true);
+                cx.notify();
+            }),
+        )
+        .on_mouse_down(
+            MouseButton::Right,
+            cx.listener(|editor, event: &MouseDownEvent, _, cx| {
+                if let Some((_, _, value)) = texel_at(editor, event.position) {
+                    editor.views.texture.ink = value;
+                }
+                cx.notify();
+            }),
+        )
+        .on_mouse_move(cx.listener(|editor, event: &MouseMoveEvent, _, cx| {
+            let paints = event.dragging() && event.pressed_button == Some(MouseButton::Left);
+            pointer(editor, event.position, paints);
+            cx.notify();
+        }));
+
+    div()
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_h_0()
+        .gap(px(GAP))
+        .child(controls(editor, entry, &words, cx))
+        .child(separator(false))
+        .child(mono(hover).text_color(color(MUTED)))
+        .child(canvas_area)
+        .into_any_element()
+}
+
+/// Paints the texture's pixels at `zoom` pixels per texel, one quad per run of equal pixels, only for
+/// the rows the window shows.
+fn paint_pixels(window: &mut gpui::Window, area: Bounds<Pixels>, pixels: &[[u8; 4]], width: usize, zoom: f32) {
+    if width == 0 {
+        return;
     }
-    let image = state.image.clone()?;
+    let visible = window.content_mask().bounds;
+    let texel = px(zoom);
+    let first = ((visible.origin.y - area.origin.y) / texel).floor().max(0.0) as usize;
+    let last = ((visible.origin.y + visible.size.height - area.origin.y) / texel).ceil().max(0.0) as usize;
 
-    let mut message = None;
-    egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
-        let size = Vec2::new(width as f32, height as f32) * state.zoom;
-        let response = ui.add(egui::Image::new(&image).fit_to_exact_size(size).sense(egui::Sense::click_and_drag()));
-        let Some(pointer) = response.hover_pos() else { return };
-
-        let local = (pointer - response.rect.min) / state.zoom;
-        let (x, y) = (local.x as usize, local.y as usize);
-        if x >= width || y >= height {
-            return;
-        }
-        let value = values[y * width + x];
-        response.clone().on_hover_text(format!("x {x}  y {y}  value {value:#X}"));
-
-        if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
-            if !round_trips {
-                message = Some("This upload does not round-trip through the rectangle writer; painting is off.".into());
-            } else if let Some(bytes) = paint(state, &words.words, words.width, words.height, x, y) {
-                entry.set(bytes);
+    for (y, row) in pixels.chunks(width).enumerate().take(last).skip(first) {
+        let mut x = 0;
+        while x < row.len() {
+            let start = x;
+            while x < row.len() && row[x] == row[start] {
+                x += 1;
             }
+            let [red, green, blue, alpha] = row[start];
+            if alpha == TRANSPARENT {
+                continue;
+            }
+            let origin = point(area.origin.x + texel * start as f32, area.origin.y + texel * y as f32);
+            let run = size(texel * (x - start) as f32, texel);
+            window.paint_quad(fill(Bounds::new(origin, run), rgba(u32::from_be_bytes([red, green, blue, alpha]))));
         }
-        if response.clicked_by(egui::PointerButton::Secondary) {
-            state.ink = value;
-        }
-    });
-    message
+    }
+}
+
+/// The texel under `position`, and its value.
+fn texel_at(editor: &Editor, position: Point<Pixels>) -> Option<(usize, usize, u16)> {
+    let state = &editor.views.texture;
+    let entry = editor.current()?;
+    let words = texture_words(entry.load_arg(), entry.payload()).ok()?;
+    let width = words.width * state.bits.depth().map_or(1, Depth::texels_per_word);
+
+    let area = state.image.get();
+    let texel = px(state.zoom as f32);
+    let (x, y) = (position.x - area.origin.x, position.y - area.origin.y);
+    if x < Pixels::ZERO || y < Pixels::ZERO {
+        return None;
+    }
+    let (x, y) = ((x / texel) as usize, (y / texel) as usize);
+    if x >= width || y >= words.height {
+        return None;
+    }
+    let values = render(&entry, state, &words.words).1;
+    Some((x, y, values[y * width + x]))
+}
+
+/// Tracks the pointer, and paints the ink at it when `paints`.
+fn pointer(editor: &mut Editor, position: Point<Pixels>, paints: bool) {
+    let hover = texel_at(editor, position);
+    editor.views.texture.hover = hover;
+    let Some((x, y, _)) = hover.filter(|_| paints) else { return };
+    let Some(entry) = editor.current() else { return };
+    let Ok(words) = texture_words(entry.load_arg(), entry.payload()) else { return };
+
+    let round_trips =
+        vram::payload_from_grid(words.width, words.height, &words.words).is_ok_and(|bytes| bytes == entry.payload());
+    if !round_trips {
+        editor.status = "This upload does not round-trip through the rectangle writer; painting is off.".into();
+        return;
+    }
+    if let Some(bytes) = paint(&editor.views.texture, &words.words, words.width, words.height, x, y) {
+        editor.set_payload(bytes);
+    }
 }
 
 /// The RGBA pixels of the texture, and the raw value (index or word) under each pixel.
-fn render(entry: &Entry<'_>, state: &State, words: &[u16]) -> (Vec<u8>, Vec<u16>) {
+fn render(entry: &Entry<'_>, state: &State, words: &[u16]) -> (Vec<[u8; 4]>, Vec<u16>) {
     match state.bits.depth() {
-        None => {
-            let pixels = words.iter().flat_map(|&word| color_rgba(word)).collect();
-            (pixels, words.to_vec())
-        }
+        None => (words.iter().map(|&word| color_rgba(word)).collect(), words.to_vec()),
         Some(depth) => {
             let colors = palette(entry, state, depth);
             let indices = texel_indices(words, depth);
             let pixels = indices
                 .iter()
-                .flat_map(|&index| colors.get(usize::from(index)).map_or([0, 0, 0, 0], |&word| color_rgba(word)))
+                .map(|&index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word)))
                 .collect();
             (pixels, indices.iter().map(|&index| u16::from(index)).collect())
         }
@@ -220,73 +319,98 @@ fn paint(state: &State, words: &[u16], width: usize, height: usize, x: usize, y:
     vram::payload_from_grid(width, height, &words).ok()
 }
 
-fn controls(ui: &mut egui::Ui, entry: &Entry<'_>, state: &mut State, words: &rebof3_assets::decode::TextureWords) {
-    ui.horizontal_wrapped(|ui| {
-        ui.label(
-            RichText::new(format!("VRAM x {} y {}  {}×{} words", words.x, words.y, words.width, words.height))
-                .monospace(),
-        );
-        ui.separator();
-        ui.label("Depth");
-        ui.selectable_value(&mut state.bits, Bits::Four, "4-bit");
-        ui.selectable_value(&mut state.bits, Bits::Eight, "8-bit");
-        ui.selectable_value(&mut state.bits, Bits::Sixteen, "16-bit");
-        ui.separator();
-        ui.label("Zoom");
-        ui.add(egui::Slider::new(&mut state.zoom, ZOOM_MIN..=ZOOM_MAX).step_by(ZOOM_STEP));
-    });
+fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut Context<Editor>) -> Div {
+    let state = &editor.views.texture;
 
+    let mut depth_row = div()
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .gap(px(GAP))
+        .child(mono(format!("VRAM x {} y {}  {}×{} words", words.x, words.y, words.width, words.height)))
+        .child(separator(true))
+        .child("Depth");
+    for (bits, label) in Bits::ALL {
+        depth_row =
+            depth_row.child(tab(label, label, state.bits == bits).on_click(cx.listener(move |editor, _, _, cx| {
+                editor.views.texture.bits = bits;
+                cx.notify();
+            })));
+    }
+    let zoom = slider("zoom", state.zoom, ZOOM_MIN..=ZOOM_MAX, &state.zoom_slider, cx, |editor, zoom| {
+        editor.views.texture.zoom = zoom;
+    });
+    depth_row = depth_row.child(separator(true)).child("Zoom").child(zoom).child(mono(format!("{}×", state.zoom)));
+
+    let mut column = div().flex().flex_col().flex_none().gap(px(GAP)).child(depth_row);
     let Some(depth) = state.bits.depth() else {
-        ui.label(RichText::new(format!("Ink: color word {:#06X} (right-click a texel to pick)", state.ink)).weak());
-        return;
+        return column.child(muted(format!("Ink: color word {:#06X} (right-click a texel to pick)", state.ink)));
     };
 
-    ui.horizontal_wrapped(|ui| {
-        ui.label("Colors");
-        let current = describe(&state.source, &state.joined);
-        egui::ComboBox::from_id_salt("palette").selected_text(current).width(style::CHOOSER_WIDTH).show_ui(ui, |ui| {
-            for (at, row) in state.joined.iter().enumerate() {
-                let label = format!("joined: bank {} clut {},{}", row.palette, row.clut.x, row.clut.y);
-                ui.selectable_value(&mut state.source, Source::Joined(at), label).on_hover_text(&row.evidence);
-            }
-            for (index, format) in entry.archive.formats.iter().enumerate() {
-                if *format != Format::ClutBank {
-                    continue;
-                }
-                let rows = entry.sibling(index).len() / 2 / depth.colors();
-                for row in 0..rows {
-                    ui.selectable_value(
-                        &mut state.source,
-                        Source::Bank { bank: index, row },
-                        format!("bank {index} row {row}"),
-                    );
-                }
-            }
-            ui.selectable_value(&mut state.source, Source::Grey, "grey ramp");
-        });
-    });
+    let chooser = button("colors", format!("{} ▾", describe(&state.source, &state.joined)), true).on_click(
+        cx.listener(|editor, _, _, cx| {
+            editor.menu = Some(WindowMenu::View(Menu::Colors));
+            cx.notify();
+        }),
+    );
+    let mut chooser_column = div().flex().flex_col().child(chooser);
+    if editing_menu(editor, Menu::Colors) {
+        chooser_column =
+            chooser_column.child(deferred(anchored().snap_to_window().child(sources(editor, entry, depth, cx))));
+    }
+    column = column.child(div().flex().items_center().gap(px(GAP)).child("Colors").child(chooser_column));
 
-    let colors = palette(entry, state, depth);
-    ui.horizontal_wrapped(|ui| {
-        ui.label("Ink");
-        ui.spacing_mut().item_spacing.x = style::SWATCH_GAP;
-        for (index, &word) in colors.iter().enumerate() {
-            let [red, green, blue, alpha] = color_rgba(word);
-            let (rect, response) = ui.allocate_exact_size(Vec2::splat(style::SWATCH), egui::Sense::click());
-            ui.painter().rect_filled(rect, style::SQUARE, Color32::from_rgba_unmultiplied(red, green, blue, alpha));
-            if usize::from(state.ink) == index {
-                ui.painter().rect_stroke(
-                    rect,
-                    style::SQUARE,
-                    (style::OUTLINE_BOLD, style::SELECTION),
-                    egui::StrokeKind::Inside,
-                );
-            }
-            if response.on_hover_text(format!("index {index}  word {word:#06X}")).clicked() {
-                state.ink = index as u16;
-            }
+    let mut inks = div().flex().flex_wrap().items_center().gap(px(SWATCH_GAP)).child(div().mr(px(GAP)).child("Ink"));
+    for (index, &word) in palette(entry, state, depth).iter().enumerate() {
+        let selected = usize::from(state.ink) == index;
+        inks = inks.child(
+            swatch(("ink", index), color_rgba(word), SWATCH, outline(selected, false))
+                .tooltip(tip(format!("index {index}  word {word:#06X}")))
+                .on_click(cx.listener(move |editor, _, _, cx| {
+                    editor.views.texture.ink = index as u16;
+                    cx.notify();
+                })),
+        );
+    }
+    column.child(inks)
+}
+
+/// The open chooser of palette rows: joined rows, the rows of every palette bank, and the grey ramp.
+fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Editor>) -> gpui::Stateful<Div> {
+    let state = &editor.views.texture;
+    let mut choices: Vec<(Source, String, Option<String>)> = Vec::new();
+    for (at, row) in state.joined.iter().enumerate() {
+        let label = format!("joined: bank {} clut {},{}", row.palette, row.clut.x, row.clut.y);
+        choices.push((Source::Joined(at), label, Some(row.evidence.clone())));
+    }
+    for (bank, format) in entry.archive.formats.iter().enumerate() {
+        if *format != Format::ClutBank {
+            continue;
         }
-    });
+        let rows = entry.sibling(bank).len() / 2 / depth.colors();
+        for row in 0..rows {
+            choices.push((Source::Bank { bank, row }, format!("bank {bank} row {row}"), None));
+        }
+    }
+    choices.push((Source::Grey, "grey ramp".into(), None));
+
+    let mut panel = menu_panel("sources").on_mouse_down_out(cx.listener(|editor, _, _, cx| {
+        editor.menu = None;
+        cx.notify();
+    }));
+    for (at, (source, label, evidence)) in choices.into_iter().enumerate() {
+        let selected = state.source == source;
+        let mut item = menu_item(("source", at), &label, if selected { "●" } else { "" }, true);
+        if let Some(evidence) = evidence {
+            item = item.tooltip(tip(evidence));
+        }
+        panel = panel.child(item.on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.texture.source = source.clone();
+            editor.menu = None;
+            cx.notify();
+        })));
+    }
+    panel
 }
 
 fn describe(source: &Source, joined: &[RowUse]) -> String {
@@ -296,5 +420,16 @@ fn describe(source: &Source, joined: &[RowUse]) -> String {
         }),
         Source::Bank { bank, row } => format!("bank {bank} row {row}"),
         Source::Grey => "grey ramp".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_grey_ramp_runs_from_black_to_white() {
+        assert_eq!(grey(0, 16), 0);
+        assert_eq!(grey(15, 16), 0x7FFF);
     }
 }
