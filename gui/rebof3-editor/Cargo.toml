@@ -1,0 +1,26 @@
+[package]
+name = "rebof3-editor"
+description = "Asset editor for the EMI archives of Breath of Fire III: browse, view and edit every entry without touching the disc files."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "bof3-edit"
+path = "src/main.rs"
+
+[dependencies]
+rebof3-emi = { workspace = true, features = ["std"] }
+rebof3-assets.workspace = true
+psx-formats = { workspace = true, features = ["std"] }
+serde.workspace = true
+serde_json.workspace = true
+eframe = { version = "0.37.0", default-features = false, features = ["glow", "wayland", "x11", "accesskit"] }
+rfd = "0.18.0"
+cpal = "0.18.2"
+
+[lints]
+workspace = true

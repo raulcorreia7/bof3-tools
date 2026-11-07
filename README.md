@@ -51,6 +51,35 @@ bof3 emi list test.EMI
 | `bof3 emi`    | List, extract, pack and inspect EMI archives                   |
 | `bof3 assets` | Extract the disc's assets or convert one asset                 |
 
+## Asset editor
+
+`bof3-edit` is a desktop editor for the disc's EMI archives. It runs on Linux (X11 and Wayland), macOS and
+Windows.
+
+```sh
+cargo run --release -p rebof3-editor -- build/disc my-mod
+```
+
+The first argument is an extracted disc (the folder that holds `BIN/`), the second a project folder. The
+editor only reads the disc. Edits are saved to `my-mod/edits/`, and **Project → Export** rebuilds each
+edited archive into `my-mod/disc/`, then reads it back to confirm that it holds exactly the edited
+payloads.
+
+| View    | Entries                       | What you can do                                                    |
+| ------- | ----------------------------- | ------------------------------------------------------------------ |
+| Info    | every entry                   | type, load address, size, format and what is known about it        |
+| Hex     | every entry                   | edit bytes; read and write the value at the cursor as any int width |
+| Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a joined or chosen palette; paint     |
+| Palette | palette banks                 | edit any color's 5-bit channels and semi-transparency bit          |
+| Tables  | `ETC/GAME.EMI` entry 0        | spreadsheets of items, equipment, shops, abilities, level growth   |
+| Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes)              |
+| Sound   | VAB banks, sequence packages  | play samples; export WAVE, SoundFont and MIDI                      |
+| Decoded | cue, scene, script, palette, LZ77 | the decoder's structured reading                              |
+
+Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); `Ctrl+S` saves, `Ctrl+E` exports. The editor
+uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to a `.ttf` file when none is
+found.
+
 ## Supported formats
 
 | Input                             | Output                                                   |
