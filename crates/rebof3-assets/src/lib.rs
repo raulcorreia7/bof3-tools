@@ -8,6 +8,7 @@
 //! strings of the extracted disc), [`sprites`] the sprite banks' palettes,
 //! and [`disc`] the patched disc image, whose writer is `psx_cd::patch`.
 
+pub mod codec;
 pub mod coverage;
 pub mod decode;
 pub mod disc;

@@ -23,6 +23,7 @@ assets = ["dep:rebof3-assets", "dep:bof3player", "dep:sha2"]
 [dependencies]
 rebof3-assets = { workspace = true, optional = true }
 bof3player = { workspace = true, features = ["std", "ogg", "bundled-names"], optional = true }
+clap.workspace = true
 rebof3-emi = { workspace = true, features = ["std"] }
 psx-cd.workspace = true
 psx-formats = { workspace = true, features = ["std"] }

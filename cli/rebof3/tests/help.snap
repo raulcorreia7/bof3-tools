@@ -1,0 +1,865 @@
+$ bof3 
+[exit 0]
+bof3: the Breath of Fire III toolchain.
+
+Usage: bof3 <COMMAND> [ARGS...]
+       bof3 <COMMAND> --help
+
+Commands:
+  disc    extract, checksum, verify and rebuild a PlayStation disc image
+  emi     list, extract, pack and inspect EMI archives
+  assets  extract every disc asset, or convert one asset to and from its open form
+
+Options:
+  -h, --help     print this text, or a command's own help
+  -V, --version  print the version
+
+Examples:
+  bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+  bof3 emi list "BIN/BGM/BGM000.EMI"
+
+Every command prints its purpose, every switch with its default, and runnable
+examples: bof3 <COMMAND> --help, then bof3 <COMMAND> <VERB> --help.
+
+$ bof3 --help
+[exit 0]
+bof3: the Breath of Fire III toolchain.
+
+Usage: bof3 <COMMAND> [ARGS...]
+       bof3 <COMMAND> --help
+
+Commands:
+  disc    extract, checksum, verify and rebuild a PlayStation disc image
+  emi     list, extract, pack and inspect EMI archives
+  assets  extract every disc asset, or convert one asset to and from its open form
+
+Options:
+  -h, --help     print this text, or a command's own help
+  -V, --version  print the version
+
+Examples:
+  bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+  bof3 emi list "BIN/BGM/BGM000.EMI"
+
+Every command prints its purpose, every switch with its default, and runnable
+examples: bof3 <COMMAND> --help, then bof3 <COMMAND> <VERB> --help.
+
+$ bof3 --version
+[exit 0]
+bof3 1.0.0
+
+$ bof3 disc --help
+[exit 0]
+bof3 disc: read, extract, checksum, rebuild and verify a PlayStation disc image.
+
+Usage: bof3 disc <COMMAND> [OPTIONS]
+       bof3 disc <COMMAND> --help
+
+Commands:
+  extract   write every file of an image, plus its project XML
+  lba-json  write the LBA table of an extracted tree
+  checksum  hash every file of an extracted tree
+  verify    compare a tree with its checksums; exit 1 on a mismatch
+  rebuild   build a synthetic ISO from top-level files
+
+Every command has focused help: bof3 disc <COMMAND> --help.
+Common switches: -i/--input PATH, -o/--output PATH, -q/--quiet.
+
+Examples:
+  bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+  bof3 disc checksum -i build/disc -o build/checksums.json
+  bof3 disc verify -i build/disc -o build/checksums.json
+
+$ bof3 disc extract --help
+[exit 0]
+bof3 disc extract: write every file of an image, plus its project XML.
+
+Usage: bof3 disc extract [-i IMAGE.cue] [-o DIR] [-p FILE.xml] [-q]
+
+  -i, --input PATH    disc image or .cue sheet (default: the image in
+                      inputs/external, then ./disk)
+  -o, --output DIR    folder to extract into (default: build/extracted)
+  -p, --project FILE  project XML to write (default: DIR/IMAGE.xml)
+  -q, --quiet         no completion line (default: off)
+
+Examples:
+  bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+  bof3 disc extract -q
+
+$ bof3 disc lba-json --help
+[exit 0]
+bof3 disc lba-json: write the LBA table of an extracted tree.
+
+Usage: bof3 disc lba-json -i IMAGE -o FILE.json -x DIR -p FILE.xml [-r DIR] [-q]
+
+  -i, --input PATH    disc image or .cue sheet (required)
+  -o, --output FILE   JSON table to write (required)
+  -x, --extract DIR   extraction folder the table describes (required)
+  -p, --project FILE  project XML of that extraction (required)
+  -r, --raw-root DIR  archive root (default: processed/emi_raw)
+  -q, --quiet         no completion line (default: off)
+
+Example:
+  bof3 disc lba-json -i game.cue -o build/lba.json -x build/disc -p build/disc/game.xml
+
+$ bof3 disc checksum --help
+[exit 0]
+bof3 disc checksum: hash every file of an extracted tree.
+
+Usage: bof3 disc checksum -i DIR -o FILE.json [-q]
+
+  -i, --input DIR     extracted folder to hash (required)
+  -o, --output FILE   JSON checksums to write (required)
+  -q, --quiet         no completion line (default: off)
+
+Example:
+  bof3 disc checksum -i build/disc -o build/checksums.json
+
+$ bof3 disc verify --help
+[exit 0]
+bof3 disc verify: compare an extracted tree with its checksums.
+
+Usage: bof3 disc verify -i DIR -o FILE.json [-q]
+
+  -i, --input DIR     extracted folder to check (required)
+  -o, --output FILE   JSON checksums to compare against (required)
+  -q, --quiet         no completion line (default: off)
+
+Exit status: 0 every file matches, 1 a mismatch, 2 an error.
+
+Example:
+  bof3 disc verify -i build/disc -o build/checksums.json
+
+$ bof3 disc rebuild --help
+[exit 0]
+bof3 disc rebuild: build a synthetic ISO from top-level files.
+
+Usage: bof3 disc rebuild -i DIR -o IMAGE.iso [-q]
+
+  -i, --input DIR     folder whose top-level files go in the image (required)
+  -o, --output FILE   ISO to write (required)
+  -q, --quiet         no completion line (default: off)
+
+Example:
+  bof3 disc rebuild -i build/iso-files -o build/synthetic.iso
+
+$ bof3 emi --help
+[exit 0]
+bof3 emi: list, extract, pack and inspect EMI archives.
+
+Usage: bof3 emi <COMMAND> [OPTIONS]
+       bof3 emi ARCHIVE.EMI [OPTIONS]     extract it
+
+Commands:
+  extract   write every entry of an archive, or one entry, as files
+  pack      build an archive from a folder or from named files
+  list      show the entry table, as text or JSON
+  vram      decode the type-3 VRAM uploads into one page set
+  clut      decode one CLUT palette entry
+  vab       parse one VAB sound bank entry
+  sep       parse one sequence package entry
+  coverage  check which formats rebuild their own bytes
+
+Every command has focused help: bof3 emi <COMMAND> --help.
+Common switches: -i/--input PATH, -o/--output PATH, -q/--quiet.
+
+Examples:
+  bof3 emi list "BIN/BGM/BGM000.EMI"
+  bof3 emi extract -i "BIN/BGM/BGM000.EMI" -o build/bgm000
+  bof3 emi pack -o build/test.EMI build/src
+
+$ bof3 emi extract --help
+[exit 0]
+bof3 emi extract: write every entry of an archive, or one entry, as files.
+
+Usage: bof3 emi extract [-i ARCHIVE] [-o DIR|FILE] [-n INDEX] [-e] [-J [FILE]] [-d] [-q]
+
+  -i, --input ARCHIVE       archive to read (or pass it as the only positional)
+  -o, --output PATH         DIR for every entry, FILE for one INDEX
+                            (default: the archive name without .EMI)
+  -n, --index INDEX         write only this entry (default: every entry)
+      --extensions, -e      add each entry's format extension (default: off)
+  -J, --manifest-json [FILE]
+                            also write emi.json (default: DIR/emi.json); a bare -J
+                            must be last, because the next argument is its path
+  -d, --dry-run             write nothing (default: off)
+  -q, --quiet               no completion line (default: off)
+
+Examples:
+  bof3 emi extract -i "BIN/BGM/BGM000.EMI" -o build/bgm000
+  bof3 emi extract -i "BIN/BGM/BGM000.EMI" -n 3 -e -o build/one
+  bof3 emi extract -i "BIN/BGM/BGM000.EMI" -o build/bgm000 -J
+
+$ bof3 emi pack --help
+[exit 0]
+bof3 emi pack: build an EMI archive from a folder, or from named files.
+
+Usage: bof3 emi pack -o ARCHIVE.EMI [-i FILE...] | FOLDER [OPTIONS]
+
+  -i, --input FILE...       files to pack, in order (default: use FOLDER)
+  -o, --output ARCHIVE.EMI  archive to write (required)
+  -t, --type TYPE           file type for inputs whose extension names none
+                            (default: 255)
+  -I, --include PATTERN     folder files to include (default: every file)
+  -X, --exclude PATTERN     folder files to exclude (default: emi.json)
+  -J, --manifest-json [FILE]
+                            read emi.json instead of guessing types
+                            (default: FOLDER/emi.json)
+  -k, --keep-original       keep the input files (default)
+  -K, --no-keep             delete the inputs after the archive is written
+  -d, --dry-run             write nothing (default: off)
+  -q, --quiet               no completion line (default: off)
+
+Examples:
+  bof3 emi pack -o build/test.EMI -i header.vh body.vb
+  bof3 emi pack -o build/test.EMI -X '*.md' build/src
+
+$ bof3 emi list --help
+[exit 0]
+bof3 emi list: show an archive's entry table.
+
+Usage: bof3 emi list [-i ARCHIVE] [--json]
+
+  -i, --input ARCHIVE  archive to read (or pass it as the only positional)
+      --json           print one JSON object per entry, as a JSON array
+                       (default: a text table)
+
+Examples:
+  bof3 emi list "BIN/BGM/BGM000.EMI"
+  bof3 emi list -i "BIN/BGM/BGM000.EMI" --json
+
+$ bof3 emi vram --help
+[exit 0]
+bof3 emi vram: decode an archive's type-3 VRAM uploads into one page set.
+
+Usage: bof3 emi vram [-i ARCHIVE] [-o PAGE.png]
+
+  -i, --input ARCHIVE  archive to read (or pass it as the only positional)
+  -o, --output PAGE.png
+                       also write the page set as a PNG (default: print only)
+
+Examples:
+  bof3 emi vram "BIN/BGM/BGM000.EMI"
+  bof3 emi vram -i "BIN/BGM/BGM000.EMI" -o build/page.png
+
+$ bof3 emi clut --help
+[exit 0]
+bof3 emi clut: decode one CLUT palette entry.
+
+Usage: bof3 emi clut [-i ARCHIVE] INDEX [-j FILE.json] [-p FILE.png]
+
+  -i, --input ARCHIVE  archive to read (or pass it as the first positional)
+  INDEX                entry index to decode (required)
+  -j, --json FILE      write the palette as JSON (default: print only)
+  -p, --png FILE       write the palette as a swatch strip (default: print only)
+
+Examples:
+  bof3 emi clut "BIN/BGM/BGM000.EMI" 3
+  bof3 emi clut -i "BIN/BGM/BGM000.EMI" 3 -j build/palette.json -p build/palette.png
+
+$ bof3 emi vab --help
+[exit 0]
+bof3 emi {vab|sep}: parse one sound bank or sequence package entry.
+
+Usage: bof3 emi vab [-i ARCHIVE] INDEX [--dump]
+       bof3 emi sep [-i ARCHIVE] INDEX [--dump]
+
+  -i, --input ARCHIVE  archive to read (or pass it as the first positional)
+  INDEX                entry index to parse (required)
+      --dump           print every field of the entry (default: a summary)
+
+Examples:
+  bof3 emi vab "BIN/BGM/BGM000.EMI" 1
+  bof3 emi sep -i "BIN/SEQ/SEQM00.EMI" 0 --dump
+
+$ bof3 emi sep --help
+[exit 0]
+bof3 emi {vab|sep}: parse one sound bank or sequence package entry.
+
+Usage: bof3 emi vab [-i ARCHIVE] INDEX [--dump]
+       bof3 emi sep [-i ARCHIVE] INDEX [--dump]
+
+  -i, --input ARCHIVE  archive to read (or pass it as the first positional)
+  INDEX                entry index to parse (required)
+      --dump           print every field of the entry (default: a summary)
+
+Examples:
+  bof3 emi vab "BIN/BGM/BGM000.EMI" 1
+  bof3 emi sep -i "BIN/SEQ/SEQM00.EMI" 0 --dump
+
+$ bof3 emi coverage --help
+[exit 0]
+bof3 emi coverage: check which formats rebuild their own bytes.
+
+Usage: bof3 emi coverage [-i DIR] [-o FILE] [--json]
+
+  -i, --input DIR    folder of .EMI archives to check (default: raw/disc/BIN)
+  -o, --output FILE  write the JSONL table to FILE (default: print only)
+      --json         print the JSONL table instead of the text table
+
+Examples:
+  bof3 emi coverage
+  bof3 emi coverage -i raw/disc/BIN -o build/coverage.jsonl
+  bof3 emi coverage --json
+
+$ bof3 assets --help
+[exit 0]
+bof3 assets: extract the disc's assets, or convert one asset.
+
+Usage: bof3 assets <COMMAND> [OPTIONS]
+       bof3 assets <COMMAND> --help
+
+Commands:
+  extract      write the disc's assets, one file per asset
+  extract-all  every asset of the disc, one folder per step, plus index.json
+  coverage     report which kinds rebuild their own bytes
+  kinds        list the asset kinds and what each writes
+  terrain      write one map bundle's terrain as glTF or OBJ
+  soundfont    write one VAB bank as a SoundFont 2 file
+  tables       write the game tables of ETC/GAME.EMI entry 0 as JSON
+  encounters   write one area's encounter block as JSON
+  export       write one asset's open form from its stored bytes
+  import       read an open form back into its stored bytes
+
+Common switches:
+  -i, --input PATH   disc .cue or image (default: the image in inputs/external, then ./disk)
+  -o, --output PATH  file or folder to write (default: beside the input)
+      --only KINDS    comma-separated kinds, for example texture,palette
+      --mode MODE     raw, modern or both (default: both)
+      --list          classify only, write nothing
+  -q, --quiet         no summary on stdout
+
+Examples:
+  bof3 assets extract --only texture,palette -o build/art
+  bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
+  bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+
+$ bof3 assets extract --help
+[exit 0]
+bof3 assets extract: write the disc's assets, one file per asset.
+
+Usage: bof3 assets extract [-i IMAGE] [-o DIR] [--only KINDS] [--mode MODE]
+                             [--audio-format FMT] [--list] [--jobs N]
+                             [--text-disc DIR] [-q]
+
+  -i, --input IMAGE       CUE sheet or image (default: the one in inputs/external, then ./disk)
+  -o, --output DIR        output folder (default: build/game-assets)
+      --only KINDS        comma-separated kinds, for example texture,palette
+                          (default: every kind)
+      --mode MODE         raw writes the stored bytes, modern the conversion,
+                          both writes each (default: both)
+      --audio-format FMT  wav, flac or ogg (default: wav)
+      --list              classify everything and write nothing (default: off)
+      --jobs N            worker threads (default: every core)
+      --text-disc DIR     extracted disc the text kind reads (default: build/disc)
+  -q, --quiet             skip the summary on stdout (default: off)
+
+Examples:
+  bof3 assets extract --only texture,palette -o build/art
+  bof3 assets extract --only audio-sequence --audio-format ogg --mode modern -o build/music
+  bof3 assets extract --list --only texture
+
+$ bof3 assets extract-all --help
+[exit 0]
+bof3 assets extract-all: every asset of the disc, one folder per step, plus index.json.
+
+Usage: bof3 assets extract-all [-i IMAGE] [-o DIR] [--jobs N] [-q] [STEP...]
+
+Steps (default: all, in this order):
+  disc           the disc's files, as they are on the disc
+  emi            every .EMI archive of disc, each entry as a file
+  assets         the classified payloads and the text, with assets.jsonl and summary.txt
+                 (needs the disc folder the disc step writes)
+  assets-export  terrain glTF, message JSON, SoundFont and MIDI made from assets
+  audio          the sample WAVs rendered by the audio library
+
+  -i, --input IMAGE  CUE sheet or image (default: the one in inputs/external, then ./disk)
+  -o, --output DIR   output folder (default: build/extract)
+      --jobs N       worker threads (default: all cores)
+  -q, --quiet        print only errors
+  -h, --help         this text
+
+DIR/index.json and DIR/index.md list every file with its step, kind, size and sha256.
+Naming STEPs reruns only those; the other steps keep their earlier files and index rows.
+Exit code: 0 success, 1 some step had failures, 2 an error.
+
+Examples:
+  bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
+  bof3 assets extract-all emi assets-export -o build/extract
+$ bof3 assets coverage --help
+[exit 0]
+bof3 assets coverage: report which kinds rebuild their own bytes.
+
+Usage: bof3 assets coverage [-i IMAGE]
+
+  -i, --input IMAGE  CUE sheet or image (default: the one in inputs/external, then ./disk)
+
+Example:
+  bof3 assets coverage -i "Breath of Fire III (USA).cue"
+
+$ bof3 assets kinds --help
+[exit 0]
+bof3 assets kinds: list the asset kinds and what each writes.
+
+Usage: bof3 assets kinds
+
+Example:
+  bof3 assets kinds
+
+$ bof3 assets terrain --help
+[exit 0]
+bof3 assets terrain: write one map bundle's terrain.
+
+Usage: bof3 assets terrain BUNDLE [-o OUT]
+
+  BUNDLE      stored map bundle (the area-map payload)
+  -o, --output OUT
+              .glb writes binary glTF; any other path writes an OBJ with its MTL
+              beside it (default: BUNDLE.glb)
+
+Example:
+  bof3 assets terrain map.bin -o map.glb
+
+$ bof3 assets soundfont --help
+[exit 0]
+bof3 assets soundfont: write one VAB bank as a SoundFont 2 file.
+
+Usage: bof3 assets soundfont HEADER BODY [-o OUT]
+
+  HEADER      the bank's .vh bytes
+  BODY        the bank's .vb bytes
+  -o, --output OUT
+              SoundFont to write (default: HEADER.sf2)
+
+Example:
+  bof3 assets soundfont BGM001.vh BGM001.vb -o BGM001.sf2
+
+$ bof3 assets tables --help
+[exit 0]
+bof3 assets tables: write the game tables of ETC/GAME.EMI entry 0 as JSON.
+
+Usage: bof3 assets tables PAYLOAD [-o DIR]
+
+  PAYLOAD     stored bytes of ETC/GAME.EMI entry 0
+  -o, --output DIR
+              folder for one JSON file per table (default: game-tables)
+
+Example:
+  bof3 assets tables GAME0.bin -o build/tables
+
+$ bof3 assets encounters --help
+[exit 0]
+bof3 assets encounters: write one area's encounter block as JSON.
+
+Usage: bof3 assets encounters PAYLOAD [-o OUT]
+
+  PAYLOAD     stored area-encounters payload
+  -o, --output OUT
+              JSON to write (default: PAYLOAD.json)
+
+Example:
+  bof3 assets encounters encounters.bin -o encounters.json
+
+$ bof3 assets export --help
+[exit 0]
+bof3 assets export: write one asset's open form from its stored bytes.
+
+Usage: bof3 assets export <KIND> ...
+
+Kinds:
+  texture         PNG view, or an indexed PNG in one palette row
+  palette         a CLUT bank as JSON
+  terrain         a map bundle as glTF or OBJ
+  vag             one sample of a VAB bank as WAVE
+  sequence        one sequence of a package as MIDI
+  message         a message bank as JSON
+  strings         the strings of another payload as JSON
+  characters      the eight playable characters as JSON
+  character-bank  a sprite bank's palette tables as JSON
+
+Every kind has focused help: bof3 assets export <KIND> --help.
+Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette BANK,
+--palette-offset WORDS, --index N.
+
+Example:
+  bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+
+$ bof3 assets import --help
+[exit 0]
+bof3 assets import: read one asset's open form back into its stored bytes.
+
+Usage: bof3 assets import <KIND> ...
+
+Kinds:
+  texture         a PNG view or indexed PNG back into a payload
+  palette         palette JSON back into color words
+  terrain         a glTF or OBJ mesh back into a map bundle
+  vag             a WAVE file back into a sample
+  table           one game table back into ETC/GAME.EMI entry 0
+  encounters      encounter JSON back into its block
+  layout          map layout JSON back into a bundle
+  emi             a container with named entries replaced
+  sequence        MIDI files back into a sequence package
+  disc            a patched copy of the whole disc
+  soundfont       a SoundFont 2 file back into a VAB bank
+  message         message JSON back into a bank
+  strings         strings JSON back into its payload
+  characters      character JSON back into ETC/START.EMI entry 8
+  character-bank  palette JSON back into a sprite bank
+
+Every kind has focused help: bof3 assets import <KIND> --help.
+Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
+--entry INDEX=FILE, --file PATH=FILE.
+
+Example:
+  bof3 assets import texture 7.png -o payload.img
+
+$ bof3 assets export texture --help
+[exit 0]
+bof3 assets export texture: write a texture's stored payload as a PNG.
+
+Usage: bof3 assets export texture PAYLOAD --load-arg HEX [-o OUT]
+       bof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette BANK
+                                           [--palette-offset WORDS] [-o OUT]
+
+  PAYLOAD                  stored texture payload
+      --load-arg HEX       the entry's load address (required)
+      --depth 4|8          draw an indexed PNG at this depth (default: off, 16 bpp view)
+      --palette BANK       color-word file for --depth (required with it)
+      --palette-offset N   first word of the palette row (default: 0)
+  -o, --output OUT         PNG to write (default: PAYLOAD.png)
+
+Examples:
+  bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+  bof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette bank.clut -o 7.png
+
+$ bof3 assets export palette --help
+[exit 0]
+bof3 assets export palette: write a CLUT bank as JSON.
+
+Usage: bof3 assets export palette BANK [-o OUT]
+
+  BANK                raw color words
+  -o, --output OUT    JSON to write (default: BANK.json)
+
+Example:
+  bof3 assets export palette palette.clut -o palette.json
+
+$ bof3 assets export terrain --help
+[exit 0]
+bof3 assets export terrain: write one map bundle's terrain.
+
+Usage: bof3 assets export terrain BUNDLE [-o OUT]
+
+  BUNDLE              stored map bundle (the area-map payload)
+  -o, --output OUT    .glb writes binary glTF; any other path writes an OBJ with
+                      its MTL beside it (default: BUNDLE.glb)
+
+Example:
+  bof3 assets export terrain map.bin -o map.glb
+
+$ bof3 assets export vag --help
+[exit 0]
+bof3 assets export vag: write one sample of a VAB bank as a WAVE file.
+
+Usage: bof3 assets export vag HEADER BODY --index N [-o OUT]
+
+  HEADER              the bank's .vh bytes
+  BODY                the bank's .vb bytes
+      --index N       sample number, 1-based (required)
+  -o, --output OUT    WAVE to write (default: HEADER-N.wav)
+
+Example:
+  bof3 assets export vag BGM001.vh BGM001.vb --index 1 -o sample.wav
+
+$ bof3 assets export sequence --help
+[exit 0]
+bof3 assets export sequence: write one sequence of a package as MIDI.
+
+Usage: bof3 assets export sequence PACKAGE [--index N] [-o OUT]
+
+  PACKAGE             sequence package (.seq payload)
+      --index N       sequence to write (default: 0)
+  -o, --output OUT    MIDI to write (default: PACKAGE.mid)
+
+Example:
+  bof3 assets export sequence package.seq --index 1 -o song.mid
+
+$ bof3 assets export message --help
+[exit 0]
+bof3 assets export message: write a message bank as JSON.
+
+Usage: bof3 assets export message PAYLOAD [-o OUT]
+
+  PAYLOAD             message-bank payload
+  -o, --output OUT    JSON to write (default: PAYLOAD.json)
+
+Example:
+  bof3 assets export message bank.bin -o bank.json
+
+$ bof3 assets export strings --help
+[exit 0]
+bof3 assets export strings: write the strings of a payload as JSON.
+
+Usage: bof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]
+
+  PAYLOAD             payload that holds strings
+      --load-arg HEX  the entry's load address, for type 0-2 payloads
+                      (default: none, so a pointer table is not recognised)
+  -o, --output OUT    JSON to write (default: PAYLOAD.json)
+
+Example:
+  bof3 assets export strings payload.bin --load-arg 0x80100000 -o strings.json
+
+$ bof3 assets export characters --help
+[exit 0]
+bof3 assets export characters: write the eight playable characters as JSON.
+
+Usage: bof3 assets export characters PAYLOAD [-o OUT]
+
+  PAYLOAD             ETC/START.EMI entry 8
+  -o, --output OUT    JSON to write (default: PAYLOAD.json)
+
+Example:
+  bof3 assets export characters START8.bin -o characters.json
+
+$ bof3 assets export character-bank --help
+[exit 0]
+bof3 assets export character-bank: write a sprite bank's palettes as JSON.
+
+Usage: bof3 assets export character-bank PAYLOAD [-o OUT]
+
+  PAYLOAD             decoded sprite bank, container or one section
+  -o, --output OUT    JSON to write (default: PAYLOAD.json)
+
+Example:
+  bof3 assets export character-bank bank.bin -o palettes.json
+
+$ bof3 assets import texture --help
+[exit 0]
+bof3 assets import texture: read a texture PNG back into its stored payload.
+
+Usage: bof3 assets import texture PNG [-o OUT] [--palette OUT]
+
+  PNG                 a PNG that export texture wrote
+  -o, --output OUT    payload to write (default: PNG.img)
+      --palette OUT   also write an indexed PNG's color words
+
+Examples:
+  bof3 assets import texture 7.png -o payload.img
+  bof3 assets import texture 7.png --palette bank.clut -o payload.img
+
+$ bof3 assets import palette --help
+[exit 0]
+bof3 assets import palette: read palette JSON back into color words.
+
+Usage: bof3 assets import palette JSON [-o OUT]
+
+  JSON                palette JSON from export palette
+  -o, --output OUT    raw color words to write (default: JSON.bin)
+
+Example:
+  bof3 assets import palette palette.json -o palette.clut
+
+$ bof3 assets import terrain --help
+[exit 0]
+bof3 assets import terrain: read a mesh back into its map bundle.
+
+Usage: bof3 assets import terrain MESH --payload BUNDLE [-o OUT]
+
+  MESH                .glb or OBJ mesh from export terrain
+      --payload BUNDLE
+                      the stored bundle the mesh came from; supplies every
+                      other section (required)
+  -o, --output OUT    bundle to write (default: MESH.bin)
+
+Example:
+  bof3 assets import terrain map.glb --payload map.bin -o rebuilt.bin
+
+$ bof3 assets import vag --help
+[exit 0]
+bof3 assets import vag: read a WAVE file back into a sample.
+
+Usage: bof3 assets import vag WAV [-o OUT]
+
+  WAV                 44.1 kHz mono 16-bit WAVE
+  -o, --output OUT    VAG to write (default: WAV.vag)
+
+Example:
+  bof3 assets import vag sample.wav -o sample.vag
+
+$ bof3 assets import table --help
+[exit 0]
+bof3 assets import table: read one game table back into GAME.EMI entry 0.
+
+Usage: bof3 assets import table NAME JSON --payload ENTRY [-o OUT]
+
+  NAME                table name, as its JSON file is named
+  JSON                table JSON from `assets tables`
+      --payload ENTRY the stored entry 0 (required); bytes the fields do not
+                      name keep their values from it
+  -o, --output OUT    entry to write (default: JSON.bin)
+
+Example:
+  bof3 assets import table items items.json --payload GAME0.bin -o GAME0.new.bin
+
+$ bof3 assets import encounters --help
+[exit 0]
+bof3 assets import encounters: read encounter JSON back into its block.
+
+Usage: bof3 assets import encounters JSON --base BLOCK [-o OUT]
+
+  JSON                encounter JSON from `assets encounters`
+      --base BLOCK    the stored block (required); unnamed bytes are kept
+  -o, --output OUT    block to write (default: JSON.bin)
+
+Example:
+  bof3 assets import encounters encounters.json --base encounters.bin -o rebuilt.bin
+
+$ bof3 assets import layout --help
+[exit 0]
+bof3 assets import layout: read map layout JSON back into a bundle.
+
+Usage: bof3 assets import layout JSON --payload BUNDLE [-o OUT]
+
+  JSON                layout JSON from `assets extract`
+      --payload BUNDLE
+                      the stored bundle (required); supplies every other section
+  -o, --output OUT    bundle to write (default: JSON.bin)
+
+Example:
+  bof3 assets import layout map.layout.json --payload map.bin -o rebuilt.bin
+
+$ bof3 assets import emi --help
+[exit 0]
+bof3 assets import emi: rebuild a container with named entries replaced.
+
+Usage: bof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]
+
+  CONTAINER           the original .EMI bytes
+      --entry INDEX=FILE
+                      replace entry INDEX with FILE (repeatable)
+  -o, --output OUT    archive to write (default: CONTAINER.rebuilt.EMI)
+
+Example:
+  bof3 assets import emi BGM000.EMI --entry 2=new.bin -o BGM000.new.EMI
+
+$ bof3 assets import sequence --help
+[exit 0]
+bof3 assets import sequence: write a sequence package from MIDI files.
+
+Usage: bof3 assets import sequence FILE.mid:ID... [-o OUT]
+
+  FILE.mid:ID         one file per sequence, in order; ID is its package id
+  -o, --output OUT    package to write (default: first file with .seq)
+
+Example:
+  bof3 assets import sequence song.mid:1 other.mid:2 -o package.seq
+
+$ bof3 assets import disc --help
+[exit 0]
+bof3 assets import disc: write a patched copy of the whole disc.
+
+Usage: bof3 assets import disc CUE [--file PATH=FILE]... -o DIR
+
+  CUE                 the disc's cue sheet
+      --file PATH=FILE
+                      replace disc file PATH with FILE (repeatable); a file
+                      cannot grow past its last sector
+  -o, --output DIR    folder for the patched disc (required)
+
+Example:
+  bof3 assets import disc game.cue --file BIN/ETC/GAME.EMI=GAME.EMI -o build/patched
+
+$ bof3 assets import soundfont --help
+[exit 0]
+bof3 assets import soundfont: read a SoundFont 2 file back into a VAB bank.
+
+Usage: bof3 assets import soundfont BANK.sf2 [-o PREFIX]
+
+  BANK.sf2            the SoundFont
+  -o, --output PREFIX writes PREFIX.vh and PREFIX.vb (default: BANK)
+
+Example:
+  bof3 assets import soundfont BGM001.sf2 -o BGM001
+
+$ bof3 assets import message --help
+[exit 0]
+bof3 assets import message: read message JSON back into a bank.
+
+Usage: bof3 assets import message JSON [-o OUT]
+
+  JSON                message JSON from export message
+  -o, --output OUT    bank to write (default: JSON.bin)
+
+Example:
+  bof3 assets import message bank.json -o bank.bin
+
+$ bof3 assets import strings --help
+[exit 0]
+bof3 assets import strings: read strings JSON back into its payload.
+
+Usage: bof3 assets import strings JSON --payload PAYLOAD [-o OUT]
+
+  JSON                strings JSON from export strings
+      --payload PATH  the payload the JSON came from (required)
+  -o, --output OUT    payload to write (default: JSON.bin)
+
+Example:
+  bof3 assets import strings strings.json --payload payload.bin -o rebuilt.bin
+
+$ bof3 assets import characters --help
+[exit 0]
+bof3 assets import characters: read character JSON back into START.EMI entry 8.
+
+Usage: bof3 assets import characters JSON --payload PAYLOAD [-o OUT]
+
+  JSON                character JSON from export characters
+      --payload PATH  the stored entry 8 (required)
+  -o, --output OUT    entry to write (default: JSON.bin)
+
+Example:
+  bof3 assets import characters characters.json --payload START8.bin -o START8.new.bin
+
+$ bof3 assets import character-bank --help
+[exit 0]
+bof3 assets import character-bank: read palette JSON back into a sprite bank.
+
+Usage: bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]
+
+  JSON                palette JSON from export character-bank
+      --payload PATH  the decoded bank (required)
+  -o, --output OUT    bank to write (default: JSON.bin)
+
+Example:
+  bof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
+
+$ bof3 assets kinds
+[exit 0]
+executable       raw       program images: SLUS_004.22 and LOGO.EXE
+system           raw       SYSTEM.CNF and the license sectors
+video            raw       MDEC video with XA audio (2336-byte sectors)
+xa-audio         raw       multiplexed XA ADPCM banks (2336-byte sectors)
+cdda             decoded   CD-DA tracks: the stored 16-bit stereo PCM and a 44.1 kHz WAV
+texture          decoded   type-3 VRAM uploads: raw words and a 16bpp PNG view
+palette          decoded   CLUT banks: raw words, JSON and a swatch PNG
+audio-bank       decoded   VAB header (.vh) and body (.vb) halves, and a SoundFont 2 (.sf2) per bank
+audio-sequence   raw       SEP sequence packages (.seq)
+audio-cues       decoded   type-8 cue tables: raw records and JSON
+character-bank   decoded   sprite banks: stored form and, for type 1, the LZ77-decoded blob
+area-message     raw       area message banks (0x80010000)
+area-cells       raw       packed 4-bit cell grids (0x80032000)
+area-script      decoded   area script banks (0x800D3800): stored bytes and JSON
+battle-script    raw       battle script banks (0x800F0800)
+area-actor-defs  decoded   actor definitions: raw records and JSON
+area-encounters  decoded   encounters and enemy records (0x800E4000): stored bytes and JSON
+area-map         decoded   map bundles (0x80104000): stored bytes and the terrain as OBJ, MTL and glTF binary
+area-module      raw       auxiliary module windows (0x80117000)
+resource-table   raw       shared resource tables (0x8001A000)
+bmagic-table     raw       magic-effect tables (0x800C3800), format not yet known
+code             raw       code images loaded from EMI entries
+reserve          none      all-zero payloads that reserve a RAM slot
+unknown          raw       entries and files no rule classifies
+data-table       decoded   fixed game tables from ETC/GAME.EMI entry 0: stored bytes and JSON for items, equipment, shops, abilities, level growth
+text             decoded   game strings and message banks as JSON, from the extracted disc
+

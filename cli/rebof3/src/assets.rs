@@ -9,6 +9,8 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use crate::disc::find_disc_image;
+use clap::Parser;
+use rebof3_assets::codec::{self, Direction, Index, Job};
 use rebof3_assets::coverage;
 use rebof3_assets::decode;
 use rebof3_assets::disc;
@@ -609,8 +611,8 @@ fn run(args: Vec<OsString>) -> Result<i32> {
         "soundfont" => soundfont_command(&rest),
         "tables" => tables_command(&rest),
         "encounters" => encounters_command(&rest),
-        "export" => export_command(&rest),
-        "import" => import_command(&rest),
+        "export" => convert_command(Direction::Export, &rest),
+        "import" => convert_command(Direction::Import, &rest),
         other => Err(Error::Usage(format!("unknown command {other:?}; run `bof3 assets --help` for the commands"))),
     };
     result.map_err(|error| {
@@ -653,61 +655,35 @@ fn help_for(args: &[String]) -> String {
     }
 }
 
-/// `bof3 assets encounters PAYLOAD [-o OUT]`: writes one area's encounter block as JSON. PAYLOAD is the
-/// stored bytes of an `area-encounters` entry. The output defaults to PAYLOAD with a `.json` extension.
-fn encounters_command(args: &[String]) -> Result<i32> {
-    let mut payload = None;
-    let mut out = None;
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        if arg == "-o" || arg == "--output" || arg == "--out" {
-            let path = rest.next().ok_or_else(|| Error::Usage("-o needs a path".into()))?;
-            out = Some(PathBuf::from(path));
-        } else if payload.is_none() {
-            payload = Some(PathBuf::from(arg));
-        } else {
-            return Err(Error::Usage(format!("unexpected argument {arg:?}")));
-        }
-    }
-    let payload = payload.ok_or_else(|| Error::Usage("encounters needs an area encounter block file".into()))?;
-    let out = out.unwrap_or_else(|| payload.with_extension("json"));
-    if let Some(parent) = out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&out, tables::encounters(&read_file(&payload)?)?)?;
-    println!("wrote {}", out.display());
-    Ok(EXIT_OK)
+/// Parses `args` into `T`. The help text is printed by `run`, so clap's own help is off; a parse
+/// error becomes a one-line usage error.
+fn parse<T: Parser>(args: &[String]) -> Result<T> {
+    let command = T::command()
+        .no_binary_name(true)
+        .disable_help_flag(true)
+        .disable_version_flag(true)
+        .disable_help_subcommand(true)
+        .args_override_self(true);
+    let usage = |error: clap::Error| {
+        let text = error.to_string();
+        let line = text.lines().next().unwrap_or_default();
+        Error::Usage(line.strip_prefix("error: ").unwrap_or(line).to_string())
+    };
+    let matches = command.try_get_matches_from(args).map_err(usage)?;
+    T::from_arg_matches(&matches).map_err(usage)
 }
 
-/// `bof3 assets tables PAYLOAD [-o DIR]`: writes the fixed game tables of `ETC/GAME.EMI` entry 0 as one
-/// JSON file per table. PAYLOAD is the stored bytes of that entry.
-fn tables_command(args: &[String]) -> Result<i32> {
-    let mut payload = None;
-    let mut out = PathBuf::from("game-tables");
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        if arg == "-o" || arg == "--output" || arg == "--out" {
-            let path = rest.next().ok_or_else(|| Error::Usage("-o needs a path".into()))?;
-            out = PathBuf::from(path);
-        } else if payload.is_none() {
-            payload = Some(PathBuf::from(arg));
-        } else {
-            return Err(Error::Usage(format!("unexpected argument {arg:?}")));
-        }
+/// The one file a command takes, or `missing` if there is none.
+fn single(mut files: Vec<PathBuf>, missing: &str) -> Result<PathBuf> {
+    if files.len() > 1 {
+        return Err(Error::Usage(format!("unexpected argument {:?}", files[1].to_string_lossy())));
     }
-    let payload = payload.ok_or_else(|| Error::Usage("tables needs the stored bytes of GAME.EMI entry 0".into()))?;
-    let files = tables::files(&read_file(&payload)?)?;
-    fs::create_dir_all(&out)?;
-    for (name, data) in &files {
-        fs::write(out.join(format!("{name}.json")), data)?;
-    }
-    println!("wrote {} tables to {}", files.len(), out.display());
-    Ok(EXIT_OK)
+    files.pop().ok_or_else(|| Error::Usage(missing.into()))
 }
 
-/// Reads the value that follows `flag`.
-fn value_of<'a>(rest: &mut std::slice::Iter<'a, String>, flag: &str) -> Result<&'a str> {
-    rest.next().map(String::as_str).ok_or_else(|| Error::Usage(format!("{flag} needs a value")))
+/// The `-o` option every conversion command takes.
+fn with_extension_of(out: Option<PathBuf>, input: &Path, extension: &str) -> PathBuf {
+    out.unwrap_or_else(|| input.with_extension(extension))
 }
 
 /// Reads a number written in decimal or with a `0x` prefix.
@@ -717,6 +693,10 @@ fn number(text: &str, flag: &str) -> Result<u32> {
         None => text.parse(),
     };
     parsed.map_err(|_| Error::Usage(format!("{flag} needs a number, not {text:?}")))
+}
+
+fn optional_number(text: Option<&str>, flag: &str) -> Result<Option<u32>> {
+    text.map(|text| number(text, flag)).transpose()
 }
 
 /// Reads a file and names it when the read fails.
@@ -733,6 +713,14 @@ fn create_parent(out: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Writes `bytes` to `out`, creating its directory, and reports the file.
+fn write_output(out: &Path, bytes: &[u8]) -> Result<()> {
+    create_parent(out)?;
+    fs::write(out, bytes)?;
+    println!("wrote {}", out.display());
+    Ok(())
+}
+
 /// The little-endian color words of a palette file.
 fn color_words(bytes: &[u8]) -> Result<Vec<u16>> {
     if !bytes.len().is_multiple_of(2) {
@@ -741,51 +729,143 @@ fn color_words(bytes: &[u8]) -> Result<Vec<u16>> {
     Ok(bytes.as_chunks::<2>().0.iter().map(|&pair| u16::from_le_bytes(pair)).collect())
 }
 
-/// `bof3 assets export KIND ...`: writes an asset's open form from its stored bytes. Only `texture` has an
-/// export so far.
-fn export_command(args: &[String]) -> Result<i32> {
-    match args.split_first() {
-        Some((kind, rest)) if kind.as_str() == "texture" => export_texture(rest),
-        Some((kind, rest)) if kind.as_str() == "palette" => export_palette(rest),
-        Some((kind, rest)) if kind.as_str() == "terrain" => terrain_command(rest),
-        Some((kind, rest)) if kind.as_str() == "vag" => export_vag(rest),
-        Some((kind, rest)) if kind.as_str() == "sequence" => export_sequence(rest),
-        Some((kind, rest)) if kind.as_str() == "message" => export_message(rest),
-        Some((kind, rest)) if kind.as_str() == "strings" => export_strings(rest),
-        Some((kind, rest)) if kind.as_str() == "characters" => export_characters(rest),
-        Some((kind, rest)) if kind.as_str() == "character-bank" => export_character_bank(rest),
-        Some((kind, _)) => Err(Error::Usage(format!(
-            "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters and character-bank"
-        ))),
-        None => Err(Error::Usage("export needs a kind, for example texture; run `bof3 assets export --help`".into())),
+/// Splits `INDEX=FILE` or `PATH=FILE` for `flag`.
+fn pair<'a>(value: &'a str, flag: &str, shape: &str) -> Result<(&'a str, &'a str)> {
+    value.split_once('=').ok_or_else(|| Error::Usage(format!("{flag} needs {shape}, not {value:?}")))
+}
+
+/// The arguments of the table-driven conversions (`export` and `import` of a kind in
+/// [`codec::CODECS`]): files, `-o`, and the options an op may take.
+#[derive(Parser)]
+struct Convert {
+    files: Vec<String>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+    #[arg(long)]
+    payload: Option<PathBuf>,
+    #[arg(long)]
+    base: Option<PathBuf>,
+    #[arg(long)]
+    index: Option<String>,
+    #[arg(long = "load-arg")]
+    load_arg: Option<String>,
+}
+
+/// `bof3 assets export|import KIND ...`: the verbs that convert one asset to or from its open form.
+fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
+    let verb = if direction == Direction::Export { "export" } else { "import" };
+    let Some((kind, rest)) = args.split_first() else {
+        return Err(Error::Usage(format!("{verb} needs a kind, for example texture; run `bof3 assets {verb} --help`")));
+    };
+    match (direction, kind.as_str()) {
+        (Direction::Export, "texture") => return export_texture(rest),
+        (Direction::Export, "terrain") => return terrain_command(rest),
+        (Direction::Import, "texture") => return import_texture(rest),
+        (Direction::Import, "emi") => return import_emi(rest),
+        (Direction::Import, "sequence") => return import_sequence(rest),
+        (Direction::Import, "disc") => return import_disc(rest),
+        (Direction::Import, "soundfont") => return import_soundfont(rest),
+        _ => {}
+    }
+    let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
+        return Err(Error::Usage(match direction {
+            Direction::Export => format!(
+                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters and character-bank"
+            ),
+            Direction::Import => {
+                format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")
+            }
+        }));
+    };
+    let args: Convert = parse(rest)?;
+    reject_unused_options(op, &args)?;
+    let wanted = op.files + usize::from(op.named);
+    if args.files.len() < wanted {
+        return Err(Error::Usage(op.needs_input.into()));
+    }
+    if let Some(extra) = args.files.get(wanted) {
+        return Err(Error::Usage(format!("unexpected argument {extra:?}")));
+    }
+    let index = optional_number(args.index.as_deref(), "--index")?;
+    if let Index::Required(missing) = op.index
+        && index.is_none()
+    {
+        return Err(Error::Usage(missing.into()));
+    }
+    let flagged = match op.companion_flag {
+        Some(flag) => {
+            let path = if flag.flag == "--base" { &args.base } else { &args.payload };
+            Some(path.as_ref().ok_or_else(|| Error::Usage(flag.missing.into()))?)
+        }
+        None => None,
+    };
+    let (name, files) =
+        if op.named { (args.files.first().map(String::as_str), &args.files[1..]) } else { (None, &args.files[..]) };
+    let input_path = Path::new(&files[0]);
+    let input = read_file(input_path)?;
+    let second = match (op.files, flagged) {
+        (2, _) => Some(read_file(&files[1])?),
+        (_, Some(path)) => Some(read_file(path)?),
+        _ => None,
+    };
+    let job = Job {
+        name,
+        input: &input,
+        companion: second.as_deref(),
+        index,
+        load_arg: optional_number(args.load_arg.as_deref(), "--load-arg")?,
+    };
+    let bytes = (op.run)(&job)?;
+    write_output(&with_extension_of(args.output, input_path, &op.extension_for(index)), &bytes)?;
+    Ok(EXIT_OK)
+}
+
+/// An option the op does not take is an unexpected argument, as it was before the table.
+fn reject_unused_options(op: &codec::Op, args: &Convert) -> Result<()> {
+    let flag = op.companion_flag.map(|flag| flag.flag);
+    let unused = [
+        ("--payload", args.payload.is_some() && flag != Some("--payload")),
+        ("--base", args.base.is_some() && flag != Some("--base")),
+        ("--index", args.index.is_some() && op.index == Index::No),
+        ("--load-arg", args.load_arg.is_some() && !op.load_arg),
+    ];
+    match unused.into_iter().find(|(_, used)| *used) {
+        Some((name, _)) => Err(Error::Usage(format!("unexpected argument {name:?}"))),
+        None => Ok(()),
     }
 }
 
 /// `bof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette BANK [--palette-offset WORDS]] [-o OUT]`:
 /// writes a texture's stored payload as a PNG. Without `--depth` the PNG is the 16 bpp view. With it, the
 /// payload is drawn with the palette row that starts at word WORDS of BANK, a file of raw color words.
+#[derive(Parser)]
+struct ExportTexture {
+    files: Vec<PathBuf>,
+    #[arg(long = "load-arg")]
+    load_arg: Option<String>,
+    #[arg(long)]
+    depth: Option<String>,
+    #[arg(long)]
+    palette: Option<PathBuf>,
+    #[arg(long = "palette-offset")]
+    palette_offset: Option<String>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
 fn export_texture(args: &[String]) -> Result<i32> {
-    let (mut payload, mut load_arg, mut depth, mut palette, mut offset, mut out) = (None, None, None, None, 0, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--load-arg" => load_arg = Some(number(value_of(&mut rest, arg)?, arg)?),
-            "--depth" => depth = Some(number(value_of(&mut rest, arg)?, arg)?),
-            "--palette" => palette = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "--palette-offset" => offset = number(value_of(&mut rest, arg)?, arg)? as usize,
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if payload.is_none() => payload = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let payload_path = payload.ok_or_else(|| Error::Usage("export texture needs a payload file".into()))?;
+    let args: ExportTexture = parse(args)?;
+    let load_arg = optional_number(args.load_arg.as_deref(), "--load-arg")?;
+    let depth = optional_number(args.depth.as_deref(), "--depth")?;
+    let offset = optional_number(args.palette_offset.as_deref(), "--palette-offset")?.unwrap_or(0) as usize;
+    let payload_path = single(args.files, "export texture needs a payload file")?;
     let load_arg =
         load_arg.ok_or_else(|| Error::Usage("export texture needs --load-arg, the entry's load address".into()))?;
     let bytes = read_file(&payload_path)?;
     let (png, what) = match depth {
         None => (decode::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
         Some(bits) => {
-            let Some(bank) = palette else {
+            let Some(bank) = args.palette else {
                 return Err(Error::Usage("--depth needs --palette, the bank that holds the row".into()));
             };
             let count = match bits {
@@ -801,55 +881,29 @@ fn export_texture(args: &[String]) -> Result<i32> {
             (png, format!("{bits}-bit indexed row at word {offset}"))
         }
     };
-    let out = out.unwrap_or_else(|| payload_path.with_extension("png"));
+    let out = with_extension_of(args.output, &payload_path, "png");
     create_parent(&out)?;
     fs::write(&out, png)?;
     println!("wrote {} ({what})", out.display());
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets import KIND ...`: reads an asset's open form back into its stored bytes. Only `texture` has
-/// an import so far.
-fn import_command(args: &[String]) -> Result<i32> {
-    match args.split_first() {
-        Some((kind, rest)) if kind.as_str() == "texture" => import_texture(rest),
-        Some((kind, rest)) if kind.as_str() == "palette" => import_palette(rest),
-        Some((kind, rest)) if kind.as_str() == "terrain" => import_terrain(rest),
-        Some((kind, rest)) if kind.as_str() == "vag" => import_vag(rest),
-        Some((kind, rest)) if kind.as_str() == "table" => import_table(rest),
-        Some((kind, rest)) if kind.as_str() == "encounters" => import_encounters(rest),
-        Some((kind, rest)) if kind.as_str() == "layout" => import_layout(rest),
-        Some((kind, rest)) if kind.as_str() == "emi" => import_emi(rest),
-        Some((kind, rest)) if kind.as_str() == "sequence" => import_sequence(rest),
-        Some((kind, rest)) if kind.as_str() == "disc" => import_disc(rest),
-        Some((kind, rest)) if kind.as_str() == "soundfont" => import_soundfont(rest),
-        Some((kind, rest)) if kind.as_str() == "message" => import_message(rest),
-        Some((kind, rest)) if kind.as_str() == "strings" => import_strings(rest),
-        Some((kind, rest)) if kind.as_str() == "characters" => import_characters(rest),
-        Some((kind, rest)) if kind.as_str() == "character-bank" => import_character_bank(rest),
-        Some((kind, _)) => Err(Error::Usage(format!(
-            "import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds"
-        ))),
-        None => Err(Error::Usage("import needs a kind, for example texture; run `bof3 assets import --help`".into())),
-    }
-}
-
 /// `bof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back
 /// into its stored payload (default: the PNG with a `.img` extension). An indexed PNG also has color words,
 /// which `--palette` writes as raw little-endian words.
+#[derive(Parser)]
+struct ImportTexture {
+    files: Vec<PathBuf>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+    #[arg(long)]
+    palette: Option<PathBuf>,
+}
+
 fn import_texture(args: &[String]) -> Result<i32> {
-    let (mut input, mut out, mut palette) = (None, None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "--palette" => palette = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if input.is_none() => input = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let input = input.ok_or_else(|| Error::Usage("import texture needs a PNG file".into()))?;
-    let out = out.unwrap_or_else(|| input.with_extension("img"));
+    let args: ImportTexture = parse(args)?;
+    let input = single(args.files, "import texture needs a PNG file")?;
+    let out = with_extension_of(args.output, &input, "img");
     create_parent(&out)?;
     match import::texture(&read_file(&input)?)? {
         TextureImport::Words(payload) => {
@@ -859,7 +913,7 @@ fn import_texture(args: &[String]) -> Result<i32> {
         TextureImport::Indexed(texture) => {
             fs::write(&out, &texture.payload)?;
             println!("wrote {} ({}-bit indexed row)", out.display(), texture.depth.bits());
-            if let Some(path) = palette {
+            if let Some(path) = args.palette {
                 let bytes: Vec<u8> = texture.palette.iter().flat_map(|word| word.to_le_bytes()).collect();
                 fs::write(&path, bytes)?;
                 println!("wrote {} ({} color words)", path.display(), texture.palette.len());
@@ -869,282 +923,27 @@ fn import_texture(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// The one input file of a command, and its `-o` output if it has one.
-fn input_and_out(args: &[String], missing: &str) -> Result<(PathBuf, Option<PathBuf>)> {
-    let (mut input, mut out) = (None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if input.is_none() => input = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    Ok((input.ok_or_else(|| Error::Usage(missing.into()))?, out))
-}
-
-/// Writes `bytes` to `out`, creating its directory, and reports the file.
-fn write_output(out: &Path, bytes: &[u8]) -> Result<()> {
-    create_parent(out)?;
-    fs::write(out, bytes)?;
-    println!("wrote {}", out.display());
-    Ok(())
-}
-
-/// `bof3 assets export palette BANK [-o OUT]`: writes one palette bank's color words as JSON (default: BANK
-/// with a `.json` extension).
-fn export_palette(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "export palette needs a palette bank file")?;
-    let json = decode::palette_json(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("json")), &json)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import palette JSON [-o OUT]`: reads a palette's JSON back to its color words, as raw
-/// little-endian words (default: JSON with a `.bin` extension).
-fn import_palette(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "import palette needs a palette JSON file")?;
-    let bytes = import::palette(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets export vag HEADER BODY --index N [-o OUT]`: writes VAG N of one VAB bank as a 44.1 kHz mono
-/// WAVE file (default: HEADER with the index and a `.wav` extension).
-fn export_vag(args: &[String]) -> Result<i32> {
-    let (mut files, mut index, mut out) = (Vec::new(), None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--index" => index = Some(number(value_of(&mut rest, arg)?, arg)?),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(PathBuf::from(other)),
-        }
-    }
-    let [header, body] = files.as_slice() else {
-        return Err(Error::Usage("export vag needs a header (.vh) and a body (.vb) file".into()));
-    };
-    let index = index.ok_or_else(|| Error::Usage("export vag needs --index, the VAG's number in the bank".into()))?;
-    let wav = decode::vab_vag_wav(&read_file(header)?, &read_file(body)?, index)?;
-    write_output(&out.unwrap_or_else(|| header.with_extension(format!("{index}.wav"))), &wav)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets export message PAYLOAD [-o OUT]`: writes one message bank as JSON. Each message is its text with the
-/// control codes kept as `{TAG}` markers (default: PAYLOAD with a `.json` extension).
-fn export_message(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "export message needs a message bank payload")?;
-    let json = rebof3_assets::text::bank::export(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("json")), &json)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import message JSON [-o OUT]`: encodes a message bank's JSON from `export message` back into its
-/// bytes (default: JSON with a `.bin` extension). Each message is encoded again from its text.
-fn import_message(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "import message needs a JSON file from export message")?;
-    let payload = rebof3_assets::text::bank::import(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("bin")), &payload)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets export strings PAYLOAD [--load-arg HEX] [-o OUT]`: writes the strings of a payload that is not a message
-/// bank as JSON (default: PAYLOAD with a `.json` extension). `--load-arg` is the entry's load address when the entry is a
-/// type 0 to 2 payload: a pointer table is recognised against it.
-fn export_strings(args: &[String]) -> Result<i32> {
-    let (mut input, mut out, mut load_arg) = (None, None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--load-arg" => load_arg = Some(number(value_of(&mut rest, arg)?, arg)?),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if input.is_none() => input = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let input = input.ok_or_else(|| Error::Usage("export strings needs a payload file".into()))?;
-    let json = rebof3_assets::text::strings::export(&read_file(&input)?, load_arg)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("json")), &json)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import strings JSON --payload PAYLOAD [-o OUT]`: writes the payload with each string encoded again
-/// from the JSON of `export strings` (default: JSON with a `.bin` extension). PAYLOAD is the file the JSON came from.
-fn import_strings(args: &[String]) -> Result<i32> {
-    let (mut input, mut payload, mut out) = (None, None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--payload" => payload = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if input.is_none() => input = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let input = input.ok_or_else(|| Error::Usage("import strings needs a JSON file from export strings".into()))?;
-    let payload =
-        payload.ok_or_else(|| Error::Usage("import strings needs --payload, the file it was exported from".into()))?;
-    let bytes = rebof3_assets::text::strings::import(&read_file(&input)?, &read_file(&payload)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets export characters PAYLOAD [-o OUT]`: writes the eight playable characters of `ETC/START.EMI` entry 8 as
-/// JSON: each name, and the rest of its base-stat record as hex (default: PAYLOAD with a `.json` extension).
-fn export_characters(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "export characters needs the payload of ETC/START.EMI entry 8")?;
-    let json = rebof3_assets::tables::characters(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("json")), &json)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import characters JSON --payload PAYLOAD [-o OUT]`: writes the payload of `ETC/START.EMI` entry 8 with its
-/// characters replaced by the JSON of `export characters` (default: JSON with a `.bin` extension).
-fn import_characters(args: &[String]) -> Result<i32> {
-    let (mut input, mut payload, mut out) = (None, None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--payload" => payload = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if input.is_none() => input = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let input =
-        input.ok_or_else(|| Error::Usage("import characters needs a JSON file from export characters".into()))?;
-    let payload = payload
-        .ok_or_else(|| Error::Usage("import characters needs --payload, the entry it was exported from".into()))?;
-    let bytes = rebof3_assets::import::characters(&read_file(&input)?, &read_file(&payload)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets export character-bank PAYLOAD [-o OUT]`: writes the palettes of one sprite bank as JSON: each section's
-/// palettes, and each colour as four hex digits. PAYLOAD is the decoded bank, a whole container or one section
-/// (default: PAYLOAD with a `.json` extension).
-fn export_character_bank(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "export character-bank needs the decoded sprite bank")?;
-    let json = rebof3_assets::sprites::character_bank(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("json")), &json)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]`: writes the decoded sprite bank with its palettes
-/// replaced by the JSON of `export character-bank` (default: JSON with a `.bin` extension).
-fn import_character_bank(args: &[String]) -> Result<i32> {
-    let (mut input, mut payload, mut out) = (None, None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--payload" => payload = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if input.is_none() => input = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let input = input
-        .ok_or_else(|| Error::Usage("import character-bank needs a JSON file from export character-bank".into()))?;
-    let payload = payload.ok_or_else(|| {
-        Error::Usage("import character-bank needs --payload, the decoded bank it was exported from".into())
-    })?;
-    let bytes = rebof3_assets::import::character_bank(&read_file(&input)?, &read_file(&payload)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import vag WAV [-o OUT]`: encodes a 44.1 kHz mono 16-bit WAVE file as a VAG (default: WAV with
-/// a `.vag` extension). ADPCM is lossy for samples that no block reproduces, and encoding the decoded samples
-/// again is exact.
-fn import_vag(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "import vag needs a WAVE file")?;
-    let vag = import::vag(&read_file(&input)?)?;
-    write_output(&out.unwrap_or_else(|| input.with_extension("vag")), &vag)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import table NAME JSON --payload ENTRY [-o OUT]`: writes one fixed table of `ETC/GAME.EMI` entry 0
-/// from its JSON records (`NAME` is the table's name, as its JSON file is named). ENTRY is the stored entry 0. The
-/// bytes no field names keep their values from ENTRY. The output defaults to JSON with a `.bin` extension.
-fn import_table(args: &[String]) -> Result<i32> {
-    let (mut files, mut payload, mut out) = (Vec::new(), None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--payload" => payload = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(other.to_string()),
-        }
-    }
-    let [name, json] = files.as_slice() else {
-        return Err(Error::Usage("import table needs a table name and its JSON file".into()));
-    };
-    let payload = payload
-        .ok_or_else(|| Error::Usage("import table needs --payload, the stored entry 0 of ETC/GAME.EMI".into()))?;
-    let bytes = import::game_table_in_payload(name, &read_file(json)?, &read_file(&payload)?)?;
-    write_output(&out.unwrap_or_else(|| Path::new(json).with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import encounters JSON --base BLOCK [-o OUT]`: writes one area's encounter block from its JSON.
-/// BLOCK is the stored block (`area-encounters`), whose bytes no field names keep. The output defaults to JSON with
-/// a `.bin` extension.
-fn import_encounters(args: &[String]) -> Result<i32> {
-    let (mut files, mut base, mut out) = (Vec::new(), None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--base" => base = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(PathBuf::from(other)),
-        }
-    }
-    let [json] = files.as_slice() else {
-        return Err(Error::Usage("import encounters needs the block's JSON file".into()));
-    };
-    let base = base.ok_or_else(|| Error::Usage("import encounters needs --base, the stored block".into()))?;
-    let bytes = import::encounters(&read_file(json)?, &read_file(&base)?)?;
-    write_output(&out.unwrap_or_else(|| json.with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets export sequence PACKAGE [--index N] [-o OUT]`: writes sequence N of a sequence package (`.seq`) as a
-/// format 0 Standard MIDI File (default: PACKAGE with a `.mid` extension, and N 0).
-fn export_sequence(args: &[String]) -> Result<i32> {
-    let (mut files, mut index, mut out) = (Vec::new(), 0, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--index" => index = number(value_of(&mut rest, arg)?, arg)? as usize,
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(PathBuf::from(other)),
-        }
-    }
-    let [package] = files.as_slice() else {
-        return Err(Error::Usage("export sequence needs a sequence package (.seq) file".into()));
-    };
-    let midi = decode::sequence_midi(&read_file(package)?, index)?;
-    write_output(&out.unwrap_or_else(|| package.with_extension("mid")), &midi)?;
-    Ok(EXIT_OK)
-}
-
 /// `bof3 assets import sequence FILE.mid:ID... [-o OUT]`: writes a sequence package (`.seq`) from Standard MIDI
 /// Files, one sequence per argument and in order. ID is the sequence's id in the package. The output defaults to
 /// the first file's name with a `.seq` extension.
+#[derive(Parser)]
+struct ImportSequence {
+    parts: Vec<String>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
 fn import_sequence(args: &[String]) -> Result<i32> {
-    let (mut parts, mut out) = (Vec::new(), None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => {
-                let (path, id) =
-                    other.rsplit_once(':').ok_or_else(|| Error::Usage(format!("{other:?} needs FILE:ID")))?;
-                let id: u16 = id.parse().map_err(|_| Error::Usage(format!("{other:?} needs a numeric ID")))?;
-                parts.push((PathBuf::from(path), id));
-            }
-        }
-    }
+    let args: ImportSequence = parse(args)?;
+    let parts = args
+        .parts
+        .iter()
+        .map(|part| {
+            let (path, id) = part.rsplit_once(':').ok_or_else(|| Error::Usage(format!("{part:?} needs FILE:ID")))?;
+            let id: u16 = id.parse().map_err(|_| Error::Usage(format!("{part:?} needs a numeric ID")))?;
+            Ok((PathBuf::from(path), id))
+        })
+        .collect::<Result<Vec<_>>>()?;
     let Some((first, _)) = parts.first() else {
         return Err(Error::Usage("import sequence needs at least one FILE:ID".into()));
     };
@@ -1154,150 +953,106 @@ fn import_sequence(args: &[String]) -> Result<i32> {
         .map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) })
         .collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
-    write_output(&out.unwrap_or(default), &import::sequence(&borrowed)?)?;
+    write_output(&args.output.unwrap_or(default), &import::sequence(&borrowed)?)?;
     Ok(EXIT_OK)
 }
 
 /// `bof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]`: rebuilds an EMI container with the entries
 /// named by `--entry` replaced by the files' bytes. Without `--entry` the output is the container as its entries
 /// pack. The output defaults to CONTAINER with a `.rebuilt.EMI` extension.
+#[derive(Parser)]
+struct ImportEmi {
+    files: Vec<PathBuf>,
+    #[arg(long)]
+    entry: Vec<String>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
 fn import_emi(args: &[String]) -> Result<i32> {
-    let (mut files, mut replacements, mut out) = (Vec::new(), Vec::new(), None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--entry" => {
-                let value = value_of(&mut rest, arg)?;
-                let (index, file) = value
-                    .split_once('=')
-                    .ok_or_else(|| Error::Usage(format!("--entry needs INDEX=FILE, not {value:?}")))?;
-                replacements.push((number(index, arg)? as usize, PathBuf::from(file)));
-            }
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(PathBuf::from(other)),
-        }
-    }
-    let [container] = files.as_slice() else {
-        return Err(Error::Usage("import emi needs the container file".into()));
-    };
+    let args: ImportEmi = parse(args)?;
+    let replacements = args
+        .entry
+        .iter()
+        .map(|value| {
+            let (index, file) = pair(value, "--entry", "INDEX=FILE")?;
+            Ok((number(index, "--entry")? as usize, PathBuf::from(file)))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let container = single(args.files, "import emi needs the container file")?;
     let payloads = replacements
         .iter()
         .map(|(index, file)| -> Result<(usize, Vec<u8>)> { Ok((*index, read_file(file)?)) })
         .collect::<Result<Vec<_>>>()?;
     let replace: Vec<(usize, &[u8])> = payloads.iter().map(|(index, bytes)| (*index, bytes.as_slice())).collect();
-    let bytes = import::emi(&read_file(container)?, &replace)?;
-    write_output(&out.unwrap_or_else(|| container.with_extension("rebuilt.EMI")), &bytes)?;
+    let bytes = import::emi(&read_file(&container)?, &replace)?;
+    write_output(&with_extension_of(args.output, &container, "rebuilt.EMI"), &bytes)?;
     Ok(EXIT_OK)
 }
 
 /// `bof3 assets import disc CUE [--file PATH=FILE]... -o DIR`: writes a patched copy of the disc into the new directory
 /// DIR. Each `--file` replaces the disc file PATH with the bytes of FILE, keeping its sectors. The copy keeps the cue
 /// sheet and every track file under its own name.
+#[derive(Parser)]
+struct ImportDisc {
+    files: Vec<PathBuf>,
+    #[arg(long)]
+    file: Vec<String>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
 fn import_disc(args: &[String]) -> Result<i32> {
-    let (mut files, mut replacements, mut out) = (Vec::new(), Vec::new(), None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--file" => {
-                let value = value_of(&mut rest, arg)?;
-                let (path, file) = value
-                    .split_once('=')
-                    .ok_or_else(|| Error::Usage(format!("--file needs PATH=FILE, not {value:?}")))?;
-                replacements.push((PathBuf::from(path), PathBuf::from(file)));
-            }
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(PathBuf::from(other)),
-        }
-    }
-    let [cue] = files.as_slice() else {
-        return Err(Error::Usage("import disc needs the cue sheet of the disc".into()));
-    };
-    let out =
-        out.ok_or_else(|| Error::Usage("import disc needs -o DIR, a new directory for the patched disc".into()))?;
+    let args: ImportDisc = parse(args)?;
+    let replacements = args
+        .file
+        .iter()
+        .map(|value| {
+            let (path, file) = pair(value, "--file", "PATH=FILE")?;
+            Ok((PathBuf::from(path), PathBuf::from(file)))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let cue = single(args.files, "import disc needs the cue sheet of the disc")?;
+    let out = args
+        .output
+        .ok_or_else(|| Error::Usage("import disc needs -o DIR, a new directory for the patched disc".into()))?;
     let replacements = replacements
         .into_iter()
         .map(|(path, file)| -> Result<disc::Replacement> { Ok(disc::Replacement { path, bytes: read_file(file)? }) })
         .collect::<Result<Vec<_>>>()?;
-    let summary = disc::patch(cue, &out, &replacements)?;
+    let summary = disc::patch(&cue, &out, &replacements)?;
     println!("patched {} files and sealed {} sectors in {}", summary.files, summary.sealed, out.display());
     Ok(EXIT_OK)
 }
 
 /// `bof3 assets import soundfont BANK.sf2 [-o PREFIX]`: writes the VAB bank a SoundFont 2 file describes as
 /// PREFIX.vh and PREFIX.vb. The default prefix is the SoundFont's path without its extension.
+#[derive(Parser)]
+struct OneFile {
+    files: Vec<PathBuf>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
 fn import_soundfont(args: &[String]) -> Result<i32> {
-    let (input, out) = input_and_out(args, "import soundfont needs a SoundFont 2 file")?;
+    let args: OneFile = parse(args)?;
+    let input = single(args.files, "import soundfont needs a SoundFont 2 file")?;
     let (header, body) = soundfont::bank(&read_file(&input)?)?;
-    let prefix = out.unwrap_or_else(|| input.with_extension(""));
+    let prefix = args.output.unwrap_or_else(|| input.with_extension(""));
     write_output(&PathBuf::from(format!("{}.vh", prefix.display())), &header)?;
     write_output(&PathBuf::from(format!("{}.vb", prefix.display())), &body)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import layout JSON --payload BUNDLE [-o OUT]`: writes a map bundle from its layout JSON. The codes,
-/// objects and height table come from JSON, and BUNDLE, the stored bundle, supplies every other section. The output
-/// defaults to JSON with a `.bin` extension.
-fn import_layout(args: &[String]) -> Result<i32> {
-    let (mut files, mut payload, mut out) = (Vec::new(), None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--payload" => payload = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => files.push(PathBuf::from(other)),
-        }
-    }
-    let [json] = files.as_slice() else {
-        return Err(Error::Usage("import layout needs the layout's JSON file".into()));
-    };
-    let payload = payload.ok_or_else(|| Error::Usage("import layout needs --payload, the stored bundle".into()))?;
-    let bytes = import::map_layout(&read_file(json)?, &read_file(&payload)?)?;
-    write_output(&out.unwrap_or_else(|| json.with_extension("bin")), &bytes)?;
-    Ok(EXIT_OK)
-}
-
-/// `bof3 assets import terrain MESH --payload BUNDLE [-o OUT]`: writes a map bundle with the corner heights of
-/// MESH, a `.glb` or an OBJ from `export terrain`. BUNDLE is the stored bundle the mesh came from, and it
-/// supplies every other section. The output defaults to MESH with a `.bin` extension.
-fn import_terrain(args: &[String]) -> Result<i32> {
-    let (mut mesh, mut payload, mut out) = (None, None, None);
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "--payload" => payload = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            "-o" | "--output" | "--out" => out = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other if mesh.is_none() => mesh = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let mesh = mesh.ok_or_else(|| Error::Usage("import terrain needs a mesh file".into()))?;
-    let payload = payload.ok_or_else(|| Error::Usage("import terrain needs --payload, the stored bundle".into()))?;
-    let bytes = import::terrain(&read_file(&mesh)?, &read_file(&payload)?)?;
-    write_output(&out.unwrap_or_else(|| mesh.with_extension("bin")), &bytes)?;
     Ok(EXIT_OK)
 }
 
 /// `bof3 assets soundfont HEADER BODY [-o OUT]`: writes one VAB bank as a SoundFont 2 file. HEADER is
 /// the `.vh` and BODY the `.vb`. The output defaults to HEADER with a `.sf2` extension.
 fn soundfont_command(args: &[String]) -> Result<i32> {
-    let mut files = Vec::new();
-    let mut out = None;
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        if arg == "-o" || arg == "--output" || arg == "--out" {
-            let path = rest.next().ok_or_else(|| Error::Usage("-o needs a path".into()))?;
-            out = Some(PathBuf::from(path));
-        } else {
-            files.push(PathBuf::from(arg));
-        }
-    }
-    let [header, body] = files.as_slice() else {
+    let args: OneFile = parse(args)?;
+    let [header, body] = args.files.as_slice() else {
         return Err(Error::Usage("soundfont needs a header (.vh) and a body (.vb) file".into()));
     };
-    let out = out.unwrap_or_else(|| header.with_extension("sf2"));
-    if let Some(parent) = out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        fs::create_dir_all(parent)?;
-    }
+    let out = with_extension_of(args.output, header, "sf2");
+    create_parent(&out)?;
     let title = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
     let data = decode::soundfont(&read_file(header)?, &read_file(body)?, &title)?;
     fs::write(&out, data)?;
@@ -1308,24 +1063,10 @@ fn soundfont_command(args: &[String]) -> Result<i32> {
 /// `bof3 assets terrain BUNDLE [-o OUT]`: writes one map bundle's terrain. A `.glb` output is a
 /// binary glTF. Any other output is an OBJ, and its MTL goes beside it.
 fn terrain_command(args: &[String]) -> Result<i32> {
-    let mut bundle = None;
-    let mut out = None;
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "-o" | "--output" | "--out" => {
-                let path = rest.next().ok_or_else(|| Error::Usage("-o needs a path".into()))?;
-                out = Some(PathBuf::from(path));
-            }
-            other if bundle.is_none() => bundle = Some(PathBuf::from(other)),
-            other => return Err(Error::Usage(format!("unexpected argument {other:?}"))),
-        }
-    }
-    let bundle = bundle.ok_or_else(|| Error::Usage("terrain needs a map bundle file".into()))?;
-    let out = out.unwrap_or_else(|| bundle.with_extension("glb"));
-    if let Some(parent) = out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        fs::create_dir_all(parent)?;
-    }
+    let args: OneFile = parse(args)?;
+    let bundle = single(args.files, "terrain needs a map bundle file")?;
+    let out = with_extension_of(args.output, &bundle, "glb");
+    create_parent(&out)?;
     let mesh = terrain::mesh_from_payload(&read_file(&bundle)?)?;
     let stem = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
     if out.extension().is_some_and(|extension| extension == "glb") {
@@ -1343,79 +1084,43 @@ fn terrain_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-struct Arguments {
-    image: Option<PathBuf>,
-    out: Option<PathBuf>,
-    selection: Selection,
-    list: bool,
-    jobs: Option<usize>,
-    text_disc: Option<PathBuf>,
-    quiet: bool,
-    mode: Mode,
-    audio: AudioFormat,
+/// `bof3 assets encounters PAYLOAD [-o OUT]`: writes one area's encounter block as JSON. PAYLOAD is the
+/// stored bytes of an `area-encounters` entry. The output defaults to PAYLOAD with a `.json` extension.
+fn encounters_command(args: &[String]) -> Result<i32> {
+    let args: OneFile = parse(args)?;
+    let payload = single(args.files, "encounters needs an area encounter block file")?;
+    let out = with_extension_of(args.output, &payload, "json");
+    create_parent(&out)?;
+    fs::write(&out, tables::encounters(&read_file(&payload)?)?)?;
+    println!("wrote {}", out.display());
+    Ok(EXIT_OK)
 }
 
-fn parse(args: &[String]) -> Result<Arguments> {
-    let mut parsed = Arguments {
-        image: None,
-        out: None,
-        selection: Selection::all(),
-        list: false,
-        jobs: None,
-        text_disc: None,
-        quiet: false,
-        mode: Mode::default(),
-        audio: AudioFormat::Wav,
-    };
-    let mut args = args.iter();
-    while let Some(flag) = args.next() {
-        let mut value = |name: &str| {
-            args.next().cloned().ok_or_else(|| Error::Usage(format!("option {name} requires an argument")))
-        };
-        match flag.as_str() {
-            "-i" | "--input" | "--image" => parsed.image = Some(PathBuf::from(value(flag)?)),
-            "-o" | "--output" | "--out" => parsed.out = Some(PathBuf::from(value(flag)?)),
-            "--only" => parsed.selection = Selection::parse(&value(flag)?)?,
-            "--mode" => parsed.mode = Mode::parse(&value(flag)?)?,
-            "--audio-format" => parsed.audio = AudioFormat::parse(&value(flag)?)?,
-            "--list" => parsed.list = true,
-            "--jobs" => {
-                let jobs = value(flag)?
-                    .parse::<usize>()
-                    .ok()
-                    .filter(|jobs| *jobs > 0)
-                    .ok_or_else(|| Error::Usage("--jobs needs a positive number".into()))?;
-                parsed.jobs = Some(jobs);
-            }
-            "--text-disc" => parsed.text_disc = Some(PathBuf::from(value(flag)?)),
-            "-q" | "--quiet" => parsed.quiet = true,
-            "-h" | "--help" => return Err(Error::Usage(USAGE.into())),
-            other => {
-                return Err(Error::Usage(format!(
-                    "unknown option {other:?} for `assets extract`; run `bof3 assets extract --help`"
-                )));
-            }
-        }
+/// `bof3 assets tables PAYLOAD [-o DIR]`: writes the fixed game tables of `ETC/GAME.EMI` entry 0 as one
+/// JSON file per table. PAYLOAD is the stored bytes of that entry.
+fn tables_command(args: &[String]) -> Result<i32> {
+    let args: OneFile = parse(args)?;
+    let payload = single(args.files, "tables needs the stored bytes of GAME.EMI entry 0")?;
+    let out = args.output.unwrap_or_else(|| PathBuf::from("game-tables"));
+    let files = tables::files(&read_file(&payload)?)?;
+    fs::create_dir_all(&out)?;
+    for (name, data) in &files {
+        fs::write(out.join(format!("{name}.json")), data)?;
     }
-    parsed.selection = parsed.selection.with_mode(parsed.mode).with_audio(parsed.audio);
-    Ok(parsed)
+    println!("wrote {} tables to {}", files.len(), out.display());
+    Ok(EXIT_OK)
+}
+
+#[derive(Parser)]
+struct CoverageArgs {
+    #[arg(short = 'i', long = "input", alias = "image")]
+    image: Option<PathBuf>,
 }
 
 /// `bof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per kind, the entries and bytes that
 /// export and import to their own bytes, against the kind's total. Kinds without a round trip report zero.
 fn coverage_command(args: &[String]) -> Result<i32> {
-    let mut image = None;
-    let mut rest = args.iter();
-    while let Some(arg) = rest.next() {
-        match arg.as_str() {
-            "-i" | "--input" | "--image" => image = Some(PathBuf::from(value_of(&mut rest, arg)?)),
-            other => {
-                return Err(Error::Usage(format!(
-                    "unexpected argument {other:?} for `assets coverage`; run `bof3 assets coverage --help`"
-                )));
-            }
-        }
-    }
+    let image = parse::<CoverageArgs>(args)?.image;
     let current = env::current_dir()?;
     let image = match image {
         Some(image) => image,
@@ -1463,8 +1168,66 @@ fn coverage_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
+struct Arguments {
+    image: Option<PathBuf>,
+    out: Option<PathBuf>,
+    selection: Selection,
+    list: bool,
+    jobs: Option<usize>,
+    text_disc: Option<PathBuf>,
+    quiet: bool,
+}
+
+/// The switches of `bof3 assets extract`.
+#[derive(Parser)]
+struct ExtractArgs {
+    #[arg(short = 'i', long = "input", alias = "image")]
+    image: Option<PathBuf>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    only: Option<String>,
+    #[arg(long)]
+    mode: Option<String>,
+    #[arg(long = "audio-format")]
+    audio: Option<String>,
+    #[arg(long)]
+    list: bool,
+    #[arg(long)]
+    jobs: Option<String>,
+    #[arg(long = "text-disc")]
+    text_disc: Option<PathBuf>,
+    #[arg(short = 'q', long)]
+    quiet: bool,
+}
+
+fn extract_arguments(args: &[String]) -> Result<Arguments> {
+    let args: ExtractArgs = parse(args)?;
+    let mode = args.mode.as_deref().map(Mode::parse).transpose()?.unwrap_or_default();
+    let audio = args.audio.as_deref().map(AudioFormat::parse).transpose()?.unwrap_or(AudioFormat::Wav);
+    let selection = args.only.as_deref().map(Selection::parse).transpose()?.unwrap_or_else(Selection::all);
+    let jobs = args
+        .jobs
+        .map(|jobs| {
+            jobs.parse::<usize>()
+                .ok()
+                .filter(|jobs| *jobs > 0)
+                .ok_or_else(|| Error::Usage("--jobs needs a positive number".into()))
+        })
+        .transpose()?;
+    Ok(Arguments {
+        image: args.image,
+        out: args.out,
+        selection: selection.with_mode(mode).with_audio(audio),
+        list: args.list,
+        jobs,
+        text_disc: args.text_disc,
+        quiet: args.quiet,
+    })
+}
+
 pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
-    let arguments = parse(args)?;
+    let arguments = extract_arguments(args)?;
     let base = env::current_dir()?;
     let out = arguments.out.clone().unwrap_or_else(|| base.join(DEFAULT_OUT));
     let write = !arguments.list;
