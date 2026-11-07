@@ -703,7 +703,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
                     let pcm: Vec<i16> =
                         wav[start..end].as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes(*pair)).collect();
                     let title = format!("Track {:02}", track.number);
-                    let tags = rebof3_audio::export::Tags {
+                    let tags = bof3player::export::Tags {
                         title: &title,
                         artist: "Breath of Fire III",
                         album: "Breath of Fire III",

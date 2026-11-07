@@ -5,7 +5,7 @@
 mod support;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use psx_cd::Image;
 use rebof3_assets::disc::{self, Replacement};
@@ -13,15 +13,6 @@ use rebof3_assets::text::bank::{self, Bank};
 use rebof3_assets::text::codec::{self, Encoding};
 use rebof3_emi::Archive;
 use rebof3_emi::classify::{Format, classify};
-
-fn retail_cue() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
 
 /// Every message bank on the disc: its archive's disc path, its entry index and its payload.
 fn message_banks(cue: &Path) -> Vec<(String, usize, Vec<u8>)> {
@@ -46,7 +37,7 @@ fn message_banks(cue: &Path) -> Vec<(String, usize, Vec<u8>)> {
 
 #[test]
 fn every_message_bank_on_the_retail_disc_exports_and_imports_to_its_own_bytes() {
-    let Some(cue) = retail_cue() else {
+    let Some(cue) = support::retail_image() else {
         eprintln!("skipping message banks: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -74,7 +65,7 @@ fn every_message_bank_on_the_retail_disc_exports_and_imports_to_its_own_bytes() 
 
 #[test]
 fn the_retail_banks_rebuild_their_archives_and_patch_the_disc_to_its_own_bytes() {
-    let Some(cue) = retail_cue() else {
+    let Some(cue) = support::retail_image() else {
         eprintln!("skipping the message chain: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
