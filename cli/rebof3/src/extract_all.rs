@@ -271,6 +271,8 @@ fn assets_step(context: &Context) -> Outcome {
         context.folder("assets").display().to_string(),
         "--text-disc".into(),
         disc.display().to_string(),
+        "--jobs".into(),
+        context.jobs.to_string(),
         "-q".into(),
     ];
     let mut outcome = Outcome::default();

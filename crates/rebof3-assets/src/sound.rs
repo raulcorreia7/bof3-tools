@@ -69,6 +69,18 @@ pub fn render(
     wanted: impl Fn(Kind) -> bool,
     mode: Mode,
     container: AudioFormat,
+    emit: impl FnMut(Clip) -> Result<()>,
+) -> Result<Vec<String>> {
+    let jobs = thread::available_parallelism().map_or(1, NonZeroUsize::get);
+    render_with_jobs(library, wanted, mode, container, jobs, emit)
+}
+
+pub(crate) fn render_with_jobs(
+    library: &Library<'_>,
+    wanted: impl Fn(Kind) -> bool,
+    mode: Mode,
+    container: AudioFormat,
+    jobs: usize,
     mut emit: impl FnMut(Clip) -> Result<()>,
 ) -> Result<Vec<String>> {
     let work: Vec<(&Item, Kind)> = library
@@ -79,7 +91,7 @@ pub fn render(
         .filter_map(|item| kind_of(item.kind).filter(|kind| wanted(*kind)).map(|kind| (item, kind)))
         .filter(|(item, _)| mode != Mode::Raw || item.kind == ItemKind::Sample)
         .collect();
-    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(work.len()).max(1);
+    let workers = jobs.min(work.len()).max(1);
     let next = AtomicUsize::new(0);
     let (sender, receiver) = sync_channel::<(usize, std::result::Result<Clip, String>)>(workers * QUEUE_PER_WORKER);
     let mut failures = Vec::new();
