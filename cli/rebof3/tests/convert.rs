@@ -51,7 +51,8 @@ fn render() -> String {
     run(&dir, &["assets", "tables"], &mut out);
     run(&dir, &["assets", "bogus"], &mut out);
     let _ = std::fs::remove_dir_all(&dir);
-    out.replace(dir.to_str().unwrap(), "<dir>")
+    // Windows prints `\` in paths.
+    out.replace('\\', "/")
 }
 
 #[test]
@@ -62,6 +63,8 @@ fn conversions_keep_their_output_and_messages() {
         std::fs::write(&path, &actual).unwrap();
         return;
     }
-    let expected = std::fs::read_to_string(&path).expect("tests/convert.snap exists; run with UPDATE_SNAPSHOT=1");
+    let expected = std::fs::read_to_string(&path)
+        .expect("tests/convert.snap exists; run with UPDATE_SNAPSHOT=1")
+        .replace("\r\n", "\n");
     assert!(actual == expected, "conversion output changed; rerun with UPDATE_SNAPSHOT=1 and read the diff");
 }
