@@ -12,6 +12,8 @@ use crate::edit::{LineEdit, Outcome};
 use crate::project::{ArchivePath, Loaded, Project};
 use crate::view::{self, Entry, Tab, Views};
 
+/// The archive the Go menu opens on its game tables.
+const GAME_TABLES: &str = "BIN/ETC/GAME.EMI";
 /// The project folder made next to the disc folder when none is named.
 const PROJECT_FOLDER: &str = "bof3-project";
 /// How often the window checks for a change it did not cause, such as a sound that ends.
@@ -31,6 +33,7 @@ pub enum Field {
 pub enum Menu {
     Project,
     Edit,
+    Go,
     View(view::Menu),
 }
 
@@ -143,6 +146,15 @@ impl Editor {
         let tabs = view::tabs(&entry);
         if !tabs.contains(&self.tab) {
             self.tab = tabs.get(1).copied().unwrap_or(Tab::Info);
+        }
+    }
+
+    /// Opens the game tables.
+    pub fn go_to_game_tables(&mut self) {
+        self.select_archive(&ArchivePath(GAME_TABLES.into()));
+        if self.archive.is_some() {
+            self.entry = Some(0);
+            self.tab = Tab::Tables;
         }
     }
 
@@ -272,6 +284,31 @@ impl Editor {
                 } else {
                     editor.folder_field = folder.display().to_string();
                 }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Asks where to save `name` and writes `bytes` there. The status line reports the result.
+    pub fn save_file(&mut self, name: String, bytes: Result<Vec<u8>, String>, cx: &mut Context<Self>) {
+        let bytes = match bytes {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.status = error;
+                return;
+            }
+        };
+        let folder = self.project.as_ref().map_or_else(|| PathBuf::from("."), |project| project.folder.clone());
+        let picked = cx.prompt_for_new_path(&folder, Some(&name));
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(path))) = picked.await else { return };
+            let status = match std::fs::write(&path, bytes) {
+                Ok(()) => format!("Wrote {}", path.display()),
+                Err(error) => format!("{}: {error}", path.display()),
+            };
+            let _ = this.update(cx, |editor, cx| {
+                editor.status = status;
                 cx.notify();
             });
         })

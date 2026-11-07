@@ -2,9 +2,13 @@
 //! payload back through [`Editor::set_payload`], so undo, save and export see every view's edits the
 //! same way.
 
+mod decoded;
 mod hex;
 mod info;
 mod palette;
+mod sound;
+mod tables;
+mod text;
 mod texture;
 
 use gpui::{AnyElement, Context, Keystroke, div, prelude::*, px};
@@ -22,6 +26,10 @@ pub enum Tab {
     Hex,
     Texture,
     Palette,
+    Tables,
+    Text,
+    Sound,
+    Decoded,
 }
 
 impl Tab {
@@ -31,6 +39,10 @@ impl Tab {
             Tab::Hex => "Hex",
             Tab::Texture => "Texture",
             Tab::Palette => "Palette",
+            Tab::Tables => "Tables",
+            Tab::Text => "Text",
+            Tab::Sound => "Sound",
+            Tab::Decoded => "Decoded",
         }
     }
 }
@@ -42,12 +54,20 @@ pub enum Field {
     Goto,
     /// A row of the hex view's value inspector.
     Inspector(usize),
+    /// The text view's filter.
+    TextFilter,
+    /// The string that starts at this offset.
+    Text(usize),
+    /// The tables view's filter.
+    TableFilter,
+    /// A name or number cell of a table.
+    Cell { row: usize, column: usize },
 }
 
 impl Field {
     /// Whether Shift+Enter breaks a line in the field.
     pub fn is_multiline(self) -> bool {
-        false
+        matches!(self, Field::Text(_))
     }
 }
 
@@ -56,6 +76,8 @@ impl Field {
 pub enum Menu {
     /// The texture view's palette rows.
     Colors,
+    /// The bits or choices of a table cell.
+    Cell { row: usize, column: usize },
 }
 
 /// The state each view keeps between frames.
@@ -64,12 +86,16 @@ pub struct Views {
     pub hex: hex::State,
     pub texture: texture::State,
     pub palette: palette::State,
+    pub tables: tables::State,
+    pub text: text::State,
+    pub sound: sound::State,
+    pub decoded: decoded::State,
 }
 
 impl Views {
     /// Advances what changes without input. Returns true when the window should redraw.
     pub fn tick(&mut self) -> bool {
-        false
+        self.sound.tick()
     }
 }
 
@@ -122,7 +148,17 @@ pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
     match entry.format() {
         Format::VramUpload => tabs.push(Tab::Texture),
         Format::ClutBank => tabs.push(Tab::Palette),
+        Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
         _ => {}
+    }
+    if tables::has_tables(entry) {
+        tabs.push(Tab::Tables);
+    }
+    if text::has_text(entry.payload(), entry.load_arg()) {
+        tabs.push(Tab::Text);
+    }
+    if decoded::decodes(entry.format()) {
+        tabs.push(Tab::Decoded);
     }
     tabs
 }
@@ -148,6 +184,10 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Hex => hex::show(editor, &entry, cx),
         Tab::Texture => texture::show(editor, &entry, cx),
         Tab::Palette => palette::show(editor, &entry, cx),
+        Tab::Tables => tables::show(editor, &entry, cx),
+        Tab::Text => text::show(editor, &entry, cx),
+        Tab::Sound => sound::show(editor, &entry, cx),
+        Tab::Decoded => decoded::show(editor, &entry, cx),
     };
     div()
         .flex()
@@ -179,6 +219,16 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
             None
         }
         Field::Inspector(row) => hex::inspector_changed(editor, row, text),
+        Field::TextFilter => {
+            editor.views.text.filter = text.to_string();
+            None
+        }
+        Field::Text(start) => text::string_changed(editor, start, text),
+        Field::TableFilter => {
+            editor.views.tables.filter = text.to_string();
+            None
+        }
+        Field::Cell { row, column } => tables::cell_changed(editor, row, column, text),
     }
 }
 
@@ -186,7 +236,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
 pub fn field_submitted(editor: &mut Editor, field: Field, text: &str) -> Option<String> {
     match field {
         Field::Goto => hex::go_to(editor, text),
-        Field::Inspector(_) => None,
+        _ => None,
     }
 }
 
