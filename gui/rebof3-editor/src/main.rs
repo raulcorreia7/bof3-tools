@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 mod app;
+mod audio;
 mod edit;
 mod fonts;
 mod theme;
