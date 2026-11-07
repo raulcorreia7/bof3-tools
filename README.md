@@ -18,8 +18,11 @@ archive has a matching `.sha256` file; check it with `sha256sum -c` (Linux) or `
 (macOS).
 
 From source: you need Git and Rust 1.99 or later (`rust-toolchain.toml` selects stable Rust and
-`rustup` installs it on the first build). On Linux, building the editor needs the ALSA headers
-(`libasound2-dev`); the `bof3` command does not.
+`rustup` installs it on the first build). On Linux, building the editor needs the ALSA, fontconfig,
+Wayland, xkbcommon, XCB and Vulkan headers (`libasound2-dev libfontconfig1-dev libwayland-dev
+libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev
+libxcb-xfixes0-dev libvulkan-dev` on Debian and Ubuntu); the `bof3` command does not. The editor
+draws with [gpui](https://crates.io/crates/gpui) and needs a Vulkan driver on Linux.
 Run `rustup update stable` to update an installed toolchain.
 
 ```sh
@@ -78,8 +81,8 @@ payloads.
 | Decoded | cue, scene, script, palette, LZ77 | the decoder's structured reading                              |
 
 Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); `Ctrl+S` saves, `Ctrl+E` exports. The editor
-uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to a `.ttf` file when none is
-found.
+uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font
+family to use another one.
 
 ## Supported formats
 

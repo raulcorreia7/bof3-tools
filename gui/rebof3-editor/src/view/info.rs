@@ -1,40 +1,57 @@
 //! What the archive and the classifier know about an entry.
 
-use eframe::egui::{self, RichText};
+use gpui::{AnyElement, div, prelude::*, px};
 
-use super::{Entry, style};
+use super::Entry;
+use crate::theme::{RAISED, READ_ONLY, color};
+use crate::widgets::{GAP, GAP_SECTION, GAP_SMALL, mono, strong};
 
-/// Space between the label and value columns, in points.
-const INFO_COLUMN_GAP: f32 = 24.0;
+/// Width of the label column, in pixels.
+const LABEL_WIDTH: f32 = 140.0;
 
-pub fn show(ui: &mut egui::Ui, entry: &Entry<'_>) -> Option<String> {
+pub fn show(entry: &Entry<'_>) -> AnyElement {
     let toc = &entry.archive.entries()[entry.index];
     let format = entry.format();
-    let original = entry.archive.original(entry.index).len();
+    let original = entry.original().len();
     let current = entry.payload().len();
 
-    egui::Grid::new("info").num_columns(2).striped(true).spacing([INFO_COLUMN_GAP, style::GAP_SMALL]).show(ui, |ui| {
-        let mut row = |label: &str, value: String| {
-            ui.label(RichText::new(label).strong());
-            ui.label(RichText::new(value).monospace());
-            ui.end_row();
-        };
+    let rows = [
+        ("Archive", entry.archive.path.0.clone()),
+        ("Entry", entry.index.to_string()),
+        ("Entry type", toc.file_type.to_string()),
+        ("Load argument", format!("{:#010X}", toc.ram_ptr)),
+        ("Disc offset", format!("{:#X}", toc.offset)),
+        ("Size on disc", format!("{original} bytes")),
+        ("Size now", format!("{current} bytes")),
+        ("Format", format.name().to_string()),
+        ("State", format.state().label().to_string()),
+        ("Spec", format.spec_state().to_string()),
+        ("Codec", format.codec_state().to_string()),
+    ];
 
-        row("Archive", entry.archive.path.0.clone());
-        row("Entry", entry.index.to_string());
-        row("Entry type", toc.file_type.to_string());
-        row("Load argument", format!("{:#010X}", toc.ram_ptr));
-        row("Disc offset", format!("{:#X}", toc.offset));
-        row("Size on disc", format!("{original} bytes"));
-        row("Size now", format!("{current} bytes"));
-        row("Format", format.name().to_string());
-        row("State", format.state().label().to_string());
-        row("Spec", format.spec_state().to_string());
-        row("Codec", format.codec_state().to_string());
-    });
+    let mut grid = div().flex().flex_col();
+    for (at, (label, value)) in rows.into_iter().enumerate() {
+        let striped = at % 2 == 1;
+        grid = grid.child(
+            div()
+                .flex()
+                .gap(px(GAP))
+                .px(px(GAP_SMALL))
+                .py(px(GAP_SMALL / 2.0))
+                .when(striped, |row| row.bg(color(RAISED)))
+                .child(strong(label).w(px(LABEL_WIDTH)).flex_none())
+                .child(mono(value)),
+        );
+    }
 
-    ui.add_space(style::GAP_SECTION);
-    ui.label(RichText::new("Evidence").strong());
-    ui.label(RichText::new(format.evidence()).color(style::READ_ONLY));
-    None
+    div()
+        .id("info")
+        .flex()
+        .flex_col()
+        .flex_1()
+        .overflow_y_scroll()
+        .child(grid)
+        .child(strong("Evidence").mt(px(GAP_SECTION)))
+        .child(div().text_color(color(READ_ONLY)).child(format.evidence().to_string()))
+        .into_any_element()
 }
