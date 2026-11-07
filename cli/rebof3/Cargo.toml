@@ -18,12 +18,11 @@ path = "src/main.rs"
 
 [features]
 default = ["assets"]
-assets = ["dep:rebof3-assets", "dep:bof3player", "dep:bof3-names", "dep:sha2"]
+assets = ["dep:rebof3-assets", "dep:bof3player", "dep:sha2"]
 
 [dependencies]
 rebof3-assets = { workspace = true, optional = true }
-bof3player = { workspace = true, features = ["std", "ogg", "cli"], optional = true }
-bof3-names = { workspace = true, optional = true }
+bof3player = { workspace = true, features = ["std", "ogg", "bundled-names"], optional = true }
 rebof3-emi = { workspace = true, features = ["std"] }
 psx-cd.workspace = true
 psx-formats = { workspace = true, features = ["std"] }
