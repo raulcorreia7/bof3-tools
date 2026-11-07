@@ -1,7 +1,7 @@
 //! Sound through `bof3player`: every playable item rendered to WAV, FLAC or Ogg Vorbis.
 //!
 //! The `bof3player` catalog lists every playable item of the disc's sound archives. Music, samples
-//! and XA streams render through a [`rebof3_audio::Player`] to 16-bit PCM, which the selected
+//! and XA streams render through a [`bof3player::Player`] to 16-bit PCM, which the selected
 //! [`AudioFormat`] writes. A music item's sequence package is the `.seq` of the same archive, which
 //! the `audio-sequence` kind keeps as stored bytes; its bank is the `.vh`/`.vb` pair.
 
@@ -12,11 +12,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::sync_channel;
 use std::thread;
 
+use bof3player::catalog::{Item, Kind as ItemKind};
+use bof3player::discover::{self, SourceKind};
+use bof3player::export::Tags;
+use bof3player::{DiscSource, Library, export};
 use psx_cd::ReadSeek;
-use rebof3_audio::catalog::{Item, Kind as ItemKind};
-use rebof3_audio::discover::{self, SourceKind};
-use rebof3_audio::export::Tags;
-use rebof3_audio::{DiscSource, Library, export};
 
 use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Mode};
@@ -358,6 +358,6 @@ impl Sounds {
     }
 }
 
-fn audio(error: rebof3_audio::Error) -> Error {
+fn audio(error: bof3player::Error) -> Error {
     Error::Audio(error.to_string())
 }

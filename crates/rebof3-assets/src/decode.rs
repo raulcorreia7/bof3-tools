@@ -181,7 +181,7 @@ pub fn soundfont(header: &[u8], body: &[u8], title: &str) -> crate::Result<Vec<u
 /// The SoundFont envelope of a tone's ADSR registers. `None` when a phase never ends, which leaves the
 /// SoundFont default on that zone.
 pub(crate) fn volume_envelope(adsr1: u16, adsr2: u16) -> Option<psx_formats::sf2::Envelope> {
-    let timing = rebof3_audio::spu::envelope_timing(adsr1, adsr2)?;
+    let timing = bof3player::spu::envelope_timing(adsr1, adsr2)?;
     Some(psx_formats::sf2::Envelope::new(timing.attack, timing.decay, timing.sustain_level, timing.release))
 }
 

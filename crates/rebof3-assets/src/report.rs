@@ -14,7 +14,7 @@ pub const COLUMNS: [&str; 15] = [
 pub const NONE: &str = "-";
 /// The `format` of a file rendered from a `bof3player` catalog item. Such a file is an output of the
 /// item, not a stored payload, so the summary does not count it as an entry.
-pub const RENDERED_ITEM: &str = "rebof3_audio item";
+pub const RENDERED_ITEM: &str = "bof3player item";
 /// The `format` of a file derived from a game table in `ETC/GAME.EMI` entry 0. Like a rendered item, it
 /// is an output of the entry, so the summary does not count it as an entry.
 pub const DERIVED_TABLE: &str = "game table (derived)";

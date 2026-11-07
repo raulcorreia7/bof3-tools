@@ -8,7 +8,6 @@
 mod support;
 
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use psx_formats::sf2::{self, SoundFont};
 use rebof3_assets::decode;
@@ -16,15 +15,6 @@ use rebof3_assets::extract::{self, Options};
 use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
 use rebof3_assets::soundfont;
-
-fn retail_image() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
 
 /// The SoundFont with its sample names cleared. A name is `VAG` and the bank's VAG number, which the import
 /// numbers in first-use order, so names are compared apart from the rest.
@@ -37,7 +27,7 @@ fn without_names(mut font: SoundFont) -> SoundFont {
 
 #[test]
 fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping SoundFont round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
