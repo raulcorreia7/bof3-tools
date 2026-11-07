@@ -10,6 +10,7 @@
 //! the field, so the stored bytes come back exactly. The other fields keep the documented offsets. Fields the
 //! decompilation has not named are left out.
 
+use crate::record::{bytes, u16_at};
 use crate::text::codec::{self, Encoding};
 use crate::{Error, Result};
 
@@ -236,15 +237,11 @@ impl GameTables {
 }
 
 fn name(record: &[u8]) -> [u8; NAME_BYTES] {
-    record[..NAME_BYTES].try_into().expect("a record holds its name")
-}
-
-fn price(record: &[u8], at: usize) -> u16 {
-    u16::from_le_bytes([record[at], record[at + 1]])
+    bytes(record, 0)
 }
 
 fn item(record: &[u8]) -> Item {
-    Item { name: name(record), flags: record[0x0c], price: price(record, 0x10) }
+    Item { name: name(record), flags: record[0x0c], price: u16_at(record, 0x10) }
 }
 
 fn vital_item(record: &[u8]) -> VitalItem {
@@ -258,7 +255,7 @@ fn weapon(record: &[u8]) -> Weapon {
         element: record[0x0f],
         weight: record[0x10],
         power: record[0x12],
-        price: price(record, 0x16),
+        price: u16_at(record, 0x16),
     }
 }
 
@@ -269,12 +266,12 @@ fn armor(record: &[u8]) -> Armor {
         equip_type: record[0x0e],
         weight: record[0x0f],
         power: record[0x10],
-        price: price(record, 0x14),
+        price: u16_at(record, 0x14),
     }
 }
 
 fn accessory(record: &[u8]) -> Accessory {
-    Accessory { name: name(record), equipability: record[0x0c], weight: record[0x0f], price: price(record, 0x12) }
+    Accessory { name: name(record), equipability: record[0x0c], weight: record[0x0f], price: u16_at(record, 0x12) }
 }
 
 fn shop(record: &[u8]) -> Shop {
@@ -297,7 +294,7 @@ fn ability(record: &[u8]) -> Ability {
 
 fn growth(record: &[u8]) -> Growth {
     Growth {
-        exp: u16::from_le_bytes([record[0], record[1]]),
+        exp: u16_at(record, 0),
         hp: record[2],
         ap: record[3],
         power: record[4] >> 4,
