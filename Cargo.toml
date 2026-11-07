@@ -2,6 +2,7 @@
 #
 #   crates/  shared libraries
 #   cli/     command lines: argument parsing and printing only
+#   gui/     the asset editor
 #
 # Every first-party crate is MIT (LICENSE). `cargo deny check` keeps dependencies permissive.
 [workspace]
@@ -10,6 +11,7 @@ members = [
     "crates/rebof3-emi",
     "crates/rebof3-assets",
     "cli/rebof3",
+    "gui/rebof3-editor",
 ]
 
 
