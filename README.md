@@ -17,9 +17,10 @@ From a release: download the archive for your platform from
 archive has a matching `.sha256` file; check it with `sha256sum -c` (Linux) or `shasum -a 256 -c`
 (macOS).
 
-From source: you need Git and Rust 1.99 or later (`rust-toolchain.toml` pins the toolchain and
+From source: you need Git and Rust 1.99 or later (`rust-toolchain.toml` selects stable Rust and
 `rustup` installs it on the first build). On Linux, audio extraction needs the ALSA headers
 (`libasound2-dev`).
+Run `rustup update stable` to update an installed toolchain.
 
 ```sh
 git clone https://github.com/raulcorreia7/bof3-tools.git

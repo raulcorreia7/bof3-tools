@@ -6,7 +6,7 @@ Issues and pull requests are welcome. All contributions follow the
 
 ## Set up
 
-You need Git and Rust 1.99 or later. `rust-toolchain.toml` pins the toolchain, and `rustup`
+You need Git and Rust 1.99 or later. `rust-toolchain.toml` selects stable Rust, and `rustup`
 installs it on the first build. Audio extraction needs the ALSA headers on Linux. The
 [README](README.md) shows how to build and run `bof3`.
 
