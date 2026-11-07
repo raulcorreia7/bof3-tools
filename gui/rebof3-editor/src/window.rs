@@ -89,6 +89,10 @@ impl Editor {
             ]
         });
 
+        let go_menu = self.menu(Menu::Go, "Go", cx, |cx| {
+            vec![action("tables", "Game tables (ETC/GAME.EMI)", "", open, cx, Editor::go_to_game_tables)]
+        });
+
         div()
             .flex()
             .flex_none()
@@ -102,6 +106,7 @@ impl Editor {
             .child(theme::icon(MENU_ICON).mr(px(GAP_SMALL)))
             .child(project_menu)
             .child(edit_menu)
+            .child(go_menu)
     }
 
     /// A menu title, and the open menu under it.
