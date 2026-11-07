@@ -1,0 +1,257 @@
+$ bof3 assets export palette bank.clut
+[exit 0]
+wrote bank.json
+
+{
+  "format": "psx-clut",
+  "words": 16,
+  "rows_4bpp": 1,
+  "rows_8bpp": null,
+  "colors": [
+    {
+      "index": 0,
+      "word": 31,
+      "stp": false,
+      "rgba": [
+        255,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "index": 1,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 2,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 3,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 4,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 5,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 6,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 7,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 8,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 9,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 10,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 11,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 12,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 13,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 14,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "index": 15,
+      "word": 32767,
+      "stp": false,
+      "rgba": [
+        255,
+        255,
+        255,
+        255
+      ]
+    }
+  ]
+}
+
+$ bof3 assets import palette bank.json -o sub/back.clut
+[exit 0]
+wrote sub/back.clut
+
+$ bof3 assets export palette bank.clut --out other.json
+[exit 0]
+wrote other.json
+
+$ bof3 assets export palette
+[exit 2]
+bof3 assets: export palette needs a palette bank file; run `bof3 assets export palette --help`
+
+$ bof3 assets export palette a b
+[exit 2]
+bof3 assets: unexpected argument "b"; run `bof3 assets export palette --help`
+
+$ bof3 assets export bogus a
+[exit 2]
+bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters and character-bank
+
+$ bof3 assets export
+[exit 2]
+bof3 assets: export needs a kind, for example texture; run `bof3 assets export --help`
+
+$ bof3 assets import strings stub.bin
+[exit 2]
+bof3 assets: import strings needs --payload, the file it was exported from; run `bof3 assets import strings --help`
+
+$ bof3 assets import encounters stub.bin
+[exit 2]
+bof3 assets: import encounters needs --base, the stored block; run `bof3 assets import encounters --help`
+
+$ bof3 assets export vag stub.bin stub.bin
+[exit 2]
+bof3 assets: export vag needs --index, the VAG's number in the bank; run `bof3 assets export vag --help`
+
+$ bof3 assets export vag stub.bin
+[exit 2]
+bof3 assets: export vag needs a header (.vh) and a body (.vb) file; run `bof3 assets export vag --help`
+
+$ bof3 assets export texture stub.bin
+[exit 2]
+bof3 assets: export texture needs --load-arg, the entry's load address; run `bof3 assets export texture --help`
+
+$ bof3 assets export texture stub.bin --load-arg zz
+[exit 2]
+bof3 assets: --load-arg needs a number, not "zz"; run `bof3 assets export texture --help`
+
+$ bof3 assets import emi stub.bin --entry oops
+[exit 2]
+bof3 assets: --entry needs INDEX=FILE, not "oops"; run `bof3 assets import emi --help`
+
+$ bof3 assets import sequence stub.bin
+[exit 2]
+bof3 assets: "stub.bin" needs FILE:ID; run `bof3 assets import sequence --help`
+
+$ bof3 assets import disc game.cue
+[exit 2]
+bof3 assets: import disc needs -o DIR, a new directory for the patched disc; run `bof3 assets import disc --help`
+
+$ bof3 assets tables
+[exit 2]
+bof3 assets: tables needs the stored bytes of GAME.EMI entry 0; run `bof3 assets tables --help`
+
+$ bof3 assets bogus
+[exit 2]
+bof3 assets: unknown command "bogus"; run `bof3 assets --help` for the commands
+
