@@ -3,26 +3,15 @@
 
 mod support;
 
-use std::path::{Path, PathBuf};
-
 use psx_cd::Image;
 use rebof3_assets::import;
 use rebof3_assets::tables;
 use rebof3_emi::Archive;
 use rebof3_emi::characters::{self, CHARACTERS};
 
-fn retail_cue() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
-
 #[test]
 fn the_retail_characters_have_their_names_and_round_trip() {
-    let Some(cue) = retail_cue() else {
+    let Some(cue) = support::retail_image() else {
         eprintln!("skipping the characters: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };

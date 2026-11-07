@@ -4,25 +4,14 @@
 
 mod support;
 
-use std::path::{Path, PathBuf};
-
 use psx_cd::Image;
 use rebof3_assets::text::strings;
 use rebof3_emi::Archive;
 use rebof3_emi::text::discover;
 
-fn retail_cue() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
-
 #[test]
 fn every_string_payload_on_the_retail_disc_exports_and_imports_to_its_own_bytes() {
-    let Some(cue) = retail_cue() else {
+    let Some(cue) = support::retail_image() else {
         eprintln!("skipping the strings: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };

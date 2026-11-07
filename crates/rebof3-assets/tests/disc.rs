@@ -15,15 +15,6 @@ use psx_cd::cue::{self, TrackMode};
 use psx_formats::sector::{self, RAW_SIZE};
 use rebof3_assets::disc::{self, Replacement};
 
-fn retail_cue() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
-
 fn data_track_file(cue_path: &Path) -> PathBuf {
     let sheet = cue::read(cue_path).expect("the cue sheet reads");
     sheet.tracks.into_iter().find(|track| track.mode != TrackMode::Audio).expect("a data track").file
@@ -31,7 +22,7 @@ fn data_track_file(cue_path: &Path) -> PathBuf {
 
 #[test]
 fn every_form1_sector_of_the_retail_data_track_is_sealed() {
-    let Some(cue_path) = retail_cue() else {
+    let Some(cue_path) = support::retail_image() else {
         eprintln!("skipping sector seal check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -70,7 +61,7 @@ fn every_form1_sector_of_the_retail_data_track_is_sealed() {
 
 #[test]
 fn the_retail_disc_patched_with_its_own_files_is_byte_identical() {
-    let Some(cue_path) = retail_cue() else {
+    let Some(cue_path) = support::retail_image() else {
         eprintln!("skipping disc identity: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };

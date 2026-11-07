@@ -21,17 +21,6 @@ use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{Kind, Mode, Selection};
 use rebof3_assets::report::Report;
 
-/// The retail disc image, from `BOF3_DISC_IMAGE` or the checkout's
-/// `inputs/external`.
-fn retail_image() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
-
 /// The extracted tree and its catalog, extracted once for the whole file.
 struct Extracted {
     /// The directory the tree is in. A static is never dropped, so the last test to finish removes it ([`Finished`]).
@@ -49,7 +38,7 @@ static EXTRACTED: OnceLock<Option<Extracted>> = OnceLock::new();
 fn extracted() -> Option<&'static Extracted> {
     EXTRACTED
         .get_or_init(|| {
-            let image = retail_image()?;
+            let image = support::retail_image()?;
             let directory = support::out_dir("originals-extracted");
             let tree = directory.join("out");
             let options = Options { image, out: tree.clone(), selection: Selection::all(), write: true, jobs: 4 };
@@ -119,7 +108,7 @@ fn the_catalog_hashes_match_the_disc_slices() {
         eprintln!("skipping the catalog hash check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         return;
     };
     let mut disc = Image::open(&image).expect("the disc opens");
@@ -339,7 +328,7 @@ fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) 
 /// written, and the tree holds exactly the files the catalog lists.
 #[test]
 fn raw_mode_writes_the_disc_bytes_of_every_kind() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping the raw mode check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };

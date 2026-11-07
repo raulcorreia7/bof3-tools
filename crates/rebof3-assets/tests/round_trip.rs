@@ -15,16 +15,6 @@ use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
 use rebof3_emi::game_tables::{PAYLOAD_START, TABLES};
 
-/// The retail disc image, from `BOF3_DISC_IMAGE` or the checkout's `inputs/external`.
-fn retail_image() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
-        return Some(PathBuf::from(path));
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
-}
-
 /// Every file under `directory`, empty when the directory is missing.
 fn files_under(directory: &Path, found: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(directory) else {
@@ -48,7 +38,7 @@ fn holds_run(bytes: &[u8], needle: &[u16]) -> bool {
 
 #[test]
 fn retail_textures_round_trip_byte_exactly() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping texture round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -143,7 +133,7 @@ fn retail_textures_round_trip_byte_exactly() {
 
 #[test]
 fn retail_terrains_round_trip_byte_exactly() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping terrain round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -184,7 +174,7 @@ fn retail_terrains_round_trip_byte_exactly() {
 /// same PCM. The stored bytes are compared too, and the count of byte-identical VAGs is reported.
 #[test]
 fn retail_vags_round_trip_through_adpcm() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping VAG round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -252,7 +242,7 @@ fn retail_vags_round_trip_through_adpcm() {
 
 #[test]
 fn retail_tables_round_trip_byte_exactly() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping table round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -295,7 +285,7 @@ fn retail_tables_round_trip_byte_exactly() {
 
 #[test]
 fn retail_encounters_round_trip_byte_exactly() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping encounter round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -339,7 +329,7 @@ fn retail_encounters_round_trip_byte_exactly() {
 /// the layout must rebuild every bundle's stored bytes, which also checks the bundle codec on all of them.
 #[test]
 fn retail_map_layouts_round_trip_byte_exactly() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping map layout round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -383,7 +373,7 @@ fn retail_map_layouts_round_trip_byte_exactly() {
 /// first container changes that entry and no other.
 #[test]
 fn retail_emi_containers_rebuild_byte_exactly() {
-    let Some(image_path) = retail_image() else {
+    let Some(image_path) = support::retail_image() else {
         eprintln!("skipping EMI rebuild: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
@@ -432,7 +422,7 @@ fn retail_emi_containers_rebuild_byte_exactly() {
 /// that `to_midi` writes, and the packages encode to their stored bytes.
 #[test]
 fn retail_sequences_round_trip_through_midi() {
-    let Some(image) = retail_image() else {
+    let Some(image) = support::retail_image() else {
         eprintln!("skipping sequence round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };

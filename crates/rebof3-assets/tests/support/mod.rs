@@ -41,3 +41,13 @@ impl Drop for Scratch {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+
+/// The retail disc image, from `BOF3_DISC_IMAGE` or the checkout's `inputs/external`.
+pub fn retail_image() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("BOF3_DISC_IMAGE") {
+        return Some(PathBuf::from(path));
+    }
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .find_map(|directory| psx_cd::discover_image(&directory.join("inputs/external")).ok())
+}

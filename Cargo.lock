@@ -3552,7 +3552,6 @@ version = "1.0.0"
 dependencies = [
  "bof3-names",
  "bof3player",
- "clap",
  "psx-cd",
  "psx-formats",
  "rebof3-assets",
