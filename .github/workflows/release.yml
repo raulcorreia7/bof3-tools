@@ -43,7 +43,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Build
-        run: cargo build --release --locked -p rebof3
+        run: cargo build --release --locked -p rebof3 -p rebof3-editor
       - name: Package
         shell: bash
         env:
@@ -55,7 +55,7 @@ jobs:
           mkdir -p "$name" dist
           suffix=""
           if [[ "$OS" == Windows ]]; then suffix=.exe; fi
-          cp "target/release/bof3${suffix}" "$name/"
+          cp "target/release/bof3${suffix}" "target/release/bof3-edit${suffix}" "$name/"
           cp README.md LICENSE NOTICE "$name/"
           if [[ "$OS" == Windows ]]; then
             7z a "dist/${name}.zip" "$name" >/dev/null
