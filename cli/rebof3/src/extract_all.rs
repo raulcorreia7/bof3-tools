@@ -407,11 +407,19 @@ fn export_step(context: &Context) -> Outcome {
 fn audio_step(context: &Context) -> Outcome {
     let mut outcome = Outcome::default();
     let out = context.folder("audio");
+    let library = match rebof3_assets::sound::open(&context.image) {
+        Ok(library) => &*Box::leak(Box::new(library)),
+        Err(error) => {
+            outcome.errors.push(format!("audio: {error}"));
+            return outcome;
+        }
+    };
+    let filter = bof3player::catalog::Filter { playable_only: true, ..Default::default() };
+    let style = bof3player::render::RenderStyle::default();
     for query in AUDIO_QUERIES {
-        match bof3player::cli::render_matching(&context.image, query, &out, bof3_names::game_names()) {
-            Ok(0) => {}
-            Ok(count) => outcome.errors.push(format!("{query}: {count} items failed to render")),
-            Err(error) => outcome.errors.push(format!("{query}: {error}")),
+        match bof3player::render::render(library, query, &out, &filter, &style, false) {
+            0 => {}
+            count => outcome.errors.push(format!("{query}: {count} items failed to render")),
         }
     }
     outcome.note = format!("items {}", AUDIO_QUERIES.join(", "));

@@ -18,8 +18,8 @@ archive has a matching `.sha256` file; check it with `sha256sum -c` (Linux) or `
 (macOS).
 
 From source: you need Git and Rust 1.99 or later (`rust-toolchain.toml` selects stable Rust and
-`rustup` installs it on the first build). On Linux, audio extraction needs the ALSA headers
-(`libasound2-dev`).
+`rustup` installs it on the first build). On Linux, building the editor needs the ALSA headers
+(`libasound2-dev`); the `bof3` command does not.
 Run `rustup update stable` to update an installed toolchain.
 
 ```sh
