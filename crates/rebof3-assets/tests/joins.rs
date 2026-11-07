@@ -81,9 +81,9 @@ fn write_artifacts(
         let files = indexed_rows(entry.ram_ptr, payload, rows).expect("the palette-applied rows");
         for file in files {
             let name = format!("{source}-{slot}{}", file.tag);
-            support::write(out, &format!("{}.png", name), file.data);
+            support::write(out, &format!("{name}.png"), file.data);
             if let Some(tim) = file.tim {
-                support::write(out, &format!("{}.tim", name), &tim);
+                support::write(out, &format!("{name}.tim"), &tim);
             }
         }
     }

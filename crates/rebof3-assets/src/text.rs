@@ -334,7 +334,7 @@ fn words_like(text: &str) -> bool {
     let letters = plain.chars().filter(|character| character.is_alphabetic()).count();
     let words = plain
         .split(|character: char| !character.is_alphanumeric())
-        .filter(|word| word.chars().any(|character| character.is_alphabetic()))
+        .filter(|word| word.chars().any(char::is_alphabetic))
         .count();
     words >= 2 && letters >= 5 && controls(text) * 2 <= letters
 }

@@ -194,5 +194,5 @@ fn is_dangling_tone(problem: &Problem) -> bool {
 }
 
 fn render<T: ToString>(problems: &[T]) -> String {
-    problems.iter().map(|problem| problem.to_string()).collect::<Vec<String>>().join("; ")
+    problems.iter().map(std::string::ToString::to_string).collect::<Vec<String>>().join("; ")
 }

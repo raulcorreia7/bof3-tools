@@ -255,7 +255,7 @@ fn is_file_kind(kind: Kind) -> bool {
 /// The kinds a non-EMI disc file can have, from its name.
 fn file_kinds(source: &str) -> &'static [Kind] {
     let name = source.rsplit('/').next().unwrap_or(source);
-    let extension = Path::new(name).extension().map(|extension| extension.to_ascii_uppercase());
+    let extension = Path::new(name).extension().map(std::ffi::OsStr::to_ascii_uppercase);
     match extension.as_deref().and_then(|value| value.to_str()) {
         Some("EXE") => &[Kind::Executable],
         Some("CNF") => &[Kind::System],

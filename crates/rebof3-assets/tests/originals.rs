@@ -85,7 +85,7 @@ fn files_under(directory: &Path) -> Vec<PathBuf> {
     let Ok(entries) = fs::read_dir(directory) else {
         return found;
     };
-    for entry in entries.filter_map(|entry| entry.ok()) {
+    for entry in entries.filter_map(std::result::Result::ok) {
         let path = entry.path();
         if path.is_dir() {
             found.extend(files_under(&path));
