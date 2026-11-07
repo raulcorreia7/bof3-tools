@@ -11,7 +11,7 @@ use rebof3_emi::fixtures::archive_at;
 
 /// A CLUT bank of one 4bpp row.
 fn bank() -> Vec<u8> {
-    (0..16u16).flat_map(|word| word.to_le_bytes()).collect()
+    (0..16u16).flat_map(u16::to_le_bytes).collect()
 }
 
 /// An archive holding a VAB header and body, a SEP package and a palette.
