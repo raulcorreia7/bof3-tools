@@ -46,19 +46,5 @@ make check
 
 ## Writing
 
-Docs, comments, commit messages and pull requests follow one standard.
-
-- **Current.** Present tense, no history.
-- **What, not how.** Say what a thing does and why. The code shows how.
-- **ASD-STE100** is the basis for technical text: short sentences, one instruction per sentence,
-  active voice, one term for one concept, numbered steps for a procedure. Exact technical terms
-  stay.
-- **Orwell's six rules** ("Politics and the English Language", 1946):
-  1. Never use a metaphor, simile or other figure of speech that you are used to seeing in print.
-  2. Never use a long word where a short one will do.
-  3. If it is possible to cut a word out, always cut it out.
-  4. Never use the passive where you can use the active.
-  5. Never use a foreign phrase, a scientific word or a jargon word if you can think of an everyday
-     English equivalent.
-  6. Break any of these rules sooner than say anything outright barbarous.
-- Comments say what, never how: one line, only where a name cannot say it ([standard](https://github.com/raulcorreia7/bof3/blob/main/docs/standard.md#comments)).
+Docs, comments, commit messages and pull requests follow the [project standard](https://github.com/raulcorreia7/bof3/blob/main/docs/standard.md#writing): present tense, what and why instead of how, ASD-STE100 and Orwell's six rules.
+Comments say what, never how: one line, only where a name cannot say it ([standard](https://github.com/raulcorreia7/bof3/blob/main/docs/standard.md#comments)).
