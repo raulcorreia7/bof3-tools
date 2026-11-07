@@ -7,6 +7,7 @@
 //! `emi/etc/game/00@0x801C6A7C`.
 
 use crate::game_tables::{name_field, name_text};
+use crate::record::{bytes, u16_at};
 use crate::{Error, Result};
 
 /// Bytes in the block.
@@ -118,14 +119,6 @@ impl EncounterBlock {
             .collect();
         Ok(Self { encounters, enemies })
     }
-}
-
-fn u16_at(record: &[u8], at: usize) -> u16 {
-    u16::from_le_bytes([record[at], record[at + 1]])
-}
-
-fn bytes<const N: usize>(record: &[u8], at: usize) -> [u8; N] {
-    record[at..at + N].try_into().expect("a fixed-size field")
 }
 
 fn action_block(record: &[u8], at: usize) -> ActionBlock {

@@ -49,6 +49,8 @@ pub mod manifest;
 #[cfg(feature = "std")]
 pub mod pack;
 #[cfg(feature = "std")]
+mod record;
+#[cfg(feature = "std")]
 pub mod text;
 #[cfg(feature = "std")]
 pub mod texture;
