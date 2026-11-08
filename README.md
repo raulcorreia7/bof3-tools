@@ -80,7 +80,7 @@ payloads.
 | Sound   | VAB banks, sequence packages  | play samples and sequences (with the archive's own bank and your edits); export WAVE, SoundFont and MIDI |
 | Map     | area map bundles              | the map from above, coloured by tile bank and height; edit a cell's corner heights |
 | Sprite bank | character sprite banks, raw or LZ77 | each section's node table and palettes; edit any palette color |
-| Decoded | cue, scene, script, palette, LZ77 | the decoder's structured reading                              |
+| Decoded | cue, scene, area and battle script, palette, LZ77 | the decoder's structured reading              |
 
 Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); `Ctrl+S` saves, `Ctrl+E` exports. The editor
 uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font

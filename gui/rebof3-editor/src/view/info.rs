@@ -111,7 +111,8 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
         }),
         Format::CharacterBlob => sprite_bank(payload),
         Format::AreaMessageBank => Ok(messages(payload, entry.load_arg())),
-        Format::AreaScriptBank => script_bank(payload),
+        // The battle bank at `0x800F0800` has the area bank's format (`wiki: formats/area`).
+        Format::AreaScriptBank | Format::BattleScriptBank => script_bank(payload),
         Format::AreaActorDefsTable => actor_defs(payload),
         Format::AreaEncounterTable => encounters(payload),
         Format::AreaMapBundle => MapBundle::decode(payload)
@@ -120,6 +121,7 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
         Format::CueTable => CueTable::decode(payload)
             .map(|table| vec![("Cue records", table.records().len().to_string())])
             .map_err(|error| error.to_string()),
+        Format::SharedResourceTable => resource_groups(payload),
         _ => Ok(vec![("Fields", "no decoder reads this format yet".into())]),
     };
     rows.unwrap_or_else(|error| vec![("Decoder", format!("does not read this payload: {error}"))])
@@ -217,6 +219,34 @@ fn script_bank(payload: &[u8]) -> Result<Vec<Row>, String> {
     ])
 }
 
+/// The id groups of a payload loaded at `0x8001A000`. `Resource_GetText` reads base word `id >> 14`; each
+/// base is a group's offset, and the group opens with a `u16` slot table (`wiki: data/text#references`).
+/// The groups follow the base words, so the first base also says how many base words there are.
+fn resource_groups(payload: &[u8]) -> Result<Vec<Row>, String> {
+    const BASE_WORD: usize = 4;
+    const SLOT: usize = 2;
+    const LABELS: [&str; 4] =
+        ["Group 0 (ids 0x0000)", "Group 1 (ids 0x4000)", "Group 2 (ids 0x8000)", "Group 3 (ids 0xC000)"];
+
+    let word =
+        |at: usize| payload.get(at..at + BASE_WORD).and_then(|bytes| bytes.try_into().ok()).map(u32::from_le_bytes);
+    let half = |at: usize| payload.get(at..at + SLOT).and_then(|bytes| bytes.try_into().ok()).map(u16::from_le_bytes);
+
+    let first = word(0).ok_or("no base words")? as usize;
+    let groups = first / BASE_WORD;
+    if groups == 0 || groups > LABELS.len() || !first.is_multiple_of(BASE_WORD) {
+        return Err(format!("the first group starts at 0x{first:X}, not after one to four base words"));
+    }
+
+    let mut rows = vec![("Groups", groups.to_string())];
+    for (group, label) in LABELS.iter().enumerate().take(groups) {
+        let base = word(group * BASE_WORD).ok_or("a base word is past the payload")? as usize;
+        let table = half(base).ok_or_else(|| format!("group {group} at 0x{base:X} is past the payload"))?;
+        rows.push((label, format!("at 0x{base:X}, {} slots", usize::from(table) / SLOT)));
+    }
+    Ok(rows)
+}
+
 fn actor_defs(payload: &[u8]) -> Result<Vec<Row>, String> {
     let table = SceneTable::decode(payload).map_err(|error| error.to_string())?;
     let sections: Vec<String> = table.sections().iter().map(u8::to_string).collect();
@@ -239,6 +269,22 @@ pub fn encounters(payload: &[u8]) -> Result<Vec<Row>, String> {
 mod tests {
     use super::*;
     use rebof3_emi::encounter::{BLOCK_BYTES, ENCOUNTER_BYTES, ENEMY_BASE};
+
+    #[test]
+    fn a_resource_table_lists_the_groups_after_its_base_words() {
+        // Two base words, so two groups: group 0 at 0x08 with 2 slots, group 1 at 0x10 with 1 slot.
+        let mut payload = vec![0; 0x14];
+        payload[0..4].copy_from_slice(&0x08u32.to_le_bytes());
+        payload[4..8].copy_from_slice(&0x10u32.to_le_bytes());
+        payload[0x08..0x0A].copy_from_slice(&4u16.to_le_bytes());
+        payload[0x10..0x12].copy_from_slice(&2u16.to_le_bytes());
+
+        let rows = resource_groups(&payload).unwrap();
+        assert_eq!(rows[0], ("Groups", "2".into()));
+        assert_eq!(rows[1].1, "at 0x8, 2 slots");
+        assert_eq!(rows[2].1, "at 0x10, 1 slots");
+        assert!(resource_groups(&[0x30, 0, 0, 0]).is_err(), "twelve base words is not a table");
+    }
 
     #[test]
     fn an_encounter_block_lists_its_live_encounters_and_named_enemies() {
