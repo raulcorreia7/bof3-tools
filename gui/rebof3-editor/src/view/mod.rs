@@ -2,6 +2,7 @@
 //! payload back through [`Editor::set_payload`], so undo, save and export see every view's edits the
 //! same way.
 
+mod cells;
 mod decoded;
 mod hex;
 mod info;
@@ -34,6 +35,7 @@ pub enum Tab {
     Decoded,
     Map,
     Sprite,
+    Cells,
 }
 
 impl Tab {
@@ -49,6 +51,7 @@ impl Tab {
             Tab::Decoded => "Decoded",
             Tab::Map => "Map",
             Tab::Sprite => "Sprite bank",
+            Tab::Cells => "Cell grid",
         }
     }
 }
@@ -100,6 +103,7 @@ pub struct Views {
     pub decoded: decoded::State,
     pub map: map::State,
     pub sprite: sprite::State,
+    pub cells: cells::State,
 }
 
 impl Views {
@@ -167,6 +171,7 @@ pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
         Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
         Format::AreaMapBundle => tabs.push(Tab::Map),
         Format::Lz77Blob | Format::CharacterBlob => tabs.push(Tab::Sprite),
+        Format::AreaCellGrid => tabs.push(Tab::Cells),
         _ => {}
     }
     if tables::has_tables(entry) {
@@ -208,6 +213,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Decoded => decoded::show(editor, &entry, cx),
         Tab::Map => map::show(editor, &entry, cx),
         Tab::Sprite => sprite::show(editor, &entry, cx),
+        Tab::Cells => cells::show(editor, &entry, cx),
     };
     div()
         .flex()
