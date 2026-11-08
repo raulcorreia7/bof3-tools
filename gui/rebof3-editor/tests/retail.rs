@@ -159,3 +159,33 @@ fn every_sheet_fits_its_entries_and_rewrites_their_bytes() {
     assert!(problems.is_empty(), "{:?}", problems.iter().take(8).collect::<Vec<_>>());
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+#[test]
+fn sequences_play_from_the_project_archive() {
+    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let folder = scratch("sequences");
+    let mut project = Project::open(&disc, &folder).expect("project opens");
+
+    let (mut played, mut silent) = (0, Vec::new());
+    for path in project.archives.clone() {
+        let loaded = project.load(&path).expect("archive loads");
+        let Some(index) = loaded.formats.iter().position(|format| *format == Format::SepPackage) else { continue };
+        let Ok(package) = psx_formats::sep::Package::parse(loaded.original(index)) else { continue };
+        let Some(sequence) = package.sequences.iter().find(|sequence| sequence.has_notes()) else { continue };
+
+        let archive = project.current_archive(&loaded).expect("archive bytes");
+        let pcm = rebof3_assets::sound::sequence_pcm(&path.0, &archive, u32::from(sequence.seq_id), 2.0)
+            .unwrap_or_else(|error| panic!("{}: {error}", path.0));
+        played += 1;
+        if pcm.samples.iter().all(|&sample| sample == 0) {
+            silent.push(path.0.clone());
+        }
+        if played == 8 {
+            break;
+        }
+    }
+
+    let _ = std::fs::remove_dir_all(&folder);
+    eprintln!("sequences: {} of {played} render silent", silent.len());
+    assert!(played > 0 && silent.is_empty(), "{silent:?}");
+}
