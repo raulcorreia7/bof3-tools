@@ -148,6 +148,11 @@ pub enum Count {
     Payload,
     /// The `u32` at this payload offset.
     Word(usize),
+    /// The `u16` at payload offset `at`, times `per`.
+    Blocks {
+        at: usize,
+        per: usize,
+    },
 }
 
 /// A table of fixed-size records: where it lives, its first record's payload offset, and its columns.
@@ -175,6 +180,9 @@ impl Sheet {
             Count::Word(at) => payload
                 .get(at..at + 4)
                 .map_or(0, |word| u32::from_le_bytes(word.try_into().expect("four bytes")) as usize),
+            Count::Blocks { at, per } => payload
+                .get(at..at + 2)
+                .map_or(0, |half| usize::from(u16::from_le_bytes(half.try_into().expect("two bytes"))) * per),
         }
     }
 
@@ -298,6 +306,9 @@ pub fn sheets() -> Vec<Sheet> {
         enemy_ai_sheet(),
         actor_def_sheet(),
         cue_sheet(),
+        vab_bank_sheet(),
+        vab_program_sheet(),
+        vab_tone_sheet(),
     ]
 }
 
@@ -544,6 +555,90 @@ fn cue_sheet() -> Sheet {
     }
 }
 
+/// VAB bank geometry (`include/audio/vab.h`): the `VabHdr` header, the fixed program table and the
+/// tone table, whose blocks the header's program count gives.
+const VAB_HEADER_SIZE: usize = 0x20;
+const VAB_PROGRAM_TABLE: usize = 0x20;
+const VAB_PROGRAM_SIZE: usize = 0x10;
+const VAB_PROGRAM_MAX: usize = 128;
+const VAB_TONE_TABLE: usize = 0x820;
+const VAB_TONE_SIZE: usize = 0x20;
+const VAB_TONES_PER_PROGRAM: usize = 16;
+/// `VabHdr.ps`, the header's program count, which sizes the tone table.
+const VAB_PROGRAM_COUNT: usize = 0x12;
+
+/// `VabHdr` (PsyQ `libsnd.h`): the bank's master volume, pan and attributes. The counts and sizes
+/// that lay out the header are left out, so an edit cannot move a table.
+fn vab_bank_sheet() -> Sheet {
+    use Field::*;
+    Sheet {
+        name: "bank",
+        place: Place::Format(Format::VabHeader),
+        start: 0,
+        count: Count::Fixed(1),
+        record: VAB_HEADER_SIZE,
+        columns: vec![
+            col("id", 0x08, U32),
+            col("master volume", 0x18, U8),
+            col("master pan", 0x19, U8),
+            col("attribute 1", 0x1a, U8),
+            col("attribute 2", 0x1b, U8),
+        ],
+    }
+}
+
+/// `ProgAtr` (PsyQ `libsnd.h`): one record per program slot; slot 0 is the bank's dummy program.
+fn vab_program_sheet() -> Sheet {
+    use Field::*;
+    Sheet {
+        name: "programs",
+        place: Place::Format(Format::VabHeader),
+        start: VAB_PROGRAM_TABLE,
+        count: Count::Fixed(VAB_PROGRAM_MAX),
+        record: VAB_PROGRAM_SIZE,
+        columns: vec![
+            col("tones", 0x00, U8),
+            col("volume", 0x01, U8),
+            col("priority", 0x02, U8),
+            col("mode", 0x03, U8),
+            col("pan", 0x04, U8),
+            col("attribute", 0x06, U16),
+        ],
+    }
+}
+
+/// `VagAtr` (PsyQ `libsnd.h`, `include/audio/vab.h`): sixteen tone slots per program block.
+fn vab_tone_sheet() -> Sheet {
+    use Field::*;
+    Sheet {
+        name: "tones",
+        place: Place::Format(Format::VabHeader),
+        start: VAB_TONE_TABLE,
+        count: Count::Blocks { at: VAB_PROGRAM_COUNT, per: VAB_TONES_PER_PROGRAM },
+        record: VAB_TONE_SIZE,
+        columns: vec![
+            col("priority", 0x00, U8),
+            col("mode", 0x01, U8),
+            col("volume", 0x02, U8),
+            col("pan", 0x03, U8),
+            col("center note", 0x04, U8),
+            col("pitch tune", 0x05, U8),
+            col("min note", 0x06, U8),
+            col("max note", 0x07, U8),
+            col("vibrato width", 0x08, U8),
+            col("vibrato time", 0x09, U8),
+            col("portamento width", 0x0a, U8),
+            col("portamento time", 0x0b, U8),
+            col("bend down", 0x0c, U8),
+            col("bend up", 0x0d, U8),
+            col("ADSR1", 0x10, U16),
+            col("ADSR2", 0x12, U16),
+            col("program", 0x14, U16),
+            col("VAG", 0x16, U16),
+        ],
+    }
+}
+
 /// The names a reference column shows: the item and ability names of `GAME.EMI` entry 0, and the
 /// enemy names of the shown encounter block.
 #[derive(Default)]
@@ -761,6 +856,17 @@ mod tests {
     }
 
     #[test]
+    fn the_tone_sheet_has_sixteen_slots_per_program_block() {
+        let tones = vab_tone_sheet();
+        let mut header = vec![0; VAB_TONE_TABLE];
+        header[VAB_PROGRAM_COUNT..VAB_PROGRAM_COUNT + 2].copy_from_slice(&3u16.to_le_bytes());
+        assert_eq!(tones.rows(&header), 3 * VAB_TONES_PER_PROGRAM);
+        assert_eq!(tones.end(&header), VAB_TONE_TABLE + 3 * VAB_TONES_PER_PROGRAM * VAB_TONE_SIZE);
+        assert_eq!(tones.rows(&header[..VAB_PROGRAM_COUNT]), 0, "a header without the count has no tones");
+        assert_eq!(vab_program_sheet().end(&header), VAB_TONE_TABLE);
+    }
+
+    #[test]
     fn a_nibble_write_keeps_the_other_nibble() {
         let high = col("power", 0, HIGH_NIBBLE);
         let low = col("defense", 0, LOW_NIBBLE);
@@ -778,6 +884,8 @@ mod tests {
         assert_eq!(sheets_for(GAME, 0, Format::CodeImage).len(), 8);
         assert!(sheets_for(GAME, 1, Format::CodeImage).is_empty());
         assert_eq!(sheets_for(START, START_PARTY_ENTRY, Format::Unclassified).len(), 1);
+        let vab = sheets_for("BIN/SND/BGM000.EMI", 0, Format::VabHeader);
+        assert_eq!(vab.iter().map(|sheet| sheet.name).collect::<Vec<_>>(), ["bank", "programs", "tones"]);
     }
 
     #[test]
