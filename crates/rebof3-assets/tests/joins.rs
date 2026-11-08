@@ -57,6 +57,8 @@ fn write_artifacts(
     rows: &std::collections::HashMap<usize, Vec<rebof3_assets::decode::RowUse>>,
     summary: &mut Vec<serde_json::Value>,
 ) {
+    // The output folder is flat, so the archive's folder joins its file name.
+    let stem = source.replace('/', "-");
     let mut slots: Vec<usize> = rows.keys().copied().collect();
     slots.sort_unstable();
     for slot in slots {
@@ -64,8 +66,8 @@ fn write_artifacts(
         let entry = &archive.entries()[slot];
         let payload = &payloads[slot];
         let view = texture_view_png(entry.ram_ptr, payload).expect("the texture view");
-        support::write(out, &format!("{source}-{slot}.view.png"), view);
-        support::write(out, &format!("{source}-{slot}.img"), payload);
+        support::write(out, &format!("{stem}-{slot}.view.png"), view);
+        support::write(out, &format!("{stem}-{slot}.img"), payload);
         for row in rows {
             summary.push(serde_json::json!({
                 "archive": source,
@@ -80,7 +82,7 @@ fn write_artifacts(
         }
         let files = indexed_rows(entry.ram_ptr, payload, rows).expect("the palette-applied rows");
         for file in files {
-            let name = format!("{source}-{slot}{}", file.tag);
+            let name = format!("{stem}-{slot}{}", file.tag);
             support::write(out, &format!("{name}.png"), file.data);
             if let Some(tim) = file.tim {
                 support::write(out, &format!("{name}.tim"), &tim);

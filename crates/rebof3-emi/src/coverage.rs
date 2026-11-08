@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::area::{map, scene};
+use crate::area::{map, scene, script};
 use crate::cue;
 use crate::emi::{Archive, Entry};
 use crate::error::{Error, Result};
@@ -224,6 +224,7 @@ impl Report {
             Format::CueTable => round_trip_cues(payload),
             Format::AreaActorDefsTable => round_trip_scenes(payload),
             Format::AreaMapBundle => round_trip_map(payload),
+            Format::AreaScriptBank | Format::BattleScriptBank | Format::MagicTable => round_trip_scripts(payload),
             _ => return,
         };
         match outcome {
@@ -425,6 +426,11 @@ fn round_trip_cues(payload: &[u8]) -> std::result::Result<(), String> {
 fn round_trip_scenes(payload: &[u8]) -> std::result::Result<(), String> {
     let table = scene::SceneTable::decode(payload).map_err(|error| error.to_string())?;
     difference(&table.encode(), payload)
+}
+
+fn round_trip_scripts(payload: &[u8]) -> std::result::Result<(), String> {
+    let bank = script::ScriptBank::decode(payload).map_err(|error| error.to_string())?;
+    difference(&bank.encode(), payload)
 }
 
 fn round_trip_map(payload: &[u8]) -> std::result::Result<(), String> {

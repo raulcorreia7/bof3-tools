@@ -856,7 +856,7 @@ area-encounters  decoded   encounters and enemy records (0x800E4000): stored byt
 area-map         decoded   map bundles (0x80104000): stored bytes and the terrain as OBJ, MTL and glTF binary
 area-module      raw       auxiliary module windows (0x80117000)
 resource-table   raw       shared resource tables (0x8001A000)
-bmagic-table     raw       magic-effect tables (0x800C3800), format not yet known
+bmagic-table     raw       magic-effect script banks (0x800C3800)
 code             raw       code images loaded from EMI entries
 reserve          none      all-zero payloads that reserve a RAM slot
 unknown          raw       entries and files no rule classifies
