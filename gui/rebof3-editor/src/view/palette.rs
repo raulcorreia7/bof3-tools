@@ -67,10 +67,16 @@ impl Channel {
     }
 }
 
+/// Rewrites colour `index` of the shown entry through a change to its word.
+pub type SetColor = fn(&mut Editor, usize, &dyn Fn(u16) -> u16);
+
+/// The track areas of the three channel sliders.
+pub type Sliders = [Rc<Cell<Bounds<Pixels>>>; 3];
+
 #[derive(Default)]
 pub struct State {
     selected: usize,
-    sliders: [Rc<Cell<Bounds<Pixels>>>; 3],
+    sliders: Sliders,
 }
 
 /// The bank's colors.
@@ -116,24 +122,29 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .min_h_0()
         .gap(px(GAP))
         .child(mono(format!("{} colors, {} rows of {ROW_COLORS}", words.len(), words.len().div_ceil(ROW_COLORS))))
-        .child(picker(editor, words[selected], selected, cx))
+        .child(picker(words[selected], selected, &editor.views.palette.sliders, set_color, cx))
         .child(separator(false))
         .child(grid)
         .into_any_element()
 }
 
-/// Channel sliders and the STP switch for color `index`.
-fn picker(editor: &Editor, word: u16, index: usize, cx: &mut Context<Editor>) -> Div {
+/// Channel sliders and the STP switch for color `index`, which `set` rewrites.
+pub fn picker(word: u16, index: usize, sliders: &Sliders, set: SetColor, cx: &mut Context<Editor>) -> Div {
     let mut controls = div().flex().flex_col().gap(px(GAP_SMALL)).child(mono(format!("Color {index}: {word:#06X}")));
 
     for (at, channel) in Channel::ALL.into_iter().enumerate() {
         let value = channel.of(word);
-        let bounds = &editor.views.palette.sliders[at];
-        let control =
-            slider(("channel", at), u32::from(value), 0..=u32::from(CHANNEL_MAX), bounds, cx, move |editor, value| {
+        let control = slider(
+            ("channel", at),
+            u32::from(value),
+            0..=u32::from(CHANNEL_MAX),
+            &sliders[at],
+            cx,
+            move |editor, value| {
                 let value = u16::try_from(value).unwrap_or(CHANNEL_MAX);
-                set_color(editor, index, |word| channel.with(word, value));
-            });
+                set(editor, index, &|word| channel.with(word, value));
+            },
+        );
         controls = controls.child(
             div()
                 .flex()
@@ -148,7 +159,7 @@ fn picker(editor: &Editor, word: u16, index: usize, cx: &mut Context<Editor>) ->
     let stp = word & STP_BIT != 0;
     controls = controls.child(checkbox("stp", "semi-transparent (STP)", stp).on_click(cx.listener(
         move |editor, _, _, cx| {
-            set_color(editor, index, |word| word ^ STP_BIT);
+            set(editor, index, &|word| word ^ STP_BIT);
             cx.notify();
         },
     )));
@@ -162,7 +173,7 @@ fn picker(editor: &Editor, word: u16, index: usize, cx: &mut Context<Editor>) ->
 }
 
 /// Rewrites color `index` of the shown bank.
-fn set_color(editor: &mut Editor, index: usize, change: impl FnOnce(u16) -> u16) {
+fn set_color(editor: &mut Editor, index: usize, change: &dyn Fn(u16) -> u16) {
     let Some(entry) = editor.current() else { return };
     let mut words = words(entry.payload());
     let Some(word) = words.get_mut(index) else { return };

@@ -46,7 +46,7 @@ pub struct Section {
 
 impl Section {
     /// The payload offset of palette `index`.
-    fn palette_at(&self, index: usize) -> usize {
+    pub fn palette_at(&self, index: usize) -> usize {
         self.table + WORD * self.palettes.len() + PALETTE_BYTES * index
     }
 

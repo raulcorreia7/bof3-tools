@@ -8,6 +8,7 @@ mod info;
 mod map;
 mod palette;
 mod sound;
+mod sprite;
 mod tables;
 mod text;
 mod texture;
@@ -32,6 +33,7 @@ pub enum Tab {
     Sound,
     Decoded,
     Map,
+    Sprite,
 }
 
 impl Tab {
@@ -46,6 +48,7 @@ impl Tab {
             Tab::Sound => "Sound",
             Tab::Decoded => "Decoded",
             Tab::Map => "Map",
+            Tab::Sprite => "Sprite bank",
         }
     }
 }
@@ -96,6 +99,7 @@ pub struct Views {
     pub sound: sound::State,
     pub decoded: decoded::State,
     pub map: map::State,
+    pub sprite: sprite::State,
 }
 
 impl Views {
@@ -162,6 +166,7 @@ pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
         Format::ClutBank => tabs.push(Tab::Palette),
         Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
         Format::AreaMapBundle => tabs.push(Tab::Map),
+        Format::Lz77Blob | Format::CharacterBlob => tabs.push(Tab::Sprite),
         _ => {}
     }
     if tables::has_tables(entry) {
@@ -202,6 +207,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Sound => sound::show(editor, &entry, cx),
         Tab::Decoded => decoded::show(editor, &entry, cx),
         Tab::Map => map::show(editor, &entry, cx),
+        Tab::Sprite => sprite::show(editor, &entry, cx),
     };
     div()
         .flex()
