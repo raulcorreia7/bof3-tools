@@ -1,25 +1,48 @@
 //! Record layouts the editor shows as spreadsheet columns.
 //!
-//! Each column reads and writes the record bytes directly, at the offsets `rebof3_emi::game_tables`
-//! documents, so a column edit changes exactly the bytes it names.
+//! Each column reads and writes the record bytes directly, at the offsets the decompilation's
+//! headers give (`include/game/item.h`, `ability.h`, `enemy.h` and `character.h`), so a column edit
+//! changes exactly the bytes it names and every byte no column names keeps its stored value.
 
-use rebof3_emi::game_tables::{self as tables, NAME_BYTES, Table};
+use rebof3_emi::classify::Format;
+use rebof3_emi::encounter::{self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES};
+use rebof3_emi::game_tables::{self as tables, Table};
 
-#[derive(Clone, Copy)]
+/// The archive that holds the fixed game tables in entry 0.
+pub const GAME: &str = "BIN/ETC/GAME.EMI";
+/// The archive and entry that hold the party members' starting records.
+pub const START: &str = "BIN/ETC/START.EMI";
+pub const START_PARTY_ENTRY: usize = 8;
+
+/// The item category that marks an empty slot (`ITEM_CAT_EMPTY`).
+pub const EMPTY_CATEGORY: u8 = 0xFF;
+/// An enemy slot of an encounter that holds no enemy.
+pub const EMPTY_ENEMY: u8 = 0xFF;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Field {
-    /// An inline name in the name encoding.
-    Name,
+    /// An inline name in the name encoding, this many bytes wide.
+    Name(usize),
     U8,
     U16,
+    U32,
     /// The high (`true`) or low nibble of a byte.
     Nibble(bool),
     /// A byte of flag bits, bit 0 first.
     Bits(&'static [&'static str]),
     /// A byte that picks one of a few values.
     Choice(&'static [(u8, &'static str)]),
+    /// An item index whose category is the byte at the given record offset.
+    ItemAt(usize),
+    /// An item index into one category's table.
+    ItemOf(u8),
+    /// An ability index into the ability table.
+    Ability,
+    /// An enemy index into the enemy records of the same encounter block.
+    Enemy,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Column {
     pub name: &'static str,
     pub offset: usize,
@@ -30,146 +53,443 @@ const fn col(name: &'static str, offset: usize, field: Field) -> Column {
     Column { name, offset, field }
 }
 
-const ITEM_FLAGS: &[&str] =
-    &["target both", "selectable", "enemy default", "target all", "story", "show name", "show anim", "menu use"];
-const ELEMENTS: &[&str] = &["fire", "ice", "lightning", "earth", "wind", "holy", "psionic", "status"];
-const ABILITY_BITS: &[&str] =
-    &["bit 0", "examinable", "ally default", "bit 3", "affects stats", "bit 5", "bit 6", "bit 7"];
+/// `ItemFlags`.
+const ITEM_FLAGS: &[&str] = &[
+    "target both",
+    "target select",
+    "enemy default",
+    "target all",
+    "story item",
+    "show name",
+    "show animation",
+    "menu use",
+];
+/// `ElementFlags`, the low byte the weapon and ability masks hold.
+const ELEMENTS: &[&str] = &["fire", "frost", "electric", "earth", "wind", "holy", "psionic", "status"];
+/// `AbilityFlags`.
+const ABILITY_FLAGS: &[&str] =
+    &["death", "examinable", "silenceable", "physical", "affects stats", "bit 5", "bit 6", "bit 7"];
+/// `AbilityTargetFlags`.
+const ABILITY_TARGETS: &[&str] =
+    &["field", "battle", "no hit reaction", "bit 3", "all", "opponent", "select", "both sides"];
+/// `EquipFlags`: the party members who may equip the item.
 const PARTY: &[&str] = &["Ryu", "Nina", "Garr", "Teepo", "Rei", "Momo", "Peco", "Whelp"];
-const EQUIP_TYPES: &[(u8, &str)] = &[(0, "nothing"), (2, "shield"), (3, "helmet"), (4, "body")];
-const ITEM_TYPES: &[(u8, &str)] =
-    &[(0, "item"), (1, "weapon"), (2, "armor"), (3, "accessory"), (4, "vital"), (0xFF, "empty")];
-const ABILITY_TYPES: &[(u8, &str)] = &[(0, "heal"), (1, "assist"), (2, "attack"), (3, "skill")];
+/// The low byte of `StatusFlags`.
+const STATUS: &[&str] = &["bit 0", "bit 1", "paralyzed", "blind", "silenced", "confused", "sleeping", "poisoned"];
+/// `ArmorType`: the equip slot an armor record fits.
+const ARMOR_TYPES: &[(u8, &str)] = &[(0, "nothing"), (2, "shield"), (3, "helmet"), (4, "body")];
+/// `ItemCategory`.
+const ITEM_CATEGORIES: &[(u8, &str)] = &[
+    (CATEGORY_ITEM, "item"),
+    (CATEGORY_WEAPON, "weapon"),
+    (CATEGORY_ARMOR, "armor"),
+    (CATEGORY_ACCESSORY, "accessory"),
+    (CATEGORY_VITAL, "vital"),
+    (EMPTY_CATEGORY, "empty"),
+];
+/// The ability classes, in `AbilitySet` order.
+const ABILITY_CLASSES: &[(u8, &str)] = &[(0, "healing"), (1, "assist"), (2, "attack"), (3, "skill")];
+/// `EnemyFamily`, the high byte of an enemy id.
+const ENEMY_FAMILIES: &[(u8, &str)] = &[(0, "none"), (1, "dragon"), (4, "demon")];
+/// `MasterId`.
+const MASTERS: &[(u8, &str)] = &[
+    (0, "Bunyan"),
+    (1, "Mygas"),
+    (2, "Yggdrasil"),
+    (3, "D'Lonzo"),
+    (4, "Fahl"),
+    (5, "Durandal"),
+    (6, "Giotto"),
+    (7, "Hondara"),
+    (8, "Emitai"),
+    (9, "Deis"),
+    (10, "Hachio"),
+    (11, "Bais"),
+    (12, "Lang"),
+    (13, "Lee"),
+    (14, "Wynn"),
+    (15, "Ladon"),
+    (16, "Meryleep"),
+    (0xFF, "none"),
+];
 
-/// A table, the archive and entry that hold it, and its columns. Field offsets follow
-/// `wiki: data/records#row-layouts`.
+/// The item categories, as `Item_GetRecord` resolves them.
+const CATEGORY_ITEM: u8 = 0;
+const CATEGORY_WEAPON: u8 = 1;
+const CATEGORY_ARMOR: u8 = 2;
+const CATEGORY_ACCESSORY: u8 = 3;
+const CATEGORY_VITAL: u8 = 4;
+
+/// The tables each item category indexes, in category order.
+const CATEGORY_TABLES: [Table; 5] =
+    [tables::ITEMS, tables::WEAPONS, tables::ARMOR, tables::ACCESSORIES, tables::VITAL_ITEMS];
+
+/// Where a sheet's records live.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Place {
+    /// One entry of one archive.
+    Entry { archive: &'static str, entry: usize },
+    /// Every entry of this format, in any archive.
+    Format(Format),
+}
+
+/// A table of fixed-size records: where it lives, its first record's payload offset, and its columns.
 pub struct Sheet {
-    pub archive: &'static str,
-    pub entry: usize,
-    pub table: Table,
+    pub name: &'static str,
+    pub place: Place,
+    pub start: usize,
+    pub count: usize,
+    pub record: usize,
     pub columns: Vec<Column>,
 }
 
 impl Sheet {
-    /// The payload offset of the first record.
-    pub fn start(&self) -> usize {
-        self.table.archive_offset - tables::PAYLOAD_START
+    /// The payload bytes of record `row`.
+    pub fn range(&self, row: usize) -> std::ops::Range<usize> {
+        let start = self.start + row * self.record;
+        start..start + self.record
+    }
+
+    /// The payload offset just past the last record.
+    pub fn end(&self) -> usize {
+        self.start + self.count * self.record
+    }
+
+    /// Whether the sheet's records live in entry `entry` of `archive`, whose format is `format`.
+    pub fn applies(&self, archive: &str, entry: usize, format: Format) -> bool {
+        match self.place {
+            Place::Entry { archive: at, entry: index } => at == archive && index == entry,
+            Place::Format(of) => of == format,
+        }
     }
 }
 
-const GAME: &str = "BIN/ETC/GAME.EMI";
-
-fn sheet(table: Table, columns: Vec<Column>) -> Sheet {
-    Sheet { archive: GAME, entry: 0, table, columns }
+fn game(table: Table, columns: Vec<Column>) -> Sheet {
+    Sheet {
+        name: table.name,
+        place: Place::Entry { archive: GAME, entry: 0 },
+        start: table.archive_offset - tables::PAYLOAD_START,
+        count: table.count,
+        record: table.record,
+        columns,
+    }
 }
 
+/// The sheets of entry `entry` of `archive`, whose format is `format`.
+pub fn sheets_for(archive: &str, entry: usize, format: Format) -> Vec<Sheet> {
+    sheets().into_iter().filter(|sheet| sheet.applies(archive, entry, format)).collect()
+}
+
+/// Every sheet the editor knows.
 pub fn sheets() -> Vec<Sheet> {
     use Field::*;
-    let mut shop = vec![col("count", 0, U8)];
-    for slot in 0..tables::SHOP_SLOTS {
-        shop.push(col(SLOT_TYPE[slot], 1 + 2 * slot, Choice(ITEM_TYPES)));
-        shop.push(col(SLOT_INDEX[slot], 2 + 2 * slot, U8));
-    }
+    let name = Name(tables::NAME_BYTES);
     vec![
-        sheet(
+        game(
             tables::ITEMS,
             vec![
-                col("name", 0, Name),
+                col("name", 0x00, name),
                 col("flags", 0x0c, Bits(ITEM_FLAGS)),
-                col("unk 0D", 0x0d, U8),
+                col("icon", 0x0d, U8),
                 col("description", 0x0e, U16),
                 col("price", 0x10, U16),
             ],
         ),
-        sheet(tables::VITAL_ITEMS, vec![col("name", 0, Name), col("description", 0x0c, U16), col("unk 0E", 0x0e, U16)]),
-        sheet(
+        game(tables::VITAL_ITEMS, vec![col("name", 0x00, name), col("description", 0x0c, U16)]),
+        game(
             tables::WEAPONS,
             vec![
-                col("name", 0, Name),
+                col("name", 0x00, name),
                 col("equip", 0x0c, Bits(PARTY)),
                 col("flags", 0x0d, U8),
-                col("kind", 0x0e, U8),
+                col("icon", 0x0e, U8),
                 col("element", 0x0f, Bits(ELEMENTS)),
                 col("weight", 0x10, U8),
                 col("sound", 0x11, U8),
                 col("power", 0x12, U8),
-                col("unk 13", 0x13, U8),
                 col("description", 0x14, U16),
                 col("price", 0x16, U16),
             ],
         ),
-        sheet(
+        game(
             tables::ARMOR,
             vec![
-                col("name", 0, Name),
+                col("name", 0x00, name),
                 col("equip", 0x0c, Bits(PARTY)),
                 col("flags", 0x0d, U8),
-                col("type", 0x0e, Choice(EQUIP_TYPES)),
+                col("equip slot", 0x0e, Choice(ARMOR_TYPES)),
                 col("weight", 0x0f, U8),
                 col("power", 0x10, U8),
-                col("unk 11", 0x11, U8),
                 col("description", 0x12, U16),
                 col("price", 0x14, U16),
             ],
         ),
-        sheet(
+        game(
             tables::ACCESSORIES,
             vec![
-                col("name", 0, Name),
+                col("name", 0x00, name),
                 col("equip", 0x0c, Bits(PARTY)),
                 col("flags", 0x0d, U8),
-                col("kind", 0x0e, U8),
+                col("icon", 0x0e, U8),
                 col("weight", 0x0f, U8),
                 col("description", 0x10, U16),
                 col("price", 0x12, U16),
             ],
         ),
-        sheet(tables::SHOPS, shop),
-        sheet(
+        game(tables::SHOPS, shop_columns()),
+        game(
             tables::ABILITIES,
             vec![
-                col("name", 0, Name),
-                col("targeting", 0x0c, U8),
-                col("type", 0x0d, Choice(ABILITY_TYPES)),
+                col("name", 0x00, name),
+                col("targeting", 0x0c, Bits(ABILITY_TARGETS)),
+                col("class", 0x0d, Choice(ABILITY_CLASSES)),
                 col("cost", 0x0e, U8),
                 col("power", 0x0f, U8),
                 col("element", 0x10, Bits(ELEMENTS)),
-                col("flags", 0x11, Bits(ABILITY_BITS)),
+                col("flags", 0x11, Bits(ABILITY_FLAGS)),
                 col("description", 0x12, U16),
             ],
         ),
-        sheet(
+        game(
             tables::LEVEL_GROWTH,
             vec![
-                col("exp", 0, U16),
-                col("hp", 2, U8),
-                col("ap", 3, U8),
-                col("power", 4, Nibble(true)),
-                col("defense", 4, Nibble(false)),
-                col("agility", 5, Nibble(true)),
-                col("intellect", 5, Nibble(false)),
-                col("ability", 6, U8),
-                col("extra ability", 7, U8),
+                col("exp", 0x00, U16),
+                col("hp", 0x02, U8),
+                col("ap", 0x03, U8),
+                col("power", 0x04, Nibble(true)),
+                col("defense", 0x04, Nibble(false)),
+                col("agility", 0x05, Nibble(true)),
+                col("intellect", 0x05, Nibble(false)),
+                col("ability", 0x06, Ability),
+                col("extra ability", 0x07, Ability),
             ],
         ),
+        party_sheet(),
+        encounter_sheet(),
+        enemy_sheet(),
     ]
 }
 
-const SLOT_TYPE: [&str; tables::SHOP_SLOTS] =
-    ["type 1", "type 2", "type 3", "type 4", "type 5", "type 6", "type 7", "type 8", "type 9", "type 10", "type 11"];
-const SLOT_INDEX: [&str; tables::SHOP_SLOTS] = [
-    "index 1", "index 2", "index 3", "index 4", "index 5", "index 6", "index 7", "index 8", "index 9", "index 10",
-    "index 11",
+const SHOP_SLOT_CATEGORY: [&str; tables::SHOP_SLOTS] = [
+    "1 category",
+    "2 category",
+    "3 category",
+    "4 category",
+    "5 category",
+    "6 category",
+    "7 category",
+    "8 category",
+    "9 category",
+    "10 category",
+    "11 category",
 ];
+const SHOP_SLOT_ITEM: [&str; tables::SHOP_SLOTS] =
+    ["1 item", "2 item", "3 item", "4 item", "5 item", "6 item", "7 item", "8 item", "9 item", "10 item", "11 item"];
+
+/// `ShopStock`: an item count, then eleven `ShopItemRef` slots of category and index.
+fn shop_columns() -> Vec<Column> {
+    let mut columns = vec![col("item count", 0, Field::U8)];
+    for slot in 0..tables::SHOP_SLOTS {
+        let category = 1 + 2 * slot;
+        columns.push(col(SHOP_SLOT_CATEGORY[slot], category, Field::Choice(ITEM_CATEGORIES)));
+        columns.push(col(SHOP_SLOT_ITEM[slot], category + 1, Field::ItemAt(category)));
+    }
+    columns
+}
+
+/// The payload offset of the first party record in `ETC/START.EMI` entry 8.
+const PARTY_START: usize = rebof3_emi::characters::PAYLOAD_OFFSET;
+/// `Character`: the record offsets of its stat blocks.
+const PARTY_STATS: usize = 0x1c;
+const PARTY_BASE: usize = 0x3c;
+
+/// `Character` (`include/game/character.h`): the party members' starting records.
+fn party_sheet() -> Sheet {
+    use Field::*;
+    let mut columns = vec![
+        col("name", 0x00, Name(rebof3_emi::characters::NAME_BYTES)),
+        col("character id", 0x05, U8),
+        col("level", 0x06, U8),
+        col("exp", 0x08, U32),
+        col("status", 0x0c, Bits(STATUS)),
+        col("weapon", 0x0e, ItemOf(CATEGORY_WEAPON)),
+        col("shield", 0x0f, ItemOf(CATEGORY_ARMOR)),
+        col("helmet", 0x10, ItemOf(CATEGORY_ARMOR)),
+        col("armor", 0x11, ItemOf(CATEGORY_ARMOR)),
+        col("accessory 1", 0x12, ItemOf(CATEGORY_ACCESSORY)),
+        col("accessory 2", 0x13, ItemOf(CATEGORY_ACCESSORY)),
+        col("hp", 0x14, U16),
+        col("ap", 0x16, U16),
+        col("willpower", 0x18, U8),
+        col("inoculations", 0x19, U8),
+        col("fatigue", 0x1a, U8),
+        col("master", 0x1b, Choice(MASTERS)),
+    ];
+    columns.extend(stat_columns(STAT_NAMES, PARTY_STATS));
+    columns.extend(stat_columns(BASE_STAT_NAMES, PARTY_BASE));
+    columns.push(col("master level", 0x84, U8));
+
+    Sheet {
+        name: "party",
+        place: Place::Entry { archive: START, entry: START_PARTY_ENTRY },
+        start: PARTY_START,
+        count: rebof3_emi::characters::CHARACTERS,
+        record: rebof3_emi::characters::RECORD_BYTES,
+        columns,
+    }
+}
+
+/// The six `u16` stats that open a `Stats` block: the live copy, then the base the equipment adds to.
+const STAT_NAMES: [&str; 6] = ["max hp", "max ap", "power", "defense", "agility", "intellect"];
+const BASE_STAT_NAMES: [&str; 6] =
+    ["base max hp", "base max ap", "base power", "base defense", "base agility", "base intellect"];
+
+/// The columns of the six `u16` stats of the `Stats` block at record offset `block`.
+fn stat_columns(names: [&'static str; 6], block: usize) -> Vec<Column> {
+    names.into_iter().enumerate().map(|(at, name)| col(name, block + 2 * at, Field::U16)).collect()
+}
+
+const ENCOUNTER_SLOTS: [&str; ENCOUNTER_ENEMIES] =
+    ["enemy 1", "enemy 2", "enemy 3", "enemy 4", "enemy 5", "enemy 6", "enemy 7", "enemy 8"];
+
+/// `Encounter`: eight enemy indexes and an appearance rate.
+fn encounter_sheet() -> Sheet {
+    let mut columns: Vec<Column> =
+        ENCOUNTER_SLOTS.into_iter().enumerate().map(|(at, name)| col(name, at, Field::Enemy)).collect();
+    columns.push(col("appearance rate", ENCOUNTER_ENEMIES, Field::U8));
+    Sheet {
+        name: "encounters",
+        place: Place::Format(Format::AreaEncounterTable),
+        start: 0,
+        count: ENCOUNTERS,
+        record: ENCOUNTER_BYTES,
+        columns,
+    }
+}
+
+/// The record offsets of an enemy's two drop rows (`EnemyDrop`); Steal takes the first.
+const ENEMY_DROPS: [usize; 2] = [0x2c, 0x30];
+/// The record offset of an enemy's resistance levels.
+const ENEMY_RESISTANCES: usize = 0x78;
+/// `ResistanceIndex`.
+const RESISTANCES: [&str; 9] = ["fire", "frost", "electric", "earth", "wind", "holy", "psionic", "status", "death"];
+const INITIAL_SKILLS: [&str; 8] =
+    ["skill 1", "skill 2", "skill 3", "skill 4", "skill 5", "skill 6", "skill 7", "skill 8"];
+
+/// `Enemy` (`include/game/enemy.h`): the eight enemy records after the encounters.
+fn enemy_sheet() -> Sheet {
+    use Field::*;
+    let mut columns = vec![
+        col("name", 0x00, Name(encounter::NAME_BYTES)),
+        col("enemy id", 0x08, U8),
+        col("family", 0x09, Choice(ENEMY_FAMILIES)),
+        col("choice AI", 0x0a, U8),
+        col("target preference", 0x0e, U8),
+        col("zenny", 0x10, U16),
+        col("exp", 0x12, U16),
+        col("level", 0x14, U16),
+        col("hp", 0x20, U16),
+        col("ap", 0x22, U16),
+        col("power", 0x24, U16),
+        col("defense", 0x26, U16),
+        col("agility", 0x28, U16),
+        col("intellect", 0x2a, U16),
+    ];
+    const DROP_NAMES: [[&str; 3]; 2] =
+        [["drop 1 item", "drop 1 category", "drop 1 rate"], ["drop 2 item", "drop 2 category", "drop 2 rate"]];
+    for (row, [item, category, rate]) in ENEMY_DROPS.into_iter().zip(DROP_NAMES) {
+        columns.push(col(item, row, ItemAt(row + 1)));
+        columns.push(col(category, row + 1, Choice(ITEM_CATEGORIES)));
+        columns.push(col(rate, row + 2, U8));
+    }
+    for (at, name) in INITIAL_SKILLS.into_iter().enumerate() {
+        columns.push(col(name, 0x18 + at, Ability));
+    }
+    for (at, name) in RESISTANCES.into_iter().enumerate() {
+        columns.push(col(name, ENEMY_RESISTANCES + at, U8));
+    }
+    columns.push(col("status", 0x81, Bits(STATUS)));
+    columns.push(col("reach", 0x82, U8));
+    columns.push(col("height", 0x83, U8));
+
+    Sheet {
+        name: "enemies",
+        place: Place::Format(Format::AreaEncounterTable),
+        start: ENEMY_BASE,
+        count: ENEMIES,
+        record: ENEMY_BYTES,
+        columns,
+    }
+}
+
+/// The names a reference column shows: the item and ability names of `GAME.EMI` entry 0, and the
+/// enemy names of the shown encounter block.
+#[derive(Default)]
+pub struct Names {
+    items: [Vec<String>; CATEGORY_TABLES.len()],
+    abilities: Vec<String>,
+    enemies: Vec<String>,
+}
+
+impl Names {
+    /// The names in `game`, the payload of `GAME.EMI` entry 0, and in `shown`, the shown entry's payload
+    /// when it is an encounter block.
+    pub fn new(game: Option<&[u8]>, shown: Option<&[u8]>) -> Self {
+        let names = |table: Table| -> Vec<String> {
+            game.and_then(|payload| table.records(payload).ok())
+                .map(|records| records.iter().map(|record| tables::name_text(&record[..tables::NAME_BYTES])).collect())
+                .unwrap_or_default()
+        };
+        let enemies = shown
+            .filter(|payload| payload.len() >= encounter::BLOCK_BYTES)
+            .map(|payload| {
+                (0..ENEMIES)
+                    .map(|index| {
+                        let start = ENEMY_BASE + index * ENEMY_BYTES;
+                        tables::name_text(&payload[start..start + encounter::NAME_BYTES])
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self { items: CATEGORY_TABLES.map(names), abilities: names(tables::ABILITIES), enemies }
+    }
+
+    /// The name of item `index` in `category`.
+    pub fn item(&self, category: u8, index: u8) -> Option<&str> {
+        self.items.get(usize::from(category))?.get(usize::from(index)).map(String::as_str)
+    }
+
+    pub fn ability(&self, index: u8) -> Option<&str> {
+        self.abilities.get(usize::from(index)).map(String::as_str)
+    }
+
+    pub fn enemy(&self, index: u8) -> Option<&str> {
+        self.enemies.get(usize::from(index)).map(String::as_str)
+    }
+
+    /// The name a reference column shows for `record`, or `None` for a column that names nothing.
+    pub fn of(&self, record: &[u8], column: &Column) -> Option<&str> {
+        let value = record[column.offset];
+        match column.field {
+            Field::ItemAt(category) => self.item(record[category], value),
+            Field::ItemOf(category) => self.item(category, value),
+            Field::Ability => self.ability(value),
+            Field::Enemy if value != EMPTY_ENEMY => self.enemy(value),
+            _ => None,
+        }
+    }
+}
 
 /// The text of a name field.
-pub fn name_text(record: &[u8], offset: usize) -> String {
-    tables::name_text(&record[offset..offset + NAME_BYTES])
+pub fn name_text(record: &[u8], column: &Column) -> String {
+    let Field::Name(width) = column.field else { return String::new() };
+    tables::name_text(&record[column.offset..column.offset + width])
 }
 
 /// The bytes of a name field, or why the text does not fit.
-pub fn name_bytes(text: &str) -> Result<Vec<u8>, String> {
-    tables::name_field(text, NAME_BYTES).map_err(|error| error.to_string())
+pub fn name_bytes(text: &str, column: &Column) -> Result<Vec<u8>, String> {
+    let Field::Name(width) = column.field else { return Err("not a name".into()) };
+    tables::name_field(text, width).map_err(|error| error.to_string())
 }
 
 /// The value a column reads.
@@ -177,24 +497,39 @@ pub fn read(record: &[u8], column: &Column) -> u32 {
     let at = column.offset;
     match column.field {
         Field::U16 => u32::from(u16::from_le_bytes([record[at], record[at + 1]])),
+        Field::U32 => u32::from_le_bytes([record[at], record[at + 1], record[at + 2], record[at + 3]]),
         Field::Nibble(true) => u32::from(record[at] >> 4),
         Field::Nibble(false) => u32::from(record[at] & 0x0F),
-        Field::Name => 0,
-        Field::U8 | Field::Bits(_) | Field::Choice(_) => u32::from(record[at]),
+        Field::Name(_) => 0,
+        Field::U8
+        | Field::Bits(_)
+        | Field::Choice(_)
+        | Field::ItemAt(_)
+        | Field::ItemOf(_)
+        | Field::Ability
+        | Field::Enemy => u32::from(record[at]),
     }
 }
 
 /// Writes a column's value, clamped to the field's range.
 pub fn write(record: &mut [u8], column: &Column, value: u32) {
     let at = column.offset;
+    let value = value.min(max(column));
     match column.field {
-        Field::U16 => record[at..at + 2].copy_from_slice(&(value.min(0xFFFF) as u16).to_le_bytes()),
+        Field::U16 => record[at..at + 2].copy_from_slice(&(value as u16).to_le_bytes()),
+        Field::U32 => record[at..at + 4].copy_from_slice(&value.to_le_bytes()),
         Field::Nibble(high) => {
-            let nibble = value.min(0x0F) as u8;
+            let nibble = value as u8;
             record[at] = if high { (record[at] & 0x0F) | (nibble << 4) } else { (record[at] & 0xF0) | nibble };
         }
-        Field::Name => {}
-        Field::U8 | Field::Bits(_) | Field::Choice(_) => record[at] = value.min(0xFF) as u8,
+        Field::Name(_) => {}
+        Field::U8
+        | Field::Bits(_)
+        | Field::Choice(_)
+        | Field::ItemAt(_)
+        | Field::ItemOf(_)
+        | Field::Ability
+        | Field::Enemy => record[at] = value as u8,
     }
 }
 
@@ -202,7 +537,136 @@ pub fn write(record: &mut [u8], column: &Column, value: u32) {
 pub fn max(column: &Column) -> u32 {
     match column.field {
         Field::U16 => 0xFFFF,
+        Field::U32 => u32::MAX,
         Field::Nibble(_) => 0x0F,
         _ => 0xFF,
+    }
+}
+
+/// The bytes a column covers in its record.
+pub fn width(column: &Column) -> usize {
+    match column.field {
+        Field::Name(width) => width,
+        Field::U16 => 2,
+        Field::U32 => 4,
+        _ => 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A record of distinct bytes, so a write to the wrong offset shows.
+    fn record(bytes: usize) -> Vec<u8> {
+        (0..bytes).map(|at| (at * 7 + 3) as u8).collect()
+    }
+
+    #[test]
+    fn every_column_fits_its_record() {
+        for sheet in sheets() {
+            for column in &sheet.columns {
+                let end = column.offset + width(column);
+                assert!(end <= sheet.record, "{}: {} ends at {end:#x}", sheet.name, column.name);
+                if let Field::ItemAt(category) = column.field {
+                    assert!(category < sheet.record, "{}: {}", sheet.name, column.name);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn writing_every_value_back_keeps_every_byte() {
+        for sheet in sheets() {
+            let stored = record(sheet.record);
+            let mut copy = stored.clone();
+            for column in &sheet.columns {
+                if let Field::Name(_) = column.field {
+                    let bytes = name_bytes(&name_text(&copy, column), column);
+                    if let Ok(bytes) = bytes {
+                        copy[column.offset..column.offset + bytes.len()].copy_from_slice(&bytes);
+                    }
+                    continue;
+                }
+                let value = read(&copy, column);
+                write(&mut copy, column, value);
+            }
+            assert_eq!(copy, stored, "{}", sheet.name);
+        }
+    }
+
+    #[test]
+    fn a_write_changes_only_its_column_bytes() {
+        for sheet in sheets() {
+            let stored = record(sheet.record);
+            for column in sheet.columns.iter().filter(|column| !matches!(column.field, Field::Name(_))) {
+                let mut copy = stored.clone();
+                write(&mut copy, column, read(&stored, column) ^ 1);
+                let span = column.offset..column.offset + width(column);
+                for at in (0..sheet.record).filter(|at| !span.contains(at)) {
+                    assert_eq!(copy[at], stored[at], "{}: {} wrote byte {at:#x}", sheet.name, column.name);
+                }
+                assert_ne!(copy, stored, "{}: {}", sheet.name, column.name);
+            }
+        }
+    }
+
+    #[test]
+    fn a_nibble_write_keeps_the_other_nibble() {
+        let high = col("power", 0, Field::Nibble(true));
+        let low = col("defense", 0, Field::Nibble(false));
+        let mut record = [0xA5];
+        write(&mut record, &high, 0x3);
+        assert_eq!(record, [0x35]);
+        write(&mut record, &low, 0x1F);
+        assert_eq!(record, [0x3F], "a value past the nibble clamps to 15");
+    }
+
+    #[test]
+    fn encounter_sheets_apply_to_every_encounter_block_and_game_sheets_to_one_entry() {
+        let area = sheets_for("BIN/WORLD00/AREA001.EMI", 3, Format::AreaEncounterTable);
+        assert_eq!(area.iter().map(|sheet| sheet.name).collect::<Vec<_>>(), ["encounters", "enemies"]);
+        assert_eq!(sheets_for(GAME, 0, Format::CodeImage).len(), 8);
+        assert!(sheets_for(GAME, 1, Format::CodeImage).is_empty());
+        assert_eq!(sheets_for(START, START_PARTY_ENTRY, Format::Unclassified).len(), 1);
+    }
+
+    #[test]
+    fn the_enemy_sheet_ends_at_the_block_end() {
+        let enemies = enemy_sheet();
+        assert_eq!(enemies.end(), encounter::BLOCK_BYTES);
+        assert_eq!(encounter_sheet().end(), ENEMY_BASE);
+    }
+
+    /// A game payload long enough for every table, with one weapon and one ability named.
+    fn game_payload() -> Vec<u8> {
+        let end = tables::TABLES
+            .iter()
+            .map(|table| table.archive_offset - tables::PAYLOAD_START + table.count * table.record);
+        let mut payload = vec![0; end.max().unwrap()];
+        let mut put = |table: Table, index: usize, name: &str| {
+            let at = table.archive_offset - tables::PAYLOAD_START + index * table.record;
+            let bytes = tables::name_field(name, tables::NAME_BYTES).unwrap();
+            payload[at..at + bytes.len()].copy_from_slice(&bytes);
+        };
+        put(tables::WEAPONS, 3, "Sword");
+        put(tables::ABILITIES, 2, "Flame");
+        payload
+    }
+
+    #[test]
+    fn reference_columns_name_the_record_they_point_at() {
+        let mut block = vec![EMPTY_ENEMY; encounter::BLOCK_BYTES];
+        let worker = tables::name_field("Worker", encounter::NAME_BYTES).unwrap();
+        block[ENEMY_BASE + ENEMY_BYTES..ENEMY_BASE + ENEMY_BYTES + worker.len()].copy_from_slice(&worker);
+        let names = Names::new(Some(&game_payload()), Some(&block));
+
+        let drop = col("drop 1 item", 0, Field::ItemAt(1));
+        assert_eq!(names.of(&[3, CATEGORY_WEAPON], &drop), Some("Sword"));
+        assert_eq!(names.of(&[3, EMPTY_CATEGORY], &drop), None);
+        assert_eq!(names.of(&[2], &col("skill 1", 0, Field::Ability)), Some("Flame"));
+        assert_eq!(names.of(&[1], &col("enemy 1", 0, Field::Enemy)), Some("Worker"));
+        assert_eq!(names.of(&[EMPTY_ENEMY], &col("enemy 1", 0, Field::Enemy)), None);
+        assert_eq!(names.item(CATEGORY_ITEM, 200), None, "past the item table");
     }
 }
