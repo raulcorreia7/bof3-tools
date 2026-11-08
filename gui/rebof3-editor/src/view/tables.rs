@@ -3,13 +3,13 @@
 
 use gpui::{AnyElement, Context, Div, anchored, deferred, div, prelude::*, px};
 
-use super::{Entry, Field, Menu, editing, editing_menu};
-use crate::app::{Editor, Field as WindowField, Menu as WindowMenu};
+use super::{Entry, Field, Menu, editing_menu, input};
+use crate::app::{Editor, Menu as WindowMenu};
 use crate::fonts;
 use crate::schema::{self, Column, Field as Kind, Names, Sheet};
 use crate::theme::{EDITED, MUTED, RAISED, color};
 use crate::widgets::{
-    GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, field, menu_item, menu_panel, muted, separator, strong, tab,
+    GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, menu_item, menu_panel, muted, separator, strong, tab,
 };
 
 /// Width of a numeric cell, of a name cell, of a reference cell and of the row number, in pixels.
@@ -57,14 +57,15 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
                 cx.notify();
             })));
     }
-    let filter_text = state.filter.clone();
-    bar = bar.child(separator(true)).child(
-        field("table-filter", &state.filter, "Filter by name", editing(editor, Field::TableFilter), Some(FILTER_WIDTH))
-            .on_click(cx.listener(move |editor, _, _, cx| {
-                editor.start_editing(WindowField::View(Field::TableFilter), filter_text.clone());
-                cx.notify();
-            })),
-    );
+    bar = bar.child(separator(true)).child(input(
+        editor,
+        "table-filter",
+        Field::TableFilter,
+        &state.filter,
+        "Filter by name",
+        Some(FILTER_WIDTH),
+        cx,
+    ));
 
     let sheet = &sheets[selected];
     let payload = entry.payload();
@@ -157,13 +158,7 @@ fn cell(
     let content = match column.field {
         Kind::Name(_) => {
             let text = schema::name_text(record, column);
-            let draft = text.clone();
-            field(("cell", at), &text, "", editing(editor, which), Some(NAME_WIDTH))
-                .on_click(cx.listener(move |editor, _, _, cx| {
-                    editor.start_editing(WindowField::View(which), draft.clone());
-                    cx.notify();
-                }))
-                .into_any_element()
+            input(editor, ("cell", at), which, &text, "", Some(NAME_WIDTH), cx).into_any_element()
         }
         Kind::Bits(names) => {
             let mut cell = div().flex().flex_col().child(
@@ -223,14 +218,7 @@ fn cell(
 
 /// A number field that edits cell `which`.
 fn number(editor: &Editor, which: Field, at: usize, value: u32, cx: &mut Context<Editor>) -> gpui::Stateful<Div> {
-    let text = value.to_string();
-    let draft = text.clone();
-    field(("cell", at), &text, "", editing(editor, which), Some(NUMBER_WIDTH)).font_family(fonts::mono()).on_click(
-        cx.listener(move |editor, _, _, cx| {
-            editor.start_editing(WindowField::View(which), draft.clone());
-            cx.notify();
-        }),
-    )
+    input(editor, ("cell", at), which, &value.to_string(), "", Some(NUMBER_WIDTH), cx).font_family(fonts::mono())
 }
 
 fn close_menu(cx: &mut Context<Editor>) -> impl Fn(&gpui::MouseDownEvent, &mut gpui::Window, &mut gpui::App) + 'static {
