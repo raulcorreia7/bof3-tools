@@ -85,7 +85,8 @@ payloads.
 
 [docs/editor.md](docs/editor.md) lists what the editor offers for every entry format.
 
-Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); `Ctrl+S` saves, `Ctrl+E` exports. The editor
+Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); one undo takes back a whole drag or typed field. `Ctrl+S`
+saves, `Ctrl+E` exports, and closing with unsaved edits asks to save or discard them. The editor
 uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font
 family to use another one.
 

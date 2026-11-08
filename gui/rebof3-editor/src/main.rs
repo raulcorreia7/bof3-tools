@@ -55,6 +55,10 @@ fn main() -> ExitCode {
         let window = cx.open_window(options, |window, cx| {
             let editor = cx.new(|cx| app::Editor::new(disc, folder, cx));
             editor.read(cx).focus.focus(window);
+            let closing = editor.clone();
+            window.on_window_should_close(cx, move |window, cx| {
+                closing.update(cx, |editor, cx| editor.should_close(window, cx))
+            });
             editor
         });
         match window {

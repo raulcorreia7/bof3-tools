@@ -134,7 +134,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             MouseButton::Left,
             cx.listener(|editor, event: &MouseDownEvent, _, cx| {
                 editor.views.map.picked = picked_at(editor, event.position);
-                editor.editing = None;
+                editor.stop_editing();
                 cx.notify();
             }),
         )

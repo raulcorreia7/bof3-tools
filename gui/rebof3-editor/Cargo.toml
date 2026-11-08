@@ -23,3 +23,6 @@ cpal = "0.18.2"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
