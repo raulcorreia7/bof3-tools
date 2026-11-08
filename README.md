@@ -76,7 +76,7 @@ payloads.
 | Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a joined or chosen palette; paint     |
 | Palette | palette banks                 | edit any color's 5-bit channels and semi-transparency bit          |
 | Tables  | `ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, area encounter blocks | spreadsheets of items, equipment, shops, abilities, level growth, party members, encounters and enemies; drops, equipment, skills and encounter slots show the name they point at |
-| Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes)              |
+| Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
 | Sound   | VAB banks, sequence packages  | play samples and sequences (with the archive's own bank and your edits); export WAVE, SoundFont and MIDI |
 | Map     | area map bundles              | the map from above, coloured by tile bank and height; edit a cell's corner heights |
 | Decoded | cue, scene, script, palette, LZ77 | the decoder's structured reading                              |
