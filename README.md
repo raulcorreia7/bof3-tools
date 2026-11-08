@@ -75,7 +75,7 @@ payloads.
 | Hex     | every entry                   | edit bytes; read and write the value at the cursor as any int width |
 | Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a joined or chosen palette; paint     |
 | Palette | palette banks                 | edit any color's 5-bit channels and semi-transparency bit          |
-| Tables  | `ETC/GAME.EMI` entry 0        | spreadsheets of items, equipment, shops, abilities, level growth   |
+| Tables  | `ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, area encounter blocks | spreadsheets of items, equipment, shops, abilities, level growth, party members, encounters and enemies; drops, equipment, skills and encounter slots show the name they point at |
 | Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes)              |
 | Sound   | VAB banks, sequence packages  | play samples; export WAVE, SoundFont and MIDI                      |
 | Decoded | cue, scene, script, palette, LZ77 | the decoder's structured reading                              |

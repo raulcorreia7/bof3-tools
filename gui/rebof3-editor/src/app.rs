@@ -10,10 +10,9 @@ use gpui::{Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, Uni
 
 use crate::edit::{LineEdit, Outcome};
 use crate::project::{ArchivePath, Loaded, Project};
+use crate::schema;
 use crate::view::{self, Entry, Tab, Views};
 
-/// The archive the Go menu opens on its game tables.
-const GAME_TABLES: &str = "BIN/ETC/GAME.EMI";
 /// The project folder made next to the disc folder when none is named.
 const PROJECT_FOLDER: &str = "bof3-project";
 /// How often the window checks for a change it did not cause, such as a sound that ends.
@@ -106,13 +105,15 @@ impl Editor {
 
     pub fn open(&mut self) {
         match Project::open(self.disc_field.trim().as_ref(), self.folder_field.trim().as_ref()) {
-            Ok(project) => {
+            Ok(mut project) => {
                 self.status = format!(
                     "{} archives, {} saved edits. Disc files are read only; edits go to {}.",
                     project.archives.len(),
                     project.edit_count(),
                     project.folder.display()
                 );
+                // The tables' reference columns read item and ability names from the game tables.
+                let _ = project.load(&ArchivePath(schema::GAME.into()));
                 self.project = Some(project);
                 self.archive = None;
                 self.entry = None;
@@ -151,7 +152,7 @@ impl Editor {
 
     /// Opens the game tables.
     pub fn go_to_game_tables(&mut self) {
-        self.select_archive(&ArchivePath(GAME_TABLES.into()));
+        self.select_archive(&ArchivePath(schema::GAME.into()));
         if self.archive.is_some() {
             self.entry = Some(0);
             self.tab = Tab::Tables;

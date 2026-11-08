@@ -112,6 +112,11 @@ impl Project {
         Ok(loaded)
     }
 
+    /// An archive that [`Project::load`] has read already.
+    pub fn loaded(&self, path: &ArchivePath) -> Option<&Loaded> {
+        self.cache.get(path).map(Arc::as_ref)
+    }
+
     /// The current payload of an entry: its edit, or the disc's bytes.
     pub fn payload<'a>(&'a self, loaded: &'a Loaded, index: usize) -> &'a [u8] {
         match self.edits.get(&(loaded.path.clone(), index)) {

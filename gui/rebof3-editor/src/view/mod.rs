@@ -16,7 +16,7 @@ use rebof3_emi::classify::Format;
 
 use crate::app::{Editor, Field as WindowField};
 use crate::edit::LineEdit;
-use crate::project::{Loaded, Project};
+use crate::project::{ArchivePath, Loaded, Project};
 use crate::widgets::{GAP_SMALL, separator, tab};
 
 /// One view of an entry.
@@ -134,6 +134,12 @@ impl Entry<'_> {
     /// The payload as it is on the disc.
     pub fn original(&self) -> &[u8] {
         self.archive.original(self.index)
+    }
+
+    /// The current payload of entry `index` of `archive`, when the project has read that archive.
+    pub fn elsewhere(&self, archive: &str, index: usize) -> Option<&[u8]> {
+        let loaded = self.project.loaded(&ArchivePath(archive.to_string()))?;
+        (index < loaded.entries().len()).then(|| self.project.payload(loaded, index))
     }
 
     /// The payload of another entry of the same archive.

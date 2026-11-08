@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use psx_formats::gfx::vram;
 use rebof3_assets::decode::texture_words;
 use rebof3_editor::project::{ArchivePath, Project};
+use rebof3_editor::schema::{self, Field};
 use rebof3_emi::classify::Format;
 use rebof3_emi::text::codec::{self, Encoding};
 use rebof3_emi::text::discover::{self, Kind};
@@ -101,5 +102,49 @@ fn every_entry_round_trips_through_its_editor() {
         strings.1.iter().take(8).collect::<Vec<_>>()
     );
     assert!(textures.1.is_empty(), "textures: {:?}", textures.1.iter().take(8).collect::<Vec<_>>());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn every_sheet_fits_its_entries_and_rewrites_their_bytes() {
+    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let folder = scratch("sheets");
+    let mut project = Project::open(&disc, &folder).expect("project opens");
+
+    let mut sheets = 0;
+    let mut problems = Vec::new();
+    for path in project.archives.clone() {
+        let loaded = project.load(&path).expect("archive loads");
+        for index in 0..loaded.entries().len() {
+            let payload = loaded.original(index);
+            for sheet in schema::sheets_for(&path.0, index, loaded.formats[index]) {
+                sheets += 1;
+                if payload.len() < sheet.end() {
+                    problems.push(format!("{}#{index} {}: ends at {:#x}", path.0, sheet.name, payload.len()));
+                    continue;
+                }
+                let mut copy = payload.to_vec();
+                for row in 0..sheet.count {
+                    let record = &mut copy[sheet.range(row)];
+                    for column in &sheet.columns {
+                        if let Field::Name(_) = column.field {
+                            let bytes = schema::name_bytes(&schema::name_text(record, column), column)
+                                .expect("a stored name encodes again");
+                            record[column.offset..column.offset + bytes.len()].copy_from_slice(&bytes);
+                        } else {
+                            let value = schema::read(record, column);
+                            schema::write(record, column, value);
+                        }
+                    }
+                }
+                if copy != payload {
+                    problems.push(format!("{}#{index} {}: a rewrite changes bytes", path.0, sheet.name));
+                }
+            }
+        }
+    }
+
+    eprintln!("sheets: {} of {sheets} do not fit or round-trip", problems.len());
+    assert!(problems.is_empty(), "{:?}", problems.iter().take(8).collect::<Vec<_>>());
     let _ = std::fs::remove_dir_all(&folder);
 }
