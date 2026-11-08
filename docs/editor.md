@@ -19,7 +19,7 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | VRAM texture upload (type 3) | 593 | Texture: 4, 8 or 16 bpp with a joined or chosen palette | paint texels | retail: words back to the payload, 593/593 | none |
 | CLUT bank | 620 | Palette, Decoded | colour channels and STP bit | none | needs a test |
 | VAB header (type 6) | 1,020 | Sound: samples, programs and tones; Tables: bank, programs, tones | master volume and pan, every program and tone field | retail: every sheet rewrites its bytes | none; the counts and sizes that lay out the header are not editable |
-| VAB body (type 7) | 1,020 | Sound: play, export WAVE and SoundFont | Hex only | none | needs a sample import |
+| VAB body (type 7) | 1,020 | Sound: play, export WAVE and SoundFont | replace a sample from a mono 16-bit 44.1 kHz WAVE file; the header's size table and bank size follow, in one undo step | retail: every sample put back in place keeps the header and body, 8,330/8,330 | none; ADPCM is lossy, so a WAVE export imported back is close, not exact |
 | SEP sequence package (type 10) | 119 | Sound: play with the archive's bank, export MIDI | each sequence's resolution, tempo and time signature; import a sequence from MIDI | retail: playback; every sequence's MIDI imports back to its bytes, 476/476 | none |
 | Character sprite bank, LZ77 (type 1) | 65 | Sprite bank: node tables and palettes | palette colours; re-encoded on an edit | retail: a colour edit keeps the decoded bank | none; the node pixel format is not decoded |
 | Character sprite bank, raw | 79 | Sprite bank | palette colours | retail, as above | none; 3 banks have no palette layer |
