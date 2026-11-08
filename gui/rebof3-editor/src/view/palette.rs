@@ -21,6 +21,8 @@ const CHANNEL_MAX: u16 = (1 << CHANNEL_BITS) - 1;
 const GREEN_SHIFT: u32 = CHANNEL_BITS;
 const BLUE_SHIFT: u32 = 2 * CHANNEL_BITS;
 const STP_BIT: u16 = 1 << 15;
+/// The bytes of one color word.
+const COLOR_BYTES: usize = 2;
 
 /// The side of one swatch in the grid, and of the picker's preview, in pixels.
 pub const SWATCH: f32 = 18.0;
@@ -81,11 +83,16 @@ pub struct State {
 
 /// The bank's colors.
 pub fn words(bytes: &[u8]) -> Vec<u16> {
-    bytes.as_chunks::<2>().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect()
+    bytes.as_chunks::<COLOR_BYTES>().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect()
 }
 
-fn bytes(words: &[u16]) -> Vec<u8> {
-    words.iter().flat_map(|word| word.to_le_bytes()).collect()
+/// Writes color `index` of `bytes` as `word`. Every other byte keeps its value, a trailing odd byte
+/// included. Returns false when the bank has no such color.
+fn put_color(bytes: &mut [u8], index: usize, word: u16) -> bool {
+    let start = index * COLOR_BYTES;
+    let Some(slot) = bytes.get_mut(start..start + COLOR_BYTES) else { return false };
+    slot.copy_from_slice(&word.to_le_bytes());
+    true
 }
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
@@ -175,15 +182,17 @@ pub fn picker(word: u16, index: usize, sliders: &Sliders, set: SetColor, cx: &mu
 /// Rewrites color `index` of the shown bank.
 fn set_color(editor: &mut Editor, index: usize, change: &dyn Fn(u16) -> u16) {
     let Some(entry) = editor.current() else { return };
-    let mut words = words(entry.payload());
-    let Some(word) = words.get_mut(index) else { return };
-    *word = change(*word);
-    editor.set_payload(bytes(&words));
+    let mut bytes = entry.payload().to_vec();
+    let Some(&word) = words(&bytes).get(index) else { return };
+    if put_color(&mut bytes, index, change(word)) {
+        editor.set_payload(bytes);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rebof3_emi::classify::Format;
 
     #[test]
     fn a_channel_change_keeps_the_other_channels() {
@@ -191,5 +200,48 @@ mod tests {
 
         assert_eq!(Channel::Green.of(word), 2);
         assert_eq!(Channel::Green.with(word, CHANNEL_MAX), 0x8000 | 3 << BLUE_SHIFT | CHANNEL_MAX << GREEN_SHIFT | 1);
+    }
+
+    #[test]
+    fn a_color_write_keeps_every_other_byte_and_a_trailing_odd_one() {
+        let mut bytes = vec![0x11, 0x22, 0x33, 0x44, 0x55];
+        assert!(put_color(&mut bytes, 1, 0xBEEF));
+        assert_eq!(bytes, [0x11, 0x22, 0xEF, 0xBE, 0x55]);
+        assert!(!put_color(&mut bytes, 2, 0), "the odd byte is not a color");
+        assert_eq!(words(&bytes), [0x2211, 0xBEEF]);
+    }
+
+    /// Every color of every retail palette bank takes an STP flip in its own two bytes and flips back to
+    /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    #[test]
+    fn every_retail_color_edit_rewrites_only_its_word() {
+        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let folder = std::env::temp_dir().join(format!("bof3-edit-palette-{}", std::process::id()));
+        let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
+
+        let (mut banks, mut failures) = (0, Vec::new());
+        for path in project.archives.clone() {
+            let archive = project.load(&path).expect("archive loads");
+            for index in (0..archive.entries().len()).filter(|&index| archive.formats[index] == Format::ClutBank) {
+                banks += 1;
+                let payload = archive.original(index);
+                let mut bytes = payload.to_vec();
+                for (color, word) in words(payload).into_iter().enumerate() {
+                    put_color(&mut bytes, color, word ^ STP_BIT);
+                    let changed = (0..bytes.len()).filter(|&at| bytes[at] != payload[at]).count();
+                    put_color(&mut bytes, color, word);
+                    if changed != 1 {
+                        failures.push(format!("{}#{index} color {color}: {changed} bytes changed", path.0));
+                    }
+                }
+                if bytes != payload {
+                    failures.push(format!("{}#{index}: the flips do not restore the bank", path.0));
+                }
+            }
+        }
+
+        let _ = std::fs::remove_dir_all(&folder);
+        eprintln!("palette: {} problems over {banks} banks", failures.len());
+        assert!(banks > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 }
