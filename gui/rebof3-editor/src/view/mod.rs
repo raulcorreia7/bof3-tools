@@ -7,6 +7,7 @@ mod decoded;
 mod hex;
 mod info;
 mod map;
+mod message;
 mod palette;
 mod sound;
 mod sprite;
