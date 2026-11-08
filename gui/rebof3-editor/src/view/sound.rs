@@ -5,12 +5,13 @@ use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use psx_formats::sep::Package;
 use psx_formats::vab::Bank;
 use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
+use rebof3_assets::sound::sequence_pcm;
 use rebof3_emi::classify::Format;
 use rebof3_emi::entry::vab_body_index;
 
 use super::Entry;
 use crate::app::Editor;
-use crate::audio::Player;
+use crate::audio::{Player, to_mono};
 use crate::fonts;
 use crate::theme::{RAISED, color};
 use crate::widgets::{GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, button, mono, muted, separator, strong};
@@ -19,6 +20,8 @@ use crate::widgets::{GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, button, mono, mute
 const COLUMN_WIDTH: f32 = 80.0;
 /// Most height the tone list takes before it scrolls, in pixels.
 const TONES_HEIGHT: f32 = 320.0;
+/// How much of a sequence the Play button renders, in seconds; a looping song never ends.
+const SEQUENCE_PREVIEW_SECONDS: f64 = 90.0;
 
 #[derive(Default)]
 pub struct State {
@@ -72,7 +75,7 @@ fn text(value: impl ToString) -> AnyElement {
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     if entry.format() == Format::SepPackage {
-        return sequences(entry, cx);
+        return sequences(editor, entry, cx);
     }
     let Some((header_index, body_index)) = vab_pair(entry) else {
         return muted("No matching VAB header and body in this archive.").into_any_element();
@@ -177,7 +180,17 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .into_any_element()
 }
 
-fn sequences(entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
+/// Renders the sequence with id `sequence` of the shown archive, edits included, and plays it.
+fn play_sequence(editor: &mut Editor, sequence: u16) -> Result<(), String> {
+    let entry = editor.current().ok_or("no entry")?;
+    let archive = entry.project.current_archive(entry.archive)?;
+    let path = entry.archive.path.0.clone();
+    let pcm = sequence_pcm(&path, &archive, u32::from(sequence), SEQUENCE_PREVIEW_SECONDS)
+        .map_err(|error| error.to_string())?;
+    editor.views.sound.player.play(to_mono(&pcm.samples, pcm.sample_rate, pcm.channels))
+}
+
+fn sequences(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     let payload = entry.payload().to_vec();
     let package = match Package::parse(&payload) {
         Ok(package) => package,
@@ -185,16 +198,35 @@ fn sequences(entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     };
     let title = format!("{}-{}", stem(entry), entry.index);
 
-    let mut list = div().flex().flex_col().child(strong(format!("{} sequences", package.sequences.len())));
+    let mut top =
+        div().flex().items_center().gap(px(GAP)).child(strong(format!("{} sequences", package.sequences.len())));
+    if editor.views.sound.player.is_playing() {
+        top = top.child(button("stop", "Stop", true).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.sound.player.stop();
+            cx.notify();
+        })));
+    }
+    let mut list = div().flex().flex_col().gap(px(GAP_SMALL)).child(top);
     for (index, sequence) in package.sequences.iter().enumerate() {
         let (payload, name) = (payload.clone(), format!("{title}-{index}.mid"));
         let midi = button(("midi", index), "MIDI…", true).on_click(cx.listener(move |editor, _, _, cx| {
             let bytes = sequence_midi(&payload, index).map_err(|error| error.to_string());
             editor.save_file(name.clone(), bytes, cx);
         }));
+        let id = sequence.seq_id;
+        let play = button(("play-sequence", index), "▶ Play", sequence.has_notes()).on_click(cx.listener(
+            move |editor, _, _, cx| {
+                if let Err(error) = play_sequence(editor, id) {
+                    editor.status = format!("Play: {error}");
+                }
+                cx.notify();
+            },
+        ));
         let cells = [
             text(format!("sequence {index}")),
+            text(format!("id {id}")),
             text(if sequence.has_notes() { "notes" } else { "silent" }),
+            play.into_any_element(),
             midi.into_any_element(),
         ];
         list = list.child(grid_row(cells, index % 2 == 1));
