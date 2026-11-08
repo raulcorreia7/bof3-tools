@@ -5,6 +5,7 @@
 mod decoded;
 mod hex;
 mod info;
+mod map;
 mod palette;
 mod sound;
 mod tables;
@@ -30,6 +31,7 @@ pub enum Tab {
     Text,
     Sound,
     Decoded,
+    Map,
 }
 
 impl Tab {
@@ -43,6 +45,7 @@ impl Tab {
             Tab::Text => "Text",
             Tab::Sound => "Sound",
             Tab::Decoded => "Decoded",
+            Tab::Map => "Map",
         }
     }
 }
@@ -62,6 +65,8 @@ pub enum Field {
     TableFilter,
     /// A name or number cell of a table.
     Cell { row: usize, column: usize },
+    /// A corner height of the map view's picked cell.
+    MapCorner(usize),
 }
 
 impl Field {
@@ -90,6 +95,7 @@ pub struct Views {
     pub text: text::State,
     pub sound: sound::State,
     pub decoded: decoded::State,
+    pub map: map::State,
 }
 
 impl Views {
@@ -155,6 +161,7 @@ pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
         Format::VramUpload => tabs.push(Tab::Texture),
         Format::ClutBank => tabs.push(Tab::Palette),
         Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
+        Format::AreaMapBundle => tabs.push(Tab::Map),
         _ => {}
     }
     if tables::has_tables(entry) {
@@ -194,6 +201,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Text => text::show(editor, &entry, cx),
         Tab::Sound => sound::show(editor, &entry, cx),
         Tab::Decoded => decoded::show(editor, &entry, cx),
+        Tab::Map => map::show(editor, &entry, cx),
     };
     div()
         .flex()
@@ -235,6 +243,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
             None
         }
         Field::Cell { row, column } => tables::cell_changed(editor, row, column, text),
+        Field::MapCorner(corner) => map::corner_changed(editor, corner, text),
     }
 }
 
