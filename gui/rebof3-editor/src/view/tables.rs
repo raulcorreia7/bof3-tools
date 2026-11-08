@@ -69,7 +69,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let sheet = &sheets[selected];
     let payload = entry.payload();
     let original = entry.original();
-    if payload.len() < sheet.end() {
+    if payload.len() < sheet.end(payload) {
         return muted(format!("The payload ends before the {} table.", sheet.name)).into_any_element();
     }
     let names = names(entry);
@@ -81,7 +81,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
     let needle = state.filter.to_lowercase();
     let mut grid = div().id("table").flex().flex_col().flex_1().min_h_0().overflow_scroll().child(header);
-    for row in 0..sheet.count {
+    for row in 0..sheet.rows(payload) {
         if !needle.is_empty()
             && !row_name(payload, sheet, row).is_some_and(|name| name.to_lowercase().contains(&needle))
         {
@@ -209,7 +209,7 @@ fn cell(
             }
             cell.into_any_element()
         }
-        Kind::U8 | Kind::U16 | Kind::U32 | Kind::Nibble(_) => number(editor, which, at, value, cx).into_any_element(),
+        Kind::U8 | Kind::U16 | Kind::U32 | Kind::Part { .. } => number(editor, which, at, value, cx).into_any_element(),
         Kind::ItemAt(_) | Kind::ItemOf(_) | Kind::Ability | Kind::Enemy => div()
             .flex()
             .items_center()
