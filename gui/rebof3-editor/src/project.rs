@@ -47,11 +47,15 @@ impl Loaded {
     }
 }
 
-/// One undoable change: the entry, and its edit before the change (`None` when it had none).
+/// One entry's part of an undo step: the entry, and its edit before the step (`None` when it had none).
 struct Change {
     key: Key,
     before: Option<Vec<u8>>,
 }
+
+/// One undoable step: every entry a gesture, a typed field or an import changed, in the order it first
+/// changed them.
+type Step = Vec<Change>;
 
 pub struct Project {
     pub disc: PathBuf,
@@ -59,8 +63,10 @@ pub struct Project {
     pub archives: Vec<ArchivePath>,
     edits: BTreeMap<Key, Vec<u8>>,
     saved: BTreeMap<Key, Vec<u8>>,
-    undo: Vec<Change>,
-    redo: Vec<Change>,
+    undo: Vec<Step>,
+    redo: Vec<Step>,
+    /// The step that collects the changes while a gesture lasts.
+    open: Option<Step>,
     cache: BTreeMap<ArchivePath, Arc<Loaded>>,
 }
 
@@ -88,6 +94,7 @@ impl Project {
             saved: BTreeMap::new(),
             undo: Vec::new(),
             redo: Vec::new(),
+            open: None,
             cache: BTreeMap::new(),
         };
         project.load_edits();
@@ -150,21 +157,58 @@ impl Project {
             return;
         }
         let before = self.replace(&key, next);
-        self.undo.push(Change { key, before });
-        self.redo.clear();
+        self.record(Change { key, before });
+    }
+
+    /// Sets the payloads of several entries of one archive as one undo step.
+    pub fn set_together(&mut self, loaded: &Loaded, payloads: Vec<(usize, Vec<u8>)>) {
+        let gesture = self.open.is_some();
+        if !gesture {
+            self.begin_step();
+        }
+        for (index, bytes) in payloads {
+            self.set(loaded, index, bytes);
+        }
+        if !gesture {
+            self.end_step();
+        }
     }
 
     /// Drops the edit of an entry, so it reads the disc's bytes again.
     pub fn revert(&mut self, key: &Key) {
         if self.edits.contains_key(key) {
             let before = self.replace(key, None);
-            self.undo.push(Change { key: key.clone(), before });
-            self.redo.clear();
+            self.record(Change { key: key.clone(), before });
+        }
+    }
+
+    /// Starts a step that collects every change until [`Project::end_step`], so one undo takes back a
+    /// whole drag or a whole typed field. A step still open ends first.
+    pub fn begin_step(&mut self) {
+        self.end_step();
+        self.open = Some(Step::new());
+    }
+
+    /// Ends the open step. A step that changed nothing leaves no undo step.
+    pub fn end_step(&mut self) {
+        if let Some(step) = self.open.take().filter(|step| !step.is_empty()) {
+            self.undo.push(step);
+        }
+    }
+
+    /// Adds a change to the open step, or makes it a step of its own. A step keeps the first state of
+    /// each entry it changed.
+    fn record(&mut self, change: Change) {
+        self.redo.clear();
+        match self.open.as_mut() {
+            Some(step) if step.iter().any(|earlier| earlier.key == change.key) => {}
+            Some(step) => step.push(change),
+            None => self.undo.push(vec![change]),
         }
     }
 
     pub fn can_undo(&self) -> bool {
-        !self.undo.is_empty()
+        !self.undo.is_empty() || self.open.as_ref().is_some_and(|step| !step.is_empty())
     }
 
     pub fn can_redo(&self) -> bool {
@@ -172,17 +216,34 @@ impl Project {
     }
 
     pub fn undo(&mut self) {
-        if let Some(change) = self.undo.pop() {
-            let before = self.replace(&change.key, change.before);
-            self.redo.push(Change { key: change.key, before });
+        self.end_step();
+        if let Some(step) = self.undo.pop() {
+            let back = self.apply(step);
+            self.redo.push(back);
         }
     }
 
     pub fn redo(&mut self) {
-        if let Some(change) = self.redo.pop() {
-            let before = self.replace(&change.key, change.before);
-            self.undo.push(Change { key: change.key, before });
+        self.end_step();
+        if let Some(step) = self.redo.pop() {
+            let back = self.apply(step);
+            self.undo.push(back);
         }
+    }
+
+    /// Puts each entry of `step` back to its recorded state, last change first. Returns the step that
+    /// undoes this one.
+    fn apply(&mut self, step: Step) -> Step {
+        let mut back: Step = step
+            .into_iter()
+            .rev()
+            .map(|change| {
+                let before = self.replace(&change.key, change.before);
+                Change { key: change.key, before }
+            })
+            .collect();
+        back.reverse();
+        back
     }
 
     fn replace(&mut self, key: &Key, next: Option<Vec<u8>>) -> Option<Vec<u8>> {
@@ -303,5 +364,94 @@ fn collect_archives(root: &Path, folder: &Path, archives: &mut Vec<ArchivePath>)
             let parts: Vec<_> = relative.components().map(|part| part.as_os_str().to_string_lossy()).collect();
             archives.push(ArchivePath(parts.join("/")));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rebof3_emi::pack::{Payload, pack_payloads};
+
+    /// The archive the tests edit, inside the synthetic disc.
+    const ARCHIVE: &str = "BIN/TEST.EMI";
+
+    /// A disc folder that holds one archive of two entries, and a project folder beside it. The folder is
+    /// removed when the value drops.
+    struct Fixture(PathBuf);
+
+    impl Fixture {
+        fn new(name: &str) -> Self {
+            let root = std::env::temp_dir().join(format!("bof3-edit-project-{name}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            let payloads =
+                [b"first".as_slice(), b"second".as_slice()].map(|bytes| Payload { bytes, file_type: 0, ram_ptr: 0 });
+            let archive = pack_payloads(0, &payloads).expect("the archive packs");
+            let file = root.join("disc").join(ARCHIVE);
+            fs::create_dir_all(file.parent().expect("a folder")).expect("the disc folder");
+            fs::write(&file, archive).expect("the archive file");
+            Self(root)
+        }
+
+        fn open(&self) -> (Project, Arc<Loaded>) {
+            let mut project = Project::open(&self.0.join("disc"), &self.0.join("project")).expect("project opens");
+            let loaded = project.load(&ArchivePath(ARCHIVE.into())).expect("archive loads");
+            (project, loaded)
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn two_entries_set_together_undo_as_one_step() {
+        let fixture = Fixture::new("together");
+        let (mut project, loaded) = fixture.open();
+
+        project.set_together(&loaded, vec![(0, b"FIRST".to_vec()), (1, b"SECOND".to_vec())]);
+        assert_eq!(project.payload(&loaded, 1), b"SECOND");
+
+        project.undo();
+        assert_eq!((project.payload(&loaded, 0), project.payload(&loaded, 1)), (&b"first"[..], &b"second"[..]));
+        assert!(!project.can_undo());
+
+        project.redo();
+        assert_eq!((project.payload(&loaded, 0), project.payload(&loaded, 1)), (&b"FIRST"[..], &b"SECOND"[..]));
+    }
+
+    #[test]
+    fn a_gesture_undoes_to_where_it_started() {
+        let fixture = Fixture::new("gesture");
+        let (mut project, loaded) = fixture.open();
+        project.set(&loaded, 0, b"one".to_vec());
+
+        project.begin_step();
+        for bytes in [b"two", b"tw3", b"t4o"] {
+            project.set(&loaded, 0, bytes.to_vec());
+        }
+        project.end_step();
+
+        project.undo();
+        assert_eq!(project.payload(&loaded, 0), b"one");
+        project.undo();
+        assert_eq!(project.payload(&loaded, 0), b"first");
+    }
+
+    #[test]
+    fn undo_ends_an_open_step_first() {
+        let fixture = Fixture::new("open-step");
+        let (mut project, loaded) = fixture.open();
+
+        project.begin_step();
+        project.set(&loaded, 1, b"changed".to_vec());
+        assert!(project.can_undo());
+        project.undo();
+        assert_eq!(project.payload(&loaded, 1), b"second");
+
+        project.begin_step();
+        project.end_step();
+        assert!(!project.can_undo(), "an empty step leaves nothing to undo");
     }
 }
