@@ -4,11 +4,11 @@ use gpui::{
     AnyElement, Context, Keystroke, ScrollStrategy, UniformListScrollHandle, div, prelude::*, px, uniform_list,
 };
 
-use super::{Entry, Field, editing};
-use crate::app::{Editor, Field as WindowField};
+use super::{Entry, Field, input};
+use crate::app::Editor;
 use crate::fonts;
 use crate::theme::{EDITED, MUTED, ON_SELECTION, SELECTION, color};
-use crate::widgets::{GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, field, mono, muted, strong};
+use crate::widgets::{GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, mono, muted, strong};
 
 /// Bytes shown on one row.
 const ROW_BYTES: usize = 16;
@@ -59,13 +59,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let state = &editor.views.hex;
     let cursor = state.cursor.min(length - 1);
 
-    let goto_text = state.goto.clone();
-    let goto = field("goto", &state.goto, "0x0", editing(editor, Field::Goto), Some(GOTO_WIDTH)).on_click(cx.listener(
-        move |editor, _, _, cx| {
-            editor.start_editing(WindowField::View(Field::Goto), goto_text.clone());
-            cx.notify();
-        },
-    ));
+    let goto = input(editor, "goto", Field::Goto, &state.goto, "0x0", Some(GOTO_WIDTH), cx);
     let header = div()
         .flex()
         .flex_none()
@@ -151,15 +145,9 @@ fn inspector(editor: &Editor, payload: &[u8], cursor: usize, cx: &mut Context<Ed
 
     for (row, &(label, width, signed)) in WIDTHS.iter().enumerate() {
         let Some(value) = read(payload, cursor, width, signed) else { continue };
-        let which = Field::Inspector(row);
-        let text = value.clone();
-        let input = field(("inspector", row), &value, "", editing(editor, which), Some(FIELD_WIDTH))
-            .font_family(fonts::mono())
-            .on_click(cx.listener(move |editor, _, _, cx| {
-                editor.start_editing(WindowField::View(which), text.clone());
-                cx.notify();
-            }));
-        column = column.child(div().flex().items_center().child(div().w(px(LABEL_WIDTH)).child(label)).child(input));
+        let value = input(editor, ("inspector", row), Field::Inspector(row), &value, "", Some(FIELD_WIDTH), cx)
+            .font_family(fonts::mono());
+        column = column.child(div().flex().items_center().child(div().w(px(LABEL_WIDTH)).child(label)).child(value));
     }
 
     if let Some(bytes) = payload.get(cursor..cursor + 4) {

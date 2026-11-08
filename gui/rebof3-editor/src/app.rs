@@ -175,6 +175,21 @@ impl Editor {
         }
     }
 
+    /// Rewrites the payload of entry `index` of `archive` with `rewrite`. A prompt names the entry before it
+    /// opens, so the change lands there even when the selection moved meanwhile.
+    pub fn rewrite_entry(
+        &mut self,
+        archive: &ArchivePath,
+        index: usize,
+        rewrite: impl FnOnce(&[u8]) -> Result<Vec<u8>, String>,
+    ) -> Result<(), String> {
+        let project = self.project.as_mut().ok_or("no project is open")?;
+        let loaded = project.load(archive)?;
+        let bytes = rewrite(project.payload(&loaded, index))?;
+        project.set(&loaded, index, bytes);
+        Ok(())
+    }
+
     pub fn is_entry_edited(&self) -> bool {
         let (Some(project), Some(archive), Some(index)) = (&self.project, &self.archive, self.entry) else {
             return false;
@@ -310,6 +325,35 @@ impl Editor {
             };
             let _ = this.update(cx, |editor, cx| {
                 editor.status = status;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Asks for a file and hands its bytes to `then`. The status line shows what `then` returns, or why the
+    /// file cannot be read.
+    pub fn open_file(
+        &mut self,
+        prompt: &'static str,
+        cx: &mut Context<Self>,
+        then: impl FnOnce(&mut Self, Vec<u8>) -> String + 'static,
+    ) {
+        let picked = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some(prompt.into()),
+        });
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(paths))) = picked.await else { return };
+            let Some(path) = paths.into_iter().next() else { return };
+            let read = std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()));
+            let _ = this.update(cx, |editor, cx| {
+                editor.status = match read {
+                    Ok(bytes) => then(editor, bytes),
+                    Err(error) => error,
+                };
                 cx.notify();
             });
         })
