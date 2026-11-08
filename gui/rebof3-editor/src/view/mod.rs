@@ -296,3 +296,100 @@ pub fn key(editor: &mut Editor, keystroke: &Keystroke) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestAppContext;
+    use rebof3_editor::fixture::{ARCHIVE, Disc, Entry as DiscEntry};
+    use rebof3_emi::classify::Format;
+
+    use super::*;
+    use crate::project::ArchivePath;
+    use crate::schema;
+
+    /// Entry types and load arguments that the classifier reads as each format but the reserve
+    /// (`rebof3_emi::classify`).
+    const PLACES: [(u16, u32); 20] = [
+        (3, 0x8000_0000), // VRAM texture upload
+        (0, 0x8003_3800), // CLUT bank
+        (6, 0),           // VAB header
+        (7, 0),           // VAB body
+        (10, 0),          // SEP sequence package
+        (1, 0),           // LZ77 sprite bank
+        (0, 0x8003_b800), // raw sprite bank
+        (0, 0x8001_0000), // area message bank
+        (0, 0x8003_2000), // area cell grid
+        (0, 0x800d_3800), // area script bank
+        (0, 0x800f_0800), // battle script bank
+        (0, 0x800e_3800), // area actor definitions
+        (0, 0x800e_4000), // area encounters
+        (0, 0x8010_4000), // area map bundle
+        (0, 0x8011_7000), // auxiliary module window
+        (0, 0x8001_a000), // shared resource table
+        (8, 0),           // cue table
+        (0, 0x800c_3800), // magic-effect script bank
+        (0, 0x8009_6800), // code image
+        (2, 0),           // unclassified
+    ];
+    /// The load argument of `ETC/GAME.EMI` entry 0, the code image that holds the game tables.
+    const GAME_CODE: u32 = 0x8019_5800;
+    /// A payload shorter than any header.
+    const SHORT: [u8; 3] = [0xFF, 0x01, 0x80];
+    /// The size of the noise payload, and the multiplier and increment of its linear congruential generator.
+    const NOISE_BYTES: usize = 4096;
+    const NOISE_MULTIPLIER: u32 = 1_103_515_245;
+    const NOISE_INCREMENT: u32 = 12_345;
+
+    fn noise() -> Vec<u8> {
+        let mut state = 1u32;
+        (0..NOISE_BYTES)
+            .map(|_| {
+                state = state.wrapping_mul(NOISE_MULTIPLIER).wrapping_add(NOISE_INCREMENT);
+                (state >> 16) as u8
+            })
+            .collect()
+    }
+
+    /// Shows every view of every format over an empty, a short and a noise payload, and draws the window
+    /// each time: a view reports a bad payload, and none panics. The game and party tables get their own
+    /// archives, since their sheets apply to one entry of one archive.
+    #[gpui::test]
+    fn every_view_survives_a_bad_payload(cx: &mut TestAppContext) {
+        let noise = noise();
+        for (name, payload) in [("empty", &[][..]), ("short", &SHORT[..]), ("noise", &noise[..])] {
+            let entries: Vec<DiscEntry<'_>> =
+                PLACES.iter().map(|&(file_type, ram_ptr)| DiscEntry { file_type, ram_ptr, bytes: payload }).collect();
+            let game = [DiscEntry { file_type: 0, ram_ptr: GAME_CODE, bytes: payload }];
+            let start: Vec<DiscEntry<'_>> = (0..=schema::START_PARTY_ENTRY)
+                .map(|_| DiscEntry { file_type: 0, ram_ptr: 0, bytes: payload })
+                .collect();
+            let archives = [(ARCHIVE, &entries[..]), (schema::GAME, &game[..]), (schema::START, &start[..])];
+            let disc = Disc::with_archives(&format!("bad-{name}"), &archives);
+            let (disc_folder, project_folder) = (disc.disc(), disc.project());
+            let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc_folder), Some(project_folder), cx));
+
+            for (archive, entries) in archives {
+                let formats = editor.update(cx, |editor, _| {
+                    editor.select_archive(&ArchivePath(archive.into()));
+                    editor.archive.as_ref().expect("the archive loads").formats.clone()
+                });
+                if name == "noise" && archive == ARCHIVE {
+                    for format in Format::ALL.iter().filter(|format| **format != Format::Reserve) {
+                        assert!(formats.contains(format), "{format:?} has no entry");
+                    }
+                }
+
+                for index in 0..entries.len() {
+                    let shown = editor.update(cx, |editor, _| {
+                        editor.select_entry(index);
+                        tabs(&editor.current().expect("an entry"))
+                    });
+                    for tab in shown {
+                        editor.update(cx, |editor, _| editor.tab = tab);
+                        cx.update(|window, cx| window.draw(cx).clear());
+                    }
+                }
+            }
+        }
+    }
+}
