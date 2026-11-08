@@ -233,6 +233,21 @@ impl Project {
         Ok(self.edits.len())
     }
 
+    /// The bytes of an archive as the project has it now: the disc's archive rebuilt with the archive's
+    /// edits, or the disc's bytes when it has none.
+    pub fn current_archive(&self, loaded: &Loaded) -> Result<Vec<u8>, String> {
+        let replace: Vec<(usize, &[u8])> = self
+            .edits
+            .iter()
+            .filter(|((archive, _), _)| *archive == loaded.path)
+            .map(|((_, index), bytes)| (*index, bytes.as_slice()))
+            .collect();
+        if replace.is_empty() {
+            return Ok(loaded.bytes.to_vec());
+        }
+        rebof3_emi::pack::rebuild(&loaded.bytes, &replace).map_err(|error| format!("{}: {error}", loaded.path.0))
+    }
+
     /// Rebuilds every edited archive into `disc/` in the project folder, and checks that each rebuilt
     /// archive reads back with the edited payloads and the disc's other payloads.
     pub fn export(&mut self) -> Result<Vec<PathBuf>, String> {

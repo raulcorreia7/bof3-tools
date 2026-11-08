@@ -11,6 +11,21 @@ pub const RATE: u32 = 44_100;
 /// The scale from a 16-bit sample to the -1.0..1.0 float range.
 const SAMPLE_SCALE: f32 = 32_768.0;
 
+/// Interleaved PCM at any rate and channel count as mono at [`RATE`]: the channels averaged, the rate
+/// changed by taking the nearest sample.
+pub fn to_mono(samples: &[i16], rate: u32, channels: u32) -> Vec<i16> {
+    let channels = channels.max(1) as usize;
+    let frames: Vec<i16> = samples
+        .chunks_exact(channels)
+        .map(|frame| (frame.iter().map(|&sample| i32::from(sample)).sum::<i32>() / channels as i32) as i16)
+        .collect();
+    if rate == RATE || rate == 0 {
+        return frames;
+    }
+    let length = (frames.len() as u64 * u64::from(RATE) / u64::from(rate)) as usize;
+    (0..length).map(|at| frames[(at as u64 * u64::from(rate) / u64::from(RATE)) as usize]).collect()
+}
+
 #[derive(Default)]
 pub struct Player {
     stream: Option<cpal::Stream>,
@@ -72,5 +87,20 @@ impl Player {
             .map_err(|error| error.to_string())?;
         stream.play().map_err(|error| error.to_string())?;
         Ok(stream)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stereo_averages_to_mono() {
+        assert_eq!(to_mono(&[100, 300, -50, 50], RATE, 2), [200, 0]);
+    }
+
+    #[test]
+    fn a_half_rate_clip_doubles_its_samples() {
+        assert_eq!(to_mono(&[1, 2, 3], RATE / 2, 1), [1, 1, 2, 2, 3, 3]);
     }
 }
