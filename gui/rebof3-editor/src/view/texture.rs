@@ -211,7 +211,13 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
 /// Paints the texture's pixels at `zoom` pixels per texel, one quad per run of equal pixels, only for
 /// the rows the window shows.
-fn paint_pixels(window: &mut gpui::Window, area: Bounds<Pixels>, pixels: &[[u8; 4]], width: usize, zoom: f32) {
+pub(super) fn paint_pixels(
+    window: &mut gpui::Window,
+    area: Bounds<Pixels>,
+    pixels: &[[u8; 4]],
+    width: usize,
+    zoom: f32,
+) {
     if width == 0 {
         return;
     }
