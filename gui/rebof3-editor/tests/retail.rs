@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use psx_formats::gfx::vram;
 use rebof3_assets::decode::texture_words;
 use rebof3_editor::project::{ArchivePath, Project};
+use rebof3_emi::area::map::MapBundle;
 use rebof3_emi::classify::Format;
 use rebof3_emi::text::codec::{self, Encoding};
 use rebof3_emi::text::discover::{self, Kind};
@@ -62,6 +63,7 @@ fn every_entry_round_trips_through_its_editor() {
 
     let mut textures = (0, Vec::new());
     let mut strings = (0, Vec::new());
+    let mut maps = (0, Vec::new());
     for path in project.archives.clone() {
         let loaded = project.load(&path).expect("archive loads");
         for index in 0..loaded.entries().len() {
@@ -76,6 +78,13 @@ fn every_entry_round_trips_through_its_editor() {
                     .is_some_and(|bytes| bytes == payload);
                 if !exact {
                     textures.1.push(format!("{}#{index}", path.0));
+                }
+            }
+
+            if loaded.formats[index] == Format::AreaMapBundle {
+                maps.0 += 1;
+                if MapBundle::decode(payload).map(|bundle| bundle.encode()).ok().as_deref() != Some(payload) {
+                    maps.1.push(format!("{}#{index}", path.0));
                 }
             }
 
@@ -100,6 +109,8 @@ fn every_entry_round_trips_through_its_editor() {
         strings.0,
         strings.1.iter().take(8).collect::<Vec<_>>()
     );
+    eprintln!("maps: {} of {} do not round-trip", maps.1.len(), maps.0);
+    assert!(maps.1.is_empty(), "maps: {:?}", maps.1.iter().take(8).collect::<Vec<_>>());
     assert!(textures.1.is_empty(), "textures: {:?}", textures.1.iter().take(8).collect::<Vec<_>>());
     let _ = std::fs::remove_dir_all(&folder);
 }

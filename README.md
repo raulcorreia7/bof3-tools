@@ -78,6 +78,7 @@ payloads.
 | Tables  | `ETC/GAME.EMI` entry 0        | spreadsheets of items, equipment, shops, abilities, level growth   |
 | Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes)              |
 | Sound   | VAB banks, sequence packages  | play samples; export WAVE, SoundFont and MIDI                      |
+| Map     | area map bundles              | the map from above, coloured by tile bank and height; edit a cell's corner heights |
 | Decoded | cue, scene, script, palette, LZ77 | the decoder's structured reading                              |
 
 Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); `Ctrl+S` saves, `Ctrl+E` exports. The editor
