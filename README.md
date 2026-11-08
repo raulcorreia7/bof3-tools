@@ -83,6 +83,8 @@ payloads.
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
 | Decoded | cue, scene, area and battle script, palette, LZ77 | the decoder's structured reading              |
 
+[docs/editor.md](docs/editor.md) lists what the editor offers for every entry format.
+
 Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); `Ctrl+S` saves, `Ctrl+E` exports. The editor
 uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font
 family to use another one.
