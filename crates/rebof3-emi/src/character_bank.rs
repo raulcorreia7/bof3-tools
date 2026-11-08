@@ -1,7 +1,7 @@
 //! Sprite banks: the palette layer of a character bank.
 //!
 //! A bank is a container of three sections (its first word is [`CONTAINER_HEAD`]: `BPLCHAR`, `PLCHAR` and
-//! `ETC/START.EMI` entry 8 at `0x8003B800`), or one section by itself (the section entries at `0x8003B80C` and its
+//! `ETC/START.EMI` entry 7 at `0x8003B800`), or one section by itself (the section entries at `0x8003B80C` and its
 //! siblings). A section's word at +4 is the offset of its palette table, relative to the section. The table is a
 //! count of palettes written as offsets: the first word is `4n` for `n` palettes, and palette `k` follows the offsets
 //! at `4n + 0x40k`. A palette holds [`COLOURS`] 16-bit colours.
