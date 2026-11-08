@@ -15,7 +15,7 @@ use std::thread;
 use bof3player::catalog::{Item, Kind as ItemKind};
 use bof3player::discover::{self, SourceKind};
 use bof3player::export::Tags;
-use bof3player::{DiscSource, Library, export};
+use bof3player::{DiscSource, Library, MemorySource, NoNaming, export};
 use psx_cd::ReadSeek;
 
 use crate::error::{Error, Result};
@@ -356,6 +356,39 @@ impl Sounds {
     fn catalog_item(&self, index: usize) -> Result<&Item> {
         self.library.catalog().items().get(index).ok_or_else(|| Error::Audio(format!("no sound item {index}")))
     }
+}
+
+/// Interleaved samples rendered per call while a sequence plays.
+const RENDER_CHUNK: usize = 4096;
+
+/// Renders the sequence whose id is `sequence` in one archive, as the game's sound driver plays it with
+/// the archive's own sound bank, for at most `seconds`. `path` is the archive's disc path (`BIN/...`)
+/// and `archive` its bytes, so an edited archive plays as edited.
+pub fn sequence_pcm(path: &str, archive: &[u8], sequence: u32, seconds: f64) -> Result<Pcm> {
+    let mut source = MemorySource::new();
+    source.add(path, archive);
+    let library = Library::open_with(source, &NoNaming).map_err(audio)?;
+    let item = library
+        .catalog()
+        .items()
+        .iter()
+        .find(|item| item.kind == ItemKind::Music && item.path == path && item.index == sequence)
+        .ok_or_else(|| Error::Audio(format!("{path} has no playable sequence {sequence}")))?;
+    let mut player = library.player(item).map_err(audio)?;
+
+    let (sample_rate, channels) = (player.sample_rate(), player.channels());
+    let limit = (seconds.max(0.0) * f64::from(sample_rate)) as usize * channels as usize;
+    let mut samples = Vec::new();
+    let mut chunk = vec![0; RENDER_CHUNK];
+    while samples.len() < limit {
+        let frames = player.render_i16(&mut chunk).map_err(audio)?;
+        if frames == 0 {
+            break;
+        }
+        samples.extend_from_slice(&chunk[..frames * channels as usize]);
+    }
+    samples.truncate(limit);
+    Ok(Pcm { sample_rate, channels, samples })
 }
 
 fn audio(error: bof3player::Error) -> Error {
