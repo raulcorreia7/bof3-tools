@@ -2,5 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+#[doc(hidden)]
+pub mod fixture;
 pub mod project;
 pub mod schema;

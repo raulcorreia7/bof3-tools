@@ -6,7 +6,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, UniformListScrollHandle, Window};
+use gpui::{
+    Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, PromptLevel, UniformListScrollHandle, Window,
+};
 
 use crate::edit::{LineEdit, Outcome};
 use crate::project::{ArchivePath, Loaded, Project};
@@ -17,6 +19,10 @@ use crate::view::{self, Entry, Tab, Views};
 const PROJECT_FOLDER: &str = "bof3-project";
 /// How often the window checks for a change it did not cause, such as a sound that ends.
 const TICK: Duration = Duration::from_millis(100);
+/// The buttons of the prompt about unsaved edits, and the positions of the two that go on.
+const UNSAVED_ANSWERS: [&str; 3] = ["Save", "Discard", "Cancel"];
+const SAVE_ANSWER: usize = 0;
+const DISCARD_ANSWER: usize = 1;
 
 /// A text field of the window.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -123,6 +129,7 @@ impl Editor {
     }
 
     pub fn close(&mut self) {
+        self.stop_editing();
         self.project = None;
         self.archive = None;
         self.entry = None;
@@ -215,16 +222,87 @@ impl Editor {
         }
     }
 
+    /// Takes back the last step. An open field closes first, so its text cannot write the entry again.
     pub fn undo(&mut self) {
+        self.stop_editing();
         if let Some(project) = self.project.as_mut() {
             project.undo();
         }
     }
 
     pub fn redo(&mut self) {
+        self.stop_editing();
         if let Some(project) = self.project.as_mut() {
             project.redo();
         }
+    }
+
+    /// Starts an undo step that collects every change of the gesture or field that begins now.
+    pub fn begin_step(&mut self) {
+        if let Some(project) = self.project.as_mut() {
+            project.begin_step();
+        }
+    }
+
+    /// Ends the open undo step.
+    pub fn end_step(&mut self) {
+        if let Some(project) = self.project.as_mut() {
+            project.end_step();
+        }
+    }
+
+    /// Whether the project holds edits the project folder does not.
+    pub fn has_unsaved_edits(&self) -> bool {
+        self.project.as_ref().is_some_and(Project::is_dirty)
+    }
+
+    /// Runs `then` when no edit would be lost: at once when every edit is saved, otherwise after the user
+    /// saves or discards them. Cancel, or a save that fails, leaves everything as it was.
+    pub fn when_saved(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        then: fn(&mut Self, &mut Window, &mut Context<Self>),
+    ) {
+        if !self.has_unsaved_edits() {
+            then(self, window, cx);
+            return;
+        }
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            "Save the edits before closing?",
+            Some("Discard drops every edit made since the last save."),
+            &UNSAVED_ANSWERS,
+            cx,
+        );
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(answer) = answer.await else { return };
+            let _ = this.update_in(cx, |editor, window, cx| {
+                match answer {
+                    SAVE_ANSWER => {
+                        editor.save();
+                        if editor.has_unsaved_edits() {
+                            return;
+                        }
+                    }
+                    DISCARD_ANSWER => {}
+                    _ => return,
+                }
+                then(editor, window, cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Whether the window may close now. With unsaved edits it asks first, and closes itself after a save
+    /// or a discard.
+    pub fn should_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if !self.has_unsaved_edits() {
+            return true;
+        }
+        self.when_saved(window, cx, |_, window, _| window.remove_window());
+        false
     }
 
     pub fn save(&mut self) {
@@ -281,8 +359,17 @@ impl Editor {
 
     /// Gives `field` the keyboard, starting from `text`.
     pub fn start_editing(&mut self, field: Field, text: String) {
+        self.stop_editing();
         self.menu = None;
         self.editing = Some((field, LineEdit::new(text)));
+        self.begin_step();
+    }
+
+    /// Takes the keyboard from the open field, which ends its undo step.
+    pub fn stop_editing(&mut self) {
+        if self.editing.take().is_some() {
+            self.end_step();
+        }
     }
 
     /// Asks for a folder and puts it in `field`. The disc folder also names a project folder next
@@ -415,10 +502,10 @@ impl Editor {
             }
             Outcome::Submit => {
                 let text = edit.text.clone();
-                self.editing = None;
+                self.stop_editing();
                 self.field_submitted(field, &text);
             }
-            Outcome::Cancel => self.editing = None,
+            Outcome::Cancel => self.stop_editing(),
         }
         true
     }
@@ -453,5 +540,77 @@ impl Editor {
             return false;
         }
         view::key(self, keystroke)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::{Entity, TestAppContext, VisualTestContext};
+    use rebof3_editor::fixture::{ARCHIVE, Disc, Entry as DiscEntry};
+
+    use super::*;
+
+    /// The bytes of the one entry the tests edit.
+    const STORED: [u8; 4] = [1, 2, 3, 4];
+
+    /// An editor on a one-entry disc, with that entry shown and its hex inspector's `u8` field open.
+    fn editing<'a>(name: &str, cx: &'a mut TestAppContext) -> (Disc, Entity<Editor>, &'a mut VisualTestContext) {
+        let disc = Disc::new(name, &[DiscEntry { file_type: 0, ram_ptr: 0, bytes: &STORED }]);
+        let (disc_folder, project_folder) = (disc.disc(), disc.project());
+        let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc_folder), Some(project_folder), cx));
+        editor.update(cx, |editor, _| {
+            editor.select_archive(&ArchivePath(ARCHIVE.into()));
+            editor.select_entry(0);
+            editor.start_editing(Field::View(view::Field::Inspector(0)), String::new());
+        });
+        (disc, editor, cx)
+    }
+
+    fn type_keys(editor: &Entity<Editor>, keys: &str, cx: &mut VisualTestContext) {
+        editor.update(cx, |editor, cx| {
+            for key in keys.split(' ') {
+                let mut keystroke = Keystroke::parse(key).expect("a key");
+                if key.chars().count() == 1 {
+                    keystroke.key_char = Some(key.into());
+                }
+                editor.edit_key(&keystroke, cx);
+            }
+        });
+    }
+
+    fn first_byte(editor: &Entity<Editor>, cx: &mut VisualTestContext) -> u8 {
+        editor.read_with(cx, |editor, _| editor.current().expect("an entry").payload()[0])
+    }
+
+    #[gpui::test]
+    fn a_typed_field_undoes_as_one_step(cx: &mut TestAppContext) {
+        let (_disc, editor, cx) = editing("field-step", cx);
+        type_keys(&editor, "1 2 7 enter", cx);
+        assert_eq!(first_byte(&editor, cx), 127);
+
+        editor.update(cx, |editor, _| editor.undo());
+        assert_eq!(first_byte(&editor, cx), STORED[0]);
+        assert!(editor.read_with(cx, |editor, _| !editor.project.as_ref().expect("a project").can_undo()));
+    }
+
+    #[gpui::test]
+    fn undo_closes_an_open_field(cx: &mut TestAppContext) {
+        let (_disc, editor, cx) = editing("undo-closes", cx);
+        type_keys(&editor, "9", cx);
+
+        editor.update(cx, |editor, _| editor.undo());
+        assert!(editor.read_with(cx, |editor, _| editor.editing.is_none()));
+
+        type_keys(&editor, "8", cx);
+        assert_eq!(first_byte(&editor, cx), STORED[0], "the closed field writes nothing");
+    }
+
+    #[gpui::test]
+    fn unsaved_edits_keep_the_window_open(cx: &mut TestAppContext) {
+        let (_disc, editor, cx) = editing("close", cx);
+        assert!(editor.update_in(cx, |editor, window, cx| editor.should_close(window, cx)));
+
+        type_keys(&editor, "5 enter", cx);
+        assert!(!editor.update_in(cx, |editor, window, cx| editor.should_close(window, cx)));
     }
 }

@@ -47,12 +47,17 @@ impl Render for Editor {
         div()
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::on_key))
-            .on_mouse_down(
-                gpui::MouseButton::Left,
-                cx.listener(|editor, _, _, _| {
-                    editor.editing = None;
-                }),
-            )
+            // A press closes the open field and starts the undo step of what the press does; the release
+            // ends it, so one undo takes back a whole drag.
+            .capture_any_mouse_down(cx.listener(|editor, _, _, _| {
+                editor.stop_editing();
+                editor.begin_step();
+            }))
+            .capture_any_mouse_up(cx.listener(|editor, _, _, _| {
+                if editor.editing.is_none() {
+                    editor.end_step();
+                }
+            }))
             .size_full()
             .flex()
             .flex_col()
@@ -78,7 +83,7 @@ impl Editor {
                 action("save", "Save edits", "Ctrl+S", open, cx, Editor::save),
                 action("export", "Export rebuilt archives", "Ctrl+E", open, cx, Editor::export),
                 separator(false).my(px(GAP_SMALL)).into_any_element(),
-                action("close", "Close project", "", true, cx, Editor::close),
+                close_action(cx),
             ]
         });
         let edit_menu = self.menu(Menu::Edit, "Edit", cx, |cx| {
@@ -345,6 +350,17 @@ fn side_panel(width: f32) -> Div {
         .bg(color(PANEL))
         .border_r_1()
         .border_color(color(BORDER))
+}
+
+/// The menu line that closes the project, after asking about unsaved edits.
+fn close_action(cx: &mut Context<Editor>) -> AnyElement {
+    menu_item("close", "Close project", "", true)
+        .on_click(cx.listener(|editor, _, window, cx| {
+            editor.menu = None;
+            editor.when_saved(window, cx, |editor, _, _| editor.close());
+            cx.notify();
+        }))
+        .into_any_element()
 }
 
 /// A menu line that runs `run` and closes the menu.

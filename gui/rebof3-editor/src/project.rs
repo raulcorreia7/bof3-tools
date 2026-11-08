@@ -370,45 +370,21 @@ fn collect_archives(root: &Path, folder: &Path, archives: &mut Vec<ArchivePath>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::pack::{Payload, pack_payloads};
+    use crate::fixture::{ARCHIVE, Disc, Entry};
 
-    /// The archive the tests edit, inside the synthetic disc.
-    const ARCHIVE: &str = "BIN/TEST.EMI";
-
-    /// A disc folder that holds one archive of two entries, and a project folder beside it. The folder is
-    /// removed when the value drops.
-    struct Fixture(PathBuf);
-
-    impl Fixture {
-        fn new(name: &str) -> Self {
-            let root = std::env::temp_dir().join(format!("bof3-edit-project-{name}-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&root);
-            let payloads =
-                [b"first".as_slice(), b"second".as_slice()].map(|bytes| Payload { bytes, file_type: 0, ram_ptr: 0 });
-            let archive = pack_payloads(0, &payloads).expect("the archive packs");
-            let file = root.join("disc").join(ARCHIVE);
-            fs::create_dir_all(file.parent().expect("a folder")).expect("the disc folder");
-            fs::write(&file, archive).expect("the archive file");
-            Self(root)
-        }
-
-        fn open(&self) -> (Project, Arc<Loaded>) {
-            let mut project = Project::open(&self.0.join("disc"), &self.0.join("project")).expect("project opens");
-            let loaded = project.load(&ArchivePath(ARCHIVE.into())).expect("archive loads");
-            (project, loaded)
-        }
-    }
-
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
+    /// A disc of two type-0 entries, opened as a project with its archive loaded.
+    fn open(name: &str) -> (Disc, Project, Arc<Loaded>) {
+        let entries =
+            [b"first".as_slice(), b"second".as_slice()].map(|bytes| Entry { file_type: 0, ram_ptr: 0, bytes });
+        let disc = Disc::new(name, &entries);
+        let mut project = Project::open(&disc.disc(), &disc.project()).expect("project opens");
+        let loaded = project.load(&ArchivePath(ARCHIVE.into())).expect("archive loads");
+        (disc, project, loaded)
     }
 
     #[test]
     fn two_entries_set_together_undo_as_one_step() {
-        let fixture = Fixture::new("together");
-        let (mut project, loaded) = fixture.open();
+        let (_disc, mut project, loaded) = open("together");
 
         project.set_together(&loaded, vec![(0, b"FIRST".to_vec()), (1, b"SECOND".to_vec())]);
         assert_eq!(project.payload(&loaded, 1), b"SECOND");
@@ -423,8 +399,7 @@ mod tests {
 
     #[test]
     fn a_gesture_undoes_to_where_it_started() {
-        let fixture = Fixture::new("gesture");
-        let (mut project, loaded) = fixture.open();
+        let (_disc, mut project, loaded) = open("gesture");
         project.set(&loaded, 0, b"one".to_vec());
 
         project.begin_step();
@@ -441,8 +416,7 @@ mod tests {
 
     #[test]
     fn undo_ends_an_open_step_first() {
-        let fixture = Fixture::new("open-step");
-        let (mut project, loaded) = fixture.open();
+        let (_disc, mut project, loaded) = open("open-step");
 
         project.begin_step();
         project.set(&loaded, 1, b"changed".to_vec());

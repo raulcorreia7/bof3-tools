@@ -42,8 +42,8 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 
 | Feature | State | Gap |
 | ------- | ----- | --- |
-| Undo and redo | every view, through the project | a drag or a typed field is one step per change, not per gesture |
-| Unsaved edits | the status line says `unsaved` | closing the project or the window drops them without asking |
+| Undo and redo | every view, through the project; a drag, a typed field or an import is one step, and undo closes an open field | none |
+| Unsaved edits | the status line says `unsaved`; closing the project or the window asks to save or discard them | none |
 | Malformed entries | each view reports a decoder error | needs a test that feeds every view's reader a bad payload |
 
 Not EMI entries, so out of scope: XA audio, STR video and CD-DA tracks. The `bof3` command line
