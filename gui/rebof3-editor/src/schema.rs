@@ -26,8 +26,11 @@ pub enum Field {
     U8,
     U16,
     U32,
-    /// The high (`true`) or low nibble of a byte.
-    Nibble(bool),
+    /// `bits` bits of a byte, from bit `shift` up.
+    Part {
+        shift: u8,
+        bits: u8,
+    },
     /// A byte of flag bits, bit 0 first.
     Bits(&'static [&'static str]),
     /// A byte that picks one of a few values.
@@ -52,6 +55,10 @@ pub struct Column {
 const fn col(name: &'static str, offset: usize, field: Field) -> Column {
     Column { name, offset, field }
 }
+
+/// The high and the low nibble of a byte.
+const HIGH_NIBBLE: Field = Field::Part { shift: 4, bits: 4 };
+const LOW_NIBBLE: Field = Field::Part { shift: 0, bits: 4 };
 
 /// `ItemFlags`.
 const ITEM_FLAGS: &[&str] = &[
@@ -133,12 +140,22 @@ pub enum Place {
     Format(Format),
 }
 
+/// How many records a sheet holds.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Count {
+    Fixed(usize),
+    /// As many whole records as the payload holds after the first.
+    Payload,
+    /// The `u32` at this payload offset.
+    Word(usize),
+}
+
 /// A table of fixed-size records: where it lives, its first record's payload offset, and its columns.
 pub struct Sheet {
     pub name: &'static str,
     pub place: Place,
     pub start: usize,
-    pub count: usize,
+    pub count: Count,
     pub record: usize,
     pub columns: Vec<Column>,
 }
@@ -150,9 +167,20 @@ impl Sheet {
         start..start + self.record
     }
 
-    /// The payload offset just past the last record.
-    pub fn end(&self) -> usize {
-        self.start + self.count * self.record
+    /// The records the sheet holds in `payload`.
+    pub fn rows(&self, payload: &[u8]) -> usize {
+        match self.count {
+            Count::Fixed(count) => count,
+            Count::Payload => payload.len().saturating_sub(self.start) / self.record,
+            Count::Word(at) => payload
+                .get(at..at + 4)
+                .map_or(0, |word| u32::from_le_bytes(word.try_into().expect("four bytes")) as usize),
+        }
+    }
+
+    /// The payload offset just past the last record in `payload`.
+    pub fn end(&self, payload: &[u8]) -> usize {
+        self.start + self.rows(payload) * self.record
     }
 
     /// Whether the sheet's records live in entry `entry` of `archive`, whose format is `format`.
@@ -169,7 +197,7 @@ fn game(table: Table, columns: Vec<Column>) -> Sheet {
         name: table.name,
         place: Place::Entry { archive: GAME, entry: 0 },
         start: table.archive_offset - tables::PAYLOAD_START,
-        count: table.count,
+        count: Count::Fixed(table.count),
         record: table.record,
         columns,
     }
@@ -256,10 +284,10 @@ pub fn sheets() -> Vec<Sheet> {
                 col("exp", 0x00, U16),
                 col("hp", 0x02, U8),
                 col("ap", 0x03, U8),
-                col("power", 0x04, Nibble(true)),
-                col("defense", 0x04, Nibble(false)),
-                col("agility", 0x05, Nibble(true)),
-                col("intellect", 0x05, Nibble(false)),
+                col("power", 0x04, HIGH_NIBBLE),
+                col("defense", 0x04, LOW_NIBBLE),
+                col("agility", 0x05, HIGH_NIBBLE),
+                col("intellect", 0x05, LOW_NIBBLE),
                 col("ability", 0x06, Ability),
                 col("extra ability", 0x07, Ability),
             ],
@@ -267,6 +295,9 @@ pub fn sheets() -> Vec<Sheet> {
         party_sheet(),
         encounter_sheet(),
         enemy_sheet(),
+        enemy_ai_sheet(),
+        actor_def_sheet(),
+        cue_sheet(),
     ]
 }
 
@@ -333,7 +364,7 @@ fn party_sheet() -> Sheet {
         name: "party",
         place: Place::Entry { archive: START, entry: START_PARTY_ENTRY },
         start: PARTY_START,
-        count: rebof3_emi::characters::CHARACTERS,
+        count: Count::Fixed(rebof3_emi::characters::CHARACTERS),
         record: rebof3_emi::characters::RECORD_BYTES,
         columns,
     }
@@ -361,7 +392,7 @@ fn encounter_sheet() -> Sheet {
         name: "encounters",
         place: Place::Format(Format::AreaEncounterTable),
         start: 0,
-        count: ENCOUNTERS,
+        count: Count::Fixed(ENCOUNTERS),
         record: ENCOUNTER_BYTES,
         columns,
     }
@@ -416,9 +447,100 @@ fn enemy_sheet() -> Sheet {
         name: "enemies",
         place: Place::Format(Format::AreaEncounterTable),
         start: ENEMY_BASE,
-        count: ENEMIES,
+        count: Count::Fixed(ENEMIES),
         record: ENEMY_BYTES,
         columns,
+    }
+}
+
+/// The record offset of an enemy's four `EnemyAIBlock`s, and the bytes of one.
+const ENEMY_AI: usize = 0x34;
+const AI_BLOCK_BYTES: usize = 0x10;
+
+/// The columns of `EnemyAIBlock` number `$block`: a condition, seven parameters and eight skills.
+macro_rules! ai_block {
+    ($block:literal) => {{
+        let at = ENEMY_AI + ($block - 1) * AI_BLOCK_BYTES;
+        [
+            col(concat!("AI ", $block, " condition"), at, Field::U8),
+            col(concat!("AI ", $block, " parameter 1"), at + 1, Field::U8),
+            col(concat!("AI ", $block, " parameter 2"), at + 2, Field::U8),
+            col(concat!("AI ", $block, " parameter 3"), at + 3, Field::U8),
+            col(concat!("AI ", $block, " parameter 4"), at + 4, Field::U8),
+            col(concat!("AI ", $block, " parameter 5"), at + 5, Field::U8),
+            col(concat!("AI ", $block, " parameter 6"), at + 6, Field::U8),
+            col(concat!("AI ", $block, " parameter 7"), at + 7, Field::U8),
+            col(concat!("AI ", $block, " skill 1"), at + 8, Field::Ability),
+            col(concat!("AI ", $block, " skill 2"), at + 9, Field::Ability),
+            col(concat!("AI ", $block, " skill 3"), at + 10, Field::Ability),
+            col(concat!("AI ", $block, " skill 4"), at + 11, Field::Ability),
+            col(concat!("AI ", $block, " skill 5"), at + 12, Field::Ability),
+            col(concat!("AI ", $block, " skill 6"), at + 13, Field::Ability),
+            col(concat!("AI ", $block, " skill 7"), at + 14, Field::Ability),
+            col(concat!("AI ", $block, " skill 8"), at + 15, Field::Ability),
+        ]
+    }};
+}
+
+/// The four `EnemyAIBlock`s of each enemy record. A skill byte of 99 marks an unused block.
+fn enemy_ai_sheet() -> Sheet {
+    let mut columns = vec![col("name", 0x00, Field::Name(encounter::NAME_BYTES))];
+    columns.extend(ai_block!(1));
+    columns.extend(ai_block!(2));
+    columns.extend(ai_block!(3));
+    columns.extend(ai_block!(4));
+    Sheet {
+        name: "enemy AI",
+        place: Place::Format(Format::AreaEncounterTable),
+        start: ENEMY_BASE,
+        count: Count::Fixed(ENEMIES),
+        record: ENEMY_BYTES,
+        columns,
+    }
+}
+
+/// `SpriteTextureMode`, the texture mode of an actor definition.
+const SPRITE_TEXTURE_MODES: &[(u8, &str)] = &[(0, "0"), (1, "1"), (2, "2"), (3, "3"), (4, "4"), (9, "9"), (10, "10")];
+
+/// `AreaActorDefs` (`include/world/area.h`): a `u32` count, then eight-byte `AreaActorDef` records.
+fn actor_def_sheet() -> Sheet {
+    use Field::*;
+    Sheet {
+        name: "actor definitions",
+        place: Place::Format(Format::AreaActorDefsTable),
+        start: rebof3_emi::scene::COUNT_BYTES,
+        count: Count::Word(0),
+        record: rebof3_emi::scene::RECORD_BYTES,
+        columns: vec![
+            col("id", 0, U16),
+            col("clut select", 2, U16),
+            col("texture page", 4, U8),
+            col("texture v", 5, U8),
+            col("texture mode", 6, Choice(SPRITE_TEXTURE_MODES)),
+            col("script section", 7, U8),
+        ],
+    }
+}
+
+/// A type-8 cue record (`EMICue`, `include/audio/cue.h`): the SPU voice, VAB program and tone of one
+/// sound effect, packed in four bytes.
+fn cue_sheet() -> Sheet {
+    use Field::*;
+    Sheet {
+        name: "cues",
+        place: Place::Format(Format::CueTable),
+        start: 0,
+        count: Count::Payload,
+        record: rebof3_emi::cue::RECORD_BYTES,
+        columns: vec![
+            col("alias bank", 0, Part { shift: 0, bits: 3 }),
+            col("program", 1, Part { shift: 0, bits: 7 }),
+            col("cue volume", 1, Part { shift: 7, bits: 1 }),
+            col("group", 2, Part { shift: 0, bits: 4 }),
+            col("tone", 2, Part { shift: 4, bits: 4 }),
+            col("voice", 3, Part { shift: 0, bits: 5 }),
+            col("layers", 3, Part { shift: 5, bits: 2 }),
+        ],
     }
 }
 
@@ -498,8 +620,7 @@ pub fn read(record: &[u8], column: &Column) -> u32 {
     match column.field {
         Field::U16 => u32::from(u16::from_le_bytes([record[at], record[at + 1]])),
         Field::U32 => u32::from_le_bytes([record[at], record[at + 1], record[at + 2], record[at + 3]]),
-        Field::Nibble(true) => u32::from(record[at] >> 4),
-        Field::Nibble(false) => u32::from(record[at] & 0x0F),
+        Field::Part { shift, bits } => u32::from(record[at] >> shift) & mask(bits),
         Field::Name(_) => 0,
         Field::U8
         | Field::Bits(_)
@@ -518,9 +639,9 @@ pub fn write(record: &mut [u8], column: &Column, value: u32) {
     match column.field {
         Field::U16 => record[at..at + 2].copy_from_slice(&(value as u16).to_le_bytes()),
         Field::U32 => record[at..at + 4].copy_from_slice(&value.to_le_bytes()),
-        Field::Nibble(high) => {
-            let nibble = value as u8;
-            record[at] = if high { (record[at] & 0x0F) | (nibble << 4) } else { (record[at] & 0xF0) | nibble };
+        Field::Part { shift, bits } => {
+            let mask = (mask(bits) as u8) << shift;
+            record[at] = (record[at] & !mask) | ((value as u8) << shift & mask);
         }
         Field::Name(_) => {}
         Field::U8
@@ -533,12 +654,17 @@ pub fn write(record: &mut [u8], column: &Column, value: u32) {
     }
 }
 
+/// The largest value `bits` bits hold.
+fn mask(bits: u8) -> u32 {
+    (1 << bits) - 1
+}
+
 /// The maximum value of a numeric column.
 pub fn max(column: &Column) -> u32 {
     match column.field {
         Field::U16 => 0xFFFF,
         Field::U32 => u32::MAX,
-        Field::Nibble(_) => 0x0F,
+        Field::Part { bits, .. } => mask(bits),
         _ => 0xFF,
     }
 }
@@ -612,9 +738,32 @@ mod tests {
     }
 
     #[test]
+    fn a_part_write_keeps_the_other_bits_of_its_byte() {
+        let program = col("program", 0, Field::Part { shift: 0, bits: 7 });
+        let volume = col("cue volume", 0, Field::Part { shift: 7, bits: 1 });
+        let mut record = [0x85];
+        assert_eq!((read(&record, &program), read(&record, &volume)), (5, 1));
+        write(&mut record, &program, 0x7F);
+        assert_eq!(record, [0xFF]);
+        write(&mut record, &volume, 0);
+        assert_eq!(record, [0x7F]);
+        assert_eq!(max(&program), 0x7F);
+    }
+
+    #[test]
+    fn a_counted_sheet_reads_its_count_word() {
+        let sheet = actor_def_sheet();
+        let mut payload = 2u32.to_le_bytes().to_vec();
+        payload.extend([0; 16]);
+        assert_eq!(sheet.rows(&payload), 2);
+        assert_eq!(sheet.end(&payload), payload.len());
+        assert_eq!(cue_sheet().rows(&[0; 10]), 2, "a partial record is not a row");
+    }
+
+    #[test]
     fn a_nibble_write_keeps_the_other_nibble() {
-        let high = col("power", 0, Field::Nibble(true));
-        let low = col("defense", 0, Field::Nibble(false));
+        let high = col("power", 0, HIGH_NIBBLE);
+        let low = col("defense", 0, LOW_NIBBLE);
         let mut record = [0xA5];
         write(&mut record, &high, 0x3);
         assert_eq!(record, [0x35]);
@@ -625,7 +774,7 @@ mod tests {
     #[test]
     fn encounter_sheets_apply_to_every_encounter_block_and_game_sheets_to_one_entry() {
         let area = sheets_for("BIN/WORLD00/AREA001.EMI", 3, Format::AreaEncounterTable);
-        assert_eq!(area.iter().map(|sheet| sheet.name).collect::<Vec<_>>(), ["encounters", "enemies"]);
+        assert_eq!(area.iter().map(|sheet| sheet.name).collect::<Vec<_>>(), ["encounters", "enemies", "enemy AI"]);
         assert_eq!(sheets_for(GAME, 0, Format::CodeImage).len(), 8);
         assert!(sheets_for(GAME, 1, Format::CodeImage).is_empty());
         assert_eq!(sheets_for(START, START_PARTY_ENTRY, Format::Unclassified).len(), 1);
@@ -634,8 +783,8 @@ mod tests {
     #[test]
     fn the_enemy_sheet_ends_at_the_block_end() {
         let enemies = enemy_sheet();
-        assert_eq!(enemies.end(), encounter::BLOCK_BYTES);
-        assert_eq!(encounter_sheet().end(), ENEMY_BASE);
+        assert_eq!(enemies.end(&[]), encounter::BLOCK_BYTES);
+        assert_eq!(encounter_sheet().end(&[]), ENEMY_BASE);
     }
 
     /// A game payload long enough for every table, with one weapon and one ability named.
