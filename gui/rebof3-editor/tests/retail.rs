@@ -130,12 +130,12 @@ fn every_sheet_fits_its_entries_and_rewrites_their_bytes() {
             let payload = loaded.original(index);
             for sheet in schema::sheets_for(&path.0, index, loaded.formats[index]) {
                 sheets += 1;
-                if payload.len() < sheet.end() {
+                if payload.len() < sheet.end(payload) {
                     problems.push(format!("{}#{index} {}: ends at {:#x}", path.0, sheet.name, payload.len()));
                     continue;
                 }
                 let mut copy = payload.to_vec();
-                for row in 0..sheet.count {
+                for row in 0..sheet.rows(payload) {
                     let record = &mut copy[sheet.range(row)];
                     for column in &sheet.columns {
                         if let Field::Name(_) = column.field {
