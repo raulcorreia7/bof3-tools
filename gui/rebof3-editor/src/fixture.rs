@@ -18,25 +18,31 @@ pub struct Entry<'a> {
     pub bytes: &'a [u8],
 }
 
-/// A disc folder with [`ARCHIVE`] and an empty project folder beside it, both removed when the value
-/// drops.
+/// A disc folder of archives and an empty project folder beside it, both removed when the value drops.
 pub struct Disc(PathBuf);
 
 impl Disc {
-    /// A disc whose archive holds `entries`. `name` keeps the folders of two tests apart.
+    /// A disc whose one archive, [`ARCHIVE`], holds `entries`. `name` keeps the folders of two tests apart.
     pub fn new(name: &str, entries: &[Entry<'_>]) -> Self {
+        Self::with_archives(name, &[(ARCHIVE, entries)])
+    }
+
+    /// A disc of several archives, each a path inside the disc folder and its entries.
+    pub fn with_archives(name: &str, archives: &[(&str, &[Entry<'_>])]) -> Self {
         let root = std::env::temp_dir().join(format!("bof3-edit-fixture-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
 
-        let payloads: Vec<Payload<'_>> = entries
-            .iter()
-            .map(|entry| Payload { bytes: entry.bytes, file_type: entry.file_type, ram_ptr: entry.ram_ptr })
-            .collect();
-        let archive = pack_payloads(ARCHIVE_VERSION, &payloads).expect("the archive packs");
+        for (path, entries) in archives {
+            let payloads: Vec<Payload<'_>> = entries
+                .iter()
+                .map(|entry| Payload { bytes: entry.bytes, file_type: entry.file_type, ram_ptr: entry.ram_ptr })
+                .collect();
+            let archive = pack_payloads(ARCHIVE_VERSION, &payloads).expect("the archive packs");
 
-        let file = root.join("disc").join(ARCHIVE);
-        fs::create_dir_all(file.parent().expect("the archive has a folder")).expect("the disc folder");
-        fs::write(&file, archive).expect("the archive file");
+            let file = root.join("disc").join(path);
+            fs::create_dir_all(file.parent().expect("the archive has a folder")).expect("the disc folder");
+            fs::write(&file, archive).expect("the archive file");
+        }
         Self(root)
     }
 
