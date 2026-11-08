@@ -18,7 +18,7 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | ------ | ------: | ---- | ---- | --------------- | ------------- |
 | VRAM texture upload (type 3) | 593 | Texture: 4, 8 or 16 bpp with a joined or chosen palette | paint texels | retail: words back to the payload, 593/593 | none |
 | CLUT bank | 620 | Palette, Decoded | colour channels and STP bit | none | needs a test |
-| VAB header (type 6) | 1,020 | Sound: samples, programs and tones | Hex only | none | the program and tone tables are fixed records: needs sheets |
+| VAB header (type 6) | 1,020 | Sound: samples, programs and tones; Tables: bank, programs, tones | master volume and pan, every program and tone field | retail: every sheet rewrites its bytes | none; the counts and sizes that lay out the header are not editable |
 | VAB body (type 7) | 1,020 | Sound: play, export WAVE and SoundFont | Hex only | none | needs a sample import |
 | SEP sequence package (type 10) | 119 | Sound: play with the archive's bank, export MIDI | Hex only | retail: playback | needs sequence header edits and MIDI import |
 | Character sprite bank, LZ77 (type 1) | 65 | Sprite bank: node tables and palettes | palette colours; re-encoded on an edit | retail: a colour edit keeps the decoded bank | none; the node pixel format is not decoded |
