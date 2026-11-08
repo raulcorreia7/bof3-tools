@@ -130,7 +130,7 @@ impl Format {
             Self::AreaAuxWindow => "area auxiliary module window (0x80117000)",
             Self::SharedResourceTable => "shared resource table (0x8001A000)",
             Self::CueTable => "type-8 cue records (type 8)",
-            Self::MagicTable => "magic-effect table (0x800C3800)",
+            Self::MagicTable => "magic-effect script bank (0x800C3800)",
             Self::CodeImage => "code image (configured EMI code targets)",
             Self::Reserve => "reserve (all-zero payload)",
             Self::Unclassified => "unclassified",
@@ -148,16 +148,17 @@ impl Format {
             | Self::CueTable
             | Self::AreaActorDefsTable
             | Self::AreaScriptBank
+            | Self::BattleScriptBank
+            | Self::MagicTable
             | Self::AreaMapBundle => State::Codec,
             Self::Lz77Blob
             | Self::CharacterBlob
             | Self::AreaMessageBank
             | Self::AreaCellGrid
-            | Self::BattleScriptBank
             | Self::AreaEncounterTable
             | Self::AreaAuxWindow
             | Self::SharedResourceTable => State::Specified,
-            Self::MagicTable | Self::Unclassified => State::Unknown,
+            Self::Unclassified => State::Unknown,
             Self::CodeImage => State::Code,
             Self::Reserve => State::Reserve,
         }
@@ -175,13 +176,14 @@ impl Format {
             | Self::AreaCellGrid
             | Self::AreaScriptBank
             | Self::BattleScriptBank
+            | Self::MagicTable
             | Self::AreaActorDefsTable
             | Self::AreaEncounterTable
             | Self::AreaMapBundle
             | Self::SharedResourceTable
             | Self::CueTable => "documented",
             Self::Lz77Blob | Self::CharacterBlob | Self::AreaAuxWindow => "partial",
-            Self::MagicTable | Self::Unclassified => "none",
+            Self::Unclassified => "none",
             Self::CodeImage | Self::Reserve => "n/a",
         }
     }
@@ -197,6 +199,8 @@ impl Format {
             | Self::CueTable
             | Self::AreaActorDefsTable
             | Self::AreaScriptBank
+            | Self::BattleScriptBank
+            | Self::MagicTable
             | Self::AreaMapBundle => "decode+encode",
             Self::Lz77Blob => "decode-only (in the game's own decoder)",
             Self::CodeImage | Self::Reserve => "n/a",
@@ -221,10 +225,10 @@ impl Format {
             Self::AreaActorDefsTable => "wiki: formats/area (`0x800E3800`)",
             Self::AreaEncounterTable => "wiki: formats/area (`0x800E4000`); include/game/enemy.h models it",
             Self::AreaMapBundle => "wiki: formats/area (`0x80104000`)",
-            Self::AreaAuxWindow => "wiki: formats/area (`0x80117000`); role open",
+            Self::AreaAuxWindow => "wiki: formats/area (`0x80117000`); a module id word, then code (area049) or data",
             Self::SharedResourceTable => "wiki: data/text#references",
             Self::CueTable => "wiki: formats/audio#emi-type-8-cue-records",
-            Self::MagicTable => "no owning doc; 42-3,148 B payloads in BMAGIC*",
+            Self::MagicTable => "BMagic_Effect.c sets g_ScriptBank to 0x800C3800: the 0x800D3800 format, one section",
             Self::CodeImage => "config/emi/**/target.toml load addresses; disc-census code rows",
             Self::Reserve => "all-zero payload; the loader reserves the destination",
             Self::Unclassified => "no selection rule matched",
@@ -263,7 +267,7 @@ const AREA_CELL_GRID: u32 = 0x8003_2000;
 /// positions (`wiki: formats/character#load-arguments`).
 const CHARACTER_BLOB_ADDRESSES: [u32; 6] =
     [0x8003_b800, 0x8003_b80c, 0x8005_680c, 0x8005_f80c, 0x8007_180c, 0x8007_a80c];
-/// Magic-effect table of the `BMAGIC*` archives; no owning spec.
+/// Magic-effect script bank of the `BMAGIC*` archives: the area script bank format, loaded here.
 const MAGIC_TABLE: u32 = 0x800c_3800;
 /// Area script bank (`wiki: formats/area`, `0x800D3800`).
 const AREA_SCRIPT_BANK: u32 = 0x800d_3800;

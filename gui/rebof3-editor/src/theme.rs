@@ -67,10 +67,8 @@ pub fn tag(format: Format) -> (&'static str, u32) {
         Format::Lz77Blob => ("LZ", 0xaa96e6),
         Format::CharacterBlob => ("CHR", 0xf0786e),
         Format::AreaCellGrid | Format::AreaMapBundle | Format::AreaAuxWindow => ("MAP", 0x78b46e),
-        Format::AreaScriptBank | Format::BattleScriptBank => ("SCR", 0xe6a05a),
-        Format::AreaActorDefsTable | Format::AreaEncounterTable | Format::SharedResourceTable | Format::MagicTable => {
-            ("TAB", 0xc8be78)
-        }
+        Format::AreaScriptBank | Format::BattleScriptBank | Format::MagicTable => ("SCR", 0xe6a05a),
+        Format::AreaActorDefsTable | Format::AreaEncounterTable | Format::SharedResourceTable => ("TAB", 0xc8be78),
         Format::CodeImage => ("EXE", 0x969baa),
         Format::Reserve => ("RES", 0x6e7382),
         Format::Unclassified => ("???", 0x6e7382),

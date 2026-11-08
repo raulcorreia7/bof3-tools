@@ -14,15 +14,15 @@ const ENTRIES: usize = 6_344;
 const BYTES: u64 = 250_503_535;
 const ARCHIVES: usize = 880;
 
-/// Entries and bytes the eight codecs own.
-const CODEC_ENTRIES: usize = 4_676;
-const CODEC_BYTES: u64 = 209_637_158;
+/// Entries and bytes the codecs own.
+const CODEC_ENTRIES: usize = 4_955;
+const CODEC_BYTES: u64 = 213_643_148;
 /// Entries and bytes whose layout is documented without a codec.
-const SPECIFIED_ENTRIES: usize = 1_030;
-const SPECIFIED_BYTES: u64 = 25_375_349;
-/// The remainder: one table with no owner, the code images, the reservations.
-const UNKNOWN_ENTRIES: usize = 37;
-const UNKNOWN_BYTES: u64 = 30_762;
+const SPECIFIED_ENTRIES: usize = 788;
+const SPECIFIED_BYTES: u64 = 21_400_121;
+/// The remainder: no entry without an owner, the code images, the reservations.
+const UNKNOWN_ENTRIES: usize = 0;
+const UNKNOWN_BYTES: u64 = 0;
 const CODE_ENTRIES: usize = 548;
 const CODE_BYTES: u64 = 14_694_370;
 const RESERVE_ENTRIES: usize = 53;

@@ -81,7 +81,7 @@ payloads.
 | Map     | area map bundles              | the map from above, coloured by tile bank and height; edit a cell's corner heights |
 | Sprite bank | character sprite banks, raw or LZ77 | each section's node table and palettes; edit any palette color |
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
-| Decoded | cue, scene, area and battle script, palette, LZ77 | the decoder's structured reading              |
+| Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |
 
 [docs/editor.md](docs/editor.md) lists what the editor offers for every entry format.
 
