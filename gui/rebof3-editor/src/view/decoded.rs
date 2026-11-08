@@ -25,12 +25,22 @@ pub struct State {
 pub fn decodes(format: Format) -> bool {
     matches!(
         format,
-        Format::CueTable | Format::AreaActorDefsTable | Format::AreaScriptBank | Format::ClutBank | Format::Lz77Blob
+        Format::CueTable
+            | Format::AreaActorDefsTable
+            | Format::AreaScriptBank
+            | Format::BattleScriptBank
+            | Format::ClutBank
+            | Format::Lz77Blob
     )
 }
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
-    let derived = match derive(entry.format(), entry.load_arg(), entry.payload()) {
+    // The battle bank at `0x800F0800` has the area bank's format (`wiki: formats/area`).
+    let format = match entry.format() {
+        Format::BattleScriptBank => Format::AreaScriptBank,
+        format => format,
+    };
+    let derived = match derive(format, entry.load_arg(), entry.payload()) {
         Ok(derived) => derived,
         Err(error) => return muted(format!("The decoder failed: {error}")).into_any_element(),
     };
