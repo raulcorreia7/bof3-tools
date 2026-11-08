@@ -25,15 +25,15 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | Character sprite bank, raw | 79 | Sprite bank | palette colours | retail, as above | none; 3 banks have no palette layer |
 | Area message bank | 200 | Text: records, message-window preview | rewrite a string in place | retail: every string decodes and encodes back | none |
 | Area cell grid | 191 | Cell grid over the map size | paint a cell's nibble | retail: a repaint keeps the payload | none; the values have no names yet |
-| Area script bank | 200 | Decoded tree | Hex only | none | the bytecode is not decoded, so records are not editable as values |
-| Battle script bank | 42 | Decoded tree | Hex only | none | as the area script bank |
+| Area script bank | 200 | Info: directory and sections; Decoded tree | Hex only | retail: decode and encode, 200/200 | the bytecode is not decoded, so records are not editable as values |
+| Battle script bank | 42 | Info, Decoded: the area bank's format | Hex only | retail: decode and encode, 42/42 | as the area script bank |
 | Area actor definitions | 200 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |
 | Area encounters and enemies | 200 | Tables: encounters, enemies, enemy AI | every sheet cell | retail: every sheet rewrites its bytes | none |
 | Area map bundle | 200 | Map: cells by tile bank and height | corner heights | retail: decode and encode, 200/200 | none; textures need the tile page, not traced |
-| Area auxiliary module window | 9 | Info and Hex | Hex only | none | needs a view |
+| Area auxiliary module window | 9 | Info: module id and body size | Hex only | n/a | area049's window is code, changed in the decompilation; the other eight hold data whose layout is not traced |
 | Shared resource table | 44 | Text, Info: id groups | strings in place | retail: strings | none |
 | Type-8 cue table | 904 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |
-| Magic-effect table (`0x800C3800`) | 37 | Info and Hex | Hex only | none | needs a view |
+| Magic-effect script bank (`0x800C3800`) | 37 | Info, Decoded: the area bank's format with one section | Hex only | retail: decode and encode, 37/37 | as the area script bank |
 | Code image | 548 | Info and Hex; `ETC/GAME.EMI` entry 0 also Tables | Hex; the game tables | retail: sheets | code is changed in the decompilation and rebuilt, not here |
 | Reserve (all-zero payload) | 53 | Info and Hex | Hex only | n/a | the payload carries no data; the loader only reserves the space |
 | Unclassified | 0 | Info and Hex | Hex only | n/a | no retail entry; types 2 and 9 never occur on the disc |

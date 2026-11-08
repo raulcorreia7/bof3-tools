@@ -221,11 +221,8 @@ impl Report {
 
     /// Every entry no rule classifies, largest first.
     fn unknown_entries(&self) -> Unknown<'_> {
-        let mut rows: Vec<&Row> = self
-            .rows
-            .iter()
-            .filter(|row| matches!(row.kind, Kind::Unknown | Kind::MagicTable) && row.role == "raw")
-            .collect();
+        let mut rows: Vec<&Row> =
+            self.rows.iter().filter(|row| matches!(row.kind, Kind::Unknown) && row.role == "raw").collect();
         let total = rows.len();
         let bytes = rows.iter().map(|row| row.size).sum();
         rows.sort_by(|left, right| {

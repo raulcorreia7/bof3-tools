@@ -13,8 +13,11 @@
 //!
 //! so the directory holds L words: word 0 is `4*L`, the directory's size,
 //! which is also section 0's base, and words 1..L-1 are strictly increasing
-//! section bases. `g_ScriptBank` points at `0x800D3800` and the battle
-//! overlays swap in `0x800F0800`, the same format.
+//! section bases. `g_ScriptBank` points at `0x800D3800`, the battle
+//! overlays swap in `0x800F0800`, and the magic-effect overlays swap in
+//! `0x800C3800` (`BMagic_Effect.c` in `decomp/src/overlays/bmagic/`), all
+//! the same format. The 37 magic-effect banks hold one section, so their
+//! directory is the single word `4`.
 //!
 //! Each section's first word is `2*M`, the size of its M offset words, and it
 //! doubles as the first offset word. No record size is stored: the engine
@@ -35,6 +38,13 @@ use psx_formats::bytes::{push_u16_le, push_u32_le, u16_le, u32_le};
 use serde::Serialize;
 
 use crate::error::{Error, Result};
+
+/// The size of one directory word: a section base.
+const DIRECTORY_WORD: usize = 4;
+/// The size of one table word: a record offset.
+const TABLE_WORD: usize = 2;
+/// The smallest bank: a one-word directory and one section's table word.
+const SMALLEST_BANK: usize = DIRECTORY_WORD + TABLE_WORD;
 
 /// One section: its stored offset words and the record bytes they name.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -65,25 +75,28 @@ pub struct ScriptBank {
 }
 
 impl ScriptBank {
-    /// Reads a `0x800D3800` payload.
+    /// Reads a `0x800D3800`, `0x800F0800` or `0x800C3800` payload.
     pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
         let len = bytes.len();
-        if len < 8 {
-            return Err(Error::ScriptBankShape("the payload is shorter than a two-word directory"));
+        if len < SMALLEST_BANK {
+            return Err(Error::ScriptBankShape("the payload is shorter than a directory word and a table word"));
         }
+
         let dir_bytes = u32_le(bytes, 0) as usize;
-        if dir_bytes < 8 || !dir_bytes.is_multiple_of(4) || dir_bytes > len {
+        if dir_bytes < DIRECTORY_WORD || !dir_bytes.is_multiple_of(DIRECTORY_WORD) || dir_bytes > len {
             return Err(Error::ScriptBankShape("the directory size is not 4*L inside the payload"));
         }
-        let section_count = dir_bytes / 4;
+
+        let section_count = dir_bytes / DIRECTORY_WORD;
         let mut bases = vec![dir_bytes];
         for index in 1..section_count {
-            let base = u32_le(bytes, 4 * index) as usize;
+            let base = u32_le(bytes, DIRECTORY_WORD * index) as usize;
             if base <= bases[index - 1] || base >= len {
                 return Err(Error::ScriptBankShape("a section offset is not strictly increasing inside the payload"));
             }
             bases.push(base);
         }
+
         let mut ends = bases[1..].to_vec();
         ends.push(len);
         let mut sections = Vec::with_capacity(section_count);
@@ -137,7 +150,7 @@ impl ScriptBank {
 
     /// The payload bytes.
     pub fn encode(&self) -> Vec<u8> {
-        let dir_bytes = 4 * self.sections.len();
+        let dir_bytes = DIRECTORY_WORD * self.sections.len();
         let mut bases = vec![dir_bytes];
         for section in &self.sections {
             bases.push(bases[bases.len() - 1] + section_bytes(section));
@@ -171,15 +184,15 @@ fn write_section(out: &mut Vec<u8>, section: &ScriptSection) {
 
 /// One section's table words and record bytes, from `[base, end)` of `bytes`.
 fn section(bytes: &[u8], base: usize, end: usize) -> Result<ScriptSection, Error> {
-    if end - base < 2 {
+    if end - base < TABLE_WORD {
         return Err(Error::ScriptBankShape("a section is shorter than its table word"));
     }
     let table_bytes = u16_le(bytes, base) as usize;
-    if table_bytes == 0 || !table_bytes.is_multiple_of(2) || base + table_bytes > end {
+    if table_bytes == 0 || !table_bytes.is_multiple_of(TABLE_WORD) || base + table_bytes > end {
         return Err(Error::ScriptBankShape("a section's table size is not 2*M inside the section"));
     }
-    let count = table_bytes / 2;
-    let offsets: Vec<u16> = (0..count).map(|index| u16_le(bytes, base + 2 * index)).collect();
+    let count = table_bytes / TABLE_WORD;
+    let offsets: Vec<u16> = (0..count).map(|index| u16_le(bytes, base + TABLE_WORD * index)).collect();
     let limit = end - base;
     if offsets.iter().any(|offset| *offset as usize > limit) {
         return Err(Error::ScriptBankShape("a record offset runs past the section end"));
@@ -284,9 +297,26 @@ mod tests {
         assert_eq!(document["sections"][1]["records"][0], "0e0f101112");
     }
 
+    /// A magic-effect bank: a one-word directory, then one section of two records.
+    #[test]
+    fn a_one_section_bank_reads_and_encodes_back() {
+        let mut payload = Vec::new();
+        push_u32_le(&mut payload, 4);
+        push_u16_le(&mut payload, 4);
+        push_u16_le(&mut payload, 6);
+        payload.extend_from_slice(&[1, 2, 3, 4, 5]);
+
+        let decoded = ScriptBank::decode(&payload).expect("a one-section bank parses");
+        assert_eq!(decoded.dir_bytes, 4);
+        assert_eq!(decoded.sections.len(), 1);
+        assert_eq!(decoded.sections[0].records, vec![vec![1, 2], vec![3, 4, 5]]);
+        assert_eq!(decoded.encode(), payload);
+    }
+
     #[test]
     fn rejects_a_payload_shorter_than_a_directory() {
         assert!(matches!(ScriptBank::decode(&[1, 2, 3]), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptBank::decode(&[4, 0, 0, 0, 2]), Err(Error::ScriptBankShape(_))));
     }
 
     #[test]

@@ -111,8 +111,9 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
         }),
         Format::CharacterBlob => sprite_bank(payload),
         Format::AreaMessageBank => Ok(messages(payload, entry.load_arg())),
-        // The battle bank at `0x800F0800` has the area bank's format (`wiki: formats/area`).
-        Format::AreaScriptBank | Format::BattleScriptBank => script_bank(payload),
+        // The battle bank at `0x800F0800` and the magic-effect bank at `0x800C3800` have the area bank's
+        // format (`wiki: formats/area`).
+        Format::AreaScriptBank | Format::BattleScriptBank | Format::MagicTable => script_bank(payload),
         Format::AreaActorDefsTable => actor_defs(payload),
         Format::AreaEncounterTable => encounters(payload),
         Format::AreaMapBundle => MapBundle::decode(payload)
@@ -125,6 +126,7 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
             .map(|table| vec![("Cue records", table.records().len().to_string())])
             .map_err(|error| error.to_string()),
         Format::SharedResourceTable => resource_groups(payload),
+        Format::AreaAuxWindow => aux_window(payload),
         _ => Ok(vec![("Fields", "no decoder reads this format yet".into())]),
     };
     rows.unwrap_or_else(|error| vec![("Decoder", format!("does not read this payload: {error}"))])
@@ -222,6 +224,17 @@ fn script_bank(payload: &[u8]) -> Result<Vec<Row>, String> {
     ])
 }
 
+/// The module id that opens a window loaded at `0x80117000`. The nine retail windows hold ids `0xFC` to
+/// `0x104`; area049's window is code whose functions sit in the game's callback table, and the other eight
+/// hold data whose layout is not traced.
+fn aux_window(payload: &[u8]) -> Result<Vec<Row>, String> {
+    const MODULE_ID: usize = 4;
+
+    let id = payload.get(..MODULE_ID).ok_or("shorter than the module id word")?;
+    let id = u32::from_le_bytes(id.try_into().expect("the slice is one word"));
+    Ok(vec![("Module id", format!("{id:#X}")), ("Body", format!("{} bytes", payload.len() - MODULE_ID))])
+}
+
 /// The id groups of a payload loaded at `0x8001A000`. `Resource_GetText` reads base word `id >> 14`; each
 /// base is a group's offset, and the group opens with a `u16` slot table (`wiki: data/text#references`).
 /// The groups follow the base words, so the first base also says how many base words there are.
@@ -287,6 +300,14 @@ mod tests {
         assert_eq!(rows[1].1, "at 0x8, 2 slots");
         assert_eq!(rows[2].1, "at 0x10, 1 slots");
         assert!(resource_groups(&[0x30, 0, 0, 0]).is_err(), "twelve base words is not a table");
+    }
+
+    #[test]
+    fn an_aux_window_shows_its_module_id() {
+        let rows = aux_window(&[0x04, 0x01, 0, 0, 0xAA, 0xBB]).unwrap();
+        assert_eq!(rows[0], ("Module id", "0x104".into()));
+        assert_eq!(rows[1], ("Body", "2 bytes".into()));
+        assert!(aux_window(&[1, 2]).is_err());
     }
 
     #[test]

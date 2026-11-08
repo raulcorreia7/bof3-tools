@@ -29,15 +29,17 @@ pub fn decodes(format: Format) -> bool {
             | Format::AreaActorDefsTable
             | Format::AreaScriptBank
             | Format::BattleScriptBank
+            | Format::MagicTable
             | Format::ClutBank
             | Format::Lz77Blob
     )
 }
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
-    // The battle bank at `0x800F0800` has the area bank's format (`wiki: formats/area`).
+    // The battle bank at `0x800F0800` and the magic-effect bank at `0x800C3800` have the area bank's
+    // format (`wiki: formats/area`).
     let format = match entry.format() {
-        Format::BattleScriptBank => Format::AreaScriptBank,
+        Format::BattleScriptBank | Format::MagicTable => Format::AreaScriptBank,
         format => format,
     };
     let derived = match derive(format, entry.load_arg(), entry.payload()) {

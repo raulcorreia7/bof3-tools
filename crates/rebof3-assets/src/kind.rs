@@ -82,7 +82,7 @@ kinds! {
     AreaMap => ("area-map", Decoded, "map bundles (0x80104000): stored bytes and the terrain as OBJ, MTL and glTF binary"),
     AreaModule => ("area-module", Raw, "auxiliary module windows (0x80117000)"),
     ResourceTable => ("resource-table", Raw, "shared resource tables (0x8001A000)"),
-    MagicTable => ("bmagic-table", Raw, "magic-effect tables (0x800C3800), format not yet known"),
+    MagicTable => ("bmagic-table", Raw, "magic-effect script banks (0x800C3800)"),
     Code => ("code", Raw, "code images loaded from EMI entries"),
     Reserve => ("reserve", Nothing, "all-zero payloads that reserve a RAM slot"),
     Unknown => ("unknown", Raw, "entries and files no rule classifies"),
