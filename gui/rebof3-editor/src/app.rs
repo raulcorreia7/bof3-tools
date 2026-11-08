@@ -183,10 +183,22 @@ impl Editor {
         index: usize,
         rewrite: impl FnOnce(&[u8]) -> Result<Vec<u8>, String>,
     ) -> Result<(), String> {
+        self.rewrite_entries(archive, &[index], |payloads| Ok(vec![rewrite(payloads[0])?]))
+    }
+
+    /// Rewrites the payloads of entries `indices` of `archive` with `rewrite`, as one undo step. `rewrite`
+    /// gets the payloads in the order of `indices` and returns the new ones in the same order.
+    pub fn rewrite_entries(
+        &mut self,
+        archive: &ArchivePath,
+        indices: &[usize],
+        rewrite: impl FnOnce(Vec<&[u8]>) -> Result<Vec<Vec<u8>>, String>,
+    ) -> Result<(), String> {
         let project = self.project.as_mut().ok_or("no project is open")?;
         let loaded = project.load(archive)?;
-        let bytes = rewrite(project.payload(&loaded, index))?;
-        project.set(&loaded, index, bytes);
+        let payloads = indices.iter().map(|&index| project.payload(&loaded, index)).collect();
+        let rewritten = rewrite(payloads)?;
+        project.set_together(&loaded, indices.iter().copied().zip(rewritten).collect());
         Ok(())
     }
 

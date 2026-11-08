@@ -1,10 +1,12 @@
 //! Sound banks and sequences: play a VAB's samples, list its programs and tones, export WAVE,
-//! SoundFont and MIDI files, edit a sequence's header and import a sequence from MIDI.
+//! SoundFont and MIDI files, replace a sample from a WAVE file, edit a sequence's header and import a
+//! sequence from MIDI.
 
 use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use psx_formats::sep::{Package, Sequence};
 use psx_formats::vab::Bank;
 use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
+use rebof3_assets::import;
 use rebof3_assets::sound::sequence_pcm;
 use rebof3_emi::classify::Format;
 use rebof3_emi::entry::vab_body_index;
@@ -22,6 +24,8 @@ const COLUMN_WIDTH: f32 = 80.0;
 const TONES_HEIGHT: f32 = 320.0;
 /// How much of a sequence the Play button renders, in seconds; a looping song never ends.
 const SEQUENCE_PREVIEW_SECONDS: f64 = 90.0;
+/// The size table counts a sample's bytes in units of this many (`wiki: formats/audio#bank-layout`).
+const SAMPLE_SIZE_UNIT: usize = 8;
 /// Width of a sequence header field, in pixels.
 const HEADER_FIELD_WIDTH: f32 = 72.0;
 /// The largest tempo the header's three bytes hold, in microseconds per quarter note.
@@ -198,6 +202,12 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             let bytes = wave_pcm.clone().and_then(|pcm| pcm_wav(&pcm).map_err(|error| error.to_string()));
             editor.save_file(wave_name.clone(), bytes, cx);
         }));
+        let sample = vag.index;
+        let replace =
+            button(("import-wave", sample), "Import WAVE…", true).on_click(cx.listener(move |editor, _, _, cx| {
+                import_sample(editor, header_index, body_index, sample, cx);
+                cx.notify();
+            }));
         let cells = [
             text(vag.index),
             text(vag.size),
@@ -205,6 +215,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             text(looped),
             play.into_any_element(),
             wave.into_any_element(),
+            replace.into_any_element(),
         ];
         samples = samples.child(grid_row(cells, at % 2 == 1));
     }
@@ -252,6 +263,58 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .child(tones_title)
         .child(tones)
         .into_any_element()
+}
+
+/// The bank's header and body with sample `index` replaced by `vag`, a sample's stored bytes. The header's
+/// size table and bank size follow the new length; every other byte of both keeps its value.
+fn with_sample(header: &[u8], body: &[u8], index: u32, vag: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    if index == 0 {
+        return Err("sample 0 is the bank's null sample".into());
+    }
+    let mut bank = Bank::parse(header, body).map_err(|error| error.to_string())?;
+    let (offset, size) =
+        bank.vag(index).map(|old| (old.offset as usize, old.size as usize)).map_err(|error| error.to_string())?;
+    let (start, end) = (offset, offset + size);
+    if end > body.len() {
+        return Err(format!("sample {index} runs past the body"));
+    }
+
+    let units = u16::try_from(vag.len() / SAMPLE_SIZE_UNIT)
+        .ok()
+        .filter(|_| vag.len().is_multiple_of(SAMPLE_SIZE_UNIT))
+        .ok_or_else(|| {
+            format!(
+                "a sample is a multiple of {SAMPLE_SIZE_UNIT} bytes, at most {} bytes",
+                usize::from(u16::MAX) * SAMPLE_SIZE_UNIT
+            )
+        })?;
+    let grown = i64::from(bank.file_size) + vag.len() as i64 - size as i64;
+    bank.file_size = u32::try_from(grown).map_err(|_| "the bank size does not fit its word".to_string())?;
+    bank.size_table[index as usize] = units;
+
+    let mut new_body = Vec::with_capacity(body.len() - size + vag.len());
+    new_body.extend_from_slice(&body[..start]);
+    new_body.extend_from_slice(vag);
+    new_body.extend_from_slice(&body[end..]);
+    Ok((bank.encode_header(), new_body))
+}
+
+/// Asks for a WAVE file and puts it in place of sample `index`, rewriting the header and the body as one
+/// undo step.
+fn import_sample(editor: &mut Editor, header: usize, body: usize, index: u32, cx: &mut Context<Editor>) {
+    let Some(entry) = editor.current() else { return };
+    let archive = entry.archive.path.clone();
+    editor.open_file("WAVE file to import (mono, 16-bit, 44100 Hz)", cx, move |editor, wav| {
+        let replaced = editor.rewrite_entries(&archive, &[header, body], |payloads| {
+            let vag = import::vag(&wav).map_err(|error| error.to_string())?;
+            let (header, body) = with_sample(payloads[0], payloads[1], index, &vag)?;
+            Ok(vec![header, body])
+        });
+        match replaced {
+            Ok(()) => format!("Imported sample {index} from WAVE."),
+            Err(error) => format!("Import: {error}"),
+        }
+    });
 }
 
 /// Renders the sequence with id `sequence` of the shown archive, edits included, and plays it.
@@ -397,6 +460,35 @@ mod tests {
         Package { sequences: vec![sequence] }.encode()
     }
 
+    /// The bytes of one silent ADPCM block of `fill`, a stand-in for a sample's stored bytes.
+    fn block(fill: u8) -> Vec<u8> {
+        vec![fill; 16]
+    }
+
+    #[test]
+    fn a_sample_import_rewrites_the_size_table_and_the_body() {
+        let (header, body) = psx_formats::vab::encode_bank(0, &[], &[block(1), block(2), block(3)]).unwrap();
+        let longer = [block(9), block(9)].concat();
+
+        let (new_header, new_body) = with_sample(&header, &body, 2, &longer).unwrap();
+        assert_eq!(new_body, [block(1), longer.clone(), block(3)].concat());
+        let bank = Bank::parse(&new_header, &new_body).unwrap();
+        assert_eq!(bank.vag_bytes(&new_body, 2).unwrap(), longer.as_slice());
+        assert_eq!(bank.vag_bytes(&new_body, 3).unwrap(), block(3).as_slice());
+        assert!(bank.problems().is_empty(), "{:?}", bank.problems());
+        assert_eq!(new_header.len(), header.len());
+    }
+
+    #[test]
+    fn a_sample_import_refuses_what_the_header_cannot_hold() {
+        let (header, body) = psx_formats::vab::encode_bank(0, &[], &[block(1)]).unwrap();
+        assert!(with_sample(&header, &body, 0, &block(0)).is_err(), "the null sample");
+        assert!(with_sample(&header, &body, 2, &block(0)).is_err(), "no sample 2");
+        assert!(with_sample(&header, &body, 1, &[0; 12]).is_err(), "not whole units");
+        let too_long = vec![0; (usize::from(u16::MAX) + 1) * SAMPLE_SIZE_UNIT];
+        assert!(with_sample(&header, &body, 1, &too_long).is_err(), "past the size table's unit");
+    }
+
     #[test]
     fn a_header_edit_changes_only_its_field() {
         let payload = package();
@@ -439,6 +531,37 @@ mod tests {
         let midi = Package::parse(&payload).unwrap().to_midi(0).unwrap();
         assert_eq!(with_midi(&payload, 0, &midi).unwrap(), payload);
         assert!(with_midi(&payload, 0, b"not a MIDI file").is_err());
+    }
+
+    /// Every sample of every retail bank, put back in place of itself, leaves the header and the body as
+    /// stored. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    #[test]
+    fn every_retail_sample_imports_back_in_place() {
+        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let folder = std::env::temp_dir().join(format!("bof3-edit-samples-{}", std::process::id()));
+        let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
+
+        let (mut samples, mut failures) = (0, Vec::new());
+        for path in project.archives.clone() {
+            let archive = project.load(&path).expect("archive loads");
+            for header in (0..archive.entries().len()).filter(|&index| archive.formats[index] == Format::VabHeader) {
+                let Ok(body) = vab_body_index(archive.entries(), header) else { continue };
+                let (header_bytes, body_bytes) = (archive.original(header), archive.original(body));
+                let Ok(bank) = Bank::parse(header_bytes, body_bytes) else { continue };
+                for vag in bank.vags.iter().filter(|vag| !vag.is_empty()) {
+                    let Ok(stored) = bank.vag_bytes(body_bytes, vag.index) else { continue };
+                    samples += 1;
+                    let back = with_sample(header_bytes, body_bytes, vag.index, stored);
+                    if back != Ok((header_bytes.to_vec(), body_bytes.to_vec())) {
+                        failures.push(format!("{}#{header} sample {}", path.0, vag.index));
+                    }
+                }
+            }
+        }
+
+        let _ = std::fs::remove_dir_all(&folder);
+        eprintln!("samples: {} of {samples} do not import back in place", failures.len());
+        assert!(samples > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 
     /// Every sequence of every retail package exports to MIDI and imports back to the stored bytes. Point
