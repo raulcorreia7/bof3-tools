@@ -117,6 +117,9 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
         Format::AreaMapBundle => MapBundle::decode(payload)
             .map(|bundle| vec![("Sections", map_summary(&bundle))])
             .map_err(|error| error.to_string()),
+        Format::AreaCellGrid => super::cells::map_size(entry)
+            .map(|(width, height)| vec![("Map size", format!("{width} × {height} cells, from the map bundle"))])
+            .ok_or_else(|| "no map bundle in this archive".to_string()),
         Format::CueTable => CueTable::decode(payload)
             .map(|table| vec![("Cue records", table.records().len().to_string())])
             .map_err(|error| error.to_string()),
