@@ -1,19 +1,21 @@
-//! The fixed game tables as spreadsheets: one row per record, one column per field.
+//! Record tables as spreadsheets: one row per record, one column per field. A reference column
+//! (a drop's item, a level's ability, an encounter's enemy) shows the name it points at.
 
 use gpui::{AnyElement, Context, Div, anchored, deferred, div, prelude::*, px};
 
 use super::{Entry, Field, Menu, editing, editing_menu};
 use crate::app::{Editor, Field as WindowField, Menu as WindowMenu};
 use crate::fonts;
-use crate::schema::{self, Column, Field as Kind, Sheet};
+use crate::schema::{self, Column, Field as Kind, Names, Sheet};
 use crate::theme::{EDITED, MUTED, RAISED, color};
 use crate::widgets::{
     GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, field, menu_item, menu_panel, muted, separator, strong, tab,
 };
 
-/// Width of a numeric cell, of a name cell and of the row number, in pixels.
+/// Width of a numeric cell, of a name cell, of a reference cell and of the row number, in pixels.
 const NUMBER_WIDTH: f32 = 56.0;
 const NAME_WIDTH: f32 = 120.0;
+const REFERENCE_WIDTH: f32 = NUMBER_WIDTH + NAME_WIDTH;
 const ROW_NUMBER_WIDTH: f32 = 40.0;
 /// Width of the filter field, in pixels.
 const FILTER_WIDTH: f32 = 160.0;
@@ -26,10 +28,12 @@ pub struct State {
 
 /// The sheets of the shown entry.
 fn sheets(entry: &Entry<'_>) -> Vec<Sheet> {
-    schema::sheets()
-        .into_iter()
-        .filter(|sheet| sheet.archive == entry.archive.path.0 && sheet.entry == entry.index)
-        .collect()
+    schema::sheets_for(&entry.archive.path.0, entry.index, entry.format())
+}
+
+/// The names the reference columns of the shown entry show.
+fn names(entry: &Entry<'_>) -> Names {
+    Names::new(entry.elsewhere(schema::GAME, 0), Some(entry.payload()))
 }
 
 /// Whether the entry has a table layout.
@@ -47,12 +51,11 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
     let mut bar = div().flex().flex_none().flex_wrap().items_center().gap(px(GAP_SMALL));
     for (at, sheet) in sheets.iter().enumerate() {
-        bar = bar.child(tab(("sheet", at), sheet.table.name, at == selected).on_click(cx.listener(
-            move |editor, _, _, cx| {
+        bar =
+            bar.child(tab(("sheet", at), sheet.name, at == selected).on_click(cx.listener(move |editor, _, _, cx| {
                 editor.views.tables.sheet = at;
                 cx.notify();
-            },
-        )));
+            })));
     }
     let filter_text = state.filter.clone();
     bar = bar.child(separator(true)).child(
@@ -66,10 +69,10 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let sheet = &sheets[selected];
     let payload = entry.payload();
     let original = entry.original();
-    let end = sheet.start() + sheet.table.count * sheet.table.record;
-    if payload.len() < end {
-        return muted(format!("The payload ends before the {} table.", sheet.table.name)).into_any_element();
+    if payload.len() < sheet.end() {
+        return muted(format!("The payload ends before the {} table.", sheet.name)).into_any_element();
     }
+    let names = names(entry);
 
     let mut header = div().flex().gap(px(GAP_SMALL)).child(strong("#").w(px(ROW_NUMBER_WIDTH)).flex_none());
     for column in &sheet.columns {
@@ -78,13 +81,13 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
     let needle = state.filter.to_lowercase();
     let mut grid = div().id("table").flex().flex_col().flex_1().min_h_0().overflow_scroll().child(header);
-    for row in 0..sheet.table.count {
+    for row in 0..sheet.count {
         if !needle.is_empty()
             && !row_name(payload, sheet, row).is_some_and(|name| name.to_lowercase().contains(&needle))
         {
             continue;
         }
-        let range = record(sheet, row);
+        let range = sheet.range(row);
         let edited = payload[range.clone()] != original[range.clone()];
         let mut line = div()
             .id(("row", row))
@@ -103,7 +106,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
                     .child(row.to_string()),
             );
         for (at, column) in sheet.columns.iter().enumerate() {
-            line = line.child(cell(editor, &payload[range.clone()], row, at, column, cx));
+            line = line.child(cell(editor, &names, &payload[range.clone()], row, at, column, cx));
         }
         grid = grid.child(line);
     }
@@ -122,23 +125,26 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
 fn width(column: &Column) -> f32 {
     match column.field {
-        Kind::Name | Kind::Choice(_) => NAME_WIDTH,
+        Kind::Name(_) | Kind::Choice(_) => NAME_WIDTH,
+        Kind::ItemAt(_) | Kind::ItemOf(_) | Kind::Ability | Kind::Enemy => REFERENCE_WIDTH,
         _ => NUMBER_WIDTH,
     }
 }
 
-/// The bytes of record `row`.
-fn record(sheet: &Sheet, row: usize) -> std::ops::Range<usize> {
-    let start = sheet.start() + row * sheet.table.record;
-    start..start + sheet.table.record
-}
-
 fn row_name(payload: &[u8], sheet: &Sheet, row: usize) -> Option<String> {
-    let column = sheet.columns.iter().find(|column| matches!(column.field, Kind::Name))?;
-    Some(schema::name_text(&payload[record(sheet, row)], column.offset))
+    let column = sheet.columns.iter().find(|column| matches!(column.field, Kind::Name(_)))?;
+    Some(schema::name_text(&payload[sheet.range(row)], column))
 }
 
-fn cell(editor: &Editor, record: &[u8], row: usize, at: usize, column: &Column, cx: &mut Context<Editor>) -> Div {
+fn cell(
+    editor: &Editor,
+    names: &Names,
+    record: &[u8],
+    row: usize,
+    at: usize,
+    column: &Column,
+    cx: &mut Context<Editor>,
+) -> Div {
     let which = Field::Cell { row, column: at };
     let menu = Menu::Cell { row, column: at };
     let opened = editing_menu(editor, menu);
@@ -149,8 +155,8 @@ fn cell(editor: &Editor, record: &[u8], row: usize, at: usize, column: &Column, 
     });
 
     let content = match column.field {
-        Kind::Name => {
-            let text = schema::name_text(record, column.offset);
+        Kind::Name(_) => {
+            let text = schema::name_text(record, column);
             let draft = text.clone();
             field(("cell", at), &text, "", editing(editor, which), Some(NAME_WIDTH))
                 .on_click(cx.listener(move |editor, _, _, cx| {
@@ -203,19 +209,28 @@ fn cell(editor: &Editor, record: &[u8], row: usize, at: usize, column: &Column, 
             }
             cell.into_any_element()
         }
-        Kind::U8 | Kind::U16 | Kind::Nibble(_) => {
-            let text = value.to_string();
-            let draft = text.clone();
-            field(("cell", at), &text, "", editing(editor, which), Some(NUMBER_WIDTH))
-                .font_family(fonts::mono())
-                .on_click(cx.listener(move |editor, _, _, cx| {
-                    editor.start_editing(WindowField::View(which), draft.clone());
-                    cx.notify();
-                }))
-                .into_any_element()
-        }
+        Kind::U8 | Kind::U16 | Kind::U32 | Kind::Nibble(_) => number(editor, which, at, value, cx).into_any_element(),
+        Kind::ItemAt(_) | Kind::ItemOf(_) | Kind::Ability | Kind::Enemy => div()
+            .flex()
+            .items_center()
+            .gap(px(GAP_SMALL))
+            .child(number(editor, which, at, value, cx))
+            .child(muted(names.of(record, column).unwrap_or_default().to_string()).w(px(NAME_WIDTH)).overflow_hidden())
+            .into_any_element(),
     };
     div().w(px(width(column))).flex_none().child(content)
+}
+
+/// A number field that edits cell `which`.
+fn number(editor: &Editor, which: Field, at: usize, value: u32, cx: &mut Context<Editor>) -> gpui::Stateful<Div> {
+    let text = value.to_string();
+    let draft = text.clone();
+    field(("cell", at), &text, "", editing(editor, which), Some(NUMBER_WIDTH)).font_family(fonts::mono()).on_click(
+        cx.listener(move |editor, _, _, cx| {
+            editor.start_editing(WindowField::View(which), draft.clone());
+            cx.notify();
+        }),
+    )
 }
 
 fn close_menu(cx: &mut Context<Editor>) -> impl Fn(&gpui::MouseDownEvent, &mut gpui::Window, &mut gpui::App) + 'static {
@@ -231,7 +246,7 @@ fn write_cell(editor: &mut Editor, row: usize, at: usize, change: impl FnOnce(u3
     let Some(sheet) = sheets(&entry).into_iter().nth(editor.views.tables.sheet) else { return };
     let Some(column) = sheet.columns.get(at) else { return };
     let mut payload = entry.payload().to_vec();
-    let Some(record) = payload.get_mut(record(&sheet, row)) else { return };
+    let Some(record) = payload.get_mut(sheet.range(row)) else { return };
     let value = change(schema::read(record, column)).min(schema::max(column));
     schema::write(record, column, value);
     editor.set_payload(payload);
@@ -243,10 +258,10 @@ pub fn cell_changed(editor: &mut Editor, row: usize, at: usize, text: &str) -> O
     let sheet = sheets(&entry).into_iter().nth(editor.views.tables.sheet)?;
     let column = sheet.columns.get(at)?;
     let mut payload = entry.payload().to_vec();
-    let record = payload.get_mut(record(&sheet, row))?;
+    let record = payload.get_mut(sheet.range(row))?;
 
     match column.field {
-        Kind::Name => match schema::name_bytes(text) {
+        Kind::Name(_) => match schema::name_bytes(text, column) {
             Ok(bytes) => record[column.offset..column.offset + bytes.len()].copy_from_slice(&bytes),
             Err(error) => return Some(format!("{}: {error}", column.name)),
         },
