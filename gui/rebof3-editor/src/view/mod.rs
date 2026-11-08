@@ -15,13 +15,13 @@ mod tables;
 mod text;
 mod texture;
 
-use gpui::{AnyElement, Context, Keystroke, div, prelude::*, px};
+use gpui::{AnyElement, Context, Div, ElementId, Keystroke, Stateful, div, prelude::*, px};
 use rebof3_emi::classify::Format;
 
 use crate::app::{Editor, Field as WindowField};
 use crate::edit::LineEdit;
 use crate::project::{ArchivePath, Loaded, Project};
-use crate::widgets::{GAP_SMALL, separator, tab};
+use crate::widgets::{GAP_SMALL, field, separator, tab};
 
 /// One view of an entry.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -74,6 +74,8 @@ pub enum Field {
     Cell { row: usize, column: usize },
     /// A corner height of the map view's picked cell.
     MapCorner(usize),
+    /// A header field of sequence `index` of the sound view's package.
+    SequenceHeader { index: usize, part: sound::Part },
 }
 
 impl Field {
@@ -233,6 +235,24 @@ pub fn editing(editor: &Editor, field: Field) -> Option<&LineEdit> {
     editor.editing.as_ref().filter(|(which, _)| *which == WindowField::View(field)).map(|(_, edit)| edit)
 }
 
+/// The text field of `which`: it shows `text`, or `hint` while `text` is empty, and a click gives it the
+/// keyboard, starting from `text`.
+pub fn input(
+    editor: &Editor,
+    id: impl Into<ElementId>,
+    which: Field,
+    text: &str,
+    hint: &str,
+    width: Option<f32>,
+    cx: &mut Context<Editor>,
+) -> Stateful<Div> {
+    let draft = text.to_string();
+    field(id, text, hint, editing(editor, which), width).on_click(cx.listener(move |editor, _, _, cx| {
+        editor.start_editing(WindowField::View(which), draft.clone());
+        cx.notify();
+    }))
+}
+
 /// Whether the chooser `menu` is open.
 pub fn editing_menu(editor: &Editor, menu: Menu) -> bool {
     editor.menu == Some(crate::app::Menu::View(menu))
@@ -257,6 +277,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
         }
         Field::Cell { row, column } => tables::cell_changed(editor, row, column, text),
         Field::MapCorner(corner) => map::corner_changed(editor, corner, text),
+        Field::SequenceHeader { index, part } => sound::header_changed(editor, index, part, text),
     }
 }
 

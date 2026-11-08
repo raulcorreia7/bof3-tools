@@ -8,10 +8,10 @@ use gpui::{AnyElement, Context, div, prelude::*, px};
 use rebof3_emi::text::codec::{self, Encoding};
 use rebof3_emi::text::discover::{self, Found, Kind};
 
-use super::{Entry, Field, editing, message};
-use crate::app::{Editor, Field as WindowField};
+use super::{Entry, Field, input, message};
+use crate::app::Editor;
 use crate::theme::{EDITED, MUTED, color};
-use crate::widgets::{GAP, GAP_SMALL, field, mono, muted, separator, strong, tab};
+use crate::widgets::{GAP, GAP_SMALL, mono, muted, separator, strong, tab};
 
 /// The byte that ends a string and pads a shortened one.
 const TERMINATOR: u8 = 0;
@@ -49,12 +49,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let strings = found(payload, entry.load_arg());
     let state = &editor.views.text;
 
-    let filter_text = state.filter.clone();
-    let filter = field("text-filter", &state.filter, "Filter", editing(editor, Field::TextFilter), Some(FILTER_WIDTH))
-        .on_click(cx.listener(move |editor, _, _, cx| {
-            editor.start_editing(WindowField::View(Field::TextFilter), filter_text.clone());
-            cx.notify();
-        }));
+    let filter = input(editor, "text-filter", Field::TextFilter, &state.filter, "Filter", Some(FILTER_WIDTH), cx);
     let header = div()
         .flex()
         .flex_none()
@@ -87,15 +82,8 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             continue;
         }
 
-        let which = Field::Text(string.start);
-        let draft = text.clone();
-        let input = field(("string", string.start), &text, "", editing(editor, which), None).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                editor.start_editing(WindowField::View(which), draft.clone());
-                cx.notify();
-            },
-        ));
-        list = list.child(div().flex().items_start().gap(px(GAP)).child(offset).child(input));
+        let string_field = input(editor, ("string", string.start), Field::Text(string.start), &text, "", None, cx);
+        list = list.child(div().flex().items_start().gap(px(GAP)).child(offset).child(string_field));
     }
 
     div()

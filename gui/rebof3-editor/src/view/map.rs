@@ -16,10 +16,10 @@ use rebof3_assets::terrain::mesh_of_bundle;
 use rebof3_emi::area::map::{CELL_BYTES, MapBundle};
 
 use super::texture::paint_pixels;
-use super::{Entry, Field, editing};
-use crate::app::{Editor, Field as WindowField};
+use super::{Entry, Field, input};
+use crate::app::Editor;
 use crate::theme::{BACKGROUND, MUTED, color};
-use crate::widgets::{GAP, GAP_SMALL, field, mono, muted, separator, strong};
+use crate::widgets::{GAP, GAP_SMALL, mono, muted, separator, strong};
 
 /// Screen pixels per map cell.
 const CELL_PIXELS: f32 = 10.0;
@@ -183,17 +183,10 @@ fn panel(editor: &Editor, bundle: &MapBundle, picked: Option<usize>, cx: &mut Co
     panel = panel.child(strong(format!("Cell x {} y {}", cell % width, cell / width)));
 
     for (corner, name) in CORNER_NAMES.into_iter().enumerate() {
-        let which = Field::MapCorner(corner);
         let text = bundle.cells[cell].heights[corner].to_string();
-        let draft = text.clone();
-        let input = field(("corner", corner), &text, "", editing(editor, which), Some(CORNER_WIDTH)).on_click(
-            cx.listener(move |editor, _, _, cx| {
-                editor.start_editing(WindowField::View(which), draft.clone());
-                cx.notify();
-            }),
-        );
+        let height = input(editor, ("corner", corner), Field::MapCorner(corner), &text, "", Some(CORNER_WIDTH), cx);
         panel = panel
-            .child(div().flex().items_center().gap(px(GAP)).child(div().w(px(CORNER_WIDTH)).child(name)).child(input));
+            .child(div().flex().items_center().gap(px(GAP)).child(div().w(px(CORNER_WIDTH)).child(name)).child(height));
     }
     panel.child(muted("A corner height is a signed byte, -128 to 127; the mesh scales it by 16."))
 }
