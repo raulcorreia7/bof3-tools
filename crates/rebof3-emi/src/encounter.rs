@@ -72,9 +72,11 @@ pub struct Enemy {
     pub agility: u16,
     pub intellect: u16,
     pub steal: ItemRef,
-    pub steal_rate: u16,
+    /// Index into the drop chance table (`EnemyDrop.rate`). The byte after it is battle-only flags, kept as read.
+    pub steal_rate: u8,
     pub drop: ItemRef,
-    pub drop_rate: u16,
+    /// Index into the drop chance table (`EnemyDrop.rate`). The byte after it is battle-only flags, kept as read.
+    pub drop_rate: u8,
     pub action_blocks: [ActionBlock; 4],
     /// Resistance levels, `0` to `7`, for fire, frost, thunder, earth, wind, holy, psionic, status and death.
     pub resistances: [u8; 9],
@@ -142,9 +144,9 @@ fn enemy(record: &[u8]) -> Enemy {
         agility: u16_at(record, 0x28),
         intellect: u16_at(record, 0x2a),
         steal: ItemRef { index: record[0x2c], item_type: record[0x2d] },
-        steal_rate: u16_at(record, 0x2e),
+        steal_rate: record[0x2e],
         drop: ItemRef { index: record[0x30], item_type: record[0x31] },
-        drop_rate: u16_at(record, 0x32),
+        drop_rate: record[0x32],
         action_blocks: [0x34, 0x44, 0x54, 0x64].map(|at| action_block(record, at)),
         resistances: bytes(record, 0x78),
     }
@@ -194,10 +196,10 @@ pub fn put_enemy(record: &mut [u8], enemy: &Enemy) -> std::result::Result<(), St
     put_u16(record, 0x2a, enemy.intellect);
     record[0x2c] = enemy.steal.index;
     record[0x2d] = enemy.steal.item_type;
-    put_u16(record, 0x2e, enemy.steal_rate);
+    record[0x2e] = enemy.steal_rate;
     record[0x30] = enemy.drop.index;
     record[0x31] = enemy.drop.item_type;
-    put_u16(record, 0x32, enemy.drop_rate);
+    record[0x32] = enemy.drop_rate;
     for (at, block) in [0x34, 0x44, 0x54, 0x64].into_iter().zip(&enemy.action_blocks) {
         record[at] = block.condition;
         record[at + 1..at + 8].copy_from_slice(&block.ai_params);
