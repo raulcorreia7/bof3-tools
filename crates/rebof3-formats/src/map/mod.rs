@@ -48,6 +48,7 @@ use crate::error::{Error, Result};
 use crate::identity::difference;
 use crate::registry::{Description, Extra, Extras, Format, RoundTrip, Selector, Site, State};
 
+pub mod codes;
 pub mod draw;
 pub mod layout;
 pub mod terrain;

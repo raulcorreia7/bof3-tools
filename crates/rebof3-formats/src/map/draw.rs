@@ -86,6 +86,44 @@ pub fn to_gte(model: [i32; 3]) -> [i32; 3] {
     [model[0], model[2], -model[1]]
 }
 
+/// The ground under a point `x2`, `y2` half cells in, in renderer units: `Area_SampleHeight`
+/// (`exe/slus_004_22@0x8015477C`; the C is a draft, the shifts are read from its asm) with the
+/// height-byte offset off, halved as the actor projection halves it. At a cell's centre it is the sum of
+/// corners 1 and 2; half a cell on in `x` the larger of the sums that meet at the edge, and likewise in
+/// `y`; at a corner the largest of the four corners that meet there. Outside the grid it is 0.
+pub fn ground(bundle: &MapBundle, x2: u16, y2: u16) -> i32 {
+    let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
+    let (x, y) = (usize::from(x2 / 2), usize::from(y2 / 2));
+    let corner = |column: usize, row: usize, index: usize| {
+        bundle
+            .cells
+            .get(row * width + column)
+            .filter(|_| column < width && row < height)
+            .map_or(0, |cell| i32::from(cell.heights[index]))
+    };
+    if x >= width || y >= height {
+        return 0;
+    }
+    let steps = match (x2 & 1 == 1, y2 & 1 == 1) {
+        (false, false) => corner(x, y, 1) + corner(x, y, 2),
+        (true, false) => (corner(x, y, 1) + corner(x, y, 3)).max(corner(x + 1, y, 0) + corner(x + 1, y, 2)),
+        (false, true) => (corner(x, y, 2) + corner(x, y, 3)).max(corner(x, y + 1, 0) + corner(x, y + 1, 1)),
+        (true, true) => {
+            let meeting = [corner(x, y, 3), corner(x + 1, y, 2), corner(x, y + 1, 1), corner(x + 1, y + 1, 0)];
+            2 * meeting.into_iter().max().unwrap_or(0)
+        }
+    };
+    steps * HEIGHT_SCALE / 2
+}
+
+/// The renderer position of an actor at `x2`, `y2` half cells: a whole cell puts it on the cell's
+/// centre, half a cell on the edge (the actor projection `vx = (x >> 9) - 0x4000` against the mesh's
+/// `x * 0x80 - 0x4040`).
+pub fn actor_position(bundle: &MapBundle, x2: u16, y2: u16) -> [i32; 3] {
+    let half = CELL_UNITS / 2;
+    [i32::from(x2) * half + half, ground(bundle, x2, y2), i32::from(y2) * half + half]
+}
+
 /// How a semi-transparent texel mixes with what is behind it: the GPU's four modes (psx-spx, "GPU
 /// Texpage Attribute", bits 5-6), `B` the colour behind and `F` the texel.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -170,6 +208,100 @@ impl Tile {
             sorted: descriptor & SORTED_BIT != 0,
             front: descriptor & FRONT_BIT != 0,
         })
+    }
+}
+
+/// A field of a descriptor word that [`Tile`] reads, by its bits (the table at the top of the module).
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum TileField {
+    /// Bits 0-11: the tile within its bank (the block, rectangle or quad index and the bank bit).
+    Tile,
+    /// Bits 12-13.
+    BlendMode,
+    /// Bit 14.
+    Sorted,
+    /// Bit 15.
+    Semi,
+    /// Bit 16.
+    FlipX,
+    /// Bit 17.
+    FlipZ,
+    /// Bit 18.
+    Turn,
+    /// Bits 19-23, read as the grey level's top five bits.
+    Shade,
+    /// Bits 24-27.
+    Clut,
+    /// Bits 28-29.
+    PageBank,
+    /// Bit 30.
+    Front,
+    /// Bit 31: set is 4-bit.
+    FourBit,
+}
+
+impl TileField {
+    pub const ALL: [TileField; 12] = [
+        Self::Tile,
+        Self::Shade,
+        Self::Clut,
+        Self::PageBank,
+        Self::FourBit,
+        Self::Semi,
+        Self::BlendMode,
+        Self::FlipX,
+        Self::FlipZ,
+        Self::Turn,
+        Self::Sorted,
+        Self::Front,
+    ];
+
+    /// The field's first bit and width.
+    pub fn bits(self) -> (u32, u32) {
+        match self {
+            Self::Tile => (0, 12),
+            Self::BlendMode => (12, 2),
+            Self::Sorted => (14, 1),
+            Self::Semi => (15, 1),
+            Self::FlipX => (16, 1),
+            Self::FlipZ => (17, 1),
+            Self::Turn => (18, 1),
+            Self::Shade => (19, 5),
+            Self::Clut => (24, 4),
+            Self::PageBank => (28, 2),
+            Self::Front => (30, 1),
+            Self::FourBit => (31, 1),
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Tile => "tile",
+            Self::BlendMode => "blend mode",
+            Self::Sorted => "depth-sorted",
+            Self::Semi => "semi-transparent",
+            Self::FlipX => "flip x",
+            Self::FlipZ => "flip z",
+            Self::Turn => "quarter turn",
+            Self::Shade => "grey (x8)",
+            Self::Clut => "CLUT index",
+            Self::PageBank => "page bank",
+            Self::Front => "front slot",
+            Self::FourBit => "4-bit",
+        }
+    }
+
+    /// The field's value in `word`.
+    pub fn get(self, word: u32) -> u32 {
+        let (shift, width) = self.bits();
+        (word >> shift) & ((1 << width) - 1)
+    }
+
+    /// `word` with the field set to `value`, or `None` when the value does not fit the field.
+    pub fn set(self, word: u32, value: u32) -> Option<u32> {
+        let (shift, width) = self.bits();
+        let mask = (1u32 << width) - 1;
+        (value <= mask).then(|| (word & !(mask << shift)) | (value << shift))
     }
 }
 
@@ -332,6 +464,34 @@ mod tests {
         let zero = Tile::of(&bundle, 0).expect("a zero word is a tile");
         assert_eq!((zero.shade, zero.page, zero.depth), (0, [320, 256], Depth::Eight));
         assert!(Tile::of(&bundle, 99).is_none());
+    }
+
+    #[test]
+    fn a_tile_field_sets_its_bits_alone() {
+        let word = 0x8180_9001;
+        assert_eq!(TileField::Shade.get(word), 0x10);
+        assert_eq!(TileField::Clut.set(word, 3), Some(0x8380_9001));
+        assert_eq!(TileField::PageBank.set(word, 4), None);
+        let mut covered = 0u64;
+        for field in TileField::ALL {
+            let (shift, width) = field.bits();
+            let mask = ((1u64 << width) - 1) << shift;
+            assert_eq!(covered & mask, 0, "{field:?} overlaps");
+            covered |= mask;
+        }
+        assert_eq!(covered, 0xFFFF_FFFF, "the fields cover the word");
+    }
+
+    #[test]
+    fn the_ground_follows_area_sample_height() {
+        let bundle = bundle();
+        // Cell (1, 1) has every corner at 2: its centre is (2 + 2) * 16 / 2.
+        assert_eq!(ground(&bundle, 2, 2), 32);
+        assert_eq!(actor_position(&bundle, 2, 2), [192, 32, 192]);
+        // Half a cell on in x: the larger of (2 + 2) and the flat neighbour's (0 + 0).
+        assert_eq!(ground(&bundle, 3, 2), 32);
+        assert_eq!(ground(&bundle, 6, 6), 0);
+        assert_eq!(ground(&bundle, 99, 2), 0);
     }
 
     #[test]
