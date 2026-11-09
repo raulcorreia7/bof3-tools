@@ -21,10 +21,18 @@ psx-formats = { workspace = true, features = ["std"] }
 serde.workspace = true
 serde_json.workspace = true
 gpui.workspace = true
+rebof3-render.workspace = true
+# The frame type gpui paints a rendered image from.
+image = { version = "0.25.10", default-features = false }
 cpal = "0.18.2"
 # The output resampler for a device that does not run at the library's 44.1 kHz. Pinned: its
 # majors come quickly and change the API.
 rubato = "=5.0.1"
+
+[features]
+default = ["gles"]
+# Draws the area view through offscreen OpenGL ES when a context opens; the software path always builds.
+gles = ["rebof3-render/gles"]
 
 [lints]
 workspace = true
