@@ -36,13 +36,7 @@ pub fn decodes(format: Format) -> bool {
 }
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
-    // The battle bank at `0x800F0800` and the magic-effect bank at `0x800C3800` have the area bank's
-    // format (`wiki: formats/area`).
-    let format = match entry.format() {
-        Format::BattleScriptBank | Format::MagicTable => Format::AreaScriptBank,
-        format => format,
-    };
-    let derived = match derive(format, entry.load_arg(), entry.payload()) {
+    let derived = match derive(entry.format(), entry.load_arg(), entry.payload()) {
         Ok(derived) => derived,
         Err(error) => return muted(format!("The decoder failed: {error}")).into_any_element(),
     };

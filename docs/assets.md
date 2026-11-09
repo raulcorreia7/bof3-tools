@@ -22,7 +22,9 @@ of every file.
 | `area-map`        | `<slot>.map`                                                       | `<slot>.obj`, `.mtl`, `.glb`, `.layout.json`                              |
 | `area-actor-defs` | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
 | `area-encounters` | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
-| `area-script`     | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
+| `area-script`     | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
+| `battle-script`   | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
+| `bmagic-table`    | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
 | `character-bank`  | `<slot>.lz77` or `<slot>.emi0`                                     | the decoded blob `<slot>.bin` of an LZ77 bank                             |
 | `cdda`            | `cdda/track<NN>.pcm` (16-bit stereo, 44.1 kHz, no header)          | `track<NN>.wav`                                                           |
 | `data-table`      | `data-table/BIN/ETC/GAME/<name>.bin` (the table's span of entry 0) | `<name>.json`                                                             |
@@ -50,13 +52,14 @@ its modern output too.
 | `palette`                                                                                                                                          | `.clut`                      | `.json`, `.png`                                    |
 | `audio-bank`                                                                                                                                       | `.vh`, `.vb`, `.vab`, `.vag` | `.sf2`, `.wav`                                     |
 | `audio-sequence`                                                                                                                                   | `.seq`                       | `.mid`                                             |
-| `audio-cues`, `area-actor-defs`, `area-encounters`, `area-script`                                                                                  | `.emi8`, `.emi0`             | `.json`                                            |
+| `audio-cues`, `area-actor-defs`, `area-encounters`                                                                                                 | `.emi8`, `.emi0`             | `.json`                                            |
+| `area-script`, `battle-script`, `bmagic-table`                                                                                                     | `.emi0`                      | `.json`, `.txt`                                    |
 | `character-bank`                                                                                                                                   | `.lz77` or `.emi0`           | `.bin` for an LZ77 bank; an unpacked bank has none |
 | `area-map`                                                                                                                                         | `.map`                       | `.obj`, `.mtl`, `.glb`, `.layout.json`             |
 | `cdda`                                                                                                                                             | `.pcm`                       | `.wav`                                             |
 | `data-table`                                                                                                                                       | `.bin`                       | `.json`                                            |
 | `xa-audio`                                                                                                                                         | the `.STR` file              | `.wav`                                             |
-| `executable`, `system`, `video`, `area-message`, `area-cells`, `battle-script`, `area-module`, `resource-table`, `bmagic-table`, `code`, `unknown` | the stored bytes             | the stored bytes                                   |
+| `executable`, `system`, `video`, `area-message`, `area-cells`, `area-module`, `resource-table`, `code`, `unknown`                                  | the stored bytes             | the stored bytes                                   |
 | `text`                                                                                                                                             | `<slot>.bin`                 | `.json`, `.txt`, `index.jsonl`                     |
 
 ## Catalog
@@ -64,7 +67,8 @@ its modern output too.
 `assets.jsonl` has one object per output file with the keys `source`, `slot`, `offset`, `size`,
 `type`, `load_arg`, `format`, `kind`, `state`, `role`, `output`, `bytes`, `sha256`, `evidence` and
 `note`. `role` is `raw` for the stored bytes (`vab` and `vag` are also the disc's own bytes); a derived
-file names its format (`png`, `tim`, `json`, `obj`, `mtl`, `glb`, `sf2`, `wav` or `midi`). `kind` is the
+file names its format (`png`, `tim`, `json`, `obj`, `mtl`, `glb`, `sf2`, `wav` or `midi`; `script` for a script
+bank's ops as text). `kind` is the
 asset kind and `format` is the entry's format. `evidence` names the loader evidence behind a derived
 file. A derived file of one entry carries the same `source` and `slot` as that entry.
 
@@ -120,6 +124,16 @@ every byte the open form does not name.
 - **Text and characters.** `export message`, `export strings`, `export characters` and
   `export character-bank` pair with the `import` verbs of the same name. `character-bank` imports palette
   tables only.
+- **Script banks.** `export script PAYLOAD` writes an area, battle or magic-effect script bank as text,
+  one op per line; `import script TEXT --payload PAYLOAD` reads it back. A record is the animation
+  stream `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`) plays: `show frame F ticks T` stages a
+  frame for its ticks (`Actor_StageAnimStep`), and `jump LABEL` continues at a labelled step (`Actor_StepAnimLoop`,
+  `Actor_StepAnimOnce`); every first byte selects one of the two. `frame` and `cell` lines give the frames,
+  `pad` the bytes before the next record, and `raw` a record that does not read as a stream. The
+  text carries every byte, so an unchanged export imports to the stored bank. A jump names a label, so a
+  step added in the text moves the jumps after it; the import refuses a bank larger than `--payload`,
+  because what follows the bank in memory is not known to be free. Game code names stream positions
+  (`Actor_BeginScript`'s start position, `script_pc` tests), and the import cannot check those.
 - **Sprite sheets.** `export sprite-sheet PAYLOAD --exe SLUS_004.22 --section N --palette N -o OUT.png`
   writes one section of a sprite bank as an 8-bit indexed PNG and `OUT.json` in Aseprite's array form:
   one row per animation a record plays, one cell per frame stitched through the VRAM model, one frame
@@ -135,8 +149,7 @@ every byte the open form does not name.
   address; a changed payload moves the entries after it. `import disc CUE --file PATH=FILE -o DIR` writes
   a patched copy of the disc; a replacement file cannot grow past its last sector.
 
-Cue tables, area scripts, area cells, actor definitions, XA and STR streams and CDDA tracks have no
-import verb. An import verb that does not exist for a kind fails with a usage error.
+Cue tables, area cells, actor definitions, XA and STR streams and CDDA tracks have no import verb. An import verb that does not exist for a kind fails with a usage error.
 
 ## Period files
 
@@ -192,6 +205,7 @@ The other kinds round trip through their own commands. Results over the retail d
 | sound bank with `--mode raw`                     | 1,020 of 1,020 banks                          | lossless |
 | VAG sample through WAVE                          | no sample comes back byte for byte            | lossy    |
 | sprite bank section through a sprite sheet       | 273 of 273 sections                           | lossless |
+| script bank through its text                     | 279 of 279 banks                              | lossless |
 
 `assets import vag` drops the end-marker block and the loop flags. The retail cases need the disc and
 skip without it.
