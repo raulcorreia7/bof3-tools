@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-//! The conversion commands' output and messages for small synthetic inputs. The expected text is `tests/convert.snap`; `UPDATE_SNAPSHOT=1` rewrites it.
+//! The conversion commands' output and messages for small synthetic inputs. The expected text is
+//! `tests/convert.snap`; `UPDATE_SNAPSHOT=1` rewrites it.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -12,7 +13,8 @@ fn palette() -> Vec<u8> {
     words
 }
 
-/// A one-section script table: a stream of two frames that loops on its second step, and two bytes of padding.
+/// A one-section script table: a stream of two frames that loops on its second step, and two bytes of
+/// padding.
 fn script_table() -> Vec<u8> {
     let stream = [
         2, 3, // frames, steps
@@ -70,6 +72,7 @@ fn render() -> String {
     run(&dir, &["assets", "tables"], &mut out);
     run(&dir, &["assets", "bogus"], &mut out);
     let _ = std::fs::remove_dir_all(&dir);
+    // Windows prints `\` in paths.
     out.replace('\\', "/")
 }
 

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-//! The help text is a contract: every command prints its own help and the output below must not change unless `tests/help.snap` changes with it. `UPDATE_SNAPSHOT=1 cargo test -p rebof3 --test help` rewrites the snapshot.
+//! The help text is a contract: every command prints its own help and the output below must not
+//! change unless `tests/help.snap` changes with it. `UPDATE_SNAPSHOT=1 cargo test -p rebof3 --test help`
+//! rewrites the snapshot.
 
 use std::fmt::Write as _;
 use std::path::PathBuf;

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! `bof3`: the Breath of Fire III toolchain.
+//!
+//! Subcommands: `disc` and `emi`, plus `assets` in the default build. Each keeps
+//! the flags and help of the command it replaced.
 
 #[cfg(feature = "assets")]
 mod assets;

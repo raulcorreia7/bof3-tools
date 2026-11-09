@@ -1,4 +1,5 @@
-//! The verbs for the files a 1990s PlayStation studio exchanged: TIM, VAB (VH and VB) and SEQ.
+//! The verbs for the files a 1990s PlayStation studio exchanged: TIM, VAB (VH and VB) and SEQ. The
+//! conversions are in `rebof3_formats`; this file reads the arguments and writes the files.
 
 use std::fs;
 use std::path::PathBuf;

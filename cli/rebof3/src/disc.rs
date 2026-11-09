@@ -10,7 +10,8 @@ pub(crate) const IMAGE_DIR: &str = "inputs/external";
 /// Folders searched for the disc image, in order, when no `-i` is given.
 pub(crate) const IMAGE_DIRS: [&str; 2] = [IMAGE_DIR, "disk"];
 
-/// The disc image in the first of `IMAGE_DIRS` below `base` that holds one; the error names every folder searched.
+/// The disc image in the first of `IMAGE_DIRS` below `base` that holds one; the error names every
+/// folder searched. Shared by `assets` and `disc` so both find the same image.
 pub(crate) fn find_disc_image(base: &Path) -> Result<PathBuf, String> {
     let mut reasons = Vec::new();
     for directory in IMAGE_DIRS {
