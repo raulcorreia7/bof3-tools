@@ -17,7 +17,7 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 
 | Format | Entries | View | Edit | Round-trip test | Gap or reason |
 | ------ | ------: | ---- | ---- | --------------- | ------------- |
-| VRAM texture upload (type 3) | 593 | Texture: 4, 8 or 16 bpp with a row a rule joins in the scene that loads it, a ranked suggestion, or a chosen row; VRAM: the scene's whole frame buffer, each region labelled by its entry, any region decoded at any depth with any CLUT row of the scene, exported as PNG | paint texels | retail: words back to the payload, 593/593; every upload of an archive a default scene loads shows in VRAM, except FIRST entry 4 | 202 of 593 are joined; the rest show a suggestion, never applied. FIRST entry 12 covers all of entry 4. `ENDKANJI` and `SCENA17` (4 uploads) have no default scene: their loaders are not read |
+| VRAM texture upload (type 3) | 593 | Texture: 4, 8 or 16 bpp, opened at the depth and row a route saw the game draw it with, else a row a rule joins in the scene that loads it, else 16 bpp with the reason; a ranked suggestion or a chosen row; export and import a TIM; VRAM: the scene's whole frame buffer, each region labelled by its entry, any region decoded at any depth with any CLUT row of the scene, exported as PNG | paint texels | retail: words back to the payload, 593/593; every upload of an archive a default scene loads shows in VRAM, except FIRST entry 4 | 202 of 593 are joined; the `new-game` route observes 14 entries (see [Observed draws](#observed-draws)); the rest show a suggestion, never applied. FIRST entry 12 covers all of entry 4. `ENDKANJI` and `SCENA17` (4 uploads) have no default scene: their loaders are not read |
 | CLUT bank | 620 | Palette, Decoded; VRAM: where the scene's palette upload puts it | colour channels and STP bit | retail: an edit rewrites only its colour word, 620/620 banks | none |
 | VRAM layout (type 3 and CLUT bank) | 593 + 620 | Layout: the scene's texture and palette placements as labelled rectangles in the frame buffer, with each entry's depth, the draw sites that read it and its collisions in red | move a texture by column and row (its load argument), or a bank by its palette-arena address; back to the disc's value | retail: AREA024 lays out, and a move and its reverse rebuild the archive byte for byte; synthetic: moves, undo, save and rebuild | a placement the game sets in code cannot move and is shown grey with its reason: palette words of a compressed bank, uploads by named code. Draw sites in the executable and overlays name pages and rows as literals; a move changes the data only |
 | VAB header (type 6) | 1,020 | Sound: samples, programs and tones; Tables: bank, programs, tones | master volume and pan, every program and tone field | retail: every sheet rewrites its bytes | none; the counts and sizes that lay out the header are not editable |
@@ -39,6 +39,37 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | Code image | 548 | Info and Hex; `ETC/GAME.EMI` entry 0 also Tables | Hex; the game tables | retail: sheets | code is changed in the decompilation and rebuilt, not here |
 | Reserve (all-zero payload) | 53 | Info and Hex | Hex only | n/a | the payload carries no data; the loader only reserves the space |
 | Unclassified | 0 | Info and Hex | Hex only | n/a | no retail entry; types 2 and 9 never occur on the disc |
+
+## Observed draws
+
+The Texture view uses the game's own draws as evidence. **Routes → Run new-game** boots the disc image
+in `psx-machine` and plays a button script (`crates/rebof3-observe/routes/*.toml`) in a background
+thread, with its progress and **Cancel** on the Routes line; the window keeps working. While it runs,
+`rebof3-observe` follows the files the game reads (`Setloc`), names the type-3 entry each 32×32 upload
+came from, and joins every textured draw to the entry whose uploads wrote all the VRAM words its page
+and UVs sample. Such a draw proves the entry's depth; its CLUT attribute names the palette row, and the
+entry that wrote the row is named when its words match (a type-3 upload, or a type-0 bank in the
+palette arena).
+
+The view opens an entry at the most-drawn depth and row a cached route saw, with the evidence line
+`Observed: route new-game, frame N, GP0(2Ch); D draws; CLUT X,Y written by ARCHIVE #SLOT`. Every
+observed row is in the colour chooser beside the joined rows. A named bank's row is read from the
+project, so a palette edit shows; an unnamed row keeps the words the draw found. A rule that names
+another row is shown on the same line, not silently dropped. With no observation the order stays:
+a joined row, then 16 bpp with the reason and the suggestion.
+
+The disc image is the one `BOF3_DISC_IMAGE` names, else the image in `inputs/external/` or `disk/`
+of the nearest folder above the disc folder. Results are a cache, never project edits:
+`<project>/build/cache/observe/<disc data-track sha256>/<route>.json`. A cache made by another
+bof3-player revision (from `Cargo.lock`), another route text or another file layout is not read.
+`bof3 observe` writes the same file ([command line](cli.md#observe)).
+
+The `new-game` route runs 8,100 frames in about 16 s in a release build (one thread): 14 entries
+in 6 archives, 53 depth and row pairs, 41 of their rows named. It reads `BOSS/BOSS001` for the first
+battle and never `BATTLE/BATL_DRA`, which only battle overlay 15 streams (`Battle_LoadDraArchive`);
+that archive needs a route that reaches a normal battle. Where a rule and a draw both name a row
+(14 rows), 10 agree; the terrain rule's rows 485 and 487 for `AREA024` slot 7 at page (448, 256) are
+drawn as rows 486 and 488. The depths agree everywhere.
 
 ## Shell
 
