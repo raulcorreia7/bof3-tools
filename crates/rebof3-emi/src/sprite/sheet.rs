@@ -22,7 +22,7 @@ use psx_formats::gfx::clut::{view_to_word, word_to_view};
 use psx_formats::gfx::png::{self, Picture};
 use serde::{Deserialize, Serialize};
 
-use super::{Animation, Bounds, COLOURS, Placement, Section, SpriteSizes, Stage, animation_bounds, compose};
+use super::{Animation, Bank, Bounds, COLOURS, Placement, Section, SpriteSizes, Stage, animation_bounds, compose};
 use crate::replay::Vram;
 use crate::{Error, Result};
 
@@ -150,6 +150,7 @@ struct Layer {
 /// What the sheet means to the game, past Aseprite's fields.
 #[derive(Serialize, Deserialize)]
 struct Extension {
+    section: usize,
     palette: usize,
     /// The actor's position in every cell.
     origin: Point,
@@ -217,9 +218,31 @@ fn placed(section: &Section) -> Vec<(usize, usize)> {
     (0..section.animations.len()).filter_map(|animation| Some((animation, section.image_of(animation)?))).collect()
 }
 
-/// The PNG and JSON of `section` drawn with palette `palette`. `image` is the PNG's file name, which the
-/// JSON names.
-pub fn export(section: &Section, palette: usize, sizes: &SpriteSizes, image: &str) -> Result<Sheet> {
+/// The PNG and JSON of section `section` of `bank` drawn with palette `palette`. `image` is the PNG's
+/// file name, which the JSON names.
+pub fn export(bank: &Bank, section: usize, palette: usize, sizes: &SpriteSizes, image: &str) -> Result<Sheet> {
+    let part = bank.sections.get(section).ok_or_else(|| missing("section", section))?;
+    export_section(part, section, palette, sizes, image)
+}
+
+/// `bank` with the colours, texels and step durations of a sheet [`export`] wrote, in the section the
+/// sheet names.
+pub fn import(bank: &Bank, sizes: &SpriteSizes, json: &[u8], png: &[u8]) -> Result<Bank> {
+    let section = read_json(json)?.meta.bof3.section;
+    let part = bank.sections.get(section).ok_or_else(|| missing("section", section))?;
+    let mut out = bank.clone();
+    out.sections[section] = import_section(part, sizes, json, png)?;
+    Ok(out)
+}
+
+/// The sheet of one section; `number` is the section's place in its bank, which the JSON records.
+pub fn export_section(
+    section: &Section,
+    number: usize,
+    palette: usize,
+    sizes: &SpriteSizes,
+    image: &str,
+) -> Result<Sheet> {
     let mut stages = Stages::new(section, palette)?;
     let placed = placed(section);
     let bounds = placed
@@ -298,6 +321,7 @@ pub fn export(section: &Section, palette: usize, sizes: &SpriteSizes, image: &st
             layers: vec![Layer { name: LAYER.into(), opacity: OPAQUE, blend_mode: BLEND.into() }],
             slices: Vec::new(),
             bof3: Extension {
+                section: number,
                 palette,
                 origin: Point { x: -bounds.left, y: -bounds.top },
                 cell: Size { w: cell_width, h: cell_height },
@@ -317,10 +341,9 @@ pub fn export(section: &Section, palette: usize, sizes: &SpriteSizes, image: &st
     Ok(Sheet { png, json })
 }
 
-/// `section` with the colours, texels and step durations of a sheet [`export`] wrote.
-pub fn import(section: &Section, sizes: &SpriteSizes, json: &[u8], png: &[u8]) -> Result<Section> {
-    let json: Json = serde_json::from_slice(json)
-        .map_err(|error| Error::SpriteBank(format!("the sheet JSON does not read: {error}")))?;
+/// `section` with the colours, texels and step durations of a sheet [`export_section`] wrote.
+pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: &[u8]) -> Result<Section> {
+    let json = read_json(json)?;
     let picture = match png::read(png)? {
         Picture::Indexed(picture) if picture.bits == PNG_BITS => picture,
         _ => return Err(Error::SpriteBank("the sheet must stay an 8-bit indexed PNG".into())),
@@ -433,6 +456,15 @@ pub fn import(section: &Section, sizes: &SpriteSizes, json: &[u8], png: &[u8]) -
     Ok(out)
 }
 
+fn read_json(json: &[u8]) -> Result<Json> {
+    serde_json::from_slice(json).map_err(|error| Error::SpriteBank(format!("the sheet JSON does not read: {error}")))
+}
+
+/// The PNG file name a sheet's JSON names (`meta.image`).
+pub fn image_name(json: &[u8]) -> Result<String> {
+    Ok(read_json(json)?.meta.image)
+}
+
 /// The steps of `animation` that show a frame: stream position, frame and delay.
 fn shown_steps(animation: &Animation, index: usize) -> Result<Vec<(usize, usize, u8)>> {
     animation
@@ -479,6 +511,16 @@ mod tests {
     }
 
     #[test]
+    fn a_bank_sheet_names_its_section() {
+        let bank = crate::sprite::decode(&crate::sprite::tests::container(0x400)).expect("decodes");
+        let sheet = export(&bank, 2, 0, &sizes(), "bank.png").expect("exports");
+        assert_eq!(image_name(&sheet.json).expect("names its PNG"), "bank.png");
+        let imported = import(&bank, &sizes(), &sheet.json, &sheet.png).expect("imports");
+        assert_eq!(crate::sprite::encode(&imported).expect("encodes"), crate::sprite::encode(&bank).expect("encodes"));
+        assert!(export(&bank, 3, 0, &sizes(), "bank.png").is_err());
+    }
+
+    #[test]
     fn durations_round_trip_through_milliseconds() {
         for delay in (0..super::super::JUMP).chain([0]) {
             assert_eq!(delay_of(duration_ms(delay)), Some(delay), "delay {delay}");
@@ -490,15 +532,15 @@ mod tests {
     #[test]
     fn an_unchanged_sheet_imports_to_the_stored_section() {
         let section = section();
-        let sheet = export(&section, 0, &sizes(), "bank.png").expect("exports");
-        let imported = import(&section, &sizes(), &sheet.json, &sheet.png).expect("imports");
+        let sheet = export_section(&section, 0, 0, &sizes(), "bank.png").expect("exports");
+        let imported = import_section(&section, &sizes(), &sheet.json, &sheet.png).expect("imports");
         assert_eq!(imported.encode().expect("encodes"), section.encode().expect("encodes"));
         assert!(imported.images.iter().all(super::super::Image::is_stored));
     }
 
     #[test]
     fn the_json_is_aseprite_shaped() {
-        let sheet = export(&section(), 0, &sizes(), "bank.png").expect("exports");
+        let sheet = export_section(&section(), 0, 0, &sizes(), "bank.png").expect("exports");
         let json: serde_json::Value = serde_json::from_slice(&sheet.json).expect("JSON");
         assert_eq!(json["meta"]["image"], "bank.png");
         assert_eq!(json["meta"]["frameTags"][0]["direction"], "forward");
@@ -521,11 +563,11 @@ mod tests {
     #[test]
     fn a_painted_pixel_goes_to_its_sheet_texel() {
         let section = section();
-        let sheet = export(&section, 0, &sizes(), "bank.png").expect("exports");
+        let sheet = export_section(&section, 0, 0, &sizes(), "bank.png").expect("exports");
         // Pose 0 is animation 0 frame 0: one 16x16 cell at (-8, -8) over texels (0..16, 0..8); the sheet is
         // 8 rows tall, so rows 8-15 of the cell are outside it. The box starts at (-8, -8) too.
         let png = repaint(&sheet, 0, (3, 2), 30);
-        let imported = import(&section, &sizes(), &sheet.json, &png).expect("imports");
+        let imported = import_section(&section, &sizes(), &sheet.json, &png).expect("imports");
         assert_eq!(imported.images[0].texel(3, 2), Some(30));
         let changed = (0..imported.images[0].texel_count())
             .filter(|&at| imported.images[0].texels()[at] != section.images[0].texels()[at])
@@ -537,22 +579,22 @@ mod tests {
     #[test]
     fn two_different_changes_to_one_texel_are_refused() {
         let section = section();
-        let sheet = export(&section, 0, &sizes(), "bank.png").expect("exports");
+        let sheet = export_section(&section, 0, 0, &sizes(), "bank.png").expect("exports");
         // Poses 0 (frame 0) and 1 (frame 1) both show texel (0, 0) at their top-left pixel.
         let once = repaint(&sheet, 0, (0, 0), 20);
         let twice = Sheet { png: once, json: sheet.json.clone() };
         let png = repaint(&twice, 1, (0, 0), 21);
-        let error = import(&section, &sizes(), &sheet.json, &png).expect_err("a conflict");
+        let error = import_section(&section, &sizes(), &sheet.json, &png).expect_err("a conflict");
         assert!(error.to_string().contains("texel (0, 0)"), "{error}");
     }
 
     #[test]
     fn a_changed_duration_sets_the_delay() {
         let section = section();
-        let sheet = export(&section, 0, &sizes(), "bank.png").expect("exports");
+        let sheet = export_section(&section, 0, 0, &sizes(), "bank.png").expect("exports");
         let mut json: serde_json::Value = serde_json::from_slice(&sheet.json).expect("JSON");
         json["frames"][0]["duration"] = serde_json::Value::from(duration_ms(10));
-        let imported = import(&section, &sizes(), json.to_string().as_bytes(), &sheet.png).expect("imports");
+        let imported = import_section(&section, &sizes(), json.to_string().as_bytes(), &sheet.png).expect("imports");
         assert_eq!(imported.animations[0].steps[0].delay, 10);
         assert_eq!(imported.animations[0].steps[1], section.animations[0].steps[1]);
     }
@@ -560,11 +602,11 @@ mod tests {
     #[test]
     fn a_changed_palette_colour_comes_back() {
         let section = section();
-        let sheet = export(&section, 0, &sizes(), "bank.png").expect("exports");
+        let sheet = export_section(&section, 0, 0, &sizes(), "bank.png").expect("exports");
         let Ok(Picture::Indexed(mut picture)) = png::read(&sheet.png) else { panic!("an indexed PNG") };
         picture.colors[4] = word_to_view(0x7C00);
         let png = png::indexed_png(picture.width, picture.height, PNG_BITS, &picture.colors, &picture.indices);
-        let imported = import(&section, &sizes(), &sheet.json, &png).expect("imports");
+        let imported = import_section(&section, &sizes(), &sheet.json, &png).expect("imports");
         assert_eq!(imported.palettes[0][4], 0x7C00);
         assert_eq!(imported.palettes[0][5], section.palettes[0][5]);
     }

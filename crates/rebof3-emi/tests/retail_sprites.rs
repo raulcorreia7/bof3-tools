@@ -98,14 +98,15 @@ fn every_retail_sprite_bank_round_trips_and_stitches() {
                 }
             }
 
-            let sheet = match sprite::export(section, FIELD_PALETTE, &sizes, "sheet.png") {
+            let sheet = match sprite::export_section(section, number, FIELD_PALETTE, &sizes, "sheet.png") {
                 Ok(sheet) => sheet,
                 Err(error) => {
                     failures.push(format!("{place} section {number}: export: {error}"));
                     continue;
                 }
             };
-            match sprite::import(section, &sizes, &sheet.json, &sheet.png).and_then(|section| section.encode()) {
+            match sprite::import_section(section, &sizes, &sheet.json, &sheet.png).and_then(|section| section.encode())
+            {
                 Ok(encoded) if section.encode().is_ok_and(|stored| stored == encoded) => imported += 1,
                 Ok(_) => failures.push(format!("{place} section {number}: the sheet imports to other bytes")),
                 Err(error) => failures.push(format!("{place} section {number}: import: {error}")),

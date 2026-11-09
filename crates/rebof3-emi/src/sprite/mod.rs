@@ -39,7 +39,9 @@ pub use draw::{
     SPRITE_SIZES, SpriteSizes, Stage, TRANSPARENT, Texel, animation_bounds, cell_rect, compose, frame_bounds,
 };
 pub use image::{Encoding, Image, PACKED_MAX, TEXELS_PER_WORD};
-pub use sheet::{Sheet, TICK_MICROS, duration_ms, export, import, ticks_of};
+pub use sheet::{
+    Sheet, TICK_MICROS, duration_ms, export, export_section, image_name, import, import_section, ticks_of,
+};
 
 use crate::{Error, Result};
 
