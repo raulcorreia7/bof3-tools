@@ -1,9 +1,5 @@
-//! What a laid-out message does that the window cannot show as the author meant: text past the window's edge,
-//! lines below its bottom, glyphs the font has no picture for, and text only the running game holds.
-//!
-//! These are warnings, not refusals: the game draws such a message anyway (the retail fishing book has four-line
+//! What a laid-out message does that the window cannot show as the author meant.
 //! pages, `wiki: data/text`). Only text the codec cannot encode and a table past [`crate::message::table::LIMIT`] are
-//! refused, where the bytes are made.
 
 use super::font::{CELL_HEIGHT, Font};
 use super::layout::{GLYPH_DROP, LINE_STEP, Layout, Shape, TEXT_ORIGIN};

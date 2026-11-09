@@ -1,8 +1,4 @@
 //! The join of a texture to the palette rows it is drawn with.
-//!
-//! A join reads a whole archive: the texture uploads, the CLUT blocks and the map bundles beside
-//! them. It is not a format; it composes the `vram`, `clut` and `map` modules through the registry,
-//! and no format module imports it.
 
 use std::collections::HashMap;
 
@@ -14,22 +10,11 @@ use crate::registry::{Format, classify};
 use crate::vram::RowUse;
 
 /// The palette rows each texture of one archive is drawn with, keyed by texture slot.
-///
-/// The rules are `rebof3_emi::texture::joins` (literal draw sites) and
-/// `rebof3_emi::texture::terrain_joins` (the world-map tile descriptors). A join needs exactly one
-/// sheet over its page and exactly one distinct block over its CLUT row. `source` is the archive's
-/// disc path, which selects the draw sites and owns the sheets. Each row carries its rule as
-/// evidence.
 pub fn joined_rows(source: &str, entries: &[rebof3_emi::Entry], payloads: &[&[u8]]) -> HashMap<usize, Vec<RowUse>> {
     joined_rows_in(source, entries, payloads, &[])
 }
 
 /// [`joined_rows`], with a resident set of CLUT blocks available as a fallback.
-///
-/// `resident` holds the blocks the caller loaded from other archives. A row uses this archive's
-/// own block when it has one; otherwise a resident block may serve it, provided every block at that
-/// arena position agrees on the words. Blocks of `source` itself are ignored here because
-/// [`joined_rows_in`] builds them from `entries`.
 pub fn joined_rows_in(
     source: &str,
     entries: &[rebof3_emi::Entry],

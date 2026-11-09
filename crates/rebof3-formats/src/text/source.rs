@@ -1,17 +1,8 @@
-//! Where a text file's strings sit: the disc path, the EMI entry, the byte in that entry, the disc
-//! offset and the address the payload loads at.
-//!
-//! One [`PayloadSource`] describes a whole payload; [`PayloadSource::origin`] turns a string's offset
-//! inside that payload into the [`Origin`] a JSON row carries. The output directory holds one payload
-//! per EMI slot, so the source chain is the same for every row of its JSON.
+//! Where a text file's strings sit.
 
 use serde::{Deserialize, Serialize};
 
-/// One string's place in the disc: the file, the EMI entry, the byte offset inside that entry, and the
-/// disc and RAM addresses when they are known.
-///
-/// `source` and `entry` are absent for a standalone `assets export strings` document, which reads a
-/// payload file and knows no archive. `offset` is always the string's byte offset inside the payload.
+/// One string's place in the disc.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Origin {

@@ -1,7 +1,7 @@
 //! A random-encounter formation as the field places it for battle.
 //!
 //! An area's encounter block (`0x800E4000`, [`crate::encounter`]) lists eight encounters of eight enemy
-//! indexes. When one is rolled, `Area_BuildEncounter` (`emi/etc/game/00@0x801C60E0`) runs:
+//! indexes. When one is rolled, `Area_BuildEncounter` (`emi/etc/game/00@0x801C60E0`) runs.
 //!
 //! - `Area_RollEncounterEnemies` (`emi/etc/game/00@0x801C6AEC`) keeps each listed slot with the chance
 //!   `s_EntitySpawnChances[slot]`, a run-time roll. [`place`] keeps every listed slot.
@@ -12,7 +12,7 @@
 //!   `func_801C6EE0`); the first offset is `(0, 0)`, so [`place`] gives the place the map accepts first.
 //! - `func_800ABC30` (`emi/battle/battle/15@0x800ABC30`) hands each kept enemy to `Battle_InitEnemy`
 //!   (`emi/battle/battle/15@0x800ABCE0`), which looks the enemy record's `+0x16` word up with
-//!   `Area_FindSceneRecord` (`exe/slus_004_22@0x8014DD3C`): the scene record gives the sprite's page, row,
+//!   `Area_FindSceneRecord` (`exe/slus_004_22@0x8014DD3C`): the scene record gives the sprite's page, row.
 //!   CLUT selector, palette kind and script section ([`crate::scene`]), with work `+0x24` cleared.
 //!
 //! The two tables are read from `ETC/GAME.EMI` entry 0, the code image that holds them.
@@ -27,8 +27,7 @@ use crate::scene::{SceneRecord, SceneTable};
 use crate::script::program::Program;
 use crate::sprite::Placement;
 
-/// The address of `s_EncounterEnemyOffsets` (`emi/etc/game/00`): one 16.16 `x`, `y` pair per kept enemy of
-/// every formation size, 1 to 8.
+/// The address of `s_EncounterEnemyOffsets` (`emi/etc/game/00`).
 pub const ENEMY_OFFSETS: u32 = 0x801C_D620;
 /// Pairs in `s_EncounterEnemyOffsets`: `1 + 2 + … + 8`.
 pub const ENEMY_OFFSET_COUNT: usize = 36;
@@ -92,7 +91,6 @@ pub struct Placed {
 }
 
 /// The enemies of encounter `encounter` of `block`, every listed slot kept, placed for scroll direction
-/// `direction` (0 to 3), with their scene records from `scenes`.
 pub fn place(
     block: &[u8],
     scenes: Option<&SceneTable>,
@@ -134,13 +132,12 @@ pub fn place(
     Ok(placed)
 }
 
-/// The VRAM placement `Area_FindSceneRecord` gives an enemy of scene record `scene`: page, row, the
-/// selector's low byte (work `+0x27` is a byte) and the palette kind, with `Battle_InitEnemy`'s flags.
+/// The VRAM placement `Area_FindSceneRecord` gives an enemy of scene record `scene`:
 pub fn placement(scene: &SceneRecord) -> Placement {
     Placement::scene(scene.texture_page, scene.texture_v, scene.clut_select as u8, scene.texture_mode, ENEMY_FLAGS)
 }
 
-/// The animation stream table entry `entry` of the scene record's script section names, as
+/// The animation stream table entry `entry` of the scene record's script section names, as `Actor_BeginScript`
 /// `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) reads it from the area script table.
 pub fn stream<'a>(program: &'a Program, scene: &SceneRecord, entry: usize) -> Option<&'a Animation> {
     let section = program.sections.get(usize::from(scene.script_section))?;

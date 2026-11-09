@@ -1,20 +1,4 @@
 //! A section as a PNG sprite sheet and an Aseprite JSON file.
-//!
-//! The sheet is an 8-bit indexed PNG with one row per animation a record plays and one cell per frame
-//! of it, every cell the size of the box around all those frames, so the actor's position is the same
-//! point of each cell. A pixel is the sheet texel the frame shows there ([`super::compose`]); where no
-//! cell reaches it is index 0. The PNG palette is the section's chosen palette, colours 32 to 255 are
-//! a marker for indices no palette colour gives, and the colour `0x0000` is transparent.
-//!
-//! The JSON is Aseprite's array form: one frame per step that shows a frame, with the step's time as
-//! its `duration`, and one `forward` tag per animation. `meta.bof3` holds what Aseprite has no field
-//! for: the section and palette, the actor's position in each cell, each pose's cell, the stream
-//! position of each step and each animation's loop point.
-//!
-//! [`import`] reads both back. A pixel goes to the sheet texel its cell showed when it was exported, so
-//! a texel several frames share takes the one change made to it, and two different changes are refused.
-//! A palette colour, a step's duration and a texel come back only when they changed; everything else
-//! stays as stored, so an unchanged sheet imports to the stored section.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -206,8 +190,7 @@ fn placed(section: &Section) -> Vec<(usize, usize)> {
     (0..section.animations.len()).filter_map(|animation| Some((animation, section.image_of(animation)?))).collect()
 }
 
-/// The PNG and JSON of section `section` of `sprites` drawn with palette `palette`. `image` is the PNG's
-/// file name, which the JSON names.
+/// The PNG and JSON of section `section` of `sprites` drawn with palette `palette`.
 pub fn export(
     sprites: &CharacterSprites,
     section: usize,
@@ -219,8 +202,7 @@ pub fn export(
     export_section(part, section, palette, sizes, image)
 }
 
-/// `sprites` with the colours, texels and step durations of a sheet [`export`] wrote, in the section the
-/// sheet names.
+/// `sprites` with the colours, texels and step durations of a sheet [`export`] wrote, in the section the sheet
 pub fn import(sprites: &CharacterSprites, sizes: &SpriteSizes, json: &[u8], png: &[u8]) -> Result<CharacterSprites> {
     let section = read_json(json)?.meta.bof3.section;
     let part = sprites.sections.get(section).ok_or_else(|| missing("section", section))?;
@@ -565,8 +547,6 @@ mod tests {
     fn a_painted_pixel_goes_to_its_sheet_texel() {
         let section = section();
         let sheet = export_section(&section, 0, 0, &sizes(), "sprites.png").expect("exports");
-        // Pose 0 is animation 0 frame 0: one 16x16 cell at (-8, -8) over texels (0..16, 0..8); the sheet is
-        // 8 rows tall, so rows 8-15 of the cell are outside it. The box starts at (-8, -8) too.
         let png = repaint(&sheet, 0, (3, 2), 30);
         let imported = import_section(&section, &sizes(), &sheet.json, &png).expect("imports");
         assert_eq!(imported.images[0].texel(3, 2), Some(30));

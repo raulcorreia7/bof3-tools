@@ -1,7 +1,7 @@
 //! A message as the message window lays it out: pages, glyph positions, colours, the runtime text a code
 //! reads, the choice panel and the events the step machine runs.
 //!
-//! The layout follows the game's two passes over a message:
+//! The layout follows the game's two passes over a message.
 //!
 //! - `UI_DrawMessageScript (exe/slus_004_22@0x80150470)` draws the page from its first byte every frame. It
 //!   owns the glyph cursor, the colour, the redirects and the line breaks, and is the source of every position
@@ -44,36 +44,39 @@ pub mod code {
     pub const BACKSPACE: u8 = 0x90;
 }
 
+/// Pixels the glyph cursor advances per glyph.
 /// Pixels the glyph cursor advances per glyph: `cursor[0] += 8` in `UI_DrawMessageScript (exe/slus_004_22@0x80150470)`.
 pub const GLYPH_ADVANCE: i32 = 8;
 /// Pixels `{NEWLINE}` moves down in the message window: `cursor[1] += 0xE` in `UI_DrawMessageScript`.
 pub const LINE_STEP: i32 = 14;
+/// Pixels `{NEWLINE}` moves down in the choice panel.
 /// Pixels `{NEWLINE}` moves down in the choice panel: `y += 0xD` in `UI_DrawTextAt (exe/slus_004_22@0x8015A2A4)`.
 pub const CHOICE_LINE_STEP: i32 = 13;
+/// Where the text starts inside the window.
 /// Where the text starts inside the window: `origin = panel + (10, 6)` in `UI_UpdateLayout (exe/slus_004_22@0x80150358)`.
 pub const TEXT_ORIGIN: (i32, i32) = (10, 6);
+/// The glyph sprite sits one row below its cursor.
 /// The glyph sprite sits one row below its cursor: `D_80145ACC = y + 1` in `UI_DrawText (exe/slus_004_22@0x8014FEA4)`.
 pub const GLYPH_DROP: i32 = 1;
-/// Bytes a redirect reads before it gives up: `count` less one (`{GOTO}` and `{INSERT}` 6, `{VAR}` 33, `{LINK}` 17).
+/// Bytes a redirect reads before it gives up.
 const GOTO_BUDGET: u8 = 6;
 const VAR_BUDGET: u8 = 33;
 const LINK_BUDGET: u8 = 17;
 /// The bytes of one character name's field in the party record: the longest `{INSERT}` or `{GOTO}` text.
 pub const NAME_FIELD_BYTES: usize = (GOTO_BUDGET - 1) as usize;
-/// Bytes of the window-style flags: bit 7 hides the frame, bit 6 picks the narrow window
+/// Bytes of the window-style flags.
 /// (`func_80159050 (exe/slus_004_22@0x80159050)`).
 const BOX_NO_FRAME: u8 = 0x80;
 const BOX_NARROW: u8 = 0x40;
-/// Low nibble of a choice's `{BOX}` operand: how many answers it holds
+/// Low nibble of a choice's `{BOX}` operand.
 /// (`s2[2] = (operand & 0xF) - 1` in `func_8015083C (exe/slus_004_22@0x8015083C)`).
 const ANSWER_COUNT_MASK: u8 = 0x0F;
-/// The choice panel: left edge, width and the text's left margin
+/// The choice panel.
 /// (`func_8015A554 (exe/slus_004_22@0x8015A554)`: `unk_18 = 0x30`, `unk_0A = 0xDC`; `UI_DrawTextRows` passes x `0x3A`).
 pub const CHOICE_PANEL_X: i32 = 0x30;
 pub const CHOICE_PANEL_WIDTH: i32 = 0xDC;
 const CHOICE_TEXT_X: i32 = 0x3A;
-/// The choice panel's vertical centre, its padding and the gap between answers
-/// (`func_8015A554`: `0x78 - (height + rows) / 2`, `height + 8 + rows * 2`, `base + line * 0xD + row * 2`).
+/// The choice panel's vertical centre, its padding and the gap between answers (`func_8015A554`:
 const CHOICE_CENTRE_Y: i32 = 0x78;
 const CHOICE_TEXT_DROP: i32 = 4;
 const CHOICE_PADDING: i32 = 8;
@@ -98,7 +101,7 @@ impl WindowKind {
     }
 }
 
-/// Where and how the window opens: the leading `{BOX}` operand, which `UI_ResetMessage
+/// Where and how the window opens.
 /// (exe/slus_004_22@0x80151BDC)` stores in `D_801490CE` and `func_80159050` reads.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Placement {
@@ -142,8 +145,7 @@ pub struct Glyph {
     pub shape: Shape,
     /// The `{COLOR}` operand: the text CLUT cell is its low four bits. 0 after `{NOCOLOR}`.
     pub color: u8,
-    /// Drawn between `{NOP0D}` and `{NOP0E}`: the game places it at the window state's animated position, which
-    /// the data does not hold, so the layout draws it at its cursor.
+    /// Drawn between `{NOP0D}` and `{NOP0E}`:
     pub animated: bool,
 }
 
@@ -277,8 +279,7 @@ pub struct Page {
 }
 
 impl Page {
-    /// The right edge of line `line`, in pixels from the window's left: the cursor's last position, counting each
-    /// runtime placeholder at its full budget.
+    /// The right edge of line `line`, in pixels from the window's left.
     pub fn line_widths(&self) -> Vec<i32> {
         let mut widths = vec![0; self.lines.max(1)];
         let row = |y: i32| ((y - GLYPH_DROP - TEXT_ORIGIN.1) / LINE_STEP).max(0) as usize;
@@ -532,8 +533,6 @@ impl<'a> Machine<'a> {
             Some(bytes) => {
                 self.streams.push(bytes);
                 self.redirected = Some(Redirected { saved: at, count: budget });
-                // The next loop reads the redirected string from its first byte; the shared tail steps over
-                // the byte before it (`p = base; ... p++`), which the stream here does not hold.
                 self.pending_jump(self.streams.len() - 1)
             }
             None => {
@@ -597,9 +596,7 @@ impl<'a> Machine<'a> {
     }
 }
 
-/// The bytes `{LINK:n}` reads from `table`: `D_80010004` holds the offset of a table of `u16` offsets, entry `n`
-/// of which, added to the table's address, is one byte before the string (`UI_DrawMessageScript`, case
-/// `STRING_LINK`; the shared tail's `p++` lands on the string). `None` when any of it lies outside the table.
+/// The bytes `{LINK:n}` reads from `table`:
 fn link_bytes(table: &[u8], operand: u8) -> Option<Vec<u8>> {
     let directory = u32::from_le_bytes(table.get(4..8)?.try_into().ok()?) as usize;
     let entry = directory.checked_add(usize::from(operand) * 2)?;

@@ -1,17 +1,6 @@
 //! Area scene table codec (`0x800E3800`).
-//!
-//! One WORLD* archive's scene/step table: a `u32` count then 8-byte records.
 //! The engine walks the records at `D_801459F4 = 0x800E3800 + 4` (`@0x8014DD3C`
-//! matches the `id` and fills the work fields, returning 1 on a miss) and reads
 //! the count at `0x800E3800` itself as one byte.
-//!
-//! The byte at `+0x7` is the record's **section index in the archive's area
-//! script table**: the reader stores it into `work+0x2C`, which the script-table
-//! reader `@0x8014D6DC` uses as `u32[bank + 4*lbu(work+0x2C)]`, and in all 200
-//! payloads the records' values cover exactly `0..u32[script_table]/4 - 1`. An
-//! earlier reading of it as "the record ordinal" is superseded.
-//!
-//! Layout and reader evidence: `wiki: formats/area#0x800e3800-scenestep-table`.
 
 use psx_formats::bytes::{push_u16_le, push_u32_le, u16_le, u32_le};
 use serde::Serialize;
@@ -51,15 +40,13 @@ fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
 pub const RECORD_BYTES: usize = 8;
 /// The count that precedes the records.
 pub const COUNT_BYTES: usize = 4;
-/// The largest count the engine's byte-wide read can carry (`@0x8014DD3C`
-/// loads the count with `lbu`).
+/// The largest count the engine's byte-wide read can carry (`@0x8014DD3C` loads the count with `lbu`).
 pub const MAX_RECORDS: u32 = 0xff;
 
 /// One scene record, with the work field its byte reaches in parentheses.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub struct SceneRecord {
-    /// Match key (`@0x8014DD3C`, `@0x80167E00`) and the id getter
-    /// `emi/etc/game/00@0x801ACE9C` reads.
+    /// Match key (`@0x8014DD3C`, `@0x80167E00`) and the id getter `emi/etc/game/00@0x801ACE9C` reads.
     pub id: u16,
     /// The record's second `u16`; its low byte reaches `work+0x27` (C `clut_select`).
     pub clut_select: u16,
@@ -148,7 +135,7 @@ impl SceneTable {
     }
 }
 
-/// The scene records as JSON. The record is `AreaActorDef` in `decomp/include/world/area.h`, the
+/// The scene records as JSON.
 /// one C definition of a scene record; its format is `wiki: formats/area#0x800e3800-scenestep-table`.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
     let data = SceneTable::decode(payload)?.json().into_bytes();

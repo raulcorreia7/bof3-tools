@@ -1,6 +1,4 @@
-//! The terrain draw over every retail map bundle: each drawn cell's walls take descriptor words that
-//! the table holds (the layout `Area_UploadCell` reads), and the descriptor fields the renderer reads
-//! are counted. An east wall with a `0` word draws black (grey level 0).
+//! The terrain draw over every retail map bundle.
 
 mod support;
 

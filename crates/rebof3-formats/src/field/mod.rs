@@ -1,20 +1,16 @@
-//! What the executable and an area's program say about the area's field, beside its own entries: the
-//! setup stream that places the actors ([`setup`]), the encounter zones and the facing steps.
-//!
-//! None of this is an entry format of its own. The tables sit in `SLUS_004.22` and the setup stream
-//! in the area program (the code image loaded at [`PROGRAM_ADDRESS`]), so the readers take the
-//! executable's bytes and the program's bytes. Every address names a decomp symbol.
+//! What the executable and an area's program say about the area's field, beside its own entries.
 
 pub mod setup;
 
 use crate::error::{Error, Result};
 
-/// Where an area program loads (`AreaLoad` records and setup streams point into it; `g_AreaLoads`
+/// Where an area program loads (`AreaLoad` records and setup streams point into it.
 /// holds addresses from `0x801F2C18`).
 pub const PROGRAM_ADDRESS: u32 = 0x801F_2C00;
+/// `g_AreaLoads` (`exe/slus_004_22@0x8017F974`).
 /// `g_AreaLoads` (`exe/slus_004_22@0x8017F974`): one `AreaLoad` pointer per area; `func_8019FAA0`
-/// passes the record's first word, the setup stream, to `Area_RunSetupStream`.
 pub const AREA_LOADS: u32 = 0x8017_F974;
+/// `g_EncounterZones` (`exe/slus_004_22@0x80181164`).
 /// `g_EncounterZones` (`exe/slus_004_22@0x80181164`): one pointer per area into
 /// `g_AreaEncounterZones`, read by `func_801B3C3C` (`emi/etc/game/00@0x801B3C3C`).
 pub const ENCOUNTER_ZONES: u32 = 0x8018_1164;
@@ -27,6 +23,7 @@ pub const ZONE_ROWS: usize = 666;
 pub const FACING_STEPS: u32 = 0x8018_1B94;
 /// Where `ETC/GAME.EMI`'s code image loads.
 pub const GAME_CODE: u32 = 0x8019_5800;
+/// `D_801C839C` (`emi/etc/game/00@0x801C839C`).
 /// `D_801C839C` (`emi/etc/game/00@0x801C839C`): per facing, the actor script `func_8015BAC4`
 /// (`exe/slus_004_22@0x8015BAC4`) starts and, at the odd byte (`D_801C839D`), the flip it latches.
 pub const FACING_SCRIPTS: u32 = 0x801C_839C;
@@ -35,7 +32,7 @@ pub const AREAS: usize = 200;
 /// Facings a step table row exists for.
 pub const FACINGS: usize = 8;
 
-/// The magic of a PlayStation executable, and where its header keeps the text address; the text
+/// The magic of a PlayStation executable, and where its header keeps the text address.
 /// starts at file offset `0x800` (psx-spx, "CDROM File Formats", "PS-X EXE").
 const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
 const EXE_TEXT_ADDRESS: usize = 0x18;
@@ -93,10 +90,7 @@ impl<'a> Executable<'a> {
         Ok(steps)
     }
 
-    /// The encounter zone rows of area `area`: the rows from its `g_EncounterZones` pointer up to the
-    /// next area's list or the table's end. `func_801B3C3C` scans them in order and takes the first
-    /// rectangle that holds the party's cell; no row ends a list, so a point no row holds runs on into
-    /// the next list.
+    /// The encounter zone rows of area `area`:
     pub fn zones(&self, area: usize) -> Result<Vec<Zone>> {
         check_area(area)?;
         let table_end = AREA_ENCOUNTER_ZONES + (ZONE_ROWS * ZONE_BYTES) as u32;
@@ -127,8 +121,7 @@ impl<'a> Executable<'a> {
     }
 }
 
-/// The script and flip of each facing, `[script, flip]`, from the game code image (the payload that
-/// loads at [`GAME_CODE`]).
+/// The script and flip of each facing, `[script, flip]`, from the game code image (the payload that loads at
 pub fn facing_scripts(code: &[u8]) -> Result<[[u8; 2]; FACINGS]> {
     let at = (FACING_SCRIPTS - GAME_CODE) as usize;
     let bytes = code
@@ -141,8 +134,7 @@ pub fn facing_scripts(code: &[u8]) -> Result<[[u8; 2]; FACINGS]> {
     Ok(scripts)
 }
 
-/// One `EncounterZone` row: a cell rectangle and what the field reads when the party enters it
-/// (`func_801B3C3C`; the fields in `src/engine/slus/D_8017FC94.c`).
+/// One `EncounterZone` row.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Zone {
     /// The row's RAM address in the executable.

@@ -1,10 +1,4 @@
 //! A message table as a PO catalogue for translators (GNU gettext, "PO Files").
-//!
-//! Each message is one entry: `msgctxt` is the stable id `message[<first slot>]`, `msgid` is the message's text with
-//! its control codes as `{TAG}` markup (`rebof3_emi::text::codec`), and `msgstr` is the translation. An empty
-//! `msgstr`, or one equal to the `msgid`, keeps the original bytes, so an untouched catalogue rebuilds the table byte
-//! for byte. A translated `msgstr` is encoded with the same markup, so its codes, its `{END}` and its padding are the
-//! translator's to keep.
 
 use rebof3_emi::text::codec::{self, Encoding};
 
@@ -25,8 +19,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(out.into_bytes())
 }
 
-/// The table bytes of `payload` with each translated message of `catalogue` put in place. Refuses an entry whose
-/// `msgctxt` names no message, text that does not encode, and a table past its limit.
+/// The table bytes of `payload` with each translated message of `catalogue` put in place.
 pub fn import(catalogue: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let text =
         std::str::from_utf8(catalogue).map_err(|error| Error::Import(format!("the PO file is not UTF-8: {error}")))?;

@@ -5,7 +5,7 @@
 //!
 //! Each preset of bank 0 becomes a program, each zone a tone, and each sample a VAG that the ADPCM encoder writes
 //! from the sample's frames. A zone keeps its keys, root, tuning, level, pan, loop and volume envelope. Three
-//! things change on the way:
+//! things change on the way.
 //! - The envelope becomes the ADSR register pair whose timing matches the SoundFont times in every phase. Where no
 //!   pair matches, it is the nearest pair. The search runs field by field over the audio library's own envelope
 //!   timing.
@@ -42,16 +42,13 @@ const NEVER: i16 = i16::MIN;
 /// Sustain nibble for full scale: a decay that starts there ends at once, so an attack is timed alone.
 const FULL_SUSTAIN: u16 = 0x0F;
 
-/// The SoundFont 2 file of one VAB bank, from its header and body. `title` names the file inside it. Each
-/// tone's volume envelope is timed by the audio library's own envelope steps, from the registers the voice
-/// plays.
+/// The SoundFont 2 file of one VAB bank, from its header and body.
 pub fn export(header: &[u8], body: &[u8], title: &str) -> Result<Vec<u8>> {
     let vab = vab::Bank::parse(header, body)?;
     Ok(sf2::write_with(&vab, body, title, &volume_envelope)?)
 }
 
-/// The SoundFont envelope of a tone's ADSR registers. `None` when a phase never ends, which leaves the
-/// SoundFont default on that zone.
+/// The SoundFont envelope of a tone's ADSR registers.
 fn volume_envelope(adsr1: u16, adsr2: u16) -> Option<Envelope> {
     let timing = bof3player::spu::envelope_timing(adsr1, adsr2)?;
     Some(Envelope::new(timing.attack, timing.decay, timing.sustain_level, timing.release))
@@ -123,8 +120,7 @@ pub fn import(sf2_file: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     Ok(vab::encode_bank(0, &programs, &vags)?)
 }
 
-/// The ADPCM of a sample as one VAG. A looping sample is cut at the end of its loop, and that block carries the
-/// repeat flag; the loop starts at the block of its first frame.
+/// The ADPCM of a sample as one VAG.
 fn vag_of(sample: &Sample, looped: bool) -> Vec<u8> {
     let mut frames = sample.pcm.clone();
     let loop_span = looped.then(|| {
@@ -149,9 +145,7 @@ fn vag_of(sample: &Sample, looped: bool) -> Vec<u8> {
     vag
 }
 
-/// The phase times the searches pick from, each read once from the audio library's envelope steps. The attack
-/// depends on its own field only. The decay depends on its shift and the sustain level. The release depends on
-/// the decay too, because the decay ends at a level that depends on its shift (see [`releases`]).
+/// The phase times the searches pick from, each read once from the audio library's envelope steps.
 struct Fields {
     attack: Vec<i16>,
     decay: Vec<i16>,
@@ -171,8 +165,7 @@ fn fields() -> &'static Fields {
     })
 }
 
-/// The release time of every release field, after a decay with this key: the decay shift and the sustain
-/// level in one byte. Built on first use, since a bank uses few keys.
+/// The release time of every release field, after a decay with this key.
 fn releases(key: u16) -> Vec<i16> {
     static CACHE: Mutex<BTreeMap<u16, Vec<i16>>> = Mutex::new(BTreeMap::new());
     let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
@@ -191,9 +184,7 @@ fn time(envelope: Option<Envelope>, pick: fn(Envelope) -> i16) -> i16 {
     envelope.map_or(NEVER, pick)
 }
 
-/// The ADSR registers for an envelope. The registers come from the exact match when one exists. Otherwise they
-/// are the nearest timing, and the envelope those registers give is matched exactly, so a bank imported from
-/// its own export gets the same registers again.
+/// The ADSR registers for an envelope.
 fn registers(envelope: Envelope) -> (u16, u16) {
     let picked = exact_registers(envelope).unwrap_or_else(|| nearest_registers(envelope));
     volume_envelope(picked.0, picked.1).and_then(exact_registers).unwrap_or(picked)
@@ -213,8 +204,7 @@ fn exact_registers(envelope: Envelope) -> Option<(u16, u16)> {
     })
 }
 
-/// The registers with the nearest timing in every phase: the sustain level, the attack, then the decay with
-/// that level and the release after it.
+/// The registers with the nearest timing in every phase.
 fn nearest_registers(envelope: Envelope) -> (u16, u16) {
     let fields = fields();
     let level = nearest(&fields.sustain, envelope.sustain);
@@ -241,8 +231,6 @@ mod tests {
 
     #[test]
     fn a_slow_attack_is_timed_by_the_library_steps() {
-        // Attack shift 16, linear step 7: 4,681 steps of 32 samples reach full scale, about 3.40 s, which is
-        // 1200 log2(3.40) = 2117 timecents.
         let envelope = volume_envelope(0x4000, 0).expect("the phases end");
         assert_eq!(envelope.attack, 2117);
         assert_eq!(envelope.sustain, 241, "the decay register's level 0 is 0x800, about 24 dB down");

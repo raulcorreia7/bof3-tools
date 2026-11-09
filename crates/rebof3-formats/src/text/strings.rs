@@ -1,9 +1,4 @@
-//! The strings of a payload that is not a message table, as JSON: each string with its offset, its length and its text.
-//!
-//! The strings are the ones [`rebof3_formats::text::discover`] finds. The JSON lists only the strings. Import
-//! takes the same payload back, so every byte between two strings stays as it was. An unedited export imports to its
-//! own bytes. A name in a fixed-width field must keep its length, so the records after it keep their offsets; a loose
-//! record may change length, and a payload that holds pointers to its records does not follow such a change.
+//! The strings of a payload that is not a message table, as JSON.
 
 use std::collections::BTreeMap;
 
@@ -21,13 +16,12 @@ pub fn holds_text(entry: &Entry) -> bool {
     !matches!(entry.file_type, 3 | 6..=10)
 }
 
-/// The address a payload loads at, when it is a RAM payload (types 0 to 2) whose address lies in the RAM window. A
-/// pointer table is recognised against this address, so a payload without one has no pointer tables.
+/// The address a payload loads at, when it is a RAM payload (types 0 to 2) whose address lies in the RAM window.
 pub fn load_address(entry: &Entry) -> Option<u32> {
     if matches!(entry.file_type, 0..=2) { ram_address(entry.ram_ptr) } else { None }
 }
 
-/// `address` when it lies in the RAM window that payloads load into, and `None` otherwise (0 is never an address).
+/// `address` when it lies in the RAM window that payloads load into, and `None` otherwise (0 is never an
 pub fn ram_address(address: u32) -> Option<u32> {
     (0x8000_0000..0x8020_0000).contains(&address).then_some(address)
 }
@@ -39,7 +33,7 @@ struct Document {
     strings: Vec<Item>,
 }
 
-/// One string: where its bytes start, how many bytes they are, its name stride if it is a fixed-width field, and its text.
+/// One string.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Item {
     #[serde(flatten)]
@@ -92,8 +86,7 @@ impl Item {
     }
 }
 
-/// The strings of `payload` as JSON. `load_address` is the address the payload loads at, when it has one; the scan
-/// uses it to recognise a pointer table. A message table is refused: its records are exported with [`super::table`].
+/// The strings of `payload` as JSON.
 pub fn export(payload: &[u8], load_address: Option<u32>) -> Result<Vec<u8>> {
     export_counted(payload, load_address, None, &[]).map(|(json, _)| json)
 }
@@ -151,8 +144,7 @@ pub fn document(size: usize, items: &[Item]) -> Vec<u8> {
     serde_json::to_vec_pretty(&document).expect("the strings serialize")
 }
 
-/// The strings that do not overlap: a name keeps its bytes, and a record that overlaps a name, or another record,
-/// is left out. Its bytes stay in the payload, which the import keeps as they are.
+/// The strings that do not overlap.
 pub fn disjoint(found: Vec<Found>) -> Vec<Found> {
     let (names, records): (Vec<Found>, Vec<Found>) =
         found.into_iter().partition(|string| !matches!(string.kind, Kind::Record));

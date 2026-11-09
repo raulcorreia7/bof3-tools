@@ -1,4 +1,4 @@
-//! The VAB bank (entry types 6 and 7): the header with its programs and tones, and the body of
+//! The VAB bank (entry types 6 and 7).
 //! ADPCM samples that shares the header's load argument (`wiki: formats/audio#bank-layout`).
 
 use psx_formats::vab::{self, Bank};
@@ -13,8 +13,7 @@ pub mod vag;
 /// The sources behind the standard VAB file and the SoundFont.
 const EVIDENCE: &str = "wiki: formats/audio#bank-layout (header and body share a load argument)";
 
-/// The header with its body as the standard VAB file and as a SoundFont 2, when a body shares the
-/// header's load argument.
+/// The header with its body as the standard VAB file and as a SoundFont 2, when a body shares the header's load
 fn open(site: &Site<'_>) -> Extras {
     let (entry, payload) = (site.entry(), site.payload());
     let body = site.entries.iter().enumerate().find_map(|(other, candidate)| {
@@ -38,10 +37,8 @@ fn open(site: &Site<'_>) -> Extras {
     extras
 }
 
+/// The bank as one VAB file.
 /// The bank as one VAB file: the header followed by the body (Sony *File Formats*, chapter 4, "VAB").
-///
-/// The header's own length is fixed by its program count, so the file needs no separator. A studio's
-/// tools read this file whole, or the header (`.vh`) and body (`.vb`) it splits into.
 pub fn standard_file(header: &[u8], body: &[u8]) -> Vec<u8> {
     let mut whole = Vec::with_capacity(header.len() + body.len());
     whole.extend_from_slice(header);
@@ -58,8 +55,7 @@ const SIZE_TABLE: usize = 256 * 2;
 /// Offset of the 16-bit program count in the header.
 const PROGRAM_COUNT: usize = 0x12;
 
-/// A VAB file split into its header (`.vh`) and body (`.vb`) at the header's own length, and checked:
-/// both halves must parse as a bank and the header must encode to the bytes it holds.
+/// A VAB file split into its header (`.vh`) and body (`.vb`) at the header's own length, and checked.
 pub fn split_file(file: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
     let count = file
         .get(PROGRAM_COUNT..PROGRAM_COUNT + 2)
@@ -78,8 +74,7 @@ pub fn split_file(file: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
     Ok((header.to_vec(), body.to_vec()))
 }
 
-/// `Ok` when `header` and `body` are a bank: the header parses against the body, encodes back to its
-/// own bytes, and the samples it sizes fit the body.
+/// `Ok` when `header` and `body` are a bank.
 pub fn check_pair(header: &[u8], body: &[u8]) -> Result<(), Error> {
     let bank = Bank::parse(header, body)?;
     round_trip(header, body).map_err(Error::Import)?;

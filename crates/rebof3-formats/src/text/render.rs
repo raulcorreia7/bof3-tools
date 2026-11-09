@@ -1,11 +1,5 @@
-//! Draws a laid-out page the way the GPU would: a 15-bit canvas with the PlayStation's texture modulation and
+//! Draws a laid-out page the way the GPU would.
 //! semi-transparency (psx-spx, "GPU Rendering Attributes" and "GPU Render Polygon Commands").
-//!
-//! The window is drawn alone, with a 2-pixel margin for the frame's outer lines, over a backdrop colour; the
-//! game draws it over the field, so the backdrop is the caller's choice. The frame follows `UI_DrawWindow` and
-//! `func_80159B9C`: a black tile (blend `0.5 B + 0.5 F`), the 16 by 16 noise tile tiled over the window with
-//! vertex colour 255 (double brightness) and the same blend where the palette word sets STP, an outline of
-//! grey 200 and four outer lines of grey `0x8C`. The glyphs are drawn with colour 128 (unmodulated) and blend
 //! `B + F` where STP is set (`func_8014FB80 (exe/slus_004_22@0x8014FB80)`, texture page `0x2F`).
 
 use super::font::{CELL_HEIGHT, CELL_WIDTH, Font, TILE_SIDE, TILE_TOP, message_cell, number_cell};

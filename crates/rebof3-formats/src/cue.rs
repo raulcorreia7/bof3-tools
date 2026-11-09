@@ -1,6 +1,5 @@
-//! The type-8 cue table: one record per sound cue of a bank
+//! The type-8 cue table.
 //! (`wiki: formats/audio#emi-type-8-cue-records`). The records are read by the `emi` crate, which
-//! the audio library also uses; this module binds them to the registry.
 
 use rebof3_emi::cue::CueTable;
 use rebof3_emi::{Entry, TYPE_CUE};
@@ -31,7 +30,7 @@ fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
     difference(&table.encode(), payload)
 }
 
-/// The cue records as JSON. The record is `EmiCue` in `decomp/include/audio/cue.h`, the one C
+/// The cue records as JSON.
 /// definition of a cue record; its format is `wiki: formats/audio#emi-type-8-cue-records`.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
     let data = CueTable::decode(payload)?.json().into_bytes();

@@ -1,5 +1,4 @@
-//! The message window over every retail text table: the font decodes, every message lays out and renders, and
-//! the tables rebuild byte for byte.
+//! The message window over every retail text table.
 
 mod support;
 

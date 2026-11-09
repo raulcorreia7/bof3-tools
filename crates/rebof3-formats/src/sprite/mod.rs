@@ -3,7 +3,7 @@
 //! Character sprites are a container of three sections (its first word is [`CONTAINER_HEAD`]: `BPLCHAR`, `PLCHAR`
 //! and `ETC/START.EMI` entry 7), or one section by itself (the `BPLCHAR` entries at `0x8003B80C` and the
 //! other section positions). `Party_LoadMemberSprite` (`emi/etc/game/00@0x801C1254`) points an actor's work
-//! `+0x4C` at section `n` (`0x8003B800 + header[n]`), and the readers below take its four header words:
+//! `+0x4C` at section `n` (`0x8003B800 + header[n]`), and the readers below take its four header words.
 //!
 //! | Offset | Field | Reader | Meaning |
 //! | -----: | ----- | ------ | ------- |
@@ -12,13 +12,13 @@
 //! | `0x08` | `animations` | `Actor_SelectScriptBank` (`header[2]`) | offset of the animation table: one halfword offset per [`Animation`], from the table |
 //! | `0x0C` | `records` | `Actor_SelectScriptBank` (`header[3]`) | offset of the 3-byte [`Record`]s |
 //!
-//! `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) takes record `n` (the actor's script record,
+//! `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) takes record `n` (the actor's script record.
 //! work `+0x4B`): it queues sheet `record[0]` for upload, points work `+0x50` at animation `record[1]`
 //! and stores `record[2]` in work `+0x2A`, which `Area_DrawObjectSprite` reads as "mirror the actor".
 //! `GFX_LoadPalette` (`exe/slus_004_22@0x80166C48`) copies one palette; `Party_LoadMemberSprite` asks for
 //! palette 0.
 //!
-//! In every retail section the parts follow the header in this order: the sheet table and the sheets,
+//! In every retail section the parts follow the header in this order: the sheet table and the sheets.
 //! the palette table and the palettes, the animation table and the animations, and the records. No word
 //! stores how many records there are: the table runs while each record names a sheet and an animation
 //! of the section and a mirror flag of 0 or 1, and the zero bytes that end a section are padding.
@@ -199,8 +199,6 @@ impl Section {
             return Err(Error::CharacterSprites("a section keeps its sheet, palette and animation counts".into()));
         }
 
-        // The sheet table and the sheets: as stored while every sheet is, otherwise packed again after
-        // whatever the stored table has before its first sheet.
         let mut out = self.stored[..images_at].to_vec();
         if self.images.iter().all(Image::is_stored) {
             out.extend(&self.stored[images_at..palettes_at]);
@@ -292,7 +290,7 @@ impl Section {
     }
 }
 
-/// The character sprites in `payload`: a container when its first word is [`CONTAINER_HEAD`], otherwise one section.
+/// The character sprites in `payload`:
 pub fn decode(payload: &[u8]) -> Result<CharacterSprites> {
     if word(payload, 0)? != CONTAINER_HEAD {
         return Ok(CharacterSprites { sections: vec![Section::decode(payload)?], container: false });
@@ -367,8 +365,7 @@ pub fn describe(sprites: &CharacterSprites) -> String {
     lines.join("\n")
 }
 
-/// The offsets a table at `at` holds, each made absolute: the first entry is the table's own size, so
-/// it gives the count. Every offset must point between the table's end and `end`.
+/// The offsets a table at `at` holds, each made absolute.
 fn table(bytes: &[u8], at: usize, width: usize, end: usize) -> Result<Vec<usize>> {
     let read = |index: usize| -> Result<usize> {
         let position = at + width * index;
@@ -414,8 +411,7 @@ fn to_usize(value: u32) -> usize {
 pub(crate) mod tests {
     use super::*;
 
-    /// A section with two sheets (raw and packed), `palettes` palettes, two animations and three records,
-    /// then `free` bytes of padding.
+    /// A section with two sheets (raw and packed), `palettes` palettes, two animations and three records, then
     pub(crate) fn section_bytes(palettes: usize, free: usize) -> Vec<u8> {
         let sheet = |seed: u8, encoding| {
             let texels = (0..16 * 8).map(|index| (index as u8 / 3 + seed) % 32).collect();

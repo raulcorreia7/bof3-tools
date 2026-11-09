@@ -1,4 +1,4 @@
-//! The SEP sequence package (entry type 10): the sequences of one sound bank
+//! The SEP sequence package (entry type 10).
 //! (`wiki: formats/audio`).
 
 use psx_formats::sep::{self, Package};

@@ -1,9 +1,4 @@
-//! Whole-archive map gate: every decodable map bundle re-encodes byte-exactly and
-//! reports the exact encoded length.
-//!
-//! Regression for review-data F2: the four variable record-region word counts
-//! were added without the `TILE_BYTES` scale, so `encoded_len` under-reported
-//! 196 of the 200 retail maps before the fix.
+//! Whole-archive map gate.
 
 mod support;
 

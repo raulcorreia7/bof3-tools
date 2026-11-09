@@ -18,7 +18,7 @@ pub enum Error {
     MapBundleTooShort(usize),
     /// A map bundle's sections do not satisfy the identities its readers assume.
     MapBundleShape(&'static str),
-    /// A script table's directory or a section's table words do not parse as the `0x800D3800`
+    /// A script table's directory or a section's table words do not parse as the `0x800D3800` layout (`wiki.
     /// layout (`wiki: formats/area`).
     ScriptTableShape(&'static str),
     /// A fixed game table runs past the end of its payload.
@@ -37,14 +37,11 @@ pub enum Error {
     },
     /// The characters table cannot be read or written: a count, a name, or the rest of a record that does not fit.
     CharacterTable(String),
-    /// The character sprites' palettes cannot be read or written: a section that is not in the palette layout, or a palette
-    /// that does not match the bank it is written to.
+    /// The character sprites' palettes cannot be read or written.
     CharacterPalettes(String),
-    /// An animation stream does not read or write in the layout `Actor_SeekScript` and the step
-    /// functions assume.
+    /// An animation stream does not read or write in the layout `Actor_SeekScript` and the step functions assume.
     AnimationStream(String),
     /// The character sprites' sections, frame sheets or animations do not read or write in the layout the field
-    /// reader assumes.
     CharacterSprites(String),
     /// An encounter formation that does not place: a missing encounter, enemy or placement table.
     Formation(String),

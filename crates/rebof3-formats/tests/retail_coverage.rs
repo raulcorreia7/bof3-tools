@@ -1,9 +1,5 @@
-//! Whole-archive coverage gate: the scoreboard's totals are the pinned ones and
-//! every format with a codec rebuilds its payloads byte-exactly.
-//!
+//! Whole-archive coverage gate.
 //! The totals come from the US `Breath of Fire III (USA)` archives (`wiki: formats/emi`). Like the
-//! other archive gates this one skips when it cannot find the retail archives;
-//! `support::retail_root` owns the lookup and honours `BOF3_DISC_DIR` (the archives are `BIN/` below it).
 
 mod support;
 

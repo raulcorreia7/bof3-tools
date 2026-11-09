@@ -1,4 +1,4 @@
-//! The CLUT block (entry type 0 in the palette arena band): colour rows the loader copies into
+//! The CLUT block (entry type 0 in the palette arena band).
 //! VRAM (`wiki: formats/graphics#palette`).
 
 use psx_formats::clut::{self, Palette};
@@ -55,8 +55,7 @@ pub struct ClutBlock {
     pub vram: Option<Clut>,
 }
 
-/// The lossless RGBA view of a color word (`clut::word_to_view`): `0x0000` reads as transparent and
-/// the STP bit reads as half alpha, so [`crate::import`] returns the word exactly.
+/// The lossless RGBA view of a color word (`clut::word_to_view`).
 pub fn color_rgba(word: u16) -> [u8; 4] {
     clut::word_to_view(word)
 }
@@ -74,8 +73,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(clut::Palette::decode(payload)?.json().into_bytes())
 }
 
-/// Reads a palette's JSON (`<slot>.json`) back to its stored bytes: the `word` of each color, in order.
-/// The `rgba` and `stp` fields are views of the word and are not read.
+/// Reads a palette's JSON (`<slot>.json`) back to its stored bytes.
 pub fn import(json: &[u8]) -> Result<Vec<u8>> {
     let document: serde_json::Value =
         serde_json::from_slice(json).map_err(|error| Error::Import(format!("palette JSON: {error}")))?;
@@ -91,9 +89,7 @@ pub fn import(json: &[u8]) -> Result<Vec<u8>> {
     Ok(clut::Palette::from_words(words)?.encode())
 }
 
-/// `block` with `words` written over its color words from word `offset`: the palette a TIM's CLUT block
-/// returns to. Every other byte of the block stays, so a block that holds the block's own words gives the
-/// block back.
+/// `block` with `words` written over its color words from word `offset`:
 pub fn splice(block: &[u8], offset: usize, words: &[u16]) -> Result<Vec<u8>> {
     let end = offset.checked_add(words.len()).filter(|end| end * 2 <= block.len()).ok_or_else(|| {
         Error::Import(format!(

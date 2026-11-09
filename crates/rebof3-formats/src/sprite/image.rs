@@ -2,7 +2,7 @@
 //!
 //! `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) queues the record `table + table[n]` for
 //! upload, and `GFX_UpdateTransferQueue` (`exe/slus_004_22@0x8014E6D0`) reads it as a rectangle and a
-//! kind:
+//! kind.
 //!
 //! | Offset | Size | Field | Meaning |
 //! | -----: | ---: | ----- | ------- |
@@ -94,8 +94,7 @@ pub struct Image {
 }
 
 impl Image {
-    /// The record at the start of `span`, which runs to the next record. The span is kept, so an
-    /// unchanged image encodes to it again.
+    /// The record at the start of `span`, which runs to the next record.
     pub fn decode(span: &[u8]) -> Result<Self> {
         let [width, height] = [half(span, 0)?, half(span, 2)?];
         let kind = word(span, 4)?;
@@ -175,8 +174,7 @@ impl Image {
         self.stored.is_some()
     }
 
-    /// The record bytes: the stored span while the texels are unchanged, otherwise the smallest record the
-    /// transfer queue reads back to the texels, padded to a word.
+    /// The record bytes.
     pub fn encode(&self) -> Vec<u8> {
         if let Some(stored) = &self.stored {
             return stored.clone();

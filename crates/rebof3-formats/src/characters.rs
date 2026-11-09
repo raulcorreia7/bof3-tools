@@ -1,7 +1,4 @@
 //! The base-stat records of the eight playable characters, in `ETC/START.EMI` entry 8.
-//!
-//! Each record is [`RECORD_BYTES`] long and begins with the character's name, [`NAME_BYTES`] bytes in the name encoding
-//! ([`crate::text::codec`]). The other stats are not typed yet, so a record's remaining bytes are written as hex. The
 //! layout is in `wiki: data/records#character-and-master-data` ("Base stats (164 bytes)").
 
 use core::fmt::Write as _;

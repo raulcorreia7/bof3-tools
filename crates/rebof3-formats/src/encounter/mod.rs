@@ -1,10 +1,6 @@
+//! The encounter block of an area.
 //! The encounter block of an area: eight encounters and eight enemy records (`0x800E4000`).
-//!
-//! The block is 1,160 bytes. Eight encounters of 9 bytes come first: the enemy indexes of the encounter
-//! (`0xFF` is an empty slot) and its appearance rate. Eight enemies of 136 bytes (`0x88`) follow at
 //! payload offset `0x48`. The layout is in `wiki: data/records#area-data` ("Enemies (136 bytes)")
-//! and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`; the picker is
-//! `emi/etc/game/00@0x801C6A7C`.
 
 use rebof3_emi::record::{bytes, u16_at};
 use rebof3_emi::text::codec::{name_field, name_text};
@@ -84,8 +80,7 @@ pub struct ItemRef {
     pub item_type: u8,
 }
 
-/// One action block of an enemy: a condition byte, seven AI parameters and eight ability indexes. A
-/// condition of `0x63` marks an unused block.
+/// One action block of an enemy.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct ActionBlock {
     pub condition: u8,
@@ -98,8 +93,8 @@ pub struct ActionBlock {
 pub struct Enemy {
     #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
+    /// The unique enemy id.
     /// The unique enemy id; some enemies have more than one (`wiki: data/records#area-data`,
-    /// "Enemy IDs").
     pub enemy_id: u16,
     pub choice_ai: u8,
     pub target_preference: u8,

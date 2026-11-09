@@ -3,12 +3,8 @@
 use super::{MapBundle, MapObject};
 use crate::error::{Error, Result};
 
-/// The layout of a map bundle as JSON: the byte code of each cell, one row per map row; the object list,
-/// each object with its tag and body words; and the height-byte table when the payload ships one. The
-/// byte codes and words keep their stored values. Their meanings are not decoded
+/// The layout of a map bundle as JSON.
 /// (`wiki: formats/area#0x80104000-map-bundle`, "Map bundle"). The field names follow the C record
-/// (`AreaMapBundle` in
-/// `decomp/include/world/area.h`).
 pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     let bundle = MapBundle::decode(payload)?;
     let width = usize::from(bundle.width).max(1);
@@ -27,8 +23,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(serde_json::to_vec_pretty(&document).expect("a JSON value always serializes"))
 }
 
-/// The layout of a map bundle (`<slot>.layout.json`): the byte codes row by row, the objects, and the
-/// height table. The field names follow the C record (`AreaMapBundle` in `decomp/include/world/area.h`)
+/// The layout of a map bundle (`<slot>.layout.json`).
 /// and the map bundle format (`wiki: formats/area#0x80104000-map-bundle`).
 #[derive(serde::Deserialize)]
 struct Layout {
@@ -46,8 +41,7 @@ struct LayoutObject {
     words: Vec<u32>,
 }
 
-/// The stored bytes of a map bundle, from its layout JSON and the stored bundle. The JSON's byte codes, objects and height
-/// table replace the stored ones. Every other section keeps its stored value, because the layout does not name it.
+/// The stored bytes of a map bundle, from its layout JSON and the stored bundle.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let layout: Layout =
         serde_json::from_slice(json).map_err(|error| Error::Import(format!("layout JSON: {error}")))?;

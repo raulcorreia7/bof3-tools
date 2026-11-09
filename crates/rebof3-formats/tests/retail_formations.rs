@@ -1,9 +1,4 @@
-//! Every random-encounter formation of every area places its enemies as `Area_PlaceEncounterEnemies`
-//! does, finds each enemy's scene record, and draws each enemy's animation frames through the area's
-//! replayed VRAM.
-//!
-//! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/` and `SLUS_004.22`);
-//! without it the test skips.
+//! Every random-encounter formation of every area places its enemies as `Area_PlaceEncounterEnemies` does, finds
 
 mod support;
 
