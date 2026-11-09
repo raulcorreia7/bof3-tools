@@ -156,7 +156,9 @@ fn retail_terrains_round_trip_byte_exactly() {
         terrains += 1;
         let stored = fs::read(glb.with_extension("map")).unwrap();
         for mesh in [glb.clone(), glb.with_extension("obj")] {
-            if import::terrain(&fs::read(&mesh).unwrap(), &stored).ok().as_deref() != Some(stored.as_slice()) {
+            if rebof3_formats::map::terrain::import(&fs::read(&mesh).unwrap(), &stored).ok().as_deref()
+                != Some(stored.as_slice())
+            {
                 failures.push(format!(
                     "{}: the mesh does not return its {} stored bytes",
                     mesh.display(),
@@ -361,7 +363,7 @@ fn retail_map_layouts_round_trip_byte_exactly() {
             .expect("every map bundle has its layout JSON");
         let stored = fs::read(dir.join(bundle.output.as_deref().unwrap())).unwrap();
         let json = fs::read(dir.join(layout_row.output.as_deref().unwrap())).unwrap();
-        if import::map_layout(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
+        if rebof3_formats::map::layout::import(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
             failures.push(format!("{}: the layout does not return its {} stored bytes", bundle.source, stored.len()));
         }
     }

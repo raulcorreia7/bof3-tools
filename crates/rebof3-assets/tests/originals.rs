@@ -199,7 +199,8 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(layout) = beside(&path, &format!("{slot}.layout.json")) else { continue };
         let document = fs::read(layout).unwrap();
-        let same = import::map_layout(&document, &payload).map(|back| back == payload).unwrap_or(false);
+        let same =
+            rebof3_formats::map::layout::import(&document, &payload).map(|back| back == payload).unwrap_or(false);
         record("area-map", same);
     }
 

@@ -23,13 +23,13 @@
 
 use std::fmt::Write;
 
+use super::{MapBundle, SELECTORS, TileRect};
 use psx_formats::gfx::png;
 use rebof3_emi::replay::Vram;
 use rebof3_emi::texture::scene::resolve;
 use rebof3_emi::texture::terrain_descriptor;
-use rebof3_formats::map::{MapBundle, SELECTORS, TileRect};
 
-use crate::decode::color_rgba;
+use crate::error::{Error, Result};
 use crate::gltf::{self, Primitive};
 
 /// Vertex height per corner-height step (`wiki: formats/area#0x80104000-map-bundle`: each cell byte
@@ -49,7 +49,7 @@ const TURN_BIT: u32 = 1 << 18;
 const FLIP_X_BIT: u32 = 1 << 16;
 const FLIP_Z_BIT: u32 = 1 << 17;
 /// The `(x, z)` offset of each corner from the cell's near corner, in stored order.
-pub(crate) const CORNER_STEPS: [[i32; 2]; 4] = [[0, 0], [1, 0], [0, 1], [1, 1]];
+pub const CORNER_STEPS: [[i32; 2]; 4] = [[0, 0], [1, 0], [0, 1], [1, 1]];
 /// The corners in the order an OBJ face walks them: around the perimeter, not in stored order. The
 /// walk runs counter-clockwise seen from above, so the face normal points up.
 const PERIMETER: [usize; 4] = [0, 2, 3, 1];
@@ -84,7 +84,7 @@ pub struct Mesh {
 }
 
 /// The terrain of a map bundle payload.
-pub fn mesh_from_payload(payload: &[u8]) -> rebof3_formats::Result<Mesh> {
+pub fn mesh_from_payload(payload: &[u8]) -> Result<Mesh> {
     Ok(mesh_of_bundle(&MapBundle::decode(payload)?))
 }
 
@@ -149,32 +149,8 @@ pub fn of_bundle(bundle: &MapBundle, mtl_name: &str) -> Terrain {
 }
 
 /// Builds the OBJ and MTL text of a map bundle payload. `mtl_name` is the MTL file the OBJ names.
-pub fn from_payload(payload: &[u8], mtl_name: &str) -> rebof3_formats::Result<Terrain> {
+pub fn from_payload(payload: &[u8], mtl_name: &str) -> Result<Terrain> {
     Ok(of_mesh(&mesh_from_payload(payload)?, mtl_name))
-}
-
-/// The layout of a map bundle as JSON: the byte code of each cell, one row per map row; the object list,
-/// each object with its tag and body words; and the height-byte table when the payload ships one. The
-/// byte codes and words keep their stored values. Their meanings are not decoded
-/// (`wiki: formats/area#0x80104000-map-bundle`, "Map bundle"). The field names follow the C record
-/// (`AreaMapBundle` in
-/// `decomp/include/world/area.h`).
-pub fn layout_json(payload: &[u8]) -> rebof3_formats::Result<Vec<u8>> {
-    let bundle = MapBundle::decode(payload)?;
-    let width = usize::from(bundle.width).max(1);
-    let cells = usize::from(bundle.width) * usize::from(bundle.height);
-    let codes = &bundle.codes[..cells.min(bundle.codes.len())];
-    let rows: Vec<&[u8]> = codes.chunks(width).collect();
-    let objects: Vec<serde_json::Value> =
-        bundle.objects.iter().map(|object| serde_json::json!({ "tag": object.tag, "words": object.words })).collect();
-    let document = serde_json::json!({
-        "width": bundle.width,
-        "height": bundle.height,
-        "byte_codes": rows,
-        "objects": objects,
-        "heights": bundle.heights,
-    });
-    Ok(serde_json::to_vec_pretty(&document).expect("a JSON value always serializes"))
 }
 
 /// The terrain as a binary glTF (`.glb`), with one primitive per tile-bank material and the same
@@ -287,7 +263,7 @@ impl TopDown {
     /// The RGBA view of every pixel; a cell with no tile, and the transparent colour `0x0000`, are
     /// clear.
     pub fn rgba(&self) -> Vec<[u8; 4]> {
-        self.words.iter().map(|word| word.map_or([0; 4], color_rgba)).collect()
+        self.words.iter().map(|word| word.map_or([0; 4], psx_formats::clut::word_to_view)).collect()
     }
 
     /// The view as an RGBA PNG.
@@ -345,10 +321,10 @@ fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
 #[cfg(test)]
 mod top_down_tests {
     use super::*;
+    use crate::map::Cell;
     use rebof3_emi::Entry;
     use rebof3_emi::replay::Writer;
     use rebof3_emi::texture::{TERRAIN_CLUT_ROW, TERRAIN_PAGE_X, TERRAIN_PAGE_Y};
-    use rebof3_formats::map::Cell;
 
     /// A VRAM whose terrain page 0 holds one 32x32-word upload with the 8-bit texel `u + 16 * v`
     /// at `(u, v)`, and whose first CLUT row maps index `i` to colour `0x100 + i`.
@@ -408,4 +384,60 @@ mod top_down_tests {
         assert_eq!((view.textured, view.unwritten), (0, 1));
         assert_eq!(&view.png()[1..4], b"PNG");
     }
+}
+
+/// The terrain mesh's corner heights, written back into the map bundle it came from.
+///
+/// `mesh` is the binary glTF or the OBJ text that the export writes, and `payload` is that bundle's
+/// stored bytes. A corner's height is its `y` divided by [`HEIGHT_SCALE`]. The mesh does not carry the
+/// tiles, objects or height table, so those sections come from `payload`. A corner that the mesh moves
+/// in `x` or `z` is an error.
+pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
+    let mut bundle = MapBundle::decode(payload)?;
+    let positions = if mesh.starts_with(b"glTF") {
+        gltf::read_positions(mesh).map_err(Error::Import)?
+    } else {
+        obj_positions(mesh)?
+    };
+    let corners = 4 * bundle.cells.len();
+    if positions.len() != corners {
+        return Err(Error::Import(format!("the mesh has {} corners; the bundle needs {corners}", positions.len())));
+    }
+    let width = usize::from(bundle.width).max(1);
+    for (cell, record) in bundle.cells.iter_mut().enumerate() {
+        let (column, row) = ((cell % width) as f32, (cell / width) as f32);
+        for (corner, [step_x, step_z]) in CORNER_STEPS.iter().enumerate() {
+            let [x, y, z] = positions[4 * cell + corner];
+            if x != column + *step_x as f32 || z != row + *step_z as f32 {
+                return Err(Error::Import(format!("corner {corner} of cell {cell} is not at its cell")));
+            }
+            record.heights[corner] = height_byte(y)
+                .ok_or_else(|| Error::Import(format!("corner {corner} of cell {cell} is at {y}, not a height step")))?;
+        }
+    }
+    Ok(bundle.encode())
+}
+
+/// The height byte of a corner at `y`. `y` is the byte times [`HEIGHT_SCALE`], so it must be a whole step
+/// that an `i8` holds.
+fn height_byte(y: f32) -> Option<i8> {
+    let step = y / HEIGHT_SCALE as f32;
+    (step.fract() == 0.0 && (-128.0..=127.0).contains(&step)).then_some(step as i8)
+}
+
+/// The vertices of an OBJ text: its `v` lines, in file order.
+fn obj_positions(mesh: &[u8]) -> Result<Vec<[f32; 3]>> {
+    let text = std::str::from_utf8(mesh).map_err(|error| Error::Import(format!("the OBJ is not text: {error}")))?;
+    let mut positions = Vec::new();
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("v ") else {
+            continue;
+        };
+        let values: std::result::Result<Vec<f32>, _> = rest.split_whitespace().map(str::parse).collect();
+        match values.as_deref() {
+            Ok([x, y, z]) => positions.push([*x, *y, *z]),
+            _ => return Err(Error::Import(format!("the OBJ vertex {rest:?} is not three numbers"))),
+        }
+    }
+    Ok(positions)
 }

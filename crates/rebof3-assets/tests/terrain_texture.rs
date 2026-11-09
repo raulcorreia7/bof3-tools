@@ -8,10 +8,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rebof3_assets::terrain::top_down;
 use rebof3_emi::Archive;
 use rebof3_emi::replay::{self, Vram, scenes};
 use rebof3_formats::map::MapBundle;
+use rebof3_formats::map::terrain::top_down;
 use rebof3_formats::{Format, classify};
 
 fn collect(root: &Path, folder: &Path, out: &mut Vec<String>) {

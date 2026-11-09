@@ -369,9 +369,9 @@ fn run_export(job: &ExportJob) -> Result<(), String> {
     let bytes = fs::read(&job.source).map_err(|error| error.to_string())?;
     let data = match &job.what {
         Export::Terrain => {
-            let mesh = rebof3_assets::terrain::mesh_from_payload(&bytes).map_err(|e| e.to_string())?;
+            let mesh = rebof3_formats::map::terrain::mesh_from_payload(&bytes).map_err(|e| e.to_string())?;
             let name = job.target.file_stem().unwrap_or_default().to_string_lossy();
-            rebof3_assets::terrain::glb_of_mesh(&mesh, &name).ok_or("no cell to draw")?
+            rebof3_formats::map::terrain::glb_of_mesh(&mesh, &name).ok_or("no cell to draw")?
         }
         Export::Message => rebof3_assets::text::bank::export(&bytes).map_err(|e| e.to_string())?,
         Export::Soundfont(body) => {

@@ -212,8 +212,10 @@ pub static CODECS: &[Codec] = &[
         kind: "terrain",
         export: None,
         import: Some(
-            Op::new("import terrain needs a mesh file", "bin", |job| import::terrain(job.input, companion(job)))
-                .with_companion("--payload", "import terrain needs --payload, the stored bundle"),
+            Op::new("import terrain needs a mesh file", "bin", |job| {
+                Ok(rebof3_formats::map::terrain::import(job.input, companion(job))?)
+            })
+            .with_companion("--payload", "import terrain needs --payload, the stored bundle"),
         ),
     },
     Codec {
@@ -242,7 +244,7 @@ pub static CODECS: &[Codec] = &[
         export: None,
         import: Some(
             Op::new("import layout needs the layout's JSON file", "bin", |job| {
-                import::map_layout(job.input, companion(job))
+                Ok(rebof3_formats::map::layout::import(job.input, companion(job))?)
             })
             .with_companion("--payload", "import layout needs --payload, the stored bundle"),
         ),

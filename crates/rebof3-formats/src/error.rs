@@ -21,6 +21,8 @@ pub enum Error {
     /// A script bank's directory or a section's table words do not parse as the `0x800D3800`
     /// layout (`wiki: formats/area`).
     ScriptBankShape(&'static str),
+    /// An open-format file that an import cannot read back to the stored bytes.
+    Import(String),
 }
 
 impl fmt::Display for Error {
@@ -38,6 +40,7 @@ impl fmt::Display for Error {
             }
             Self::MapBundleShape(reason) => write!(f, "map bundle: {reason}"),
             Self::ScriptBankShape(reason) => write!(f, "script bank: {reason}"),
+            Self::Import(message) => f.write_str(message),
         }
     }
 }

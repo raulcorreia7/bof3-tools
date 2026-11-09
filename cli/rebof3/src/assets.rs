@@ -19,9 +19,9 @@ use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
 use rebof3_assets::soundfont;
 use rebof3_assets::tables;
-use rebof3_assets::terrain;
 use rebof3_assets::text::{self, DEFAULT_DISC};
 use rebof3_assets::{Error, Result};
+use rebof3_formats::map::terrain;
 
 /// Exit codes: 0 success, 1 some payloads failed to write, 2 an error.
 const EXIT_OK: i32 = 0;

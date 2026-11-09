@@ -10,12 +10,9 @@ use psx_formats::gfx::texture::{self, Depth};
 use psx_formats::gfx::{clut, png, vram};
 use rebof3_emi::encounter::{self, EncounterBlock};
 use rebof3_emi::game_tables::{self, PAYLOAD_START, TABLES, Table};
-use rebof3_formats::map::{MapBundle, MapObject};
 
 use crate::decode::VAG_RATE;
 use crate::error::{Error, Result};
-use crate::gltf;
-use crate::terrain::{CORNER_STEPS, HEIGHT_SCALE};
 
 /// One fixed table of `ETC/GAME.EMI` entry 0, from its JSON records (`<name>.json`, an array of the records).
 /// `base` holds the table's stored bytes. Each named field is written over its base record, so the bytes no
@@ -66,53 +63,6 @@ pub fn game_table_in_payload(table: &str, json: &[u8], payload: &[u8]) -> Result
     let end = start + descriptor.count * descriptor.record;
     let base = payload.get(start..end).ok_or_else(|| Error::Import(format!("the payload ends before {table}")))?;
     game_table(table, json, base)
-}
-
-/// The layout of a map bundle (`<slot>.layout.json`): the byte codes row by row, the objects, and the
-/// height table. The field names follow the C record (`AreaMapBundle` in `decomp/include/world/area.h`)
-/// and the map bundle format (`wiki: formats/area#0x80104000-map-bundle`).
-#[derive(serde::Deserialize)]
-struct Layout {
-    width: u8,
-    height: u8,
-    byte_codes: Vec<Vec<u8>>,
-    objects: Vec<LayoutObject>,
-    heights: Option<Vec<u8>>,
-}
-
-/// One object of a layout: its tag and its body words.
-#[derive(serde::Deserialize)]
-struct LayoutObject {
-    tag: u16,
-    words: Vec<u32>,
-}
-
-/// The stored bytes of a map bundle, from its layout JSON and the stored bundle. The JSON's byte codes, objects and height
-/// table replace the stored ones. Every other section keeps its stored value, because the layout does not name it.
-pub fn map_layout(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let layout: Layout =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("layout JSON: {error}")))?;
-    let mut bundle = MapBundle::decode(payload)?;
-    let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
-    if layout.width != bundle.width || layout.height != bundle.height {
-        return Err(Error::Import(format!(
-            "the layout is {}x{}; the bundle is {width}x{height}",
-            layout.width, layout.height
-        )));
-    }
-    if layout.byte_codes.len() != height || layout.byte_codes.iter().any(|row| row.len() != width) {
-        return Err(Error::Import(format!("the byte codes are not {height} rows of {width}")));
-    }
-    for (cell, code) in layout.byte_codes.iter().flatten().enumerate() {
-        bundle.codes[cell] = *code;
-    }
-    if layout.heights.as_ref().is_some_and(|table| table.len() != width * height) {
-        return Err(Error::Import(format!("the height table is not {} bytes", width * height)));
-    }
-    bundle.objects =
-        layout.objects.into_iter().map(|object| MapObject { tag: object.tag, words: object.words }).collect();
-    bundle.heights = layout.heights;
-    Ok(bundle.encode())
 }
 
 /// The encounter block of an area (`area-encounters`), from its JSON and its stored bytes. `base` is the stored
@@ -219,62 +169,6 @@ fn read_pcm_wav(bytes: &[u8]) -> Result<Vec<i16>> {
         return Err(bad("must be mono 16-bit PCM at 44100 Hz"));
     }
     Ok(data.as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes(*pair)).collect())
-}
-
-/// The terrain mesh's corner heights, written back into the map bundle it came from.
-///
-/// `mesh` is the binary glTF or the OBJ text that the export writes, and `payload` is that bundle's
-/// stored bytes. A corner's height is its `y` divided by [`HEIGHT_SCALE`]. The mesh does not carry the
-/// tiles, objects or height table, so those sections come from `payload`. A corner that the mesh moves
-/// in `x` or `z` is an error.
-pub fn terrain(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let mut bundle = MapBundle::decode(payload)?;
-    let positions = if mesh.starts_with(b"glTF") {
-        gltf::read_positions(mesh).map_err(Error::Import)?
-    } else {
-        obj_positions(mesh)?
-    };
-    let corners = 4 * bundle.cells.len();
-    if positions.len() != corners {
-        return Err(Error::Import(format!("the mesh has {} corners; the bundle needs {corners}", positions.len())));
-    }
-    let width = usize::from(bundle.width).max(1);
-    for (cell, record) in bundle.cells.iter_mut().enumerate() {
-        let (column, row) = ((cell % width) as f32, (cell / width) as f32);
-        for (corner, [step_x, step_z]) in CORNER_STEPS.iter().enumerate() {
-            let [x, y, z] = positions[4 * cell + corner];
-            if x != column + *step_x as f32 || z != row + *step_z as f32 {
-                return Err(Error::Import(format!("corner {corner} of cell {cell} is not at its cell")));
-            }
-            record.heights[corner] = height_byte(y)
-                .ok_or_else(|| Error::Import(format!("corner {corner} of cell {cell} is at {y}, not a height step")))?;
-        }
-    }
-    Ok(bundle.encode())
-}
-
-/// The height byte of a corner at `y`. `y` is the byte times [`HEIGHT_SCALE`], so it must be a whole step
-/// that an `i8` holds.
-fn height_byte(y: f32) -> Option<i8> {
-    let step = y / HEIGHT_SCALE as f32;
-    (step.fract() == 0.0 && (-128.0..=127.0).contains(&step)).then_some(step as i8)
-}
-
-/// The vertices of an OBJ text: its `v` lines, in file order.
-fn obj_positions(mesh: &[u8]) -> Result<Vec<[f32; 3]>> {
-    let text = std::str::from_utf8(mesh).map_err(|error| Error::Import(format!("the OBJ is not text: {error}")))?;
-    let mut positions = Vec::new();
-    for line in text.lines() {
-        let Some(rest) = line.strip_prefix("v ") else {
-            continue;
-        };
-        let values: std::result::Result<Vec<f32>, _> = rest.split_whitespace().map(str::parse).collect();
-        match values.as_deref() {
-            Ok([x, y, z]) => positions.push([*x, *y, *z]),
-            _ => return Err(Error::Import(format!("the OBJ vertex {rest:?} is not three numbers"))),
-        }
-    }
-    Ok(positions)
 }
 
 /// Reads a palette's JSON (`<slot>.json`) back to its stored bytes: the `word` of each color, in order.

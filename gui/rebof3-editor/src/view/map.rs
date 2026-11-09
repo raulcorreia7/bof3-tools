@@ -3,7 +3,7 @@
 //!
 //! The textured mode draws each cell's tile instead, read from the VRAM of the area's own scene
 //! (`rebof3_emi::replay::scenes::field`, the project's edits included) through the tile descriptor
-//! (`rebof3_assets::terrain::top_down`).
+//! (`rebof3_formats::map::terrain::top_down`).
 //!
 //! A picked cell's corner heights are editable. The edit decodes the bundle, changes the one cell and
 //! encodes it again ([`MapBundle::encode`]), so every header offset follows and an unchanged bundle
@@ -17,8 +17,8 @@ use gpui::{
     AnyElement, Bounds, Context, Div, Image, ImageFormat, MouseButton, MouseDownEvent, MouseMoveEvent, ObjectFit,
     Pixels, Point, canvas, div, img, prelude::*, px,
 };
-use rebof3_assets::terrain::{self, mesh_of_bundle};
 use rebof3_emi::replay::scenes;
+use rebof3_formats::map::terrain::{self, mesh_of_bundle};
 use rebof3_formats::map::{CELL_BYTES, MapBundle};
 
 use super::texture::paint_pixels;

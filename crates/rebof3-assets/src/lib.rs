@@ -14,7 +14,6 @@ pub mod decode;
 pub mod disc;
 pub mod error;
 pub mod extract;
-pub mod gltf;
 pub mod import;
 pub mod kind;
 pub mod report;
@@ -22,7 +21,6 @@ pub mod sound;
 pub mod soundfont;
 pub mod sprites;
 pub mod tables;
-pub mod terrain;
 pub mod text;
 
 pub use error::{Error, Result};

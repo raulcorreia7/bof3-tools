@@ -26,7 +26,7 @@ use crate::kind::{AudioFormat, Kind, Selection};
 use crate::report::{DERIVED_TABLE, RENDERED_ITEM, Report, Row};
 use crate::sound;
 use crate::tables;
-use crate::terrain;
+use rebof3_formats::map::{layout, terrain};
 
 /// Name of the table written next to the asset tree.
 pub const TABLE_FILE: &str = "assets.jsonl";
@@ -448,7 +448,7 @@ fn emi_rows(
                     }
                     Err(error) => note = format!("terrain skipped: {error}"),
                 }
-                match terrain::layout_json(payload) {
+                match layout::export(payload) {
                     Ok(data) => outputs.push(Output {
                         role: "json",
                         path: name(".layout", "json"),

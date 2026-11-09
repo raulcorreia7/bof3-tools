@@ -1,5 +1,8 @@
 //! Area map bundle codec (`0x80104000`).
 //!
+//! [`terrain`] exports the bundle as OBJ and glTF and imports edited heights; [`layout`] exports and
+//! imports the byte codes, objects and height table as JSON.
+//!
 //! The WORLD* archives' map payload: a 0x30-byte header of section offsets in
 //! 4-byte units, the per-cell tables, the tile records and four record regions.
 //! [`MapBundle::decode`] splits a payload into its sections and
@@ -44,6 +47,9 @@ use rebof3_emi::Entry;
 use crate::error::{Error, Result};
 use crate::identity::difference;
 use crate::registry::{Description, Format, RoundTrip, Selector, State};
+
+pub mod layout;
+pub mod terrain;
 use psx_formats::bytes::{u16_le, u32_le};
 
 /// The load address of the bundle.
