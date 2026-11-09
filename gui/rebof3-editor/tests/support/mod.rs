@@ -1,16 +1,8 @@
 //! Retail-input discovery for the editor's tests.
-//!
-//! `tests/retail.rs` and the unit tests in `src/` (through `main.rs`) share this module.
 
 #![allow(dead_code)]
 
 use std::path::PathBuf;
-
-// ---- Retail inputs ----------------------------------------------------------------------------
-//
-// Two variables name the retail data: `BOF3_DISC_DIR` (the extracted disc, which holds `BIN/`) and
-// `BOF3_DISC_IMAGE` (the disc's cue sheet). Unset, a retail test skips with a message. Set but
-// invalid, it panics with the path. `BOF3_REQUIRE_RETAIL=1` turns every skip into a failure.
 
 /// The variable that names the extracted disc.
 pub const DISC_DIR_VARIABLE: &str = "BOF3_DISC_DIR";
@@ -32,7 +24,7 @@ fn skip(variable: &str) -> Option<PathBuf> {
     None
 }
 
-/// The extracted disc named by `BOF3_DISC_DIR`; `None` (a skip) when unset, a panic when it has no `BIN/`.
+/// The extracted disc named by `BOF3_DISC_DIR`;
 pub fn retail_disc() -> Option<PathBuf> {
     let Some(value) = std::env::var_os(DISC_DIR_VARIABLE) else { return skip(DISC_DIR_VARIABLE) };
     let disc = PathBuf::from(value);
@@ -49,7 +41,7 @@ pub fn retail_root() -> Option<PathBuf> {
     retail_disc().map(|disc| disc.join(ARCHIVE_FOLDER))
 }
 
-/// The disc's cue sheet named by `BOF3_DISC_IMAGE`; `None` (a skip) when unset, a panic when the file is missing.
+/// The disc's cue sheet named by `BOF3_DISC_IMAGE`;
 pub fn retail_image() -> Option<PathBuf> {
     let Some(value) = std::env::var_os(DISC_IMAGE_VARIABLE) else { return skip(DISC_IMAGE_VARIABLE) };
     let cue = PathBuf::from(value);

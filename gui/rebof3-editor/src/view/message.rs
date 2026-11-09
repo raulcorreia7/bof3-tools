@@ -1,11 +1,5 @@
-//! A message laid out the way the message window prints it: pages, lines and colour runs.
-//!
-//! The layout reads the `{TAG}` text that `codec::decode` writes and follows `wiki: data/text`:
-//! `{NEWLINE}` starts a line, `{PAGE}` waits for a button and starts a page, `{COLOR:nn}` and
-//! `{NOCOLOR}` switch the glyph colour, and `{BACKSPACE}` steps back one glyph. Codes that read
-//! another string (`{GOTO}`, `{INSERT}`, `{VAR}`, `{LINK}`) and `{NUM}` show as a placeholder,
-//! because their text is only known while the game runs. Codes that only time or box the window
-//! draw nothing.
+//! A message laid out the way the message window prints it: pages, lines and colour runs. The layout reads the
+//! `{TAG}` text that `codec::decode` writes and follows `wiki: data/text`:
 
 use gpui::{Div, div, prelude::*, px};
 
@@ -27,8 +21,7 @@ const WINDOW_WIDTH: f32 = 360.0;
 /// The height of a printed line, in pixels; the window steps 12 px per line in the game.
 const LINE_HEIGHT: f32 = 16.0;
 
-/// A run of glyphs in one colour. `color` is the `{COLOR}` operand, or `None` for the window's own
-/// colour. A placeholder stands for text the game fills in.
+/// A run of glyphs in one colour.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Run {
     pub text: String,
@@ -123,8 +116,7 @@ impl Layout {
     }
 }
 
-/// The pages of a decoded message. Trailing `{END}` padding draws nothing; an `{END}` with text after
-/// it, as between `{CHOICE}` answers, starts a line.
+/// The pages of a decoded message.
 pub fn pages(text: &str) -> Vec<Page> {
     let mut layout = Layout { pages: vec![vec![Vec::new()]], color: None };
     let pieces = pieces(text);

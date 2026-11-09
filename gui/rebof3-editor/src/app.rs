@@ -1,5 +1,5 @@
-//! The editor's state and what the user can do with it: open a project, pick an archive and an
-//! entry, edit, undo, save and export. `window` draws it.
+//! The editor's state and what the user can do with it: open a project, pick an archive and an entry, edit, undo,
+//! save and export.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -204,8 +204,7 @@ impl Editor {
         }
     }
 
-    /// Rewrites the payload of entry `index` of `archive` with `rewrite`. A prompt names the entry before it
-    /// opens, so the change lands there even when the selection moved meanwhile.
+    /// Rewrites the payload of entry `index` of `archive` with `rewrite`.
     pub fn rewrite_entry(
         &mut self,
         archive: &ArchivePath,
@@ -215,8 +214,7 @@ impl Editor {
         self.rewrite_entries(archive, &[index], |payloads| Ok(vec![rewrite(payloads[0])?]))
     }
 
-    /// Rewrites the payloads of entries `indices` of `archive` with `rewrite`, as one undo step. `rewrite`
-    /// gets the payloads in the order of `indices` and returns the new ones in the same order.
+    /// Rewrites the payloads of entries `indices` of `archive` with `rewrite`, as one undo step.
     pub fn rewrite_entries(
         &mut self,
         archive: &ArchivePath,
@@ -278,8 +276,8 @@ impl Editor {
         self.project.as_ref().is_some_and(Project::is_dirty)
     }
 
-    /// Runs `then` when no edit would be lost: at once when every edit is saved, otherwise after the user
-    /// saves or discards them. Cancel, or a save that fails, leaves everything as it was.
+    /// Runs `then` when no edit would be lost: at once when every edit is saved, otherwise after the user saves or
+    /// discards them.
     pub fn when_saved(
         &mut self,
         window: &mut Window,
@@ -317,8 +315,7 @@ impl Editor {
         .detach();
     }
 
-    /// Whether the window may close now. With unsaved edits it asks first, and closes itself after a save
-    /// or a discard.
+    /// Whether the window may close now.
     pub fn should_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if !self.has_unsaved_edits() {
             return true;
@@ -350,8 +347,7 @@ impl Editor {
         }
     }
 
-    /// The archive browser's lines: folders, and the archives of each open folder. A filter opens
-    /// every folder that has a match.
+    /// The archive browser's lines: folders, and the archives of each open folder.
     pub fn browser_rows(&self) -> Vec<BrowserRow> {
         let Some(project) = self.project.as_ref() else { return Vec::new() };
         let filter = self.filter.to_ascii_uppercase();
@@ -424,8 +420,7 @@ impl Editor {
         }
     }
 
-    /// Asks for a folder and puts it in `field`. The disc folder also names a project folder next
-    /// to it when none is set.
+    /// Asks for a folder and puts it in `field`.
     pub fn browse(&mut self, field: Field, cx: &mut Context<Self>) {
         let prompt = match field {
             Field::Disc => "Extracted disc folder",
@@ -482,8 +477,7 @@ impl Editor {
         .detach();
     }
 
-    /// Asks for a file and hands its bytes to `then`. The status line shows what `then` returns, or why the
-    /// file cannot be read.
+    /// Asks for a file and hands its bytes to `then`.
     pub fn open_file(
         &mut self,
         prompt: &'static str,

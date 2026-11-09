@@ -1,7 +1,5 @@
-//! A CLUT block as a grid of 16-color rows, with a 15-bit color picker.
-//!
-//! A color word is `stp << 15 | blue << 10 | green << 5 | red`, five bits per channel. Word `0x0000`
-//! draws transparent; the STP bit marks a semi-transparent texel.
+//! A CLUT block as a grid of 16-color rows, with a 15-bit color picker. Word `0x0000` draws transparent; the STP bit
+//! marks a semi-transparent texel.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -86,8 +84,7 @@ pub fn words(bytes: &[u8]) -> Vec<u16> {
     bytes.as_chunks::<COLOR_BYTES>().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect()
 }
 
-/// Writes color `index` of `bytes` as `word`. Every other byte keeps its value, a trailing odd byte
-/// included. Returns false when the block has no such color.
+/// Writes color `index` of `bytes` as `word`.
 fn put_color(bytes: &mut [u8], index: usize, word: u16) -> bool {
     let start = index * COLOR_BYTES;
     let Some(slot) = bytes.get_mut(start..start + COLOR_BYTES) else { return false };
@@ -211,8 +208,8 @@ mod tests {
         assert_eq!(words(&bytes), [0x2211, 0xBEEF]);
     }
 
-    /// Every color of every retail CLUT block takes an STP flip in its own two bytes and flips back to
-    /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// Every color of every retail CLUT block takes an STP flip in its own two bytes and flips back to the stored
+    /// bytes.
     #[test]
     fn every_retail_color_edit_rewrites_only_its_word() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };

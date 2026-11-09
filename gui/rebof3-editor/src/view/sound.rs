@@ -1,7 +1,6 @@
-//! Sound banks and sequences: play a VAB's samples and its tones at a chosen note, list its programs
-//! and tones, export WAVE, SoundFont and MIDI files, replace a sample from a WAVE file, edit a
-//! sequence's header and import a sequence from MIDI. Every preview renders through the audio
-//! library's sound driver and SPU (`rebof3_editor::preview`), in stereo at the library's rate.
+//! Sound banks and sequences: play a VAB's samples and its tones at a chosen note, list its programs and tones,
+//! export WAVE, SoundFont and MIDI files, replace a sample from a WAVE file, edit a sequence's header and import a
+//! sequence from MIDI.
 
 use std::collections::HashMap;
 
@@ -336,9 +335,8 @@ fn raw_sample(editor: &Editor, index: u32) -> Result<Vec<i16>, String> {
     bank.decode_vag(&body, index).map_err(|error| error.to_string())
 }
 
-/// How long a preview note is held: one pass of the tone's sample at the note, at least
-/// [`NOTE_HOLD_SECONDS`] and at most [`NOTE_HOLD_LIMIT`]. The pass is reckoned in equal temperament, which
-/// is near enough for a hold.
+/// How long a preview note is held: one pass of the tone's sample at the note, at least [`NOTE_HOLD_SECONDS`] and at
+/// most [`NOTE_HOLD_LIMIT`].
 fn hold(bank: &Bank, tone: &Tone, note: u8) -> f64 {
     let frames = bank.vags.get(tone.vag as usize).map_or(0, |vag| vag.frames);
     let octaves = (f64::from(tone.center_note) - f64::from(note)) / SEMITONES_PER_OCTAVE;
@@ -346,8 +344,8 @@ fn hold(bank: &Bank, tone: &Tone, note: u8) -> f64 {
     pass.clamp(NOTE_HOLD_SECONDS, NOTE_HOLD_LIMIT)
 }
 
-/// Plays the note picked for tone `block`/`slot` of the shown bank: the tone alone, or with `program`
-/// every tone of its program that answers the note.
+/// Plays the note picked for tone `block`/`slot` of the shown bank: the tone alone, or with `program` every tone of
+/// its program that answers the note.
 fn play_note(editor: &mut Editor, block: u8, slot: u8, program: bool) -> Result<(), String> {
     let pcm = {
         let (entry, header_index, header, body) = shown_bank(editor)?;
@@ -368,8 +366,7 @@ fn play_note(editor: &mut Editor, block: u8, slot: u8, program: bool) -> Result<
     editor.views.sound.player.play(&pcm)
 }
 
-/// Sets the note tone `block`/`slot` of the shown bank plays. Returns a status message when the text is
-/// not a note the tone answers.
+/// Sets the note tone `block`/`slot` of the shown bank plays.
 pub fn note_changed(editor: &mut Editor, block: u8, slot: u8, text: &str) -> Option<String> {
     let (key, note) = {
         let (entry, header_index, header, body) = match shown_bank(editor) {
@@ -390,8 +387,7 @@ pub fn note_changed(editor: &mut Editor, block: u8, slot: u8, text: &str) -> Opt
     None
 }
 
-/// The bank's header and body with sample `index` replaced by `vag`, a sample's stored bytes. The header's
-/// size table and bank size follow the new length; every other byte of both keeps its value.
+/// The bank's header and body with sample `index` replaced by `vag`, a sample's stored bytes.
 fn with_sample(header: &[u8], body: &[u8], index: u32, vag: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
     if index == 0 {
         return Err("sample 0 is the bank's null sample".into());
@@ -424,8 +420,7 @@ fn with_sample(header: &[u8], body: &[u8], index: u32, vag: &[u8]) -> Result<(Ve
     Ok((bank.encode_header(), new_body))
 }
 
-/// Asks for a WAVE file and puts it in place of sample `index`, rewriting the header and the body as one
-/// undo step.
+/// Asks for a WAVE file and puts it in place of sample `index`, rewriting the header and the body as one undo step.
 fn import_sample(editor: &mut Editor, header: usize, body: usize, index: u32, cx: &mut Context<Editor>) {
     let Some(entry) = editor.current() else { return };
     let archive = entry.archive.path.clone();
@@ -465,8 +460,7 @@ fn with_header(payload: &[u8], index: usize, part: Part, text: &str) -> Result<V
     Ok(package.encode())
 }
 
-/// The package with sequence `index` replaced by the format 0 Standard MIDI File `midi`. The sequence
-/// keeps its id, which MIDI does not carry.
+/// The package with sequence `index` replaced by the format 0 Standard MIDI File `midi`.
 fn with_midi(payload: &[u8], index: usize, midi: &[u8]) -> Result<Vec<u8>, String> {
     let mut package = Package::parse(payload).map_err(|error| error.to_string())?;
     let sequence = package.sequences.get_mut(index).ok_or("the package has no such sequence")?;
@@ -474,8 +468,7 @@ fn with_midi(payload: &[u8], index: usize, midi: &[u8]) -> Result<Vec<u8>, Strin
     Ok(package.encode())
 }
 
-/// Applies a changed header field of the shown package. Returns a status message when the text cannot be
-/// written.
+/// Applies a changed header field of the shown package.
 pub fn header_changed(editor: &mut Editor, index: usize, part: Part, text: &str) -> Option<String> {
     let entry = editor.current()?;
     match with_header(entry.payload(), index, part, text) {
@@ -679,8 +672,7 @@ mod tests {
         assert!(with_midi(&payload, 0, b"not a MIDI file").is_err());
     }
 
-    /// Every sample of every retail bank, put back in place of itself, leaves the header and the body as
-    /// stored. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// Every sample of every retail bank, put back in place of itself, leaves the header and the body as stored.
     #[test]
     fn every_retail_sample_imports_back_in_place() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
@@ -710,8 +702,7 @@ mod tests {
         assert!(samples > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 
-    /// Every sequence of every retail package exports to MIDI and imports back to the stored bytes. Point
-    /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// Every sequence of every retail package exports to MIDI and imports back to the stored bytes.
     #[test]
     fn every_retail_sequence_imports_back_from_its_midi() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };

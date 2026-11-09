@@ -1,8 +1,4 @@
 //! Fonts from the operating system.
-//!
-//! The editor ships no font files, so its license stays the workspace's. It uses the first
-//! proportional and monospace family the system has; `BOF3_EDIT_FONT` and `BOF3_EDIT_MONO` name other
-//! families.
 
 use std::sync::OnceLock;
 

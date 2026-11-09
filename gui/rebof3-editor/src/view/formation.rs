@@ -1,12 +1,6 @@
-//! An encounter of an area as the field places it for battle (`rebof3_formats::formation`): each listed
-//! enemy at the cell `Area_PlaceEncounterEnemies` gives it, drawn from its scene record through the
-//! area's replayed VRAM and animated at the game's tick.
-//!
-//! The layout is top-down on the cell grid, one cell [`CELL_PIXELS`] pixels, with the formation origin
-//! (the party's cell) marked; the battle camera's projection is not drawn. What stays a run-time choice
-//! is offered, not guessed: the scroll direction, which slots the spawn roll keeps (all are shown), the
-//! cell the map accepts when the first one is blocked, and the record the battle plays
-//! (`func_801E2314` reads it from the enemy's battle script, not traced).
+//! An encounter of an area as the field places it for battle (`rebof3_formats::formation`): each listed enemy at the
+//! cell `Area_PlaceEncounterEnemies` gives it, drawn from its scene record through the area's replayed VRAM and
+//! animated at the game's tick.
 
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -387,8 +381,7 @@ mod tests {
     use crate::app::Editor;
     use crate::project::ArchivePath;
 
-    /// AREA003's encounter 2 places its goblins and draws each through the area's VRAM. Point
-    /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// AREA003's encounter 2 places its goblins and draws each through the area's VRAM.
     #[gpui::test]
     fn a_retail_formation_places_and_draws(cx: &mut TestAppContext) {
         let Some(disc) = crate::retail_support::retail_disc() else {

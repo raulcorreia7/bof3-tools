@@ -1,13 +1,4 @@
-//! An area map bundle seen from above: one square per cell. A cell's hue is its texture page and its
-//! brightness the mean of its four corner heights; a cell with no tile is left out.
-//!
-//! The textured mode draws each cell's tile instead, read from the VRAM of the area's own scene
-//! (`rebof3_emi::replay::scenes::field`, the project's edits included) through the tile descriptor
-//! (`rebof3_formats::map::terrain::top_down`).
-//!
-//! A picked cell's corner heights are editable. The edit decodes the bundle, changes the one cell and
-//! encodes it again ([`MapBundle::encode`]), so every header offset follows and an unchanged bundle
-//! writes back byte for byte.
+//! An area map bundle seen from above: one square per cell.
 
 use std::cell::Cell as Shared;
 use std::rc::Rc;
@@ -114,8 +105,7 @@ fn mean_heights(bundle: &MapBundle) -> Vec<i32> {
         .collect()
 }
 
-/// One RGBA pixel per cell, row-major: the cell's page hue, darker for a lower cell. A cell whose grid
-/// value is 0 holds no tile and draws nothing.
+/// One RGBA pixel per cell, row-major: the cell's page hue, darker for a lower cell.
 pub fn cell_colors(bundle: &MapBundle) -> Vec<[u8; 4]> {
     let heights = mean_heights(bundle);
     let low = heights.iter().copied().min().unwrap_or(0);

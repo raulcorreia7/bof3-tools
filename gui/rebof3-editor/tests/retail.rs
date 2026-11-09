@@ -1,6 +1,5 @@
-//! Round trips over a whole extracted disc: every edit path the editor offers must write back exactly the
-//! bytes it read. Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the
-//! tests skip, and `BOF3_REQUIRE_RETAIL=1` makes a skip a failure.
+//! Round trips over a whole extracted disc: every edit path the editor offers must write back exactly the bytes it
+//! read.
 
 mod support;
 

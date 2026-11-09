@@ -1,5 +1,5 @@
-//! The small controls the window draws itself: buttons, tabs, text fields, menus, check boxes,
-//! color swatches, sliders and tooltips. The caller adds the click handlers.
+//! The small controls the window draws itself: buttons, tabs, text fields, menus, check boxes, color swatches,
+//! sliders and tooltips.
 
 use std::cell::Cell;
 use std::ops::RangeInclusive;
@@ -92,8 +92,7 @@ pub fn tab(id: impl Into<ElementId>, label: impl Into<SharedString>, selected: b
     if selected { tab.border_b_2().border_color(color(ACCENT)) } else { tab }
 }
 
-/// A text field. `edit` is the field's text and cursor while it has the keyboard; otherwise it shows
-/// `text`, or `hint` when `text` is empty. The caller adds `on_click` to give it the keyboard.
+/// A text field.
 pub fn field(
     id: impl Into<ElementId>,
     text: &str,
@@ -189,8 +188,7 @@ pub fn swatch(id: impl Into<ElementId>, rgba_bytes: [u8; 4], side: f32, outline:
     }
 }
 
-/// A slider over `range`. `bounds` keeps the track's last painted area, which maps the pointer to a
-/// value; `set` receives the new value on press and drag.
+/// A slider over `range`.
 pub fn slider<T: 'static>(
     id: impl Into<ElementId>,
     value: u32,

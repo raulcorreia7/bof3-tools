@@ -1,12 +1,4 @@
-//! A project: a read-only disc folder, and a separate project folder that holds the edits and the
-//! rebuilt archives.
-//!
-//! The disc files are only ever read. An edit is the whole new payload of one entry, kept in memory and
-//! saved as `edits/<archive>/<index>.bin` in the project folder. A placement edit is a new load argument for
-//! one entry (where a texture or palette lands in VRAM), saved as `edits/<archive>/<index>.load` in hex.
-//! Export rebuilds each edited archive with [`rebof3_emi::pack::rebuild_placed`] into `disc/<archive>` in
-//! the project folder and reads it back to prove the rebuild holds exactly the edited payloads and load
-//! arguments.
+//! A project: a read-only disc folder, and a separate project folder that holds the edits and the rebuilt archives.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -61,8 +53,7 @@ struct Change {
     before: Before,
 }
 
-/// One undoable step: every entry a gesture, a typed field or an import changed, in the order it first
-/// changed them.
+/// One undoable step: every entry a gesture, a typed field or an import changed, in the order it first changed them.
 type Step = Vec<Change>;
 
 pub struct Project {
@@ -84,8 +75,7 @@ pub struct Project {
 }
 
 impl Project {
-    /// Opens a disc folder (the one that holds `BIN/`) with a project folder for the edits. The two
-    /// folders must not contain each other, so nothing the project writes can land on a disc file.
+    /// Opens a disc folder (the one that holds `BIN/`) with a project folder for the edits.
     pub fn open(disc: &Path, folder: &Path) -> Result<Self, String> {
         let disc = disc.canonicalize().map_err(|error| format!("disc folder {}: {error}", disc.display()))?;
         fs::create_dir_all(folder).map_err(|error| format!("project folder {}: {error}", folder.display()))?;
@@ -240,8 +230,8 @@ impl Project {
         }
     }
 
-    /// Starts a step that collects every change until [`Project::end_step`], so one undo takes back a
-    /// whole drag or a whole typed field. A step still open ends first.
+    /// Starts a step that collects every change until [`Project::end_step`], so one undo takes back a whole drag or a
+    /// whole typed field.
     pub fn begin_step(&mut self) {
         self.end_step();
         self.open = Some(Step::new());
@@ -254,8 +244,7 @@ impl Project {
         }
     }
 
-    /// Adds a change to the open step, or makes it a step of its own. A step keeps the first state of
-    /// each entry it changed.
+    /// Adds a change to the open step, or makes it a step of its own.
     fn record(&mut self, change: Change) {
         self.redo.clear();
         let same = |earlier: &Change| {
@@ -293,8 +282,7 @@ impl Project {
         }
     }
 
-    /// Puts each entry of `step` back to its recorded state, last change first. Returns the step that
-    /// undoes this one.
+    /// Puts each entry of `step` back to its recorded state, last change first.
     fn apply(&mut self, step: Step) -> Step {
         let mut back: Step = step
             .into_iter()
@@ -400,8 +388,8 @@ impl Project {
         Ok(self.edit_count())
     }
 
-    /// The bytes of an archive as the project has it now: the disc's archive rebuilt with the archive's
-    /// edits, or the disc's bytes when it has none.
+    /// The bytes of an archive as the project has it now: the disc's archive rebuilt with the archive's edits, or the
+    /// disc's bytes when it has none.
     pub fn current_archive(&self, loaded: &Loaded) -> Result<Vec<u8>, String> {
         let replace: Vec<(usize, &[u8])> = self
             .edits
@@ -426,8 +414,8 @@ impl Project {
             .collect()
     }
 
-    /// Rebuilds every edited archive into `disc/` in the project folder, and checks that each rebuilt
-    /// archive reads back with the edited payloads and the disc's other payloads.
+    /// Rebuilds every edited archive into `disc/` in the project folder, and checks that each rebuilt archive reads
+    /// back with the edited payloads and the disc's other payloads.
     pub fn export(&mut self) -> Result<Vec<PathBuf>, String> {
         let mut by_archive: BTreeMap<ArchivePath, Vec<(usize, Vec<u8>)>> = BTreeMap::new();
         for ((archive, index), bytes) in &self.edits {
@@ -456,8 +444,8 @@ impl Project {
     }
 }
 
-/// Checks a rebuilt archive: same entries, the replaced payloads where they were replaced, the disc's
-/// payloads everywhere else, and the placed load arguments where they were placed.
+/// Checks a rebuilt archive: same entries, the replaced payloads where they were replaced, the disc's payloads
+/// everywhere else, and the placed load arguments where they were placed.
 fn verify(loaded: &Loaded, rebuilt: &[u8], replace: &[(usize, &[u8])], placed: &[(usize, u32)]) -> Result<(), String> {
     let archive = Archive::parse(rebuilt).map_err(|error| format!("rebuilt archive does not parse: {error}"))?;
     if archive.entries().len() != loaded.entries().len() {

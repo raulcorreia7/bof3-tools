@@ -1,14 +1,4 @@
-//! An area in 3D, as the field renderer draws it, with the field data laid over it and edited in
-//! place.
-//!
-//! The view reads the map bundle and its siblings (the battle grid, the area program's setup stream,
-//! the scene table and the encounter block), the executable's field tables (`SLUS_004.22`) and the
-//! VRAM of the area's own scene ([`model::Area::read`]). It builds a renderer scene
-//! ([`model::scene`]) and draws it offscreen with `rebof3_render` (OpenGL ES when a context opens,
-//! else the software path), then paints the frame as one image (`docs/adr/0003-area-3d-rendering.md`).
-//!
-//! Every edit writes a whole new payload through [`Editor::rewrite_entry`], so it is one undo step and
-//! saves like any other edit; a drag that paints or moves is one step from press to release.
+//! An area in 3D, as the field renderer draws it, with the field data laid over it and edited in place.
 
 mod model;
 
@@ -49,8 +39,7 @@ const FIRST_FRAME: (usize, usize) = (640, 480);
 const LARGEST_FRAME: usize = 1600;
 /// How far the pointer moves before a press becomes a drag, in pixels.
 const DRAG_SLOP: f32 = 3.0;
-/// Radians of turn per pixel of drag, the zoom per wheel pixel, and the pitch the free camera keeps
-/// within.
+/// Radians of turn per pixel of drag, the zoom per wheel pixel, and the pitch the free camera keeps within.
 const TURN_PER_PIXEL: f32 = 0.01;
 const ZOOM_PER_PIXEL: f32 = 0.004;
 const PITCH_LIMIT: f32 = 1.5;
@@ -116,8 +105,7 @@ pub enum Part {
     BattleInk,
 }
 
-/// What is picked: a face of a cell, or an actor. A face outlives the rebuild an edit causes, where a
-/// quad index would not.
+/// What is picked: a face of a cell, or an actor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Target {
     Face { cell: usize, face: Face },
@@ -209,8 +197,7 @@ impl Default for State {
     }
 }
 
-/// What the view reads once and keeps: the executable, and the last scene replay with the revision
-/// it holds for.
+/// What the view reads once and keeps: the executable, and the last scene replay with the revision it holds for.
 #[derive(Default)]
 pub struct Cache {
     exe: Option<Option<Rc<Vec<u8>>>>,
@@ -343,8 +330,8 @@ fn draw(editor: &mut Editor, key: &(String, usize, u64)) {
     state.drawn = Some(Drawn { key: draw, image, scene: Rc::new(scene), camera, size });
 }
 
-/// The frame size for a view of `width` by `height` pixels: the view's own size, no larger than
-/// [`LARGEST_FRAME`] on its longer side.
+/// The frame size for a view of `width` by `height` pixels: the view's own size, no larger than [`LARGEST_FRAME`] on
+/// its longer side.
 fn frame_size(width: f32, height: f32) -> (usize, usize) {
     if width < 1.0 || height < 1.0 {
         return FIRST_FRAME;
@@ -387,8 +374,8 @@ fn shown_area(editor: &mut Editor) -> Option<Rc<Area>> {
     editor.views.area.read.as_ref()?.area.as_ref().ok().cloned()
 }
 
-/// Keeps the scene replay current across an edit of this view: the view writes the bundle, the battle
-/// grid, the area program and the encounter block, and the replay reads none of them for the VRAM.
+/// Keeps the scene replay current across an edit of this view: the view writes the bundle, the battle grid, the area
+/// program and the encounter block, and the replay reads none of them for the VRAM.
 fn keep_replay(editor: &mut Editor, before: u64) {
     let after = editor.project.as_ref().map_or(before, Project::revision);
     if let Some((_, revision)) = editor.views.area.sources.replay.as_mut()

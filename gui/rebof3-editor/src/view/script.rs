@@ -1,13 +1,7 @@
-//! A script table as the programs its records hold: one animation stream per record, listed one op
-//! per line.
-//!
-//! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points an actor at a record of the table and
-//! `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`) plays it: each step is a `show` (a frame and the
-//! ticks it stays) or a `jump` (the step to continue at), [`rebof3_formats::script::program::OPCODES`].
-//! Editing an operand rewrites its byte and keeps every other byte. A step is added or removed at the
-//! end of a stream only: game code names stream positions (the start position `Actor_BeginScript`
-//! takes, `script_pc` tests in the area and party code), and a step moved mid-stream would change
-//! what they name. No edit may grow the table past its stored size.
+//! A script table as the programs its records hold: one animation stream per record, listed one op per line.
+//! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points an actor at a record of the table and `Actor_SeekScript`
+//! (`exe/slus_004_22@0x8014D910`) plays it: each step is a `show` (a frame and the ticks it stays) or a `jump` (the
+//! step to continue at), [`rebof3_formats::script::program::OPCODES`].
 
 use gpui::{AnyElement, Context, Div, Stateful, div, prelude::*, px};
 use rebof3_formats::script::program::{CellAt, Op, Program, Record, Section, StepAt, Stream};
@@ -318,8 +312,8 @@ fn appended_ticks(editor: &Editor, end: StepAt) -> u8 {
         .unwrap_or(APPENDED_TICKS)
 }
 
-/// The payload after `change`, refused when the table would grow past `limit`, its stored size: what
-/// follows the table in memory is not known to be free.
+/// The payload after `change`, refused when the table would grow past `limit`, its stored size: what follows the
+/// table in memory is not known to be free.
 pub fn rewritten(
     payload: &[u8],
     limit: usize,
@@ -471,8 +465,8 @@ mod tests {
         assert!(rewritten(&payload, payload.len(), |program| program.remove_op(at(2))).is_ok());
     }
 
-    /// Every retail script table takes an operand edit that rewrites one byte, and the edit undone gives
-    /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// Every retail script table takes an operand edit that rewrites one byte, and the edit undone gives the stored
+    /// bytes.
     #[test]
     fn every_retail_script_table_takes_an_operand_edit() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
@@ -520,8 +514,7 @@ mod tests {
         assert!(failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 
-    /// A retail area table draws in the view, a field edit rewrites its byte, and a jump's label picks
-    /// its target. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// A retail area table draws in the view, a field edit rewrites its byte, and a jump's label picks its target.
     #[gpui::test]
     fn a_retail_area_table_lists_and_edits(cx: &mut gpui::TestAppContext) {
         let Some(disc) = crate::retail_support::retail_disc() else { return };

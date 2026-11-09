@@ -1,6 +1,4 @@
 //! The game catalog over the retail disc: every entry of every archive is filed exactly once.
-//! Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips, and `BOF3_REQUIRE_RETAIL=1`
-//! makes a skip a failure.
 
 mod support;
 
@@ -15,7 +13,7 @@ const ENTRIES: usize = 6344;
 /// The entries of `MTEST.EMI` and `RTEST.EMI`, which no caller loads (`wiki: appendix/open-questions`).
 const UNSORTED_ENTRIES: usize = 3;
 
-/// The retail groups: entries and archives. An archive counts in each group that holds one of its entries.
+/// The retail groups: entries and archives.
 const GROUPS: [(Which, usize, usize); 10] = [
     (Which::Characters, 881, 159),
     (Which::Enemies, 1545, 440),

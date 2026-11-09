@@ -1,7 +1,5 @@
-//! The text that a field holds while it has the keyboard, and the keys that change it.
-//!
-//! gpui 0.2 has no text box, so the window draws its fields itself and routes the keys here, as the
-//! player's window does.
+//! The text that a field holds while it has the keyboard, and the keys that change it. gpui 0.2 has no text box, so
+//! the window draws its fields itself and routes the keys here, as the player's window does.
 
 use gpui::Keystroke;
 
@@ -42,8 +40,7 @@ impl LineEdit {
         shown
     }
 
-    /// Applies one key. `multiline` lets Shift+Enter insert a line break; `pasted` is the clipboard
-    /// text for Ctrl+V.
+    /// Applies one key.
     pub fn key(&mut self, keystroke: &Keystroke, multiline: bool, pasted: Option<String>) -> Outcome {
         let command = keystroke.modifiers.control || keystroke.modifiers.platform;
 

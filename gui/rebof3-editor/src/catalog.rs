@@ -1,17 +1,5 @@
-//! The game catalog: every entry of every archive, filed the way the game's developers keep their
-//! source assets (characters, enemies, areas, battle, interface, audio, text, data tables).
-//!
-//! The grouping is derived, not listed per entry. An entry is placed by the first rule that matches:
-//!
-//! 1. a fixed game table: an entry that a [`schema`] sheet is bound to by archive and slot
-//!    (`ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8) goes to [`Which::DataTables`];
-//! 2. its format, for the formats whose owner is not the archive that holds them (see [`RULES`]);
-//! 3. its archive's name, by the family rules of [`RULES`];
-//! 4. otherwise [`Which::Unsorted`], with the reason in the section title.
-//!
-//! Every row of [`RULES`] cites its source. Units (archives) sort in the disc's own order: the disc file
-//! list is in ascending name order within each folder, which is also the order of the slot ids in
-//! `include/sys/cd_format.h` (`EMI_SLOT_*`), and the numbered series count up (`ENEMY000`, `AREA105`).
+//! The game catalog: every entry of every archive, filed the way the game's developers keep their source assets
+//! (characters, enemies, areas, battle, interface, audio, text, data tables).
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
@@ -117,8 +105,7 @@ const ETC: &str = "include/sys/cd_format.h ETC block; wiki: formats/emi";
 /// The reason for an archive that no row names.
 const NO_ROW: &str = "no catalog row names this archive";
 
-/// The catalog table, in display order. A format row beats a family row; among family rows the first
-/// match wins.
+/// The catalog table, in display order.
 static RULES: &[Rule] = &[
     // Characters: the party's field and battle archives.
     Rule {
@@ -527,8 +514,7 @@ impl Catalog {
     }
 }
 
-/// The order of a section among its group's: the row that first names it, so rows sharing a title
-/// share a section.
+/// The order of a section among its group's: the row that first names it, so rows sharing a title share a section.
 fn section_order(group: Which, section: &str, row: usize) -> usize {
     RULES.iter().position(|candidate| candidate.group == group && candidate.section == section).unwrap_or(row)
 }
@@ -648,7 +634,7 @@ impl Mode {
         }
     }
 
-    /// Remembers the mode in the project folder. A folder that cannot be written keeps the mode for the session only.
+    /// Remembers the mode in the project folder.
     pub fn write(self, folder: &Path) {
         let _ = fs::write(folder.join(MODE_FILE), if self == Mode::Disc { "disc\n" } else { "game\n" });
     }
@@ -683,9 +669,7 @@ pub struct Line {
 }
 
 impl Catalog {
-    /// The lines of the tree. `open` holds the keys of the lines the user opened. A filter keeps the
-    /// lines whose text matches, with their parents, and opens the parents; the contents of a line that
-    /// matches stay shut until opened.
+    /// The lines of the tree.
     pub fn lines(&self, filter: &str, open: &HashSet<String>) -> Vec<Line> {
         let filter = filter.to_ascii_uppercase();
         let hit = |text: &str| !filter.is_empty() && text.to_ascii_uppercase().contains(&filter);
@@ -891,8 +875,6 @@ mod tests {
     fn formats_that_belong_elsewhere_leave_their_archive() {
         let catalog = catalog(&disc("catalog-formats"));
 
-        // The encounter tables are the formations; the auxiliary windows are interface; the shared
-        // resource tables are text; the area keeps its terrain and messages.
         assert_eq!(
             titles(&catalog, Which::Enemies)
                 .iter()

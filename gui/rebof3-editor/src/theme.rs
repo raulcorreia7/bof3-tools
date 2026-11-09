@@ -1,5 +1,5 @@
-//! The editor's look: a dark theme with one warm accent, its icon, and the short colored tag each
-//! entry format wears in the lists. Each color is a 24-bit `0xRRGGBB` value.
+//! The editor's look: a dark theme with one warm accent, its icon, and the short colored tag each entry format wears
+//! in the lists. Each color is a 24-bit `0xRRGGBB` value.
 
 use gpui::{Div, Hsla, div, prelude::*, px, rgb};
 use rebof3_formats::Format;
@@ -90,8 +90,8 @@ const ICON_GAP: f32 = 0.03;
 /// The icon tile's corner radius, as a fraction of its side.
 const ICON_CORNER: f32 = 0.125;
 
-/// The editor's icon: a 4×4 palette grid, the editor's subject, on a rounded dark tile. gpui sets
-/// no window icon, so the window draws it in its menu bar and on the welcome screen.
+/// The editor's icon: a 4×4 palette grid, the editor's subject, on a rounded dark tile. gpui sets no window icon, so
+/// the window draws it in its menu bar and on the welcome screen.
 pub fn icon(side: f32) -> Div {
     let margin = side * ICON_MARGIN;
     let gap = side * ICON_GAP;

@@ -1,5 +1,4 @@
-//! Record tables as spreadsheets: one row per record, one column per field. A reference column
-//! (a drop's item, a level's ability, an encounter's enemy) shows the name it points at.
+//! Record tables as spreadsheets: one row per record, one column per field.
 
 use gpui::{AnyElement, Context, Div, anchored, deferred, div, prelude::*, px};
 

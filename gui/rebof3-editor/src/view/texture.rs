@@ -1,11 +1,4 @@
 //! A texture upload as a paintable image.
-//!
-//! The upload's VRAM words read at 4, 8 or 16 bits per texel. A 4- or 8-bit texture is drawn with a
-//! palette row: one a rule joins to it in the scene that loads it (`rebof3_emi::texture::scene`),
-//! a suggested row of that scene (`rebof3_emi::texture::suggest`), a row of a CLUT block in the
-//! same archive, or a grey ramp. A suggestion is listed, never chosen for the user. Painting writes
-//! texel indices (or 16-bit colors) back into the words and the words back into the upload's
-//! rectangles.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -125,8 +118,7 @@ impl Default for State {
     }
 }
 
-/// Picks the depth and colors the first time an upload is shown: a joined row when the scene that
-/// loads it has one. Otherwise the texture stays at 16 bits and the suggestion is only listed.
+/// Picks the depth and colors the first time an upload is shown: a joined row when the scene that loads it has one.
 pub fn prepare(editor: &mut Editor) {
     let Some(entry) = editor.current() else { return };
     let key = (entry.archive.path.0.clone(), entry.index);
@@ -306,8 +298,8 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .into_any_element()
 }
 
-/// Paints the texture's pixels at `zoom` pixels per texel, one quad per run of equal pixels, only for
-/// the rows the window shows.
+/// Paints the texture's pixels at `zoom` pixels per texel, one quad per run of equal pixels, only for the rows the
+/// window shows.
 pub(super) fn paint_pixels(
     window: &mut gpui::Window,
     area: Bounds<Pixels>,

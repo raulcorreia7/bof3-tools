@@ -1,5 +1,5 @@
-//! What the archive, the classifier and the format's decoder know about an entry: where it sits, where
-//! the game loads it, and the fields its format holds.
+//! What the archive, the classifier and the format's decoder know about an entry: where it sits, where the game loads
+//! it, and the fields its format holds.
 
 use gpui::{AnyElement, Div, div, prelude::*, px};
 use psx_formats::sep::Package;
@@ -226,9 +226,9 @@ fn script_table(payload: &[u8]) -> Result<Vec<Row>, String> {
     ])
 }
 
-/// The module id that opens a window loaded at `0x80117000`. The nine retail windows hold ids `0xFC` to
-/// `0x104`; area049's window is code whose functions sit in the game's callback table, and the other eight
-/// hold data whose layout is not traced.
+/// The module id that opens a window loaded at `0x80117000`. The nine retail windows hold ids `0xFC` to `0x104`;
+/// area049's window is code whose functions sit in the game's callback table, and the other eight hold data whose
+/// layout is not traced.
 fn aux_window(payload: &[u8]) -> Result<Vec<Row>, String> {
     const MODULE_ID: usize = 4;
 
@@ -237,9 +237,8 @@ fn aux_window(payload: &[u8]) -> Result<Vec<Row>, String> {
     Ok(vec![("Module id", format!("{id:#X}")), ("Body", format!("{} bytes", payload.len() - MODULE_ID))])
 }
 
-/// The id groups of a payload loaded at `0x8001A000`. `Resource_GetText` reads base word `id >> 14`; each
-/// base is a group's offset, and the group opens with a `u16` slot table (`wiki: data/text#references`).
-/// The groups follow the base words, so the first base also says how many base words there are.
+/// The id groups of a payload loaded at `0x8001A000`. `Resource_GetText` reads base word `id >> 14`; each base is a
+/// group's offset, and the group opens with a `u16` slot table (`wiki: data/text#references`).
 fn resource_groups(payload: &[u8]) -> Result<Vec<Row>, String> {
     const BASE_WORD: usize = 4;
     const SLOT: usize = 2;
@@ -337,8 +336,7 @@ mod tests {
         assert!(rows[1].1.ends_with("1 palette"), "{rows:?}");
     }
 
-    /// Every entry of a whole extracted disc gets its format's fields without a decoder error. Point
-    /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
+    /// Every entry of a whole extracted disc gets its format's fields without a decoder error.
     #[test]
     fn every_retail_entry_shows_its_fields() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
