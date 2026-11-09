@@ -40,6 +40,9 @@ pub enum Error {
     /// A sprite bank's palettes cannot be read or written: a section that is not in the palette layout, or a palette
     /// that does not match the bank it is written to.
     CharacterBank(String),
+    /// An animation stream does not read or write in the layout `Actor_SeekScript` and the step
+    /// functions assume.
+    AnimationStream(String),
     /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
     /// reader assumes.
     SpriteBank(String),
@@ -71,6 +74,7 @@ impl fmt::Display for Error {
                 write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
             }
             Self::CharacterTable(message) | Self::CharacterBank(message) => f.write_str(message),
+            Self::AnimationStream(message) => write!(f, "animation stream: {message}"),
             Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
             Self::Audio(message) | Self::Import(message) => f.write_str(message),
         }

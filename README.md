@@ -82,6 +82,7 @@ payloads.
 | Map     | area map bundles              | the map from above, textured from its area's replayed VRAM or coloured by tile bank and height; export the textured map as PNG; edit a cell's corner heights |
 | Sprite bank | character sprite banks, raw or LZ77 | play each section's animations at the game's tick (loop, once, reverse; step by tick or step) with the frame stitched through VRAM and its cells outlined; the frame sheet; edit any palette colour; export and import a PNG sprite sheet with Aseprite JSON |
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
+| Script  | area, battle and magic-effect script banks | each record's animation stream one op per line: `show` a frame for its ticks, `jump` to a labelled step; edit any operand or cell; add or remove a step at the end of a stream; export and import the bank as text |
 | Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |
 
 [docs/editor.md](docs/editor.md) lists what the editor offers for every entry format.

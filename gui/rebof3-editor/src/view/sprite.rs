@@ -342,7 +342,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 /// What the reader of the bank proves.
 fn reader_note(reader: Reader) -> String {
     match reader {
-        Reader::Field => "Party bank: func_801C1254 places it and loads palette 0.".into(),
+        Reader::Field => "Party bank: Party_LoadMemberSprite places it and loads palette 0.".into(),
         Reader::Battle => "Battle bank: its reader is not traced; drawn with the field placement.".into(),
         Reader::Unknown => "No traced loader reads this archive; drawn with the field placement.".into(),
     }
@@ -379,7 +379,7 @@ fn palette_line(state: &State, section: &Section, reader: Reader, cx: &mut Conte
 fn suggestion(section: &Section) -> String {
     let rest = (1..section.palettes.len()).map(|palette| palette.to_string()).collect::<Vec<_>>().join(", ");
     let rest = if rest.is_empty() { String::new() } else { format!(", then {rest} in table order") };
-    format!("Suggested, not applied: palette {} (the one func_801C1254 loads){rest}.", format::FIELD_PALETTE)
+    format!("Suggested, not applied: palette {} (the one Party_LoadMemberSprite loads){rest}.", format::FIELD_PALETTE)
 }
 
 /// Every animation of the section, with its sheet, frames, steps, loop point and the records that play it.
@@ -525,9 +525,9 @@ fn transport(state: &State, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div 
 /// The step function a playback mode stands for.
 fn playback_rule(playback: Playback) -> &'static str {
     match playback {
-        Playback::Loop => "func_8014D978: wraps to the first step and follows jumps.",
-        Playback::Once => "func_8014DAEC: holds the last step and follows jumps.",
-        Playback::Reverse => "func_8014DA24: plays the steps backwards and ignores jumps.",
+        Playback::Loop => "Actor_StepAnimLoop: wraps to the first step and follows jumps.",
+        Playback::Once => "Actor_StepAnimOnce: holds the last step and follows jumps.",
+        Playback::Reverse => "Actor_StepAnimReverse: plays the steps backwards and ignores jumps.",
     }
 }
 

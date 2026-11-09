@@ -27,9 +27,9 @@ const FORMATS: [&str; 19] = [
     "window",
 ];
 
-/// The modules a format may import: the registry row types, the identity check, the error type and
-/// the glTF writer.
-const SHARED: [&str; 5] = ["registry", "identity", "error", "gltf", "text"];
+/// The modules a format may import: the registry row types, the identity check, the error type, the
+/// glTF writer, the text codec and the animation stream the sprite and script banks both hold.
+const SHARED: [&str; 6] = ["registry", "identity", "error", "gltf", "text", "animation"];
 
 /// The source files of one format: `<format>.rs`, or every file of `<format>/`.
 fn sources(source: &Path, format: &str) -> Vec<String> {

@@ -1,36 +1,37 @@
-//! Area script bank codec (`0x800D3800`).
+//! Script bank codec: the area (`0x800D3800`), battle (`0x800F0800`) and magic-effect
+//! (`0x800C3800`) banks.
 //!
-//! One archive's area script bank: a self-sizing directory, then its
-//! sections, each a `u16` record-offset table and the record bytes. The
-//! reader is `Actor_BeginScript`
-//! (`decomp/src/engine/slus/Actor_BeginScript.c`):
+//! One archive's script bank: a self-sizing directory, then its sections, each a `u16`
+//! record-offset table and the record bytes. The reader is `Actor_BeginScript`
+//! (`exe/slus_004_22@0x8014D6DC`, `decomp/src/engine/slus/Actor_BeginScript.c`):
 //!
 //! ```c
 //! table = (u8*)g_ScriptBank;
-//! table += ((s32*)table)[g_SpadWork->unk_2C];               // section base
-//! g_SpadWork->source_50 = table + ((u16*)table)[g_SpadWork->unk_4B]; // record
+//! table += ((s32*)table)[g_Task->unk_2C];                // section base
+//! g_Task->script = table + ((u16*)table)[g_Task->unk_4B]; // record
 //! ```
 //!
-//! so the directory holds L words: word 0 is `4*L`, the directory's size,
-//! which is also section 0's base, and words 1..L-1 are strictly increasing
-//! section bases. `g_ScriptBank` points at `0x800D3800`, the battle
-//! overlays swap in `0x800F0800`, and the magic-effect overlays swap in
-//! `0x800C3800` (`BMagic_Effect.c` in `decomp/src/overlays/bmagic/`), all
-//! the same format. The 37 magic-effect banks hold one section, so their
-//! directory is the single word `4`.
+//! so the directory holds L words: word 0 is `4*L`, the directory's size, which is also section 0's
+//! base, and words 1..L-1 are strictly increasing section bases. `g_ScriptBank` points at
+//! `0x800D3800`, the battle handlers swap in `0x800F0800` (`func_801E6C84`,
+//! `emi/battle/battle/03@0x801E6C84`), and the magic-effect overlays swap in `0x800C3800`
+//! (`BMagic_Effect.c` in `decomp/src/overlays/bmagic/`), all the same format. The 37 magic-effect
+//! banks hold one section, so their directory is the single word `4`.
 //!
-//! Each section's first word is `2*M`, the size of its M offset words, and it
-//! doubles as the first offset word. No record size is stored: the engine
-//! copies from the record cursor with a length the bytecode supplies
-//! (`Actor_CopyScriptEntry`, `decomp/src/engine/slus/Actor_CopyScriptEntry.c`), so the
-//! table offsets are the only record boundaries. In all 200 retail payloads
-//! the distinct offsets of each section's table are strictly increasing and
-//! the spans between them tile from the table end to the section end
-//! exactly; a table entry may repeat an earlier offset, in which case the
-//! record is shared with the earlier entry. No bytecode opcode is decoded
-//! here.
+//! Each section's first word is `2*M`, the size of its M offset words, and it doubles as the first
+//! offset word. No record size is stored, so the table offsets are the only record boundaries. In
+//! every retail payload the distinct offsets of each section's table are strictly increasing and the
+//! spans between them tile from the table end to the section end exactly; a table entry may repeat
+//! an earlier offset, in which case the record is shared with the earlier entry.
+//!
+//! `Actor_BeginScript` hands the record to `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`), so a
+//! record is an animation stream: [`program`] reads each record's steps as ops, and [`text`] writes
+//! and reads them one op per line.
 //!
 //! Layout and reader evidence: `wiki: formats/area#0x800d3800-area-script-bank`.
+
+pub mod program;
+pub mod text;
 
 use core::fmt::Write as _;
 
@@ -50,14 +51,19 @@ const BATTLE_ADDRESS: u32 = 0x800f_0800;
 /// The load address of the magic-effect script bank of the `BMAGIC*` archives.
 const MAGIC_ADDRESS: u32 = 0x800c_3800;
 
+/// The readers every script bank row cites.
+const STREAM_EVIDENCE: &str = "Actor_BeginScript (exe/slus_004_22@0x8014D6DC) reads a record of g_ScriptBank; \
+Actor_SeekScript (exe/slus_004_22@0x8014D910) and Actor_StageAnimStep, Actor_StepAnimLoop, Actor_StepAnimOnce, Actor_StepAnimReverse \
+play it as an animation stream; wiki: formats/area (`0x800D3800`)";
+
 /// The area script bank as a format-registry row.
 pub static AREA: Description = Description {
     format: Format::AreaScriptBank,
     name: "area script bank (0x800D3800)",
     state: State::Codec,
     spec_state: "documented",
-    codec_state: "decode+encode",
-    evidence: "wiki: formats/area (`0x800D3800`); size-prefixed directory",
+    codec_state: "decode+encode; ops and text",
+    evidence: STREAM_EVIDENCE,
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[AREA_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
@@ -72,12 +78,12 @@ pub static BATTLE: Description = Description {
     name: "battle script bank (0x800F0800)",
     state: State::Codec,
     spec_state: "documented",
-    codec_state: "decode+encode",
-    evidence: "wiki: formats/area: the 0x800D3800 format, 42 copies",
+    codec_state: "decode+encode; ops and text",
+    evidence: STREAM_EVIDENCE,
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[BATTLE_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
-    derive: None,
+    derive: Some(derive),
     open: None,
     kind: "battle-script",
 };
@@ -88,20 +94,20 @@ pub static MAGIC: Description = Description {
     name: "magic-effect script bank (0x800C3800)",
     state: State::Codec,
     spec_state: "documented",
-    codec_state: "decode+encode",
-    evidence: "BMagic_Effect.c sets g_ScriptBank to 0x800C3800: the 0x800D3800 format, one section",
+    codec_state: "decode+encode; ops and text",
+    evidence: STREAM_EVIDENCE,
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[MAGIC_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
-    derive: None,
+    derive: Some(derive),
     open: None,
     kind: "bmagic-table",
 };
 
-/// Decodes the bank and encodes it again; `Err` names the first difference.
+/// Decodes the bank to its ops and encodes it again; `Err` names the first difference.
 fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
-    let bank = ScriptBank::decode(payload).map_err(|error| error.to_string())?;
-    difference(&bank.encode(), payload)
+    let program = program::Program::decode(payload).map_err(|error| error.to_string())?;
+    difference(&program.encode().map_err(|error| error.to_string())?, payload)
 }
 
 /// The size of one directory word: a section base.
@@ -292,12 +298,16 @@ fn hex(bytes: &[u8]) -> String {
     out
 }
 
-/// The script records as JSON. The reader is `Actor_BeginScript` in
+/// The script records as JSON and the ops as [`text`]. The reader is `Actor_BeginScript` in
 /// `decomp/src/engine/slus/Actor_BeginScript.c`; the layout is
 /// `wiki: formats/area#0x800d3800-area-script-bank`.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
-    let data = ScriptBank::decode(payload)?.json().into_bytes();
-    Ok(vec![Derived { role: "json", extension: "json", data }])
+    let bank = ScriptBank::decode(payload)?;
+    let listing = text::write(&program::Program::from_bank(&bank)).into_bytes();
+    Ok(vec![
+        Derived { role: "json", extension: "json", data: bank.json().into_bytes() },
+        Derived { role: "script", extension: "txt", data: listing },
+    ])
 }
 
 #[cfg(test)]

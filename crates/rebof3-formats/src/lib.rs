@@ -14,9 +14,13 @@
 //! | [`sprite_bank`] | character sprite bank | `wiki: formats/character` |
 //! | [`message`], [`cells`], [`script`], [`scene`], [`encounter`], [`map`], [`window`], [`resources`] | area formats | `wiki: formats/area` |
 //! | [`residue`] | code images, reserved slots, unclassified entries | |
+//!
+//! [`animation`] is not a format: it is the actor animation stream that both the sprite banks and the
+//! script banks hold, shared like [`text`].
 
 #![forbid(unsafe_code)]
 
+pub mod animation;
 pub mod cells;
 pub mod character_bank;
 pub mod characters;

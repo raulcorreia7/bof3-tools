@@ -10,7 +10,7 @@
 //! writes them back over the bank's own bytes, so every other byte stays as it was.
 //!
 //! The palette index is the `mode` argument of `GFX_StagePalette` (`decomp/src/engine/slus/GFX_StagePalette.c`), which
-//! copies palette `mode` into the palette RAM of a work slot. The section is chosen by `func_801C1254`, which stages
+//! copies palette `mode` into the palette RAM of a work slot. The section is chosen by `Party_LoadMemberSprite`, which stages
 //! the record at work `+0x4C`. Its callers pass `mode` 0, except `func_8019C664`, which passes 1.
 
 use serde::{Deserialize, Serialize};

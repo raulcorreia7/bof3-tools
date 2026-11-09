@@ -27,15 +27,15 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | Character sprite bank, raw | 79 | Sprite bank, as above | as above | retail, as above | as above; 3 entries are not sprite banks and show why |
 | Area message bank | 200 | Text: records, message-window preview | rewrite a string in place | retail: every string decodes and encodes back | none |
 | Area cell grid | 191 | Cell grid over the map size | paint a cell's nibble | retail: a repaint keeps the payload | none; the values have no names yet |
-| Area script bank | 200 | Info: directory and sections; Decoded tree | Hex only | retail: decode and encode, 200/200 | the bytecode is not decoded, so records are not editable as values |
-| Battle script bank | 42 | Info, Decoded: the area bank's format | Hex only | retail: decode and encode, 42/42 | as the area script bank |
+| Area script bank | 200 | Script: each section's records, each record's ops (`show` a frame for its ticks, `jump` to a labelled step, a click on the label picks the step), its frames' cells and its padding; Decoded tree; export and import the bank as text | every op operand and cell field in place; a step added or removed at the end of a stream, with its jumps checked | retail: the ops encode to the stored bytes and the text imports to them, 200/200; an operand edit rewrites one byte and undone gives the stored bytes, 279/279 banks of the three formats | a record is an animation stream (`Actor_SeekScript`), not event bytecode. Steps change at the end of a stream only, because game code names stream positions; no edit may grow the bank past its stored size |
+| Battle script bank | 42 | Script and Decoded, as the area script bank | as the area script bank | retail: as the area script bank, 42/42 | as the area script bank; 84 shows name a frame past their frame table, whose cells the game reads from past the bank |
 | Area actor definitions | 200 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |
 | Area encounters and enemies | 200 | Tables: encounters, enemies, enemy AI | every sheet cell | retail: every sheet rewrites its bytes | none |
 | Area map bundle | 200 | Map: cells textured from the area's replayed VRAM, or by tile bank and height | corner heights | retail: decode and encode, 200/200; all 688,118 cells with a tile find their page and CLUT row | none; drawn flat, without the vertex colour or semi-transparency |
 | Area auxiliary module window | 9 | Info: module id and body size | Hex only | n/a | area049's window is code, changed in the decompilation; the other eight hold data whose layout is not traced |
 | Shared resource table | 44 | Text, Info: id groups | strings in place | retail: strings | none |
 | Type-8 cue table | 904 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |
-| Magic-effect script bank (`0x800C3800`) | 37 | Info, Decoded: the area bank's format with one section | Hex only | retail: decode and encode, 37/37 | as the area script bank |
+| Magic-effect script bank (`0x800C3800`) | 37 | Script and Decoded, as the area script bank, with one section | as the area script bank | retail: as the area script bank, 37/37 | as the area script bank; 23 records are empty and show as raw |
 | Code image | 548 | Info and Hex; `ETC/GAME.EMI` entry 0 also Tables | Hex; the game tables | retail: sheets | code is changed in the decompilation and rebuilt, not here |
 | Reserve (all-zero payload) | 53 | Info and Hex | Hex only | n/a | the payload carries no data; the loader only reserves the space |
 | Unclassified | 0 | Info and Hex | Hex only | n/a | no retail entry; types 2 and 9 never occur on the disc |
