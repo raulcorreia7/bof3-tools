@@ -69,6 +69,14 @@ editor only reads the disc. Edits are saved to `my-mod/edits/`, and **Project â†
 edited archive into `my-mod/disc/`, then reads it back to confirm that it holds exactly the edited
 payloads.
 
+The left panel has two trees, switched at its top (**Game** and **Disc**) and remembered in the project
+folder. **Game** is the catalog: characters, enemies and bosses, areas and maps, battle, interface,
+audio, text, data tables, movies and other, each with its entry count, in the game's own order (area
+number, enemy bank, boss, spell effect). Every entry of every archive is in it once, and a name no rule
+places is under Unsorted with the reason. **Disc** is the file tree. The filter works in both, and
+each line opens the views below. [docs/editor.md](docs/editor.md#game-catalog) says how the catalog files
+an entry.
+
 | View    | Entries                       | What you can do                                                    |
 | ------- | ----------------------------- | ------------------------------------------------------------------ |
 | Info    | every entry                   | type, load address, size, format and what is known about it        |

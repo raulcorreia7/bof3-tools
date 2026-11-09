@@ -30,7 +30,7 @@ use std::rc::Rc;
 
 use gpui::{App, AppContext, Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 
-pub use rebof3_editor::{project, schema};
+pub use rebof3_editor::{catalog, project, schema};
 
 /// The window's title and the application id desktops group it by.
 const TITLE: &str = "BOF3 Asset Editor";

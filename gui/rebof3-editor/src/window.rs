@@ -8,16 +8,17 @@ use gpui::{
 use rebof3_formats::Format;
 
 use crate::app::{BrowserRow, Editor, Field, Menu};
+use crate::catalog::Mode;
 use crate::fonts;
 use crate::theme::{self, BACKGROUND, BORDER, EDITED, MUTED, PANEL, TEXT, color};
 use crate::view;
 use crate::widgets::{
     CONTROL_HEIGHT, GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, button, field, menu_item, menu_panel, mono, muted,
-    selectable, separator, strong, tip,
+    selectable, separator, strong, tab, tip,
 };
 
 /// Width of the archive list and of the entry list, in pixels.
-const ARCHIVES_WIDTH: f32 = 220.0;
+const ARCHIVES_WIDTH: f32 = 300.0;
 const ENTRIES_WIDTH: f32 = 400.0;
 /// Width of the folder fields on the welcome screen, and of their labels, in pixels.
 const PATH_WIDTH: f32 = 520.0;
@@ -256,7 +257,76 @@ impl Editor {
         .track_scroll(self.archive_scroll.clone())
         .flex_1();
 
-        side_panel(ARCHIVES_WIDTH).child(filter).child(list)
+        let modes = div().flex().flex_none().gap(px(GAP_SMALL)).children([Mode::Game, Mode::Disc].map(|mode| {
+            tab(("mode", mode as usize), mode.label(), mode == self.mode).on_click(cx.listener(
+                move |editor, _, _, cx| {
+                    editor.set_mode(mode);
+                    cx.notify();
+                },
+            ))
+        }));
+        let tree = match self.mode {
+            Mode::Disc => list.into_any_element(),
+            Mode::Game => self.catalog_tree(cx),
+        };
+
+        side_panel(ARCHIVES_WIDTH).child(modes).child(filter).child(tree)
+    }
+
+    /// The game catalog: groups, sections, archives and entries, in the game's order.
+    fn catalog_tree(&self, cx: &mut Context<Self>) -> AnyElement {
+        let lines = self.catalog_lines();
+        if self.catalog.is_none() {
+            return muted("The game catalog is not available.").into_any_element();
+        }
+        let selected = self.archive.as_ref().map(|archive| archive.path.clone()).zip(self.entry);
+        uniform_list(
+            "catalog",
+            lines.len(),
+            cx.processor(move |editor, range: std::ops::Range<usize>, _, cx| {
+                let lines = editor.catalog_lines();
+                range
+                    .filter_map(|at| {
+                        let line = lines.get(at)?;
+                        let key = line.key.clone();
+                        let archive = line.archive.clone();
+                        let entry = line.entry;
+                        let is_selected = match (&archive, entry, &selected) {
+                            (Some(path), Some(index), Some((open, open_index))) => path == open && index == *open_index,
+                            _ => false,
+                        };
+                        let arrow = match line.open {
+                            Some(true) => "▾ ",
+                            Some(false) => "▸ ",
+                            None => "",
+                        };
+                        let text = match line.open {
+                            Some(_) => format!("{arrow}{}  ({})", line.label, line.count),
+                            None => line.label.clone(),
+                        };
+                        let row = selectable(("catalog-line", at), is_selected)
+                            .h(px(ROW_HEIGHT))
+                            .pl(px(GAP_SECTION * line.depth as f32 + GAP_SMALL))
+                            .when(line.depth == 0, |row| row.font_weight(FontWeight::BOLD))
+                            .when(line.entry.is_some(), |row| row.font_family(fonts::mono()))
+                            .child(div().overflow_hidden().whitespace_nowrap().child(text));
+                        let row = if line.tip.is_empty() { row } else { row.tooltip(tip(line.tip.clone())) };
+                        Some(row.on_click(cx.listener(move |editor, _, _, cx| {
+                            if line_has_children(entry) {
+                                editor.toggle_catalog(&key);
+                            }
+                            if let Some(archive) = &archive {
+                                editor.select_catalog(archive, entry);
+                            }
+                            cx.notify();
+                        })))
+                    })
+                    .collect()
+            }),
+        )
+        .track_scroll(self.catalog_scroll.clone())
+        .flex_1()
+        .into_any_element()
     }
 
     fn entries(&self, cx: &mut Context<Self>) -> Div {
@@ -335,6 +405,11 @@ impl Editor {
         }
         line.child(div().overflow_hidden().whitespace_nowrap().child(self.status.clone()))
     }
+}
+
+/// Whether a catalog line opens and shuts: every line but an entry.
+fn line_has_children(entry: Option<usize>) -> bool {
+    entry.is_none()
 }
 
 /// A list column at the side of the window.
