@@ -26,10 +26,10 @@ const CELL_PIXELS: f32 = 10.0;
 const VALUES: usize = 16;
 /// The side of an ink swatch, in pixels.
 const INK_SWATCH: f32 = 18.0;
-/// The value of a free cell, which draws nothing.
+/// The value of a cell no battler stands on (`func_801C7518`), which draws nothing.
 const FREE: u8 = 0;
 const OPAQUE: u8 = 0xFF;
-/// One colour per nibble value; value 0, a free cell, draws nothing.
+/// One colour per nibble value; value 0, a cell no battler stands on, draws nothing.
 const VALUE_COLOURS: [[u8; 3]; VALUES] = [
     [0x00, 0x00, 0x00],
     [0xE0, 0x6C, 0x5A],
@@ -153,7 +153,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .flex_1()
         .min_h_0()
         .gap(px(GAP))
-        .child(muted(format!("{width} × {height} cells, one 4-bit value each; 0 is free")))
+        .child(muted(format!("{width} × {height} cells, one 4-bit value each; 0 holds no battler, 1 to 12 hold battlers of reach 0 to 2 (func_801C7518)")))
         .child(inks(state.ink, cx))
         .child(separator(false))
         .child(mono(hover).text_color(color(MUTED)))

@@ -15,6 +15,9 @@
 //! | [`message`], [`cells`], [`script`], [`scene`], [`encounter`], [`map`], [`window`], [`resources`] | area formats | `wiki: formats/area` |
 //! | [`residue`] | code images, reserved slots, unclassified entries | |
 //!
+//! [`field`] is not a format either: it reads the executable's field tables and the setup stream of an
+//! area program.
+//!
 //! [`animation`] is not a format: it is the actor animation stream that both the sprite banks and the
 //! script banks hold, shared like [`text`].
 
@@ -29,6 +32,7 @@ pub mod coverage;
 pub mod cue;
 pub mod encounter;
 pub mod error;
+pub mod field;
 pub mod formation;
 pub mod game_tables;
 pub mod gltf;

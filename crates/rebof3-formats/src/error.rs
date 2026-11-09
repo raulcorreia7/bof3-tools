@@ -52,6 +52,8 @@ pub enum Error {
     Audio(String),
     /// An open-format file that an import cannot read back to the stored bytes.
     Import(String),
+    /// A field table of the executable or a setup stream of an area program that does not read.
+    Field(String),
 }
 
 impl fmt::Display for Error {
@@ -80,6 +82,7 @@ impl fmt::Display for Error {
             Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
             Self::Formation(message) => write!(f, "formation: {message}"),
             Self::Audio(message) | Self::Import(message) => f.write_str(message),
+            Self::Field(message) => write!(f, "field: {message}"),
         }
     }
 }

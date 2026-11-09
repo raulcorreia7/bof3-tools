@@ -1,8 +1,10 @@
 //! Binary glTF 2.0 (`.glb`) writer for triangle meshes.
 //!
-//! One mesh with one node. The binary chunk packs the positions, the texture coordinates and one
-//! index list per primitive, in that order, each section starting on a 4-byte boundary. A primitive
-//! names one material. Materials carry a name and a white base colour, and no texture.
+//! One mesh, on node 0. The binary chunk packs the positions, the texture coordinates, the vertex
+//! colours when there are any, and one index list per primitive, in that order, each section
+//! starting on a 4-byte boundary. A primitive names one material. Materials carry a name and a white
+//! base colour, and no texture. More nodes, with no mesh, may follow node 0: each has a name, an
+//! optional translation, its `extras` and its children ([`Node`]).
 
 use serde_json::{Value, json};
 
@@ -13,6 +15,17 @@ pub struct Primitive {
     pub material: usize,
     /// Vertex indices, three per triangle.
     pub indices: Vec<u32>,
+}
+
+/// A node without a mesh: a named place, what it records in `extras`, and its children.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Node {
+    pub name: String,
+    /// The node's place in the mesh's coordinates.
+    pub translation: Option<[f32; 3]>,
+    /// What the node records, as glTF `extras`; `Null` writes none.
+    pub extras: Value,
+    pub children: Vec<Node>,
 }
 
 /// `glTF`, the file magic.
@@ -36,6 +49,20 @@ pub fn glb(
     primitives: &[Primitive],
     materials: &[&str],
 ) -> Option<Vec<u8>> {
+    glb_with(name, positions, uvs, None, primitives, materials, &[])
+}
+
+/// Writes a `.glb` like [`glb`], with an RGBA vertex colour per vertex (`COLOR_0`, floats 0 to 1) when
+/// `colours` is given, and `nodes` as more root nodes after the mesh's node.
+pub fn glb_with(
+    name: &str,
+    positions: &[[f32; 3]],
+    uvs: &[[f32; 2]],
+    colours: Option<&[[f32; 4]]>,
+    primitives: &[Primitive],
+    materials: &[&str],
+    nodes: &[Node],
+) -> Option<Vec<u8>> {
     if positions.is_empty() || primitives.iter().all(|primitive| primitive.indices.is_empty()) {
         return None;
     }
@@ -56,6 +83,16 @@ pub fn glb(
         "bufferView": 1, "componentType": FLOAT, "count": uvs.len(), "type": "VEC2",
     }));
 
+    let mut attributes = json!({"POSITION": 0, "TEXCOORD_0": 1});
+    if let Some(colours) = colours {
+        let bytes = colours.iter().flatten().flat_map(|value| value.to_le_bytes()).collect::<Vec<u8>>();
+        push_section(&mut bin, &mut views, &bytes, ARRAY_BUFFER);
+        attributes["COLOR_0"] = json!(accessors.len());
+        accessors.push(json!({
+            "bufferView": views.len() - 1, "componentType": FLOAT, "count": colours.len(), "type": "VEC4",
+        }));
+    }
+
     let mut draws = Vec::new();
     for primitive in primitives.iter().filter(|primitive| !primitive.indices.is_empty()) {
         let bytes = primitive.indices.iter().flat_map(|index| index.to_le_bytes()).collect::<Vec<u8>>();
@@ -68,7 +105,7 @@ pub fn glb(
             "type": "SCALAR",
         }));
         draws.push(json!({
-            "attributes": {"POSITION": 0, "TEXCOORD_0": 1},
+            "attributes": attributes,
             "indices": accessor,
             "material": primitive.material,
         }));
@@ -87,11 +124,13 @@ pub fn glb(
             })
         })
         .collect();
+    let mut all = vec![json!({"name": name, "mesh": 0})];
+    let roots: Vec<usize> = std::iter::once(0).chain(nodes.iter().map(|node| flatten(node, &mut all))).collect();
     let document = json!({
         "asset": {"version": "2.0", "generator": "rebof3-assets"},
         "scene": 0,
-        "scenes": [{"nodes": [0]}],
-        "nodes": [{"name": name, "mesh": 0}],
+        "scenes": [{"nodes": roots}],
+        "nodes": all,
         "meshes": [{"name": name, "primitives": draws}],
         "materials": materials,
         "accessors": accessors,
@@ -99,6 +138,23 @@ pub fn glb(
         "buffers": [{"byteLength": bin.len()}],
     });
     Some(pack(&document, &bin))
+}
+
+/// Appends `node` and its children to `all`, children after their parent, and returns its index.
+fn flatten(node: &Node, all: &mut Vec<Value>) -> usize {
+    let index = all.len();
+    all.push(json!({"name": node.name}));
+    if let Some(translation) = node.translation {
+        all[index]["translation"] = json!(translation);
+    }
+    if !node.extras.is_null() {
+        all[index]["extras"] = node.extras.clone();
+    }
+    let children: Vec<usize> = node.children.iter().map(|child| flatten(child, all)).collect();
+    if !children.is_empty() {
+        all[index]["children"] = json!(children);
+    }
+    index
 }
 
 /// Appends one section to the binary chunk and records its buffer view.
@@ -149,21 +205,7 @@ fn pack(document: &Value, bin: &[u8]) -> Vec<u8> {
 /// floats from its buffer view. A file with any other layout is an error, so a mesh that this writer
 /// could not have made is refused rather than misread.
 pub fn read_positions(glb: &[u8]) -> Result<Vec<[f32; 3]>, String> {
-    let word =
-        |at: usize| glb.get(at..at + 4).map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
-    if word(0) != Some(MAGIC) || word(4) != Some(VERSION) || word(16) != Some(CHUNK_JSON) {
-        return Err("the file is not a glTF 2.0 binary with its JSON chunk first".into());
-    }
-    let json_length = word(12).ok_or("the glTF JSON chunk has no length")? as usize;
-    let json = glb.get(20..20 + json_length).ok_or("the glTF JSON chunk runs past the file")?;
-    let bin_at = 20 + json_length;
-    let bin_length = word(bin_at).ok_or("the glTF binary chunk is missing")? as usize;
-    if word(bin_at + 4) != Some(CHUNK_BIN) {
-        return Err("the glTF binary chunk is missing".into());
-    }
-    let bin = glb.get(bin_at + 8..bin_at + 8 + bin_length).ok_or("the glTF binary chunk runs past the file")?;
-
-    let document: Value = serde_json::from_slice(json).map_err(|error| error.to_string())?;
+    let (document, bin) = chunks(glb)?;
     let accessor = document["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
         .as_u64()
         .and_then(|index| document["accessors"].get(index as usize))
@@ -189,4 +231,45 @@ pub fn read_positions(glb: &[u8]) -> Result<Vec<[f32; 3]>, String> {
             [float(0), float(4), float(8)]
         })
         .collect())
+}
+
+/// A node's name and its translation, when it has one.
+pub type NamedPlace = (String, Option<[f32; 3]>);
+
+/// The named nodes of a binary glTF, in file order.
+pub fn read_nodes(glb: &[u8]) -> Result<Vec<NamedPlace>, String> {
+    let (document, _) = chunks(glb)?;
+    let nodes = document["nodes"].as_array().ok_or("the glTF has no nodes")?;
+    Ok(nodes
+        .iter()
+        .filter_map(|node| {
+            let name = node["name"].as_str()?.to_string();
+            let translation = node["translation"].as_array().and_then(|values| {
+                let values: Vec<f32> =
+                    values.iter().filter_map(|value| value.as_f64().map(|value| value as f32)).collect();
+                <[f32; 3]>::try_from(values).ok()
+            });
+            Some((name, translation))
+        })
+        .collect())
+}
+
+/// The JSON document and the binary chunk of a `.glb`.
+fn chunks(glb: &[u8]) -> Result<(Value, &[u8]), String> {
+    let word =
+        |at: usize| glb.get(at..at + 4).map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
+    if word(0) != Some(MAGIC) || word(4) != Some(VERSION) || word(16) != Some(CHUNK_JSON) {
+        return Err("the file is not a glTF 2.0 binary with its JSON chunk first".into());
+    }
+    let json_length = word(12).ok_or("the glTF JSON chunk has no length")? as usize;
+    let json = glb.get(20..20 + json_length).ok_or("the glTF JSON chunk runs past the file")?;
+    let bin_at = 20 + json_length;
+    let bin_length = word(bin_at).ok_or("the glTF binary chunk is missing")? as usize;
+    if word(bin_at + 4) != Some(CHUNK_BIN) {
+        return Err("the glTF binary chunk is missing".into());
+    }
+    let bin = glb.get(bin_at + 8..bin_at + 8 + bin_length).ok_or("the glTF binary chunk runs past the file")?;
+
+    let document: Value = serde_json::from_slice(json).map_err(|error| error.to_string())?;
+    Ok((document, bin))
 }
