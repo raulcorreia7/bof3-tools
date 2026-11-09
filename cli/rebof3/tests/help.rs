@@ -62,6 +62,7 @@ fn invocations() -> Vec<Vec<&'static str>> {
     all.extend(EXPORT.iter().map(|kind| vec!["assets", "export", kind, "--help"]));
     all.extend(IMPORT.iter().map(|kind| vec!["assets", "import", kind, "--help"]));
     all.push(vec!["assets", "kinds"]);
+    all.push(vec!["observe", "--help"]);
     all
 }
 

@@ -16,6 +16,7 @@ path = "src/main.rs"
 rebof3-emi = { workspace = true, features = ["std"] }
 rebof3-formats.workspace = true
 rebof3-assets.workspace = true
+rebof3-observe.workspace = true
 bof3player = { workspace = true, features = ["std"] }
 psx-formats = { workspace = true, features = ["std"] }
 serde.workspace = true

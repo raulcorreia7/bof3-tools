@@ -182,6 +182,9 @@ repository does not run those tools.
   the colour words; with `--clut-block` (the old `--bank` still works) they are spliced into the CLUT block. An image that is not on the
   32-word, 32-row grid the loader uploads in is refused. An unchanged export imports to the stored
   bytes. The extractor writes a plain 16 bpp `.tim` for a type-3 texture no row joins.
+  The editor's Texture view writes the same files with **Export TIM** (at the shown depth and row;
+  the grey ramp has no VRAM place and is refused) and reads them with **Import TIM** (image words
+  and place, one undo step; the CLUT block is left to the palette bank).
 - **VAB.** `export vab HEADER BODY` writes one `.vab` file, the header followed by the body, as
   VABTOOL writes it; `--mode` still writes the `.vh` and `.vb` pair. `import vab FILE.vab -o OUT.vh
   --body OUT.vb` splits a file back. A pair is checked first: the header's size, the `pBAV` magic and

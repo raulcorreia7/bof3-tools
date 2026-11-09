@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! `bof3`: the Breath of Fire III toolchain.
 //!
-//! Subcommands: `disc` and `emi`, plus `assets` in the default build. Each keeps
+//! Subcommands: `disc`, `emi` and `observe`, plus `assets` in the default build. Each keeps
 //! the flags and help of the command it replaced.
 
 #[cfg(feature = "assets")]
@@ -10,6 +10,7 @@ mod disc;
 mod emi;
 #[cfg(feature = "assets")]
 mod extract_all;
+mod observe;
 
 use std::env;
 use std::ffi::OsString;
@@ -26,6 +27,7 @@ Commands:
   disc    extract, checksum, verify and rebuild a PlayStation disc image
   emi     list, extract, pack and inspect EMI archives
   assets  extract every disc asset, or convert one asset to and from its open form
+  observe run the disc on a route and record how the game draws each texture
 
 Options:
   -h, --help     print this text, or a command's own help
@@ -48,6 +50,7 @@ Usage: bof3 <COMMAND> [ARGS...]
 Commands:
   disc    extract, checksum, verify and rebuild a PlayStation disc image
   emi     list, extract, pack and inspect EMI archives
+  observe run the disc on a route and record how the game draws each texture
 
 Options:
   -h, --help     print this text
@@ -68,6 +71,7 @@ fn main() -> ExitCode {
     match command.to_str() {
         Some("disc") => disc::main(rest),
         Some("emi") => emi::main(rest),
+        Some("observe") => observe::main(rest),
         #[cfg(feature = "assets")]
         Some("assets") => assets::main(rest),
         Some("-h" | "--help" | "help") => {

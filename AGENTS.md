@@ -8,10 +8,11 @@ It is a Cargo workspace with one CLI, `bof3`, and one editor, `bof3-edit`. Read 
 
 | Path                     | What it holds                                                    | Doc                                        |
 | ------------------------ | ---------------------------------------------------------------- | ------------------------------------------ |
-| `cli/rebof3/`            | The `bof3` binary: `disc`, `emi` and `assets` subcommands         | [docs/cli.md](docs/cli.md)                 |
+| `cli/rebof3/`            | The `bof3` binary: `disc`, `emi`, `assets` and `observe` subcommands | [docs/cli.md](docs/cli.md)                 |
 | `crates/rebof3-emi/`     | The EMI archive reader and writer                                | [docs/crates.md](docs/crates.md#rebof3-emi) |
 | `crates/rebof3-formats/` | The format registry, `classify` and the coverage table          | [docs/crates.md](docs/crates.md#rebof3-formats) |
 | `crates/rebof3-assets/`  | Asset conversion and the extract-all output                      | [docs/assets.md](docs/assets.md)           |
+| `crates/rebof3-observe/` | The disc run on a route: how the game draws each texture       | [docs/crates.md](docs/crates.md#rebof3-observe) |
 | `crates/rebof3-render/`  | Field scenes drawn offscreen with OpenGL ES or in software       | [ADR 0003](docs/adr/0003-area-3d-rendering.md) |
 | `gui/rebof3-editor/`     | The `bof3-edit` asset editor: browse, view and edit EMI entries  | [docs/editor.md](docs/editor.md)           |
 | `Cargo.toml`             | Workspace members and the pinned `bof3player` crates         | [docs/crates.md](docs/crates.md)      |

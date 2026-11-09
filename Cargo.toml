@@ -11,16 +11,17 @@ members = [
     "crates/rebof3-emi",
     "crates/rebof3-formats",
     "crates/rebof3-assets",
+    "crates/rebof3-observe",
     "crates/rebof3-render",
     "cli/rebof3",
     "gui/rebof3-editor",
 ]
 
 # gpui needs two patched crates. Their sources live once, in the bof3-player repository at the
-# pinned tag; docs/adr/0001-one-workspace-and-gpui.md lists why and when each patch goes.
+# pinned revision; docs/adr/0001-one-workspace-and-gpui.md lists why and when each patch goes.
 [patch.crates-io]
-stacksafe-macro = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3" }
-taffy = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3" }
+stacksafe-macro = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993" }
+taffy = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993" }
 
 [workspace.package]
 edition = "2024"
@@ -35,16 +36,19 @@ publish = false
 [workspace.dependencies]
 rebof3-formats = { path = "crates/rebof3-formats", version = "0.2.0" }
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
+rebof3-observe = { path = "crates/rebof3-observe", version = "0.1.0" }
 rebof3-emi = { path = "crates/rebof3-emi", version = "0.2.0", default-features = false }
 rebof3-render = { path = "crates/rebof3-render", version = "0.2.0", default-features = false }
-emi = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
-bof3player = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
-psx-cd = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3" }
-psx-formats = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
+emi = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993", version = "0.1.3", default-features = false }
+bof3player = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993", version = "0.1.3", default-features = false }
+psx-cd = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993", version = "0.1.3" }
+psx-formats = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993", version = "0.1.3", default-features = false }
+psx-machine = { git = "https://github.com/raulcorreia7/bof3-player.git", rev = "da74b60862bbcb92d4e0bbf5c88647d597c4b993", version = "0.1.3" }
 clap = { version = "4.6.7", default-features = false, features = ["std", "derive", "error-context"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
+toml = { version = "1.2.1", default-features = false, features = ["parse", "serde", "std"] }
 gpui = "=0.2.2"
 
 [workspace.lints.rust]
@@ -87,4 +91,11 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.psx-formats]
+opt-level = 2
+
+# The machine interprets millions of instructions per frame; a route is too slow below full optimization.
+[profile.dev.package.psx-machine]
+opt-level = 3
+
+[profile.dev.package.rebof3-observe]
 opt-level = 2
