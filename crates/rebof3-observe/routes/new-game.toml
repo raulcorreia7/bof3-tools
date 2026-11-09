@@ -1,0 +1,19 @@
+# A new game from power-on: Start through the title screen and the opening, then Cross every second
+# to page through the dialogue and pick the first battle's commands. The game loads the first area
+# (WORLD00/AREA024), fights the first boss battle (BOSS/BOSS001, with BATTLE/BATL_DRA) and is back in
+# the field near frame 8054, where it waits for the player to walk.
+name = "new-game"
+frames = 8100
+
+[[press]]
+buttons = ["start"]
+from = 900
+until = 2300
+every = 90
+hold = 4
+
+[[press]]
+buttons = ["cross"]
+from = 2400
+every = 60
+hold = 4

@@ -749,7 +749,7 @@ dependencies = [
 [[package]]
 name = "bof3player"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "emi",
  "psx-audio",
@@ -1680,7 +1680,7 @@ dependencies = [
 [[package]]
 name = "emi"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "psx-formats",
  "serde",
@@ -4451,7 +4451,7 @@ dependencies = [
 [[package]]
 name = "psx-audio"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "flacenc",
  "psx-cd",
@@ -4462,7 +4462,7 @@ dependencies = [
 [[package]]
 name = "psx-cd"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "md-5 0.11.0",
  "psx-formats",
@@ -4475,11 +4475,19 @@ dependencies = [
 [[package]]
 name = "psx-formats"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "png 0.18.1",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "psx-machine"
+version = "0.1.3"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
+dependencies = [
+ "psx-cd",
 ]
 
 [[package]]
@@ -4840,6 +4848,7 @@ dependencies = [
  "rebof3-assets",
  "rebof3-emi",
  "rebof3-formats",
+ "rebof3-observe",
  "serde_json",
  "sha2 0.11.1",
 ]
@@ -4868,6 +4877,7 @@ dependencies = [
  "rebof3-assets",
  "rebof3-emi",
  "rebof3-formats",
+ "rebof3-observe",
  "rubato",
  "serde",
  "serde_json",
@@ -4893,6 +4903,21 @@ dependencies = [
  "rebof3-emi",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "rebof3-observe"
+version = "0.1.0"
+dependencies = [
+ "psx-cd",
+ "psx-formats",
+ "psx-machine",
+ "rebof3-emi",
+ "rebof3-formats",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "toml 1.2.1+spec-1.1.0",
 ]
 
 [[package]]
@@ -5699,7 +5724,7 @@ dependencies = [
 [[package]]
 name = "stacksafe-macro"
 version = "0.1.4"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "proc-macro-error3",
  "quote",
@@ -5982,7 +6007,7 @@ dependencies = [
 [[package]]
 name = "taffy"
 version = "0.9.0"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?tag=v0.1.3#8df1a81d0791cee6507c616e998c725b7ef1347c"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=da74b60862bbcb92d4e0bbf5c88647d597c4b993#da74b60862bbcb92d4e0bbf5c88647d597c4b993"
 dependencies = [
  "arrayvec",
  "grid",
