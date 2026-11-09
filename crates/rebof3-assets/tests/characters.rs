@@ -7,7 +7,7 @@ use psx_cd::Image;
 use rebof3_assets::import;
 use rebof3_assets::tables;
 use rebof3_emi::Archive;
-use rebof3_emi::characters::{self, CHARACTERS};
+use rebof3_formats::characters::{self, CHARACTERS};
 
 #[test]
 fn the_retail_characters_have_their_names_and_round_trip() {

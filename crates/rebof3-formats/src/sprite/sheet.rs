@@ -23,8 +23,8 @@ use psx_formats::gfx::png::{self, Picture};
 use serde::{Deserialize, Serialize};
 
 use super::{Animation, Bank, Bounds, COLOURS, Placement, Section, SpriteSizes, Stage, animation_bounds, compose};
-use crate::replay::Vram;
-use crate::{Error, Result};
+use crate::error::{Error, Result};
+use rebof3_emi::replay::Vram;
 
 /// `SYS_Main` (`exe/slus_004_22@0x8014AAC8`) runs one game frame per `VSync(2)`, and a step function
 /// runs once a frame, so one tick is two NTSC fields of `1001 / 60000` seconds.

@@ -137,7 +137,7 @@ then the formats that nothing else in the container uses, then the ones others d
 
 ## Implementation status
 
-Everything that is a format moved into `rebof3-formats`, one commit per move:
+Every format moved into `rebof3-formats`, one commit per move:
 
 - the registry with `classify`, the coverage table and each format's `kind`, `derive` and `open`
   hooks, which replace the `match`es in `Format`, `Kind::of_format`, `decode::derive` and the
@@ -147,6 +147,9 @@ Everything that is a format moved into `rebof3-formats`, one commit per move:
 - `clut` and `vram`, with the palette and texture PNG, TIM and JSON conversion and their imports;
 - `message` (the bank and its JSON) and the shared `text` module (scan rules, strings, known
   tables, string sources);
+- `sprite` (frame sheets, animations, records, draw), `character_bank` and `characters`, after the
+  sprite-frames lane merged, with `GameTableShort`, `CharacterTable`, `CharacterBank` and
+  `SpriteBank` moving from the container error to the formats error;
 - description-only rows: `cells`, `window`, `resources`, `residue`.
 
 `joins` (a texture's palette rows over a whole archive) and `text` read several formats, so they
@@ -159,9 +162,8 @@ The editor maps a format to its views through one table (`VIEWS` in `view/mod.rs
 
 Left:
 
-- `sprite_bank`, `characters` and `character_bank` stay in `rebof3-emi` while the sprite-frames
-  lane edits them. `GameTableShort` stays in the container error for `characters.rs`. They move
-  last.
+- `rebof3-emi` keeps only the container and primitives (LZ77, LZSS, record readers, text codec, VRAM
+  model and replay), and its error has no variant for a format.
 - `rebof3-assets` keeps the disc walk, the output tree, the report, the kinds, the CLI codec table,
   the sound rendering and the text extraction run, which are not formats.
 - `Kind::of_format` reads the row's `kind` name; the kinds themselves stay in `rebof3-assets`.

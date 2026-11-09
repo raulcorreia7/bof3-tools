@@ -43,7 +43,7 @@ pub use sheet::{
     Sheet, TICK_MICROS, duration_ms, export, export_section, image_name, import, import_section, ticks_of,
 };
 
-use crate::{Error, Result};
+use crate::error::{Error, Result};
 
 /// The first word of a container: the offset of its first section, which is also the header's size.
 pub const CONTAINER_HEAD: u32 = 0x0C;

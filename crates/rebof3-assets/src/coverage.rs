@@ -126,9 +126,9 @@ fn palettes(report: &mut Report, format: Format, payload: &[u8]) {
 }
 
 fn palette_tables(report: &mut Report, decoded: &[u8]) {
-    let Ok(bank) = rebof3_emi::character_bank::parse(decoded) else { return };
-    let both = rebof3_emi::character_bank::export(decoded)
-        .and_then(|json| rebof3_emi::character_bank::import(&json, decoded))
+    let Ok(bank) = rebof3_formats::character_bank::parse(decoded) else { return };
+    let both = rebof3_formats::character_bank::export(decoded)
+        .and_then(|json| rebof3_formats::character_bank::import(&json, decoded))
         .is_ok_and(|rebuilt| rebuilt == decoded);
     let typed = if both { bank.table_bytes() as u64 } else { 0 };
     report.palettes.count_part(decoded.len() as u64, typed, both);
@@ -156,11 +156,11 @@ fn text_round_trips(entry: &rebof3_emi::Entry, payload: &[u8]) -> Option<bool> {
 
 /// Each record of the playable characters: its stored bytes, and whether the table's JSON reads back to them.
 fn characters(report: &mut Report, payload: &[u8]) {
-    let both = rebof3_emi::characters::export(payload)
-        .and_then(|json| rebof3_emi::characters::import(&json, payload))
+    let both = rebof3_formats::characters::export(payload)
+        .and_then(|json| rebof3_formats::characters::import(&json, payload))
         .is_ok_and(|rebuilt| rebuilt == payload);
-    for _ in 0..rebof3_emi::characters::CHARACTERS {
-        report.kinds.entry(Kind::DataTable).or_default().count(rebof3_emi::characters::RECORD_BYTES as u64, both);
+    for _ in 0..rebof3_formats::characters::CHARACTERS {
+        report.kinds.entry(Kind::DataTable).or_default().count(rebof3_formats::characters::RECORD_BYTES as u64, both);
     }
 }
 

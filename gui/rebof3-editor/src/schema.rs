@@ -342,7 +342,7 @@ fn shop_columns() -> Vec<Column> {
 }
 
 /// The payload offset of the first party record in `ETC/START.EMI` entry 8.
-const PARTY_START: usize = rebof3_emi::characters::PAYLOAD_OFFSET;
+const PARTY_START: usize = rebof3_formats::characters::PAYLOAD_OFFSET;
 /// `Character`: the record offsets of its stat blocks.
 const PARTY_STATS: usize = 0x1c;
 const PARTY_BASE: usize = 0x3c;
@@ -351,7 +351,7 @@ const PARTY_BASE: usize = 0x3c;
 fn party_sheet() -> Sheet {
     use Field::*;
     let mut columns = vec![
-        col("name", 0x00, Name(rebof3_emi::characters::NAME_BYTES)),
+        col("name", 0x00, Name(rebof3_formats::characters::NAME_BYTES)),
         col("character id", 0x05, U8),
         col("level", 0x06, U8),
         col("exp", 0x08, U32),
@@ -377,8 +377,8 @@ fn party_sheet() -> Sheet {
         name: "party",
         place: Place::Entry { archive: START, entry: START_PARTY_ENTRY },
         start: PARTY_START,
-        count: Count::Fixed(rebof3_emi::characters::CHARACTERS),
-        record: rebof3_emi::characters::RECORD_BYTES,
+        count: Count::Fixed(rebof3_formats::characters::CHARACTERS),
+        record: rebof3_formats::characters::RECORD_BYTES,
         columns,
     }
 }

@@ -8,12 +8,12 @@ use crate::error::Result;
 
 /// The characters of `ETC/START.EMI` entry 8 from the JSON of `tables::characters`, written over the stored payload.
 pub fn characters(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    Ok(rebof3_emi::characters::import(json, payload)?)
+    Ok(rebof3_formats::characters::import(json, payload)?)
 }
 
 /// The palettes of one sprite bank from the JSON of `sprites::character_bank`, written over the decoded bank.
 pub fn character_bank(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    Ok(rebof3_emi::character_bank::import(json, payload)?)
+    Ok(rebof3_formats::character_bank::import(json, payload)?)
 }
 
 /// An EMI container with the entries named in `replace` swapped for new payloads. Every other entry keeps its

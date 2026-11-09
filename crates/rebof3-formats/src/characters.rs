@@ -6,8 +6,8 @@
 
 use core::fmt::Write as _;
 
-use crate::text::codec::{name_field, name_text};
-use crate::{Error, Result};
+use crate::error::{Error, Result};
+use rebof3_emi::text::codec::{name_field, name_text};
 
 /// Playable characters, one base-stat record each.
 pub const CHARACTERS: usize = 8;

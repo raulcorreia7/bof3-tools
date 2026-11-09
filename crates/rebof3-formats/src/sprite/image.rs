@@ -16,7 +16,9 @@
 //! 5-bit texels in each word, at bits 0, 5, 10, 16, 21 and 26 (`GFX_ExpandRgb555`,
 //! `exe/slus_004_22@0x8014E7F8`), so it holds indices into one 32-colour palette.
 
-use crate::{Error, Result, lzss};
+use rebof3_emi::lzss;
+
+use crate::error::{Error, Result};
 
 /// Bytes before the body: width, height and kind.
 pub const HEADER_BYTES: usize = 8;

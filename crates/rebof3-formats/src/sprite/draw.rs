@@ -21,9 +21,9 @@
 use psx_formats::gfx::texture::{Clut, Depth};
 
 use super::{Animation, Cell, Frame, Image, Palette};
-use crate::replay::{Vram, Writer};
-use crate::texture::ARENA_VRAM_ROW;
-use crate::{Error, Result};
+use crate::error::{Error, Result};
+use rebof3_emi::replay::{Vram, Writer};
+use rebof3_emi::texture::ARENA_VRAM_ROW;
 
 /// The address of `g_SpriteSizes` (`exe/slus_004_22@0x8017F53C`): one width and height per shape.
 pub const SPRITE_SIZES: u32 = 0x8017_F53C;
@@ -429,8 +429,8 @@ mod tests {
         for slot in 0..3 {
             let placement = Placement::field(slot);
             let clut = placement.clut();
-            let arena_word = (placement.palette_stage - crate::texture::ARENA_BASE) / 2;
-            let row_words = u32::from(crate::texture::ARENA_ROW_WORDS);
+            let arena_word = (placement.palette_stage - rebof3_emi::texture::ARENA_BASE) / 2;
+            let row_words = u32::from(rebof3_emi::texture::ARENA_ROW_WORDS);
             assert_eq!(u32::from(clut.y - ARENA_VRAM_ROW), arena_word / row_words, "slot {slot} row");
             assert_eq!(u32::from(clut.x), arena_word % row_words, "slot {slot} column");
         }

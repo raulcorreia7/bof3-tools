@@ -6,7 +6,7 @@
 //! game data that owns it. The layouts are in `wiki: data/records#gameemi-fixed-tables`,
 //! `wiki: data/records#character-and-master-data` and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`.
 
-use rebof3_emi::characters;
+use crate::characters;
 
 use crate::game_tables::{self, PAYLOAD_START, TABLES, Table};
 use crate::registry::Format;

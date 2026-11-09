@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, Result};
+use crate::error::{Error, Result};
 
 /// The first word of a container: the offset of its first section, which is also the header's size.
 pub const CONTAINER_HEAD: u32 = 0x0C;

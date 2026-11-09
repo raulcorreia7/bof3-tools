@@ -19,8 +19,8 @@ PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) are in
 ## rebof3-emi
 
 The EMI container and the primitives the format modules share: packing, `emi.json` manifests, LZ77,
-the record readers, the text codec, the VRAM model with its load replay, the character tables (until
-they move) and the container round trip (`verify`). Without the `std` feature the crate is
+the record readers, the text codec, LZSS, the VRAM model with its load replay and the container
+round trip (`verify`). Without the `std` feature the crate is
 `no_std + alloc` and keeps the container table and the cue table, which the audio library reads. The
 extractor validates the header, the table bounds, the payload bounds and the entry index before it
 writes. The packer reproduces the retail fill bytes

@@ -11,8 +11,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rebof3_emi::replay::Vram;
-use rebof3_emi::sprite::{self, FIELD_PALETTE, Placement, SpriteSizes, Stage, compose, frame_bounds};
 use rebof3_emi::{Archive, lz77};
+use rebof3_formats::sprite::{self, FIELD_PALETTE, Placement, SpriteSizes, Stage, compose, frame_bounds};
 use rebof3_formats::{Format, classify};
 
 /// The executable that holds `g_SpriteSizes`.

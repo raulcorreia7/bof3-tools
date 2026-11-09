@@ -35,6 +35,14 @@ pub enum Error {
         /// The block size.
         bytes: usize,
     },
+    /// The characters table cannot be read or written: a count, a name, or the rest of a record that does not fit.
+    CharacterTable(String),
+    /// A sprite bank's palettes cannot be read or written: a section that is not in the palette layout, or a palette
+    /// that does not match the bank it is written to.
+    CharacterBank(String),
+    /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
+    /// reader assumes.
+    SpriteBank(String),
     /// A sound item that could not be read or rendered.
     Audio(String),
     /// An open-format file that an import cannot read back to the stored bytes.
@@ -62,6 +70,8 @@ impl fmt::Display for Error {
             Self::GameTableShort { table, bytes, needed } => {
                 write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
             }
+            Self::CharacterTable(message) | Self::CharacterBank(message) => f.write_str(message),
+            Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
             Self::Audio(message) | Self::Import(message) => f.write_str(message),
         }
     }

@@ -18,6 +18,8 @@
 #![forbid(unsafe_code)]
 
 pub mod cells;
+pub mod character_bank;
+pub mod characters;
 pub mod clut;
 pub mod coverage;
 pub mod cue;
@@ -35,6 +37,7 @@ pub mod resources;
 pub mod scene;
 pub mod script;
 pub mod sep;
+pub mod sprite;
 pub mod sprite_bank;
 pub mod text;
 pub mod vab;

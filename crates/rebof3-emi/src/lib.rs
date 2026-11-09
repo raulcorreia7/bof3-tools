@@ -8,12 +8,13 @@
 //! | [`emi`], `pack`, `manifest` | container, repacking, `emi.json` | `wiki: formats/emi` |
 //! | `lz77` | type-1 payload codec | `wiki: formats/lz77` |
 //! | `lzss` | the transfer queue's packed images (`GFX_DecodeLzss`) | |
-//! | `sprite` | sprite banks: frame sheets, palettes, animations, records | `wiki: formats/character` |
+//! | `record`, `text` | the record readers and the game's text codec | `wiki: data/text` |
 //! | [`cue`] | type-8 cue tables | `wiki: formats/audio#emi-type-8-cue-records` |
 //! | `entry` | decoders applied to one entry on disk | |
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
 //!
-//! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`. The
+//! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`; the game's
+//! formats (sprite banks, maps, scripts, tables) live in `rebof3-formats`. The
 //! crate is `no_std + alloc` without the `std` feature, which keeps [`emi`] (the container table
 //! read from bytes) and [`cue`].
 
@@ -23,9 +24,7 @@
 extern crate alloc;
 
 #[cfg(feature = "std")]
-pub mod character_bank;
 #[cfg(feature = "std")]
-pub mod characters;
 pub mod cue;
 pub mod emi;
 #[cfg(feature = "std")]
@@ -46,7 +45,6 @@ pub mod record;
 #[cfg(feature = "std")]
 pub mod replay;
 #[cfg(feature = "std")]
-pub mod sprite;
 #[cfg(feature = "std")]
 pub mod text;
 #[cfg(feature = "std")]

@@ -27,7 +27,7 @@
 //! | `0x03` | 1 | `u` | texel column in the frame sheet |
 //! | `0x04` | 1 | `v` | texel row in the frame sheet, added to the actor's sheet row (work `+0x26`) |
 
-use crate::{Error, Result};
+use crate::error::{Error, Result};
 
 /// A delay byte at or above this makes the step a jump (`entry[0] >= 0x80` in `func_8014D978`).
 pub const JUMP: u8 = 0x80;

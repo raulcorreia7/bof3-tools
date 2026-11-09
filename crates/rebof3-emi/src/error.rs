@@ -50,13 +50,6 @@ pub enum Error {
         distance: usize,
         produced: usize,
     },
-    /// A fixed table runs past the end of its payload.
-    #[cfg(feature = "std")]
-    GameTableShort {
-        table: &'static str,
-        bytes: usize,
-        needed: usize,
-    },
     /// A manifest input is unusable: an absolute or parent-relative name, an
     /// entry that is missing or not a regular file, or a name whose resolved
     /// path leaves the input folder. The message names the entry and the file.
@@ -65,20 +58,9 @@ pub enum Error {
     /// A game text cannot be encoded: a character or tag the encoding does not have, or an operand that does not fit.
     #[cfg(feature = "std")]
     Text(String),
-    /// The characters table cannot be read or written: a count, a name, or the rest of a record that does not fit.
-    #[cfg(feature = "std")]
-    CharacterTable(String),
-    /// A sprite bank's palettes cannot be read or written: a section that is not in the palette layout, or a palette
-    /// that does not match the bank it is written to.
-    #[cfg(feature = "std")]
-    CharacterBank(String),
     /// A transfer-queue LZSS stream does not decode: it ends early or reads a ring byte it never wrote.
     #[cfg(feature = "std")]
     Lzss(String),
-    /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
-    /// reader assumes.
-    #[cfg(feature = "std")]
-    SpriteBank(String),
 }
 
 impl fmt::Display for Error {
@@ -115,21 +97,11 @@ impl fmt::Display for Error {
                 write!(f, "distance {distance} needs {produced} produced bytes")
             }
             #[cfg(feature = "std")]
-            Self::GameTableShort { table, bytes, needed } => {
-                write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
-            }
-            #[cfg(feature = "std")]
             Self::ManifestInput(message) => write!(f, "{message}"),
             #[cfg(feature = "std")]
             Self::Text(message) => write!(f, "{message}"),
             #[cfg(feature = "std")]
-            Self::CharacterTable(message) => write!(f, "{message}"),
-            #[cfg(feature = "std")]
-            Self::CharacterBank(message) => write!(f, "{message}"),
-            #[cfg(feature = "std")]
             Self::Lzss(message) => write!(f, "LZSS stream: {message}"),
-            #[cfg(feature = "std")]
-            Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
         }
     }
 }

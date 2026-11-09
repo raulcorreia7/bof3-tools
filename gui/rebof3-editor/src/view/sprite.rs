@@ -1,4 +1,4 @@
-//! A sprite bank as the game shows it (`rebof3_emi::sprite`, `wiki: formats/character`): each section's
+//! A sprite bank as the game shows it (`rebof3_formats::sprite`, `wiki: formats/character`): each section's
 //! animations played at the game's tick, every frame stitched through the VRAM model, the frame sheet
 //! the cells cut from, and the palettes.
 //!
@@ -24,7 +24,7 @@ use gpui::{
 use rebof3_assets::decode::color_rgba;
 use rebof3_assets::sprites::{self, SpriteSizes};
 use rebof3_emi::replay::Vram;
-use rebof3_emi::sprite::{
+use rebof3_formats::sprite::{
     self as format, Animation, Bank, Bounds, COLOURS, Frame, Image, Palette, Placement, Playback, Player, Reader,
     Section, Stage, TICK_MICROS, animation_bounds, cell_rect, compose, duration_ms, frame_bounds, ticks_of,
 };
@@ -981,7 +981,7 @@ fn import_into(editor: &mut Editor, json: &[u8], png: &[u8], sizes: &SpriteSizes
 mod tests {
     use gpui::TestAppContext;
     use rebof3_emi::lz77;
-    use rebof3_emi::sprite::{Cell, Encoding, SHAPES, Step};
+    use rebof3_formats::sprite::{Cell, Encoding, SHAPES, Step};
 
     use super::*;
     use crate::project::ArchivePath;
