@@ -13,8 +13,7 @@ struct Corner {
     uv: [f32; 2],
 }
 
-/// The two triangles the GPU splits a four-corner polygon into (psx-spx, "GPU Render Polygon
-/// Commands": a quad is drawn as the triangles 1-2-3 and 2-3-4).
+/// The two triangles the GPU splits a four-corner polygon into (psx-spx, "GPU Render Polygon Commands": a quad is drawn as the triangles 1-2-3 and 2-3-4).
 pub const TRIANGLES: [[usize; 3]; 2] = [[0, 1, 2], [1, 2, 3]];
 
 /// Draws `scene` through `camera` into a `width` x `height` frame.
@@ -28,13 +27,11 @@ pub fn draw(scene: &Scene, camera: &Camera, width: usize, height: usize) -> Fram
     for index in draw_order(scene, camera) {
         target.primitive(scene, camera, &scene.primitives[index]);
     }
-    // The frame is opaque, as the GPU's display is.
     let rgba = target.rgb.iter().flat_map(|&[red, green, blue]| [red, green, blue, 0xFF]).collect();
     Frame { width, height, rgba }
 }
 
-/// The frame being drawn: colours and the inverse view depth of the nearest opaque pixel (0 is
-/// empty).
+/// The frame being drawn: colours and the inverse view depth of the nearest opaque pixel (0 is empty).
 struct Target {
     width: usize,
     height: usize,
@@ -135,9 +132,7 @@ fn shade(scene: &Scene, primitive: &Primitive, uv: [f32; 2]) -> Option<Fragment>
     }
 }
 
-/// The colour word the GPU reads at texel `u`, `v` of a page through a CLUT (psx-spx, "GPU Texture
-/// Caching": a 4-bit texel is nibble `u % 4` of word `u / 4`, an 8-bit one byte `u % 2` of word
-/// `u / 2`, low first). An empty VRAM reads as zero.
+/// The colour word the GPU reads at texel `u`, `v` of a page through a CLUT (psx-spx, "GPU Texture Caching": a 4-bit texel is nibble `u % 4` of word `u / 4`, an 8-bit one byte `u % 2` of word `u / 2`, low first).
 pub fn fetch(vram: &[u16], page: [u16; 2], clut: [u16; 2], depth: Depth, u: u8, v: u8) -> u16 {
     if vram.len() < VRAM_WIDTH * VRAM_HEIGHT {
         return 0;
@@ -155,8 +150,7 @@ pub fn fetch(vram: &[u16], page: [u16; 2], clut: [u16; 2], depth: Depth, u: u8, 
     vram[usize::from(clut[1]) % VRAM_HEIGHT * VRAM_WIDTH + column]
 }
 
-/// The 8-bit channels of a colour word: each 5-bit channel shifted up by three (psx-spx, "GPU Color
-/// Depth").
+/// The 8-bit channels of a colour word: each 5-bit channel shifted up by three (psx-spx, "GPU Color Depth").
 pub fn word_rgb(word: u16) -> [u8; 3] {
     [0, 5, 10].map(|shift| (((word >> shift) & 0x1F) as u8) << 3)
 }
@@ -213,8 +207,7 @@ mod tests {
     use super::*;
     use crate::{Primitive, Scene};
 
-    /// A VRAM whose 8-bit page at (0, 0) holds texel `u` at every `(u, v)`, with CLUT row 500 mapping
-    /// index `i` to the colour word `i` (and index 0 to transparent).
+    /// A VRAM whose 8-bit page at (0, 0) holds texel `u` at every `(u, v)`, with CLUT row 500 mapping index `i` to the colour word `i` (and index 0 to transparent).
     fn vram() -> Vec<u16> {
         let mut vram = vec![0u16; VRAM_WIDTH * VRAM_HEIGHT];
         for v in 0..256 {
@@ -251,8 +244,6 @@ mod tests {
         let scene =
             Scene { vram: vram(), primitives: vec![quad(texture, [0x40; 4], Blend::Opaque)], ..Scene::default() };
         let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
-        // The quad spans pixels 16..48; pixel 47's texel is u = 30.5 -> 30, red channel 30 << 3 = 240,
-        // halved by the 0x40 shade.
         assert_eq!(frame.pixel(47, 20)[0], 120);
         assert_eq!(frame.pixel(16, 20), [0, 0, 0, 255], "texel 0 is transparent");
         assert_eq!(frame.pixel(4, 4), [0, 0, 0, 255], "outside the quad");
@@ -269,7 +260,6 @@ mod tests {
         let mut scene = Scene { vram: vram(), background: [200, 200, 200, 255], ..Scene::default() };
         scene.primitives.push(quad(texture, [NEUTRAL_SHADE; 4], Blend::Psx(2)));
         let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
-        // Texel 31 has bit 15: 200 - (31 << 3) clamps to 0 in red; green and blue hold 200 - 0.
         assert_eq!(frame.pixel(32, 32), [0, 200, 200, 255]);
     }
 

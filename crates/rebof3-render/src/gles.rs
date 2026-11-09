@@ -1,15 +1,4 @@
-//! The OpenGL ES 3.0 renderer: an offscreen EGL context, a framebuffer object of the frame's size,
-//! and the GPU's texel rules in a fragment shader. The frame is read back into memory, so the
-//! window toolkit shows it like any image.
-//!
-//! EGL is loaded at run time (`libEGL.so.1` on Linux, ANGLE's `libEGL.dll` on Windows); a missing
-//! library, display or context is an error and the caller draws in software. The display is Mesa's
-//! surfaceless platform when there is one, else the default display.
-//!
-//! The shader reads the VRAM as a 1024 x 512 `R16UI` texture and looks each texel up through its CLUT
-//! row, as [`crate::software::fetch`] does. Texture coordinates are affine in screen space like the
-//! GPU's: the vertex stage multiplies them by the clip `w` and the fragment stage divides by the
-//! interpolated `w`. Semi-transparent texels use the blend equations of the GPU's four modes.
+//! The OpenGL ES 3.0 renderer: an offscreen EGL context, a framebuffer object of the frame's size, and the GPU's texel rules in a fragment shader.
 
 use std::sync::Arc;
 
@@ -22,8 +11,7 @@ use crate::{Blend, Camera, Depth, Frame, Primitive, Scene, Texture, VRAM_HEIGHT,
 const PLATFORM_SURFACELESS_MESA: egl::Enum = 0x31DD;
 /// The depth the projection maps to the far plane.
 const FAR: f32 = 1.0e6;
-/// Floats per vertex: view position 3, texture coordinate 2, colour 4, texture kind, page 2, depth,
-/// CLUT 2, semi-transparency.
+/// Floats per vertex: view position 3, texture coordinate 2, colour 4, texture kind, page 2, depth, CLUT 2, semi-transparency.
 const VERTEX_FLOATS: usize = 16;
 
 const VERTEX_SHADER: &str = r#"#version 300 es
@@ -59,7 +47,6 @@ precision highp usampler2D;
 uniform usampler2D u_vram;
 uniform sampler2D u_image;
 uniform ivec2 u_image_size;
-// 0: opaque texels only, 1: semi-transparent texels only, 2: everything.
 uniform int u_pass;
 in vec2 v_uvw;
 in float v_w;
@@ -299,7 +286,6 @@ impl Gles {
 
             let order = draw_order(scene, camera);
             let pass = gl.get_uniform_location(self.program, "u_pass");
-            // The opaque texels of every depth-tested primitive but the alpha overlays.
             let solid: Vec<&Primitive> = order
                 .iter()
                 .map(|&index| &scene.primitives[index])
@@ -309,7 +295,6 @@ impl Gles {
             gl.depth_mask(true);
             gl.uniform_1_i32(pass.as_ref(), 0);
             self.draw_run(&solid, camera, &images);
-            // The semi-transparent texels, far to near, one run per mode.
             gl.uniform_1_i32(pass.as_ref(), 1);
             gl.depth_mask(false);
             gl.enable(glow::BLEND);
@@ -318,7 +303,6 @@ impl Gles {
                 psx_blend(&gl, mode);
                 self.draw_run(&run, camera, &images);
             }
-            // The overlays: alpha over the frame, then the ones drawn on top.
             gl.uniform_1_i32(pass.as_ref(), 2);
             gl.blend_equation(glow::FUNC_ADD);
             gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
@@ -361,7 +345,6 @@ impl Gles {
             if error != glow::NO_ERROR {
                 return Err(format!("OpenGL ES reports error {error:#06X}"));
             }
-            // OpenGL's first row is the bottom one.
             let row = width * 4;
             let mut flipped = Vec::with_capacity(rgba.len());
             for line in rgba.chunks(row).rev() {

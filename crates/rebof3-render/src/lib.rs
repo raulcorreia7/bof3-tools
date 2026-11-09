@@ -1,22 +1,4 @@
-//! Draws a field scene as the PlayStation GPU draws its primitives, into an RGBA frame that any
-//! window toolkit can show.
-//!
-//! A [`Scene`] is a VRAM image, a list of RGBA images (billboards) and a list of [`Primitive`]s:
-//! four-corner polygons in model space. A [`Camera`] projects the corners the way the GTE does
-//! (`screen = centre + focal * (x, y) / z`), and a renderer fills the frame:
-//!
-//! - [`software`] is always built. It reproduces the GPU's rules: the quad is two triangles of
-//!   corners 0, 1, 2 and 1, 2, 3, texture coordinates are affine in screen space, a texel is read
-//!   through its CLUT, the colour `0x0000` is transparent, texels are multiplied by the vertex colour
-//!   with `0x80` as one, and a semi-transparent primitive mixes the texels whose bit 15 is set by
-//!   one of the four modes (psx-spx, "GPU Rendering Attributes" and "GPU Texpage Attribute").
-//!   The GPU has no depth buffer; the renderer keeps one so that a free camera can look from any
-//!   side, and draws semi-transparent and overlay primitives after the opaque ones, far to near.
-//! - `gles` (the cargo feature of the same name) draws the same scene through OpenGL ES 3.0 on an
-//!   offscreen EGL context and reads the frame back. [`Renderer::new`] falls back to the software
-//!   path when no EGL display or context is available.
-//!
-//! [`pick`] finds the primitive under a frame pixel from the same projection, without a renderer.
+//! Draws a field scene as the PlayStation GPU draws its primitives, into an RGBA frame that any window toolkit can show. A [`Camera`] projects the corners the way the GTE does (`screen = centre + focal * (x, y) / z`), and a renderer fills the frame: corners 0, 1, 2 and 1, 2, 3, texture coordinates are affine in screen space, a texel is read through its CLUT, the colour `0x0000` is transparent, texels are multiplied by the vertex colour with `0x80` as one, and a semi-transparent primitive mixes the texels whose bit 15 is set by one of the four modes (psx-spx, "GPU Rendering Attributes" and "GPU Texpage Attribute").
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -84,8 +66,7 @@ pub struct Primitive {
     /// Model-space corners; the GPU draws the triangles 0, 1, 2 and 1, 2, 3.
     pub corners: [[f32; 3]; 4],
     pub texture: Texture,
-    /// The vertex colour: for a texture, the multiplier (`0x80` is one) and, for an image, the alpha;
-    /// for no texture, the fill.
+    /// The vertex colour: for a texture, the multiplier (`0x80` is one) and, for an image, the alpha; for no texture, the fill.
     pub colour: [u8; 4],
     pub blend: Blend,
     /// Whether the primitive hides behind nearer ones; an overlay drawn on top clears it.
@@ -147,7 +128,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    /// Opens the preferred backend. `prefer_gles` false keeps the software path.
+    /// Opens the preferred backend.
     pub fn new(prefer_gles: bool) -> Self {
         #[cfg(feature = "gles")]
         {
@@ -191,8 +172,7 @@ impl Renderer {
     }
 }
 
-/// The primitives that draw last: semi-transparent and overlay ones, far to near; then the
-/// overlays that ignore depth. Opaque primitives keep their order and come first.
+/// The primitives that draw last: semi-transparent and overlay ones, far to near; then the overlays that ignore depth.
 pub fn draw_order(scene: &Scene, camera: &Camera) -> Vec<usize> {
     let mut opaque = Vec::new();
     let mut mixed = Vec::new();
@@ -213,8 +193,7 @@ pub fn draw_order(scene: &Scene, camera: &Camera) -> Vec<usize> {
     opaque
 }
 
-/// The pickable primitive nearest the camera under frame pixel `x`, `y` of a `width` x `height`
-/// frame: its id and its view depth. Overlays that ignore depth win over the rest.
+/// The pickable primitive nearest the camera under frame pixel `x`, `y` of a `width` x `height` frame: its id and its view depth.
 pub fn pick(scene: &Scene, camera: &Camera, width: usize, height: usize, x: f32, y: f32) -> Option<u32> {
     let mut best: Option<(bool, f32, u32)> = None;
     for primitive in &scene.primitives {

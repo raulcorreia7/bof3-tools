@@ -1,14 +1,11 @@
-//! The OpenGL ES renderer draws what the software renderer draws. Without an EGL display (a CI runner
-//! with no GPU or Mesa) the comparison skips and says why.
+//! The OpenGL ES renderer draws what the software renderer draws.
 
 use rebof3_render::{
     Backend, Blend, Camera, Depth, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT,
     VRAM_WIDTH, software,
 };
 
-/// A VRAM with an 8-bit page at (64, 0) whose texel at `(u, v)` is `(u + v) & 0xFF`, a 4-bit page at
-/// (128, 0) whose texel is `u & 15`, and a CLUT row 480 mapping index `i` to a colour with bit 15 on
-/// for odd `i`.
+/// A VRAM with an 8-bit page at (64, 0) whose texel at `(u, v)` is `(u + v) & 0xFF`, a 4-bit page at (128, 0) whose texel is `u & 15`, and a CLUT row 480 mapping index `i` to a colour with bit 15 on for odd `i`.
 fn vram() -> Vec<u16> {
     let mut vram = vec![0u16; VRAM_WIDTH * VRAM_HEIGHT];
     for v in 0..256 {
