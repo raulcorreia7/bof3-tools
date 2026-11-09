@@ -29,7 +29,7 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | Battle script bank | 42 | Info, Decoded: the area bank's format | Hex only | retail: decode and encode, 42/42 | as the area script bank |
 | Area actor definitions | 200 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |
 | Area encounters and enemies | 200 | Tables: encounters, enemies, enemy AI | every sheet cell | retail: every sheet rewrites its bytes | none |
-| Area map bundle | 200 | Map: cells by tile bank and height | corner heights | retail: decode and encode, 200/200 | none; textures need the tile page, not traced |
+| Area map bundle | 200 | Map: cells textured from the area's replayed VRAM, or by tile bank and height | corner heights | retail: decode and encode, 200/200; all 688,118 cells with a tile find their page and CLUT row | none; drawn flat, without the vertex colour or semi-transparency |
 | Area auxiliary module window | 9 | Info: module id and body size | Hex only | n/a | area049's window is code, changed in the decompilation; the other eight hold data whose layout is not traced |
 | Shared resource table | 44 | Text, Info: id groups | strings in place | retail: strings | none |
 | Type-8 cue table | 904 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |

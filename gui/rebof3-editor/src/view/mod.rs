@@ -128,8 +128,10 @@ pub fn prepare(editor: &mut Editor) {
         vram::prepare(editor);
     }
     let Some(entry) = editor.current() else { return };
-    if entry.format() == Format::VramUpload {
-        texture::prepare(editor);
+    match entry.format() {
+        Format::VramUpload => texture::prepare(editor),
+        Format::AreaMapBundle if editor.tab == Tab::Map => map::prepare(editor),
+        _ => {}
     }
 }
 
@@ -397,5 +399,34 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// An area map draws textured from its own scene's VRAM. Point `BOF3_DISC_DIR` at an extracted
+    /// disc; without it the test skips.
+    #[gpui::test]
+    fn a_retail_area_map_draws_textured(cx: &mut TestAppContext) {
+        let Some(disc) = std::env::var_os("BOF3_DISC_DIR").map(std::path::PathBuf::from) else {
+            return eprintln!("skipping: set BOF3_DISC_DIR");
+        };
+        let folder = std::env::temp_dir().join(format!("bof3-edit-map-{}", std::process::id()));
+        let project = folder.clone();
+        let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc), Some(project), cx));
+        editor.update(cx, |editor, _| {
+            editor.select_archive(&ArchivePath("BIN/WORLD00/AREA001.EMI".into()));
+            let index = editor
+                .archive
+                .as_ref()
+                .expect("the area loads")
+                .formats
+                .iter()
+                .position(|format| *format == Format::AreaMapBundle);
+            editor.select_entry(index.expect("the area has a map bundle"));
+            editor.tab = Tab::Map;
+        });
+        cx.update(|window, cx| window.draw(cx).clear());
+        let summary = editor.update(cx, |editor, _| editor.views.map.textured_summary());
+        let summary = summary.expect("the map is textured");
+        assert!(summary.contains("Field: AREA001") && summary.contains(", 0 whose page"), "{summary}");
+        let _ = std::fs::remove_dir_all(&folder);
     }
 }
