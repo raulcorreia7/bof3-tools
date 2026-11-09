@@ -28,7 +28,7 @@ Run `rustup update stable` to update an installed toolchain.
 ```sh
 git clone https://github.com/raulcorreia7/bof3-tools.git
 cd bof3-tools
-make build   # writes target/release/bof3
+make build   # builds target/release and links bof3 and bof3-edit into bin/
 ```
 
 ## Usage
@@ -61,7 +61,7 @@ bof3 emi list test.EMI
 Windows.
 
 ```sh
-cargo run --release -p rebof3-editor -- build/disc my-mod
+bin/bof3-edit build/disc my-mod   # after make build; or: cargo run --release -p rebof3-editor -- build/disc my-mod
 ```
 
 The first argument is an extracted disc (the folder that holds `BIN/`), the second a project folder. The
