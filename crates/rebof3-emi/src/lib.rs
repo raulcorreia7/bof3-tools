@@ -10,6 +10,7 @@
 //! | [`cue`] | type-8 cue tables | `wiki: formats/audio#emi-type-8-cue-records` |
 //! | `area` | script banks, scene tables, map bundles | `wiki: formats/area` |
 //! | `entry` | decoders applied to one entry on disk | |
+//! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
 //! | `classify`, `coverage` | which format each entry is, and what the codecs rebuild | `wiki: formats/conversion#conversion-map` |
 //!
 //! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`. The
@@ -50,6 +51,8 @@ pub mod manifest;
 pub mod pack;
 #[cfg(feature = "std")]
 mod record;
+#[cfg(feature = "std")]
+pub mod replay;
 #[cfg(feature = "std")]
 pub mod text;
 #[cfg(feature = "std")]
