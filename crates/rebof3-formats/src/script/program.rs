@@ -394,11 +394,15 @@ impl Program {
         Ok(())
     }
 
-    /// Removes step `at.step`. Refused while a jump names it; every jump past it moves back.
+    /// Removes step `at.step`. Refused while a jump names it or when it is the only step; every jump
+    /// past it moves back.
     pub fn remove_op(&mut self, at: StepAt) -> Result<()> {
         let stream = self.stream_mut(at.section, at.record)?;
         if at.step >= stream.animation.steps.len() {
             return Err(refused("no such step"));
+        }
+        if stream.animation.steps.len() == 1 {
+            return Err(refused("a stream keeps one step: the step functions stage a step whatever the count"));
         }
         if let Some(from) = stream
             .animation

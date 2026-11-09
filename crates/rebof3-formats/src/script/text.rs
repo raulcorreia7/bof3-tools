@@ -31,7 +31,7 @@
 use core::fmt::Write as _;
 use std::collections::HashMap;
 
-use crate::animation::{Animation, Cell, FLIP, Frame, JUMP, SHAPE_MASK, duration_ms, ticks_of};
+use crate::animation::{Animation, Cell, FLIP, Frame, JUMP, SHAPE_MASK, duration_ms};
 use crate::error::{Error, Result};
 
 use super::program::{Op, Program, Record, Section, Stream};
@@ -183,6 +183,7 @@ impl Draft {
         match self.raw {
             Some(bytes) if !self.is_stream() => Ok(Record::Raw { bytes, reason: "raw in the text".into() }),
             Some(_) => Err(at(line, "a record is raw or a stream, not both")),
+            None if self.steps.is_empty() => Err(at(line, "a stream holds at least one step; write `raw` for bytes")),
             None => {
                 let mut steps = Vec::with_capacity(self.steps.len());
                 for (code, operand) in self.steps {
@@ -411,11 +412,6 @@ fn strip(line: &str) -> &str {
 
 fn at(line: usize, message: &str) -> Error {
     Error::Import(format!("script text line {line}: {message}"))
-}
-
-/// Ticks as the listing says them: 0 lasts 256.
-pub fn ticks_text(ticks: u8) -> String {
-    format!("{} ticks, {} ms", ticks_of(ticks), duration_ms(ticks))
 }
 
 #[cfg(test)]

@@ -226,6 +226,7 @@ fn listing(editor: &Editor, section: usize, shown: &Section, record: usize, cx: 
     }
 
     let end = StepAt { section, record, step: stream.animation.steps.len() };
+    let removable = end.step > 1;
     let edits = div()
         .flex()
         .items_center()
@@ -235,13 +236,13 @@ fn listing(editor: &Editor, section: usize, shown: &Section, record: usize, cx: 
             report(editor, |program| program.insert_op(end, Op::Show { ticks, frame: 0 }));
             cx.notify();
         })))
-        .child(button("script-remove", "Remove the last op", end.step > 0).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                let last = StepAt { step: end.step.saturating_sub(1), ..end };
+        .child(button("script-remove", "Remove the last op", removable).when(removable, |remove| {
+            remove.on_click(cx.listener(move |editor, _, _, cx| {
+                let last = StepAt { step: end.step - 1, ..end };
                 report(editor, |program| program.remove_op(last));
                 cx.notify();
-            },
-        )))
+            }))
+        }))
         .child(muted("Steps change at the end only: game code names stream positions."));
 
     column
