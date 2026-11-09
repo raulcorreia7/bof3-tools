@@ -271,9 +271,6 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
         return Err("manifest input is only supported when packing a folder".into());
     }
 
-    // The containment root the folder modes validated their inputs against; the
-    // cleanup rechecks every path against it. `-i` inputs have no folder: the
-    // caller named those files, so their scope stays caller-selected.
     let mut cleanup_root: Option<PathBuf> = None;
     let packed_paths = if let Some(folder) = options.folder {
         if !folder.is_dir() {
@@ -282,8 +279,7 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
         cleanup_root = Some(fs::canonicalize(&folder).map_err(|error| format!("{}: {error}", folder.display()))?);
         if let Some(requested) = options.manifest {
             let manifest = requested.unwrap_or_else(|| folder.join("emi.json"));
-            // The manifest loads and validates once; these entries serve the
-            // pack, the dry run and the cleanup, which never rereads it.
+            // The manifest loads and validates once; these entries serve the pack, the dry run and the cleanup, which never rereads it.
             let (entries, archive_version) = manifest_entries(&folder, &manifest).map_err(|error| {
                 format!("cannot read the manifest {}: {error}; pass -J FILE or drop -J", manifest.display())
             })?;
@@ -341,8 +337,6 @@ fn enumerate_paths(folder: &Path, options: &PackFolderOptions) -> Result<Vec<Pat
             || options.include_patterns.iter().any(|pattern| rebof3_emi::glob_match(pattern, &name));
         let excluded = options.exclude_patterns.iter().any(|pattern| rebof3_emi::glob_match(pattern, &name));
         if included && !excluded {
-            // Entries are recorded resolved, so the cleanup step can compare a
-            // path against the identity that was validated and packed.
             paths.push(fs::canonicalize(entry.path()).map_err(|error| format!("{}: {error}", entry.path().display()))?);
         }
     }
@@ -354,14 +348,6 @@ fn enumerate_paths(folder: &Path, options: &PackFolderOptions) -> Result<Vec<Pat
 }
 
 /// Deletes the inputs the pack step already owns, once each.
-///
-/// `owned` is that list, so repeated manifest entries collapse here instead of
-/// through a second collection of the payloads. Each path is re-resolved first:
-/// one that has disappeared, no longer resolves to itself, is no longer a
-/// regular file, or no longer lies inside `folder` was replaced while the
-/// archive was written. Such a path is refused by name and nothing is deleted,
-/// which leaves the completed archive in place. `-i` inputs pass no folder: the
-/// caller named them, and only their own identity is rechecked.
 fn cleanup_inputs(owned: Vec<PathBuf>, folder: Option<&Path>) -> Result<(), String> {
     let mut resolved_paths: Vec<PathBuf> = Vec::with_capacity(owned.len());
     let mut pending: Vec<PathBuf> = Vec::with_capacity(owned.len());
@@ -711,8 +697,7 @@ fn vram_options(args: &[OsString]) -> Result<VramOptions, String> {
     Ok(options)
 }
 
-/// Places every type-3 entry of the archive into `page_set`, printing one row
-/// per upload and the totals.
+/// Places every type-3 entry of the archive into `page_set`, printing one row per upload and the totals.
 fn print_uploads(archive: &Archive, retail: &[u8], page_set: &mut Plane, source: &Path) -> Result<(), String> {
     let mut uploads = 0;
     let mut rectangles = 0;
@@ -906,9 +891,6 @@ fn run_sep(args: &[OsString]) -> Result<i32, String> {
 }
 
 /// Prints one line per problem and fails when the parse has any.
-/// Prints each problem and returns the code the caller reports: 1 when there is
-/// one, because a format the retail bytes disagree with is a measured negative,
-/// not a tool failure.
 fn report_problems(problems: impl Iterator<Item = String>) -> i32 {
     let mut count = 0;
     for problem in problems {
@@ -923,12 +905,10 @@ fn report_problems(problems: impl Iterator<Item = String>) -> i32 {
     }
 }
 
-/// Where `coverage` looks for the retail archives when `--corpus` is absent,
-/// relative to the working directory.
+/// Where `coverage` looks for the retail archives when `--corpus` is absent, relative to the working directory.
 const COVERAGE_CORPUS: &str = "raw/disc/BIN";
 
-/// Prints the format coverage scoreboard over the retail archives and, with
-/// `--jsonl`, writes it as the coverage table.
+/// Prints the format coverage scoreboard over the retail archives and, with `--jsonl`, writes it as the coverage table.
 fn run_coverage(args: &[OsString]) -> Result<i32, String> {
     let mut corpus = PathBuf::from(COVERAGE_CORPUS);
     let mut jsonl: Option<PathBuf> = None;

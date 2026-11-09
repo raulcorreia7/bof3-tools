@@ -746,8 +746,7 @@ fn help_hint(verb: &str, rest: &[String]) -> String {
     format!("bof3 assets {verb}")
 }
 
-/// The focused help for the command in `args`: a verb, or an export/import
-/// sub-verb.
+/// The focused help for the command in `args`: a verb, or an export/import sub-verb.
 fn help_for(args: &[String]) -> String {
     let Some(verb) = args.first() else {
         return USAGE.to_string();
@@ -770,8 +769,7 @@ fn help_for(args: &[String]) -> String {
     }
 }
 
-/// Parses `args` into `T`. The help text is printed by `run`, so clap's own help is off; a parse
-/// error becomes a one-line usage error.
+/// Parses `args` into `T`.
 fn parse<T: Parser>(args: &[String]) -> Result<T> {
     let command = T::command()
         .no_binary_name(true)
@@ -849,8 +847,7 @@ fn pair<'a>(value: &'a str, flag: &str, shape: &str) -> Result<(&'a str, &'a str
     value.split_once('=').ok_or_else(|| Error::Usage(format!("{flag} needs {shape}, not {value:?}")))
 }
 
-/// The arguments of the table-driven conversions (`export` and `import` of a kind in
-/// [`codec::CODECS`]): files, `-o`, and the options an op may take.
+/// The arguments of the table-driven conversions (`export` and `import` of a kind in [`codec::CODECS`]): files, `-o`, and the options an op may take.
 #[derive(Parser)]
 struct Convert {
     files: Vec<String>,
@@ -957,9 +954,7 @@ fn reject_unused_options(op: &codec::Op, args: &Convert) -> Result<()> {
     }
 }
 
-/// `bof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette CLUT_BLOCK [--palette-offset WORDS]] [-o OUT]`:
-/// writes a texture's stored payload as a PNG. Without `--depth` the PNG is the 16 bpp view. With it, the
-/// payload is drawn with the palette row that starts at word WORDS of CLUT_BLOCK, a file of raw color words.
+/// `bof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette CLUT_BLOCK [--palette-offset WORDS]] [-o OUT]`: writes a texture's stored payload as a PNG. With it, the payload is drawn with the palette row that starts at word WORDS of CLUT_BLOCK, a file of raw color words.
 #[derive(Parser)]
 struct ExportTexture {
     files: Vec<PathBuf>,
@@ -1010,8 +1005,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets export sprite-sheet PAYLOAD --exe EXE [--section N] [--palette N] [-o OUT]`: writes one
-/// section of a stored character sprites as an indexed PNG and, next to it, the Aseprite JSON that names it.
+/// `bof3 assets export sprite-sheet PAYLOAD --exe EXE [--section N] [--palette N] [-o OUT]`: writes one section of a stored character sprites as an indexed PNG and, next to it, the Aseprite JSON that names it.
 #[derive(Parser)]
 struct ExportSpriteSheet {
     files: Vec<PathBuf>,
@@ -1040,8 +1034,7 @@ fn export_sprite_sheet(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe EXE [-o OUT]`: reads a sheet that
-/// `export sprite-sheet` wrote back into the stored payload, raw or LZ77 as the payload was.
+/// `bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe EXE [-o OUT]`: reads a sheet that `export sprite-sheet` wrote back into the stored payload, raw or LZ77 as the payload was.
 #[derive(Parser)]
 struct ImportSpriteSheet {
     files: Vec<PathBuf>,
@@ -1075,9 +1068,7 @@ fn sprite_sizes(exe: Option<&Path>, verb: &str) -> Result<sprites::SpriteSizes> 
     sprites::sprite_sizes(&read_file(exe)?)
 }
 
-/// `bof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back
-/// into its stored payload (default: the PNG with a `.img` extension). An indexed PNG also has color words,
-/// which `--palette` writes as raw little-endian words.
+/// `bof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back into its stored payload (default: the PNG with a `.img` extension).
 #[derive(Parser)]
 struct ImportTexture {
     files: Vec<PathBuf>,
@@ -1110,9 +1101,7 @@ fn import_texture(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets import sequence FILE.mid:ID... [-o OUT]`: writes a sequence package (`.seq`) from Standard MIDI
-/// Files, one sequence per argument and in order. ID is the sequence's id in the package. The output defaults to
-/// the first file's name with a `.seq` extension.
+/// `bof3 assets import sequence FILE.mid:ID... [-o OUT]`: writes a sequence package (`.seq`) from Standard MIDI Files, one sequence per argument and in order.
 #[derive(Parser)]
 struct ImportSequence {
     parts: Vec<String>,
@@ -1144,9 +1133,7 @@ fn import_sequence(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]`: rebuilds an EMI container with the entries
-/// named by `--entry` replaced by the files' bytes. Without `--entry` the output is the container as its entries
-/// pack. The output defaults to CONTAINER with a `.rebuilt.EMI` extension.
+/// `bof3 assets import emi CONTAINER [--entry INDEX=FILE]... [-o OUT]`: rebuilds an EMI container with the entries named by `--entry` replaced by the files' bytes.
 #[derive(Parser)]
 struct ImportEmi {
     files: Vec<PathBuf>,
@@ -1177,9 +1164,7 @@ fn import_emi(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets import disc CUE [--file PATH=FILE]... -o DIR`: writes a patched copy of the disc into the new directory
-/// DIR. Each `--file` replaces the disc file PATH with the bytes of FILE, keeping its sectors. The copy keeps the cue
-/// sheet and every track file under its own name.
+/// `bof3 assets import disc CUE [--file PATH=FILE]... -o DIR`: writes a patched copy of the disc into the new directory DIR.
 #[derive(Parser)]
 struct ImportDisc {
     files: Vec<PathBuf>,
@@ -1212,8 +1197,7 @@ fn import_disc(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets import soundfont BANK.sf2 [-o PREFIX]`: writes the VAB bank a SoundFont 2 file describes as
-/// PREFIX.vh and PREFIX.vb. The default prefix is the SoundFont's path without its extension.
+/// `bof3 assets import soundfont BANK.sf2 [-o PREFIX]`: writes the VAB bank a SoundFont 2 file describes as PREFIX.vh and PREFIX.vb.
 #[derive(Parser)]
 struct OneFile {
     files: Vec<PathBuf>,
@@ -1231,8 +1215,7 @@ fn import_soundfont(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets soundfont HEADER BODY [-o OUT]`: writes one VAB bank as a SoundFont 2 file. HEADER is
-/// the `.vh` and BODY the `.vb`. The output defaults to HEADER with a `.sf2` extension.
+/// `bof3 assets soundfont HEADER BODY [-o OUT]`: writes one VAB bank as a SoundFont 2 file.
 fn soundfont_command(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let [header, body] = args.files.as_slice() else {
@@ -1247,8 +1230,7 @@ fn soundfont_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets terrain BUNDLE [-o OUT]`: writes one map bundle's terrain. A `.glb` output is a
-/// binary glTF. Any other output is an OBJ, and its MTL goes beside it.
+/// `bof3 assets terrain BUNDLE [-o OUT]`: writes one map bundle's terrain.
 fn terrain_command(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let bundle = single(args.files, "terrain needs a map bundle file")?;
@@ -1271,8 +1253,7 @@ fn terrain_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets encounters PAYLOAD [-o OUT]`: writes one area's encounter block as JSON. PAYLOAD is the
-/// stored bytes of an `area-encounters` entry. The output defaults to PAYLOAD with a `.json` extension.
+/// `bof3 assets encounters PAYLOAD [-o OUT]`: writes one area's encounter block as JSON.
 fn encounters_command(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let payload = single(args.files, "encounters needs an area encounter block file")?;
@@ -1283,8 +1264,7 @@ fn encounters_command(args: &[String]) -> Result<i32> {
     Ok(EXIT_OK)
 }
 
-/// `bof3 assets tables PAYLOAD [-o DIR]`: writes the fixed game tables of `ETC/GAME.EMI` entry 0 as one
-/// JSON file per table. PAYLOAD is the stored bytes of that entry.
+/// `bof3 assets tables PAYLOAD [-o DIR]`: writes the fixed game tables of `ETC/GAME.EMI` entry 0 as one JSON file per table.
 fn tables_command(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let payload = single(args.files, "tables needs the stored bytes of GAME.EMI entry 0")?;
@@ -1304,8 +1284,7 @@ struct CoverageArgs {
     image: Option<PathBuf>,
 }
 
-/// `bof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per kind, the entries and bytes that
-/// export and import to their own bytes, against the kind's total. Kinds without a round trip report zero.
+/// `bof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per kind, the entries and bytes that export and import to their own bytes, against the kind's total.
 fn coverage_command(args: &[String]) -> Result<i32> {
     let image = parse::<CoverageArgs>(args)?.image;
     let current = env::current_dir()?;
@@ -1427,7 +1406,6 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
     let image = match arguments.image.clone() {
         Some(image) => Some(image),
         None if !only_text => Some(find_disc_image(&base).map_err(Error::Usage)?),
-        // The text kind can read an extracted disc without the image; it only loses the LBA.
         None => find_disc_image(&base).ok(),
     };
     let mut report = if only_text {

@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! `assets extract-all`: every asset of the disc, one folder per step, plus the `index.json`
-//! manifest for the extracted assets.
-//!
-//! Steps (each writes `DIR/<step>/`): `disc` the disc's files, `emi` every archive of `disc`,
-//! `assets` the classified payloads (`assets.jsonl`), `assets-export` terrain glTF, message JSON,
-//! SoundFont and MIDI from those payloads, `audio` rendered sample WAVs.
+//! `assets extract-all`: every asset of the disc, one folder per step, plus the `index.json` manifest for the extracted assets.
 
 use std::collections::BTreeMap;
 use std::env;

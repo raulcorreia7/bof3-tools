@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! The Psy-Q file verbs (TIM, VAB, SEQ, SEP) over small synthetic inputs: each export reads back to
-//! the bytes it came from.
+//! The Psy-Q file verbs (TIM, VAB, SEQ, SEP) over small synthetic inputs: each export reads back to the bytes it came from.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
