@@ -356,6 +356,22 @@ impl Vram {
         indices
     }
 
+    /// The colour word a textured primitive reads at texel `u`, `v` of the page whose top-left
+    /// word is `page_x`, `page_y`, through the CLUT at `clut`: the GPU's texture fetch without a
+    /// texture window. A 4-bit texel is the `u % 4`-th nibble of word `u / 4`, an 8-bit texel the
+    /// `u % 2`-th byte of word `u / 2`, low first. Coordinates wrap at the VRAM edges, as the GPU's
+    /// do.
+    pub fn fetch(&self, page_x: u16, page_y: u16, clut: Clut, depth: Depth, u: u8, v: u8) -> u16 {
+        let per_word = depth.texels_per_word();
+        let bits = depth.bits() as usize;
+        let x = (usize::from(page_x) + usize::from(u) / per_word) % VRAM_WIDTH;
+        let y = (usize::from(page_y) + usize::from(v)) % VRAM_HEIGHT;
+        let shift = (usize::from(u) % per_word) * bits;
+        let index = (usize::from(self.words[y * VRAM_WIDTH + x]) >> shift) & ((1 << bits) - 1);
+        let column = (usize::from(clut.x) + index) % VRAM_WIDTH;
+        self.words[usize::from(clut.y) % VRAM_HEIGHT * VRAM_WIDTH + column]
+    }
+
     /// The rectangles each entry wrote, merged from per-row runs, in VRAM order.
     pub fn regions(&self) -> Vec<Region> {
         // Runs of one owner per row, keyed by owner and column span, extended while the next row
@@ -507,6 +523,22 @@ mod tests {
         let entries: Vec<Entry> = items.iter().map(|(entry, _)| entry.clone()).collect();
         let payloads: Vec<&[u8]> = items.iter().map(|(_, payload)| payload.as_slice()).collect();
         vram.load(archive, &entries, &payloads);
+    }
+
+    #[test]
+    fn a_fetch_reads_a_texel_through_its_clut() {
+        let mut vram = Vram::new();
+        // Word 0x4321 holds 4-bit texels 1, 2, 3, 4 and 8-bit texels 0x21, 0x43.
+        vram.load_image(320, 256, 1, 1, &[0x4321], Writer::Named("page".into()));
+        let colors: Vec<u16> = (0..256).map(|index| 0x1000 + index).collect();
+        vram.load_image(0, 483, 256, 1, &colors, Writer::Named("clut".into()));
+        let clut = Clut::new(0, 483).unwrap();
+        assert_eq!(vram.fetch(320, 256, clut, Depth::Four, 0, 0), 0x1001);
+        assert_eq!(vram.fetch(320, 256, clut, Depth::Four, 3, 0), 0x1004);
+        assert_eq!(vram.fetch(320, 256, clut, Depth::Eight, 1, 0), 0x1043);
+        assert_eq!(vram.fetch(320, 256, clut, Depth::Eight, 2, 0), 0x1000, "the next word is unwritten");
+        vram.load_image(0, 0, 1, 1, &[0x0021], Writer::Named("origin".into()));
+        assert_eq!(vram.fetch(1023, 511, clut, Depth::Eight, 2, 1), 0x1021, "u and v wrap to the origin");
     }
 
     #[test]
