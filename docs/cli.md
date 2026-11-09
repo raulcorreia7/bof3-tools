@@ -137,8 +137,8 @@ payload that holds text writes `text/<disc path without .EMI>/<slot>.bin`, `<slo
 
 | Operation | Verbs                                                                                                                                                                                     |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Export    | `terrain` (glTF or OBJ), `soundfont`, `tables`, `encounters`, and `export` for `texture`, `palette`, `terrain`, `vag`, `sequence`, `message`, `strings`, `characters` or `character-bank` |
-| Import    | `import` for `texture`, `palette`, `terrain`, `vag`, `table`, `encounters`, `layout`, `emi`, `sequence`, `disc`, `soundfont`, `message`, `strings`, `characters` or `character-bank`      |
+| Export    | `terrain` (glTF or OBJ), `soundfont`, `tables`, `encounters`, and `export` for `texture`, `palette`, `terrain`, `vag`, `sequence`, `message`, `script`, `strings`, `characters` or `character-bank` |
+| Import    | `import` for `texture`, `palette`, `terrain`, `vag`, `table`, `encounters`, `layout`, `emi`, `sequence`, `disc`, `soundfont`, `message`, `script`, `strings`, `characters` or `character-bank`      |
 
 Each verb has focused help with its own switches and defaults, for example
 `bof3 assets export texture --help` and `bof3 assets import disc --help`. Common export switches are
