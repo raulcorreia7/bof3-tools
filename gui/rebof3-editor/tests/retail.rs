@@ -189,3 +189,45 @@ fn sequences_play_from_the_project_archive() {
     eprintln!("sequences: {} of {played} render silent", silent.len());
     assert!(played > 0 && silent.is_empty(), "{silent:?}");
 }
+
+#[test]
+fn samples_and_tones_play_through_the_spu() {
+    use psx_formats::vab::Bank;
+    use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
+
+    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let folder = scratch("tones");
+    let mut project = Project::open(&disc, &folder).expect("project opens");
+    let path = ArchivePath("BIN/BATTLE/BATL_SE.EMI".into());
+    let loaded = project.load(&path).expect("archive loads");
+
+    let (mut samples, mut tones, mut problems) = (0, 0, Vec::new());
+    for header in (0..loaded.entries().len()).filter(|&index| loaded.formats[index] == Format::VabHeader) {
+        let body = rebof3_emi::entry::vab_body_index(loaded.entries(), header).expect("the header has a body");
+        let (header_bytes, body_bytes) = (loaded.original(header), loaded.original(body));
+        let bank = Bank::parse(header_bytes, body_bytes).expect("a retail bank parses");
+        for vag in bank.vags.iter().filter(|vag| !vag.is_empty()) {
+            match sample_pcm(header_bytes, body_bytes, vag.index) {
+                Ok(pcm) if pcm.samples.iter().any(|&sample| sample != 0) => samples += 1,
+                Ok(_) => problems.push(format!("bank {header} sample {}: silent", vag.index)),
+                // The library declines a sample whose tones are all silent; it has nothing to play.
+                Err(error) if error.to_string().contains("carries no audio") => {}
+                Err(error) => problems.push(format!("bank {header} sample {}: {error}", vag.index)),
+            }
+        }
+        for tone in bank.usable_tones().filter(|tone| tone.min_note <= tone.max_note) {
+            let keys = Keys::Tone { block: tone.storage_block, slot: tone.tone_slot };
+            let note = tone.center_note.clamp(tone.min_note, tone.max_note);
+            match note_pcm(header_bytes, body_bytes, &Note { keys, note, hold: 0.25 }) {
+                Ok(pcm) if pcm.channels == 2 && pcm.sample_rate == psx_formats::VAB_SAMPLE_RATE => tones += 1,
+                Ok(pcm) => problems
+                    .push(format!("bank {header} tone {keys:?}: {} Hz, {} channels", pcm.sample_rate, pcm.channels)),
+                Err(error) => problems.push(format!("bank {header} tone {keys:?}: {error}")),
+            }
+        }
+    }
+
+    let _ = std::fs::remove_dir_all(&folder);
+    eprintln!("{}: {samples} samples and {tones} tones play, {} problems", path.0, problems.len());
+    assert!(samples > 0 && tones > 0 && problems.is_empty(), "{:?}", problems.iter().take(8).collect::<Vec<_>>());
+}

@@ -80,6 +80,8 @@ pub enum Field {
     MapCorner(usize),
     /// A header field of sequence `index` of the sound view's package.
     SequenceHeader { index: usize, part: sound::Part },
+    /// The note the sound view plays tone `slot` of program block `block` at.
+    ToneNote { block: u8, slot: u8 },
 }
 
 impl Field {
@@ -286,6 +288,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
         Field::Cell { row, column } => tables::cell_changed(editor, row, column, text),
         Field::MapCorner(corner) => map::corner_changed(editor, corner, text),
         Field::SequenceHeader { index, part } => sound::header_changed(editor, index, part, text),
+        Field::ToneNote { block, slot } => sound::note_changed(editor, block, slot, text),
     }
 }
 
