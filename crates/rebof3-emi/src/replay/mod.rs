@@ -310,6 +310,15 @@ impl Vram {
         self.writer_of(self.owners[y * VRAM_WIDTH + x])
     }
 
+    /// How the word at `x`, `y` reached VRAM, if anything wrote it.
+    pub fn kind(&self, x: usize, y: usize) -> Option<Kind> {
+        if x >= VRAM_WIDTH || y >= VRAM_HEIGHT {
+            return None;
+        }
+        let owner = self.owners[y * VRAM_WIDTH + x];
+        owner.checked_sub(1).and_then(|index| self.kinds.get(index as usize).copied())
+    }
+
     /// The one entry that wrote every word of the rectangle, or `None` when a word is unwritten,
     /// the rectangle leaves VRAM, or two entries share it.
     pub fn sole_writer(&self, x: usize, y: usize, width: usize, height: usize) -> Option<&Writer> {

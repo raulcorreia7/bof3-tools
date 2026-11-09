@@ -1,8 +1,8 @@
-//! The palette joins over the retail archives: 212 textures and 890 rows.
+//! The palette joins over the retail archives: 202 textures and 882 rows.
 //!
 //! The test skips when no retail archive directory is present. Set `BOF3_EMI_ROOT` to a
 //! directory of `.EMI` containers, or place them at the checkout's `raw/disc/BIN`. The counts
-//! are `tasks/gfx-1/eval_joins.py --total`: the world-map terrain rule plus the literal sites.
+//! are the world-map terrain rule plus the literal sites (`rebof3_emi::texture::SITES`).
 //!
 //! Every joined row is written to the test artifacts as its palette-applied PNG and its TIM, so
 //! the result can be inspected by eye (`target/tmp/retail_textures_join_their_proven_palette_rows`).
@@ -20,9 +20,9 @@ use rebof3_emi::texture::ResidentBank;
 /// The path of the retail archives, relative to the checkout root.
 const RETAIL_SUFFIX: &str = "raw/disc/BIN";
 
-/// The proven palette joins: 212 textures and 890 rows.
-const TEXTURES: usize = 212;
-const ROWS: usize = 890;
+/// The proven palette joins: 202 textures and 882 rows.
+const TEXTURES: usize = 202;
+const ROWS: usize = 882;
 
 /// The retail archive root: `BOF3_EMI_ROOT` when set, otherwise the checkout's
 /// `raw/disc/BIN` found by walking up from the crate directory.
