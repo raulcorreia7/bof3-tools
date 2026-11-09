@@ -3,7 +3,7 @@
 //! The ADPCM of a sample is lossy, so the first import is not the stored bank. The gate is the second round trip:
 //! importing what an export of an imported bank gives reproduces that bank byte for byte, and its SoundFont
 //! holds the same zones and frames. The disc test skips when no disc image is present. Point `BOF3_DISC_IMAGE`
-//! at its cue sheet, or place the image in the checkout's `inputs/external`.
+//! at its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -28,7 +28,6 @@ fn without_names(mut font: SoundFont) -> SoundFont {
 #[test]
 fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping SoundFont round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("soundfont-retail_banks_take_a_second_round_trip_to_the_same_bank");

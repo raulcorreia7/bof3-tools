@@ -24,7 +24,10 @@ Run from this folder before every report. CI runs the same checks:
 make check
 ```
 
-`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests.
+`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. Retail tests skip
+when `BOF3_DISC_DIR` (extracted disc) or `BOF3_DISC_IMAGE` (cue sheet) is unset, so a green
+`make check` alone proves nothing about retail data. Run `make check-retail` with both set: it sets
+`BOF3_REQUIRE_RETAIL=1` and any skip fails.
 
 ## Rules
 

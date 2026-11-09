@@ -8,7 +8,6 @@ use rebof3_assets::coverage;
 #[test]
 fn every_retail_sprite_bank_palette_table_round_trips() {
     let Some(cue) = support::retail_image() else {
-        eprintln!("skipping the sprite palettes: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let palettes = coverage::run(&cue).expect("the disc is read").palettes;

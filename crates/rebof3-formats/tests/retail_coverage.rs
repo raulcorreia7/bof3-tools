@@ -3,7 +3,7 @@
 //!
 //! The totals come from the US `Breath of Fire III (USA)` archives (`wiki: formats/emi`). Like the
 //! other archive gates this one skips when it cannot find the retail archives;
-//! `support::retail_root` owns the lookup and honours `BOF3_EMI_ROOT`.
+//! `support::retail_root` owns the lookup and honours `BOF3_DISC_DIR` (the archives are `BIN/` below it).
 
 mod support;
 
@@ -32,7 +32,6 @@ const RESERVE_BYTES: u64 = 765_896;
 #[test]
 fn retail_coverage_reaches_the_pinned_totals() {
     let Some(root) = support::retail_root() else {
-        eprintln!("skipping coverage gate: no retail archives below the checkout");
         return;
     };
 

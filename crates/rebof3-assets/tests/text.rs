@@ -38,7 +38,6 @@ fn message_banks(cue: &Path) -> Vec<(String, usize, Vec<u8>)> {
 #[test]
 fn every_message_bank_on_the_retail_disc_exports_and_imports_to_its_own_bytes() {
     let Some(cue) = support::retail_image() else {
-        eprintln!("skipping message banks: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let banks = message_banks(&cue);
@@ -66,7 +65,6 @@ fn every_message_bank_on_the_retail_disc_exports_and_imports_to_its_own_bytes() 
 #[test]
 fn the_retail_banks_rebuild_their_archives_and_patch_the_disc_to_its_own_bytes() {
     let Some(cue) = support::retail_image() else {
-        eprintln!("skipping the message chain: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let mut image = Image::open(&cue).expect("the disc opens");

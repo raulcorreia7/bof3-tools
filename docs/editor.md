@@ -12,7 +12,7 @@ it back. An entry no view changes keeps its stored bytes.
 ## Formats
 
 The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip without
-`BOF3_DISC_DIR`.
+`BOF3_DISC_DIR` (and fail under `BOF3_REQUIRE_RETAIL=1`).
 
 | Format | Entries | View | Edit | Round-trip test | Gap or reason |
 | ------ | ------: | ---- | ---- | --------------- | ------------- |

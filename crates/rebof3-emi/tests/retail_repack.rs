@@ -1,7 +1,7 @@
 //! Whole-archive pack gate: extract, repack, and compare every retail archive.
 //!
 //! The test skips when it cannot find the retail archives; `support::retail_root`
-//! owns the lookup and honours `BOF3_EMI_ROOT`. Two walks run: the on-disk one
+//! owns the lookup and reads `BOF3_DISC_DIR`. Two walks run: the on-disk one
 //! (extract to files, write `emi.json`, `pack_manifest`) and the in-memory one
 //! the `coverage` verb runs (`verify::container_round_trip`).
 
@@ -14,10 +14,6 @@ use rebof3_emi::{Archive, archives_under, pack_manifest, verify};
 #[test]
 fn retail_repack_is_byte_identical() {
     let Some(root) = support::retail_root() else {
-        eprintln!(
-            "skipping repack gate: no retail archives below the checkout \
-             (set BOF3_EMI_ROOT to a directory of .EMI containers)"
-        );
         return;
     };
 

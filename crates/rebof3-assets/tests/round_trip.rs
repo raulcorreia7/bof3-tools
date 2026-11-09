@@ -1,7 +1,7 @@
 //! Export then import, byte for byte, over the texture kind of the retail disc.
 //!
 //! The test skips when no disc image is present. Point `BOF3_DISC_IMAGE` at its
-//! cue sheet, or place the image in the checkout's `inputs/external`.
+//! cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -39,7 +39,6 @@ fn holds_run(bytes: &[u8], needle: &[u16]) -> bool {
 #[test]
 fn retail_textures_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping texture round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_textures_round_trip_byte_exactly");
@@ -134,7 +133,6 @@ fn retail_textures_round_trip_byte_exactly() {
 #[test]
 fn retail_terrains_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping terrain round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_terrains_round_trip_byte_exactly");
@@ -177,7 +175,6 @@ fn retail_terrains_round_trip_byte_exactly() {
 #[test]
 fn retail_vags_round_trip_through_adpcm() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping VAG round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_vags_round_trip_through_adpcm");
@@ -245,7 +242,6 @@ fn retail_vags_round_trip_through_adpcm() {
 #[test]
 fn retail_tables_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping table round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_tables_round_trip_byte_exactly");
@@ -293,7 +289,6 @@ fn retail_tables_round_trip_byte_exactly() {
 #[test]
 fn retail_encounters_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping encounter round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_encounters_round_trip_byte_exactly");
@@ -337,7 +332,6 @@ fn retail_encounters_round_trip_byte_exactly() {
 #[test]
 fn retail_map_layouts_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping map layout round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_map_layouts_round_trip_byte_exactly");
@@ -381,7 +375,6 @@ fn retail_map_layouts_round_trip_byte_exactly() {
 #[test]
 fn retail_emi_containers_rebuild_byte_exactly() {
     let Some(image_path) = support::retail_image() else {
-        eprintln!("skipping EMI rebuild: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let mut image = psx_cd::Image::open(&image_path).unwrap();
@@ -430,7 +423,6 @@ fn retail_emi_containers_rebuild_byte_exactly() {
 #[test]
 fn retail_sequences_round_trip_through_midi() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping sequence round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_sequences_round_trip_through_midi");

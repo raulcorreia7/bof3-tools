@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn a_retail_scene_replays_with_the_projects_edits() {
         use crate::project::{ArchivePath, Project};
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-vram-{}", std::process::id()));
         let mut project = Project::open(disc.as_ref(), &folder).expect("project opens");
         let area = "BIN/WORLD00/AREA024.EMI";

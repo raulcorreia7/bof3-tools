@@ -16,10 +16,6 @@ use support::{collect_archives, retail_root};
 #[test]
 fn map_bundles_reencode_exactly_and_report_their_size() {
     let Some(root) = retail_root() else {
-        eprintln!(
-            "skipping map gate: no retail EMI archives at <ancestor>/raw/disc/BIN \
-             (set BOF3_EMI_ROOT to a directory of .EMI containers)"
-        );
         return;
     };
     let mut archives = Vec::new();

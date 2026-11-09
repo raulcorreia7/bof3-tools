@@ -408,8 +408,8 @@ mod tests {
     /// disc; without it the test skips.
     #[gpui::test]
     fn a_retail_area_map_draws_textured(cx: &mut TestAppContext) {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR").map(std::path::PathBuf::from) else {
-            return eprintln!("skipping: set BOF3_DISC_DIR");
+        let Some(disc) = crate::retail_support::retail_disc() else {
+            return;
         };
         let folder = std::env::temp_dir().join(format!("bof3-edit-map-{}", std::process::id()));
         let project = folder.clone();

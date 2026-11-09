@@ -5,6 +5,8 @@
 //! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the test
 //! skips.
 
+mod support;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,8 +23,8 @@ struct Disc {
 
 impl Disc {
     fn open() -> Option<Self> {
-        let root = PathBuf::from(std::env::var_os("BOF3_DISC_DIR")?);
-        root.join("BIN").is_dir().then(|| Self { root, archives: BTreeMap::new() })
+        let root = support::retail_disc()?;
+        Some(Self { root, archives: BTreeMap::new() })
     }
 
     fn paths(&self) -> Vec<String> {
@@ -71,7 +73,7 @@ fn collect(root: &Path, folder: &Path, out: &mut Vec<String>) {
 
 #[test]
 fn retail_scenes_replay_and_place_every_upload() {
-    let Some(mut disc) = Disc::open() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(mut disc) = Disc::open() else { return };
     let paths = disc.paths();
     let catalog = scenes::catalog(paths.iter().map(String::as_str));
     assert!(catalog.len() > 200, "{} scenes", catalog.len());
@@ -123,7 +125,7 @@ fn retail_scenes_replay_and_place_every_upload() {
 /// The joins the archive-only rule proves (`texture::joins`) hold in the replayed VRAM too.
 #[test]
 fn retail_replay_agrees_with_the_proven_joins() {
-    let Some(mut disc) = Disc::open() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(mut disc) = Disc::open() else { return };
 
     // AREA024: the literal site's 4-bit page (704, 256) is entry 7, and row (160, 483) is bank 8.
     let area = "BIN/WORLD00/AREA024.EMI";
@@ -153,7 +155,7 @@ fn retail_joins_and_the_suggestion_scorer() {
     use rebof3_formats::{Format, classify};
     use std::collections::{BTreeMap, BTreeSet};
 
-    let Some(mut disc) = Disc::open() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(mut disc) = Disc::open() else { return };
     let paths = disc.paths();
     // Known joins per texture: (depth bits, clut) pairs, from the texture's home scene.
     let mut known: BTreeMap<(String, usize), Rows> = BTreeMap::new();

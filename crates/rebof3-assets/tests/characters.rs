@@ -12,7 +12,6 @@ use rebof3_emi::characters::{self, CHARACTERS};
 #[test]
 fn the_retail_characters_have_their_names_and_round_trip() {
     let Some(cue) = support::retail_image() else {
-        eprintln!("skipping the characters: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let mut image = Image::open(&cue).expect("the disc opens");

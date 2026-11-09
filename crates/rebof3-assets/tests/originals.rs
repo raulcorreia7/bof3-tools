@@ -2,7 +2,7 @@
 //! slices, and every kind with a codec comes back to its own bytes.
 //!
 //! The test skips when the disc image is not there. Point `BOF3_DISC_IMAGE` at
-//! its cue sheet, or place the image in the checkout's `inputs/external`.
+//! its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -105,7 +105,6 @@ fn beside(path: &Path, name: &str) -> Option<PathBuf> {
 fn the_catalog_hashes_match_the_disc_slices() {
     let _finished = Finished;
     let Some(extracted) = extracted() else {
-        eprintln!("skipping the catalog hash check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let Some(image) = support::retail_image() else {
@@ -147,7 +146,6 @@ fn the_catalog_hashes_match_the_disc_slices() {
 fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
     let _finished = Finished;
     let Some(extracted) = extracted() else {
-        eprintln!("skipping the round trip check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let tree = &extracted.tree;
@@ -329,7 +327,6 @@ fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) 
 #[test]
 fn raw_mode_writes_the_disc_bytes_of_every_kind() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping the raw mode check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let directory = support::scratch_dir("originals-raw");

@@ -683,7 +683,7 @@ mod tests {
     /// stored. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_sample_imports_back_in_place() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-samples-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 
@@ -714,7 +714,7 @@ mod tests {
     /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_sequence_imports_back_from_its_midi() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-midi-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

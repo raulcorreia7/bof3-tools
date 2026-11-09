@@ -215,7 +215,7 @@ mod tests {
     /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_color_edit_rewrites_only_its_word() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-palette-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

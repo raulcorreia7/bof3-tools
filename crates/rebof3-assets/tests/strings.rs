@@ -12,7 +12,6 @@ use rebof3_emi::text::discover;
 #[test]
 fn every_string_payload_on_the_retail_disc_exports_and_imports_to_its_own_bytes() {
     let Some(cue) = support::retail_image() else {
-        eprintln!("skipping the strings: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let mut image = Image::open(&cue).expect("the disc opens");
