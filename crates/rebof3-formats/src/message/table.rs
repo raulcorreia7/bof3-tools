@@ -1,4 +1,9 @@
-//! Message tables.
+//! Message tables: a `u16` offset table, then the messages it points at.
+//!
+//! `offset[0]` is the table's length in bytes, so the table holds `offset[0] / 2` slots. A slot holds the offset of
+//! its message, and a message runs to the next distinct offset. The slots past the last message point at the end of
+//! the table. The table is the table, then the messages in offset order, so the messages and the slot map rebuild it
+//! exactly. [`parse`] refuses a layout that this rule does not describe.
 
 use std::collections::BTreeMap;
 
@@ -44,7 +49,8 @@ pub struct Message {
     pub kind: String,
 }
 
-/// The JSON form.
+/// The JSON form: the payload size, one row per message, and the slot map. A slot is `null` when it
+/// points past the last message.
 #[derive(Debug, Deserialize, Serialize)]
 struct Document {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -135,8 +141,9 @@ pub fn build(table: &Table) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// The most bytes a table may hold.
+/// The most bytes a table may hold: it loads at `0x8001_0000` and the resource table starts at `0x8001_A000`
 /// (`Message_GetText (exe/slus_004_22@0x801502D0)` reads the table and the table from those addresses), so the
+/// table has `0xA000` bytes before it runs into the table.
 pub const LIMIT: usize = 0xA000;
 
 /// [`build`], refusing a table that no longer fits the space the game gives it, with the reason.
@@ -153,7 +160,8 @@ pub fn build_within_limit(table: &Table) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// The table as JSON.
+/// The table as JSON: each message decoded with its control codes kept, and the slot map. Refuses a table that
+/// [`build`] would not lay out to the same bytes.
 pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     export_counted(payload, None).map(|(json, _, _)| json)
 }

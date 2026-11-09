@@ -1,4 +1,14 @@
 //! Format coverage scoreboard over the retail archives.
+//!
+//! One row per entry format: how many entries and bytes the retail archives
+//! hold, what this crate can do with them (a decode → encode codec, a
+//! documented layout without a codec, or nothing yet), and what the codec gate
+//! observed. The `coverage` verb prints the scoreboard and writes the
+//! `coverage.jsonl` table; the `retail_coverage` test asserts the pinned totals.
+//!
+//! Format selection reads the entry header — file type plus load address —
+//! plus one payload property, an all-zero body, which is the reserved-slot
+//! shape the asset census counts on its own. Names and addresses come from
 //! `wiki: formats/area`, `wiki: formats/audio`,
 //! `wiki: formats/graphics`, `wiki: data/text` and the `wiki: formats/assets` catalog.
 
@@ -153,7 +163,8 @@ impl Report {
         out
     }
 
-    /// The scoreboard as the `coverage.jsonl` table.
+    /// The scoreboard as the `coverage.jsonl` table: one JSON object per
+    /// format, then the total.
     pub fn jsonl(&self) -> String {
         let mut out = String::new();
         for format in Format::ALL {
@@ -178,7 +189,8 @@ impl Report {
         out
     }
 
-    /// Counts one entry, runs its codec when the format has one, and records the result.
+    /// Counts one entry, runs its codec when the format has one, and records
+    /// the result.
     fn record(&mut self, source: &str, index: usize, entry: &Entry, payload: &[u8], banks: &BankResults) {
         let format = classify(entry, payload);
         let row = &mut self.rows[format as usize];
@@ -207,7 +219,8 @@ impl Report {
     }
 }
 
-/// Checks the retail archives.
+/// Checks the retail archives: every entry's format, its codec round trip, and
+/// the container round trip of every archive.
 pub fn check(root: &Path) -> Result<Report> {
     let archives = archives_under(root);
     if archives.is_empty() {
@@ -226,7 +239,8 @@ pub fn check(root: &Path) -> Result<Report> {
 }
 
 impl Report {
-    /// Checks one container held in memory.
+    /// Checks one container held in memory: the format and codec round trip of
+    /// every entry, then the container round trip. `label` names it in failures.
     pub fn check_archive(&mut self, label: &str, bytes: &[u8]) {
         let Some(archive) = self.container.check(label, bytes) else {
             return;
@@ -241,7 +255,8 @@ impl Report {
     }
 }
 
-/// Round trip results of an archive's VAB banks, keyed by entry index.
+/// Round trip results of an archive's VAB banks, keyed by entry index: a body
+/// is covered when the header that carries it rebuilds both byte runs.
 #[derive(Default)]
 struct BankResults {
     outcomes: BTreeMap<usize, std::result::Result<(), String>>,

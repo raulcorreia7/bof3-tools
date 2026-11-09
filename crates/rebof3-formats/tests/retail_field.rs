@@ -1,4 +1,6 @@
-//! The field readers over the retail disc.
+//! The field readers over the retail disc: every area's setup stream walks to its end, its records'
+//! scene ids name rows of the area's own scene table, the record lengths are the game's own table, and
+//! every area has an encounter zone list.
 
 mod support;
 

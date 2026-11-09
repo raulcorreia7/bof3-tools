@@ -1,5 +1,12 @@
-//! The Psy-Q sequence files.
 //! The Psy-Q sequence files: SEP (a package of sequences) and SEQ (one sequence), as Sony's *File
+//! Formats* manual, chapter 4, lays them out. A studio exchanged both between its sound tools.
+//!
+//! The game stores a package as a SEP: `pQES`, a 16-bit version, then per sequence a 13-byte header
+//! (id, resolution, tempo, rhythm, data size) and the score data. A SEQ file is one such sequence with
+//! its own header: `pQES`, a 32-bit version, the resolution, the tempo, the rhythm and the score data
+//! to the end of the file. It has no id and no data size, so the id belongs to the package.
+//!
+//! Generic codecs for both belong in `psx-formats`; this module holds them until that crate has them.
 
 use psx_formats::sep::{Package, Sequence};
 
@@ -7,8 +14,8 @@ use crate::error::{Error, Result};
 
 /// The `pQES` magic both files open with, in file order.
 const MAGIC: &[u8; 4] = b"pQES";
-/// The version a SEQ file declares (the manual gives the field as four bytes and no value.
 /// The version a SEQ file declares (the manual gives the field as four bytes and no value; Sony's
+/// sequencer files carry 1).
 const SEQ_VERSION: u32 = 1;
 /// A SEQ file's header: magic, version, resolution, tempo and rhythm.
 const SEQ_HEADER: usize = 15;
@@ -19,7 +26,8 @@ const SEQUENCE_HEADER: usize = 13;
 /// The bytes of a sequence header that a SEQ file shares: resolution, tempo and rhythm.
 const SHARED: std::ops::Range<usize> = 2..9;
 
-/// The package as a SEP file.
+/// The package as a SEP file. The stored package is that file, so the bytes come back unchanged once
+/// they parse as a package.
 pub fn export_sep(package: &[u8]) -> Result<Vec<u8>> {
     let parsed = Package::parse(package)?;
     check(&parsed)?;

@@ -34,6 +34,8 @@ pub fn document(payload: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// One fixed table of `ETC/GAME.EMI` entry 0, from its JSON records (`<name>.json`, an array of the records).
+/// `base` holds the table's stored bytes. Each named field is written over its base record, so the bytes no
+/// field names keep their stored values, and a name keeps its stored bytes while its text is unchanged.
 pub fn import(table: &str, json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
     let descriptor = *TABLES
         .iter()

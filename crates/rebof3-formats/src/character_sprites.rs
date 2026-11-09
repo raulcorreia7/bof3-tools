@@ -1,4 +1,4 @@
-//! The character sprites, stored as a type-1 LZ77 blob or as a raw type-0 container (`wiki.
+//! The character sprites, stored as a type-1 LZ77 blob or as a raw type-0 container
 //! (`wiki: formats/character#container`).
 
 use rebof3_emi::{TYPE_LZ77, lz77};
@@ -6,7 +6,7 @@ use rebof3_emi::{TYPE_LZ77, lz77};
 use crate::error::Result;
 use crate::registry::{Derived, Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
-/// Load arguments of the raw sprites.
+/// Load arguments of the raw sprites: the whole container and the five section positions
 /// (`wiki: formats/character#load-arguments`).
 const RAW_ADDRESSES: [u32; 6] = [0x8003_b800, 0x8003_b80c, 0x8005_680c, 0x8005_f80c, 0x8007_180c, 0x8007_a80c];
 

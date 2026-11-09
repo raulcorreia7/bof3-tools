@@ -3,10 +3,10 @@
 //!
 //! The mesh builder `func_801530D0` (`exe/slus_004_22@0x801530D0`) walks the visible cells, projects
 //! each cell's four corners and links one `POLY_FT4` per cell into the ordering table. Two more rows
-//! hang off a cell (`+0x46` and `+0x4E` of its primitive row).
+//! hang off a cell (`+0x46` and `+0x4E` of its primitive row):
 //!
 //! - the **east wall**, allocated when the east neighbour's corner 0 is below this cell's corner 1 or
-//!   its corner 2 is below this cell's corner 3 (`@0x801534B4`-`@0x801534D8`).
+//!   its corner 2 is below this cell's corner 3 (`@0x801534B4`-`@0x801534D8`);
 //! - the **south wall**, allocated when the south neighbour's corner 0 is below this cell's corner 2 or
 //!   its corner 1 is below this cell's corner 3 (`@0x801534FC`-`@0x80153530`).
 //!
@@ -16,7 +16,7 @@
 //! `Area_GetCell` (`@0x801541C0`) reports only the cells strictly inside the bundle (column `1` to
 //! `width - 2`, row `1` to `height - 2`) with a non-zero grid value, so the border is never drawn.
 //!
-//! The tile setter `func_80155560` (`@0x80155560`) turns a descriptor into the primitive.
+//! The tile setter `func_80155560` (`@0x80155560`) turns a descriptor into the primitive:
 //!
 //! | Bits | Field | Primitive |
 //! | ---- | ----- | --------- |
@@ -56,13 +56,16 @@ const SHADE_SHIFT: u32 = 16;
 const SHADE_MASK: u32 = 0xF8;
 /// The bit that defers a cell to the depth-sorted list (`func_801530D0`, flag `0x4000`).
 const SORTED_BIT: u32 = 1 << 14;
-/// The bit that links a cell into its row's second ordering-table slot (`Area_UploadCell` folds it to flag
+/// The bit that links a cell into its row's second ordering-table slot (`Area_UploadCell` folds it to
+/// flag `0x8000`).
 const FRONT_BIT: u32 = 1 << 30;
 
-/// The field camera the area init sets and `Area_UpdateCamera` (`exe/slus_004_22@0x801527E4`) applies every
+/// The field camera the area init sets and `Area_UpdateCamera` (`exe/slus_004_22@0x801527E4`) applies
+/// every frame: `RotMatrix(angle)`, a translation that centres the followed point, and the projection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GameCamera {
-    /// `g_AreaCameraAngle` as `func_80153DE8` seeds it, in GTE units (4096 a turn).
+    /// `g_AreaCameraAngle` as `func_80153DE8` seeds it, in GTE units (4096 a turn). Scripts turn it
+    /// later (`Area_TurnCameraX` and its kin), so this is the camera an area opens with.
     pub angle: [i32; 3],
     /// The projection distance `H` (`SetGeomScreen(1000)` in `func_80153DE8`).
     pub focal: i32,
@@ -76,13 +79,18 @@ pub struct GameCamera {
 pub const GAME_CAMERA: GameCamera =
     GameCamera { angle: [-682, 0, 0x200], focal: 1000, offset: [160, 120], distance: 0x1194 };
 
-/// A model point in the GTE's world space.
+/// A model point in the GTE's world space: `x` and `z` move to the GTE's `x` and `y`, and up is the
+/// GTE's negative `z` (`func_801530D0`: `vz = -corner * 16`). The cell origin offset is left out:
+/// it cancels against the camera's translation.
 pub fn to_gte(model: [i32; 3]) -> [i32; 3] {
     [model[0], model[2], -model[1]]
 }
 
-/// The ground under a point `x2`, `y2` half cells in, in renderer units.
+/// The ground under a point `x2`, `y2` half cells in, in renderer units: `Area_SampleHeight`
 /// (`exe/slus_004_22@0x8015477C`; the C is a draft, the shifts are read from its asm) with the
+/// height-byte offset off, halved as the actor projection halves it. At a cell's centre it is the sum of
+/// corners 1 and 2; half a cell on in `x` the larger of the sums that meet at the edge, and likewise in
+/// `y`; at a corner the largest of the four corners that meet there. Outside the grid it is 0.
 pub fn ground(bundle: &MapBundle, x2: u16, y2: u16) -> i32 {
     let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
     let (x, y) = (usize::from(x2 / 2), usize::from(y2 / 2));
@@ -108,14 +116,16 @@ pub fn ground(bundle: &MapBundle, x2: u16, y2: u16) -> i32 {
     steps * HEIGHT_SCALE / 2
 }
 
-/// The renderer position of an actor at `x2`, `y2` half cells.
+/// The renderer position of an actor at `x2`, `y2` half cells: a whole cell puts it on the cell's
+/// centre, half a cell on the edge (the actor projection `vx = (x >> 9) - 0x4000` against the mesh's
+/// `x * 0x80 - 0x4040`).
 pub fn actor_position(bundle: &MapBundle, x2: u16, y2: u16) -> [i32; 3] {
     let half = CELL_UNITS / 2;
     [i32::from(x2) * half + half, ground(bundle, x2, y2), i32::from(y2) * half + half]
 }
 
-/// How a semi-transparent texel mixes with what is behind it.
 /// How a semi-transparent texel mixes with what is behind it: the GPU's four modes (psx-spx, "GPU
+/// Texpage Attribute", bits 5-6), `B` the colour behind and `F` the texel.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Blend {
     /// `B / 2 + F / 2`.
@@ -174,7 +184,9 @@ pub struct Tile {
 }
 
 impl Tile {
-    /// The tile of descriptor `index` of the bundle, or `None` past the table.
+    /// The tile of descriptor `index` of the bundle, or `None` past the table. A `0` word is drawn
+    /// too, as `func_80155560` reads it: block 0 of page 0 through CLUT row 483 at grey level 0,
+    /// which leaves every texel but the transparent one black.
     pub fn of(bundle: &MapBundle, index: usize) -> Option<Self> {
         let descriptor = *bundle.records.get(index)?;
         let (page_x, page_y, clut, depth) = terrain_descriptor(descriptor).unwrap_or((
@@ -320,13 +332,15 @@ pub struct Quad {
     /// The cell, `row * width + column`.
     pub cell: usize,
     pub face: Face,
-    /// The corners `[x, y, z]` in renderer units, in primitive order.
+    /// The corners `[x, y, z]` in renderer units, in primitive order: the GPU draws the triangles of
+    /// corners 0, 1, 2 and 1, 2, 3.
     pub corners: [[i32; 3]; 4],
     /// The tile, `None` when the descriptor index is past the table.
     pub tile: Option<Tile>,
 }
 
-/// The quads the field renderer draws for a bundle, cell by cell in row-major order.
+/// The quads the field renderer draws for a bundle, cell by cell in row-major order: the top, then
+/// the east wall, then the south wall.
 pub fn quads(bundle: &MapBundle) -> Vec<Quad> {
     let mut quads = Vec::new();
     for cell in 0..bundle.cells.len() {
@@ -342,12 +356,14 @@ pub fn quads_of_cell(bundle: &MapBundle, cell: usize) -> Vec<Quad> {
     quads
 }
 
-/// The descriptor words a cell's rows take, in [`quads`] order.
+/// The descriptor words a cell's rows take, in [`quads`] order: its top, its east wall and its
+/// south wall, as `Area_UploadCell` reads them. Empty for a cell the renderer does not draw.
 pub fn descriptor_indices(bundle: &MapBundle, cell: usize) -> Vec<(Face, usize)> {
     quads_of_cell(bundle, cell).into_iter().filter_map(|quad| Some((quad.face, quad.tile?.index))).collect()
 }
 
-/// Whether the field renderer draws `cell`:
+/// Whether the field renderer draws `cell`: strictly inside the bundle, with a grid value that names
+/// a descriptor (`Area_GetCell`, `func_801530D0`).
 pub fn is_drawn(bundle: &MapBundle, cell: usize) -> bool {
     let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
     let (column, row) = (cell % width.max(1), cell / width.max(1));
@@ -397,7 +413,8 @@ mod tests {
     use super::*;
     use crate::map::Cell;
 
-    /// A 4 x 4 bundle whose inner 2 x 2 cells have tiles.
+    /// A 4 x 4 bundle whose inner 2 x 2 cells have tiles; cell (1, 1) is 2 steps high and its
+    /// neighbours flat, so it has an east and a south wall.
     fn bundle() -> MapBundle {
         let mut cells = vec![Cell { heights: [0; 4] }; 16];
         cells[5] = Cell { heights: [2; 4] };

@@ -1,4 +1,4 @@
-//! The VRAM texture upload (entry type 3).
+//! The VRAM texture upload (entry type 3): rectangles of 16-bit words the loader copies into the
 //! frame buffer (`wiki: formats/graphics#chunk-layout`).
 
 use psx_formats::gfx::texture::{self, Clut, Depth, texel_indices};
@@ -37,7 +37,8 @@ fn round_trip(entry: &Entry, payload: &[u8]) -> Result<(), String> {
 fn open(site: &Site<'_>) -> Extras {
     let mut extras = Extras::default();
     if site.rows.is_empty() {
-        // No rule joins the texture to a palette row, so the TIM carries no CLUT:
+        // No rule joins the texture to a palette row, so the TIM carries no CLUT: guessing one would
+        // put a placement in the header that the game never states.
         match texture_tim_direct(site.entry().ram_ptr, site.payload()) {
             Ok(data) => extras.files.push(Extra {
                 role: "tim",
@@ -87,7 +88,8 @@ fn derive(load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
 pub struct RowUse {
     /// The EMI slot of the CLUT block that holds the row.
     pub palette: usize,
-    /// The disc path of the archive that loads the block.
+    /// The disc path of the archive that loads the block; the texture's own archive,
+    /// unless the row came from another archive of the resident set.
     pub palette_archive: String,
     /// The row's VRAM position.
     pub clut: Clut,
@@ -132,7 +134,8 @@ pub struct RowFile {
     pub evidence: String,
     /// The PNG bytes.
     pub data: Vec<u8>,
-    /// The standard PS1 TIM file of the same row.
+    /// The standard PS1 TIM file of the same row: the texture's VRAM words as
+    /// the image and the row's color words as the CLUT.
     pub tim: Option<Vec<u8>>,
 }
 
@@ -165,12 +168,18 @@ pub fn texture_words(load_arg: u32, payload: &[u8]) -> Result<TextureWords> {
     })
 }
 
-/// The standard PS1 TIM file of a texture read in one palette row.
+/// The standard PS1 TIM file of a texture read in one palette row: the
+/// texture's VRAM words as the image and the row's color words as the CLUT.
+///
+/// The game stores no TIM, but a texture and its palette are what a TIM
+/// holds, so the file is exact: the words are the words the disc stores.
 pub fn texture_tim(load_arg: u32, payload: &[u8], row: &RowUse) -> Result<Vec<u8>> {
     texture_tim_of(load_arg, payload, row.depth.bits(), &row.words, row.clut.x, row.clut.y)
 }
 
-/// The standard PS1 TIM file of a texture drawn with one CLUT row.
+/// The standard PS1 TIM file of a texture drawn with one CLUT row: `bits` is
+/// 4 or 8, `words` is the row's color words, and `clut_x` and `clut_y` are the
+/// row's place in the frame buffer.
 pub fn texture_tim_of(
     load_arg: u32,
     payload: &[u8],
@@ -207,8 +216,11 @@ pub fn texture_tim_of(
     Ok(tim.write())
 }
 
-/// The TIM of a texture with no CLUT.
+/// The TIM of a texture with no CLUT: the upload's VRAM words as a 15-bit image at the place its load
 /// argument gives (Sony *File Formats*, chapter 3, "TIM": the pixel mode field `2` has no CLUT block).
+///
+/// This is the file for a texture no rule joins to a palette row: the header names no CLUT, because the
+/// game states none. The words are the words the disc stores, so [`import_tim`] returns the payload.
 pub fn texture_tim_direct(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
     let descriptor = vram::Descriptor::from_load_argument(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
@@ -227,8 +239,8 @@ pub fn texture_tim_direct(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
     Ok(tim.write())
 }
 
-/// Where a type-3 upload lands.
 /// Where a type-3 upload lands: the three fields of its load argument (`wiki: formats/graphics`). The
+/// upload is whole 32-by-32-word rectangles on a 32-word, 32-row grid, `chunks_per_row` of them to a row.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Placement {
     /// The first rectangle's column, in 32-word units (6 bits; VRAM holds 32).
@@ -271,7 +283,8 @@ impl Placement {
             | u32::from(self.chunks_per_row) << 8
     }
 
-    /// The same upload with its top-left rectangle at VRAM `column` and `row` (32-word and 32-row units), or `None`
+    /// The same upload with its top-left rectangle at VRAM `column` and `row` (32-word and 32-row units),
+    /// or `None` when `rectangles` of it would leave the frame buffer.
     pub fn moved(self, column: u8, row: u8, rectangles: usize) -> Option<Self> {
         let per_row = usize::from(self.chunks_per_row).max(1);
         let rows = rectangles.div_ceil(per_row);
@@ -312,6 +325,12 @@ pub struct TimTexture {
 }
 
 /// Reads a TIM file as a texture upload (Sony *File Formats*, chapter 3, "TIM").
+///
+/// The image block's words are the upload's words, so a TIM that [`texture_tim`] or [`texture_tim_direct`]
+/// wrote returns the payload byte for byte. The game uploads whole 32-by-32-word rectangles on a 32-word,
+/// 32-row grid; a TIM whose image is not that shape is refused with its size, because padding it would put
+/// words in the texture that the TIM does not hold. An image that leaves the 1024-by-512 frame buffer is
+/// kept, as the disc keeps it: the loader skips those rectangles.
 pub fn import_tim(bytes: &[u8]) -> Result<TimTexture> {
     let file = tim::File::read(bytes)?;
     let image = &file.image;
@@ -324,6 +343,8 @@ pub fn import_tim(bytes: &[u8]) -> Result<TimTexture> {
             "the TIM image is {width} by {height} words at ({x}, {y}); a texture upload is whole {side} by {side}              word rectangles on a {side}-word grid, so size and place the image to multiples of {side}"
         )));
     }
+    // The loader skips the rectangles of a retail upload that leave the frame buffer, so the TIM keeps
+    // them: only what the load argument cannot name is refused.
     if x / side > 0x3f || y / side > 0x1f {
         return Err(Error::Import(format!(
             "the TIM image at ({x}, {y}) is past the place a load argument can name (column 63, row 31)"
@@ -372,13 +393,15 @@ pub fn indexed_images(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> Result<
         .collect())
 }
 
-/// The 16 bpp view of a texture upload, as the export writes it (`<slot>.png`), from the payload and its load
+/// The 16 bpp view of a texture upload, as the export writes it (`<slot>.png`), from the payload and
+/// its load argument.
 pub fn texture_view_png(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
     let image = vram::upload_image(payload, vram::Descriptor::from_load_argument(load_arg))?;
     Ok(png::rgba_png(image.width, image.height, &image.rgba))
 }
 
-/// The indexed PNG of a texture upload drawn with one palette row.
+/// The indexed PNG of a texture upload drawn with one palette row: `bits` is 4 or 8, and `palette` holds
+/// the row's `2^bits` color words. This is the export of [`indexed_rows`] for a row given by its words.
 pub fn texture_row_png(load_arg: u32, payload: &[u8], bits: u32, palette: &[u16]) -> Result<Vec<u8>> {
     let depth = match bits {
         4 => Depth::Four,
@@ -425,7 +448,8 @@ pub fn indexed_rows(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> Result<Ve
         .collect())
 }
 
-/// A texture read back from an indexed row.
+/// A texture read back from an indexed row: its payload and the CLUT row its
+/// texels are drawn with.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexedTexture {
     /// The type-3 payload, as stored.
@@ -446,6 +470,9 @@ pub enum TextureImport {
 }
 
 /// Reads a texture PNG that the export wrote, as its stored payload.
+///
+/// A view returns every word exactly, STP included. An indexed row packs its
+/// texels back into words of its depth, and its colors return as color words.
 pub fn import(bytes: &[u8]) -> Result<TextureImport> {
     Ok(match png::read(bytes)? {
         png::Picture::Rgba(picture) => {

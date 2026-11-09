@@ -1,4 +1,8 @@
-//! The strings that a documented table places, rather than a scan.
+//! The strings that a documented table places, rather than a scan: the fixed game tables of
+//! `ETC/GAME.EMI` entry 0, the base-stat character names, and the enemy names of an area encounter
+//! block.
+//!
+//! Each row carries its table and record index, so a string in the output can be read back as the
 //! game data that owns it. The layouts are in `wiki: data/records#gameemi-fixed-tables`,
 //! `wiki: data/records#character-and-master-data` and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`.
 

@@ -43,7 +43,8 @@ pub struct Font {
 }
 
 impl Font {
-    /// Builds the font from the three `FIRST.EMI` payloads.
+    /// Builds the font from the three `FIRST.EMI` payloads. `sheet_load_argument` is the sheet entry's load
+    /// argument. Returns `None` when the sheet is not a whole page or a palette is shorter than a cell.
     pub fn new(sheet: &[u8], sheet_load_argument: u32, text_palette: &[u8], frame_palette: &[u8]) -> Option<Self> {
         let grid = word_grid(sheet, Descriptor::from_load_argument(sheet_load_argument)).ok()?;
         let texels = texel_indices(&grid.words, Depth::Four);
@@ -80,7 +81,8 @@ fn words(bytes: &[u8]) -> Vec<u16> {
     bytes.as_chunks::<2>().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect()
 }
 
-/// The sheet position of the cell a message byte draws.
+/// The sheet position of the cell a message byte draws: `u = ((c - 0x30) % 31) * 8` and
+/// `v = ((c - 0x30) / 31) * 12 + 0x48` in C integer arithmetic, each stored in a byte
 /// (`UI_DrawTextGlyphs (exe/slus_004_22@0x8014F84C)`). Bytes below `0x30` give negative terms the byte wraps.
 pub fn message_cell(byte: u8) -> (usize, usize) {
     let index = i32::from(byte) - MESSAGE_FIRST;

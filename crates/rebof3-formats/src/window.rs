@@ -1,4 +1,3 @@
-//! The auxiliary module window (`0x80117000`).
 //! The auxiliary module window (`0x80117000`): a module id word, then code or data
 //! (`wiki: formats/area`).
 

@@ -1,4 +1,5 @@
 //! A format module depends on the registry and the primitives, never on another format module
+//! (`docs/adr/0002-self-contained-formats.md`, rule 1).
 
 use std::fs;
 use std::path::Path;
@@ -26,7 +27,8 @@ const FORMATS: [&str; 19] = [
     "window",
 ];
 
-/// The modules a format may import.
+/// The modules a format may import: the registry row types, the identity check, the error type, the
+/// glTF writer, the text codec and the animation stream the sprite and script tables both hold.
 const SHARED: [&str; 6] = ["registry", "identity", "error", "gltf", "text", "animation"];
 
 /// The source files of one format: `<format>.rs`, or every file of `<format>/`.
@@ -41,7 +43,7 @@ fn sources(source: &Path, format: &str) -> Vec<String> {
         .collect()
 }
 
-/// Whether `text` names the path `needle`, not a longer name that starts with it (`sprite` and
+/// Whether `text` names the path `needle`, not a longer name that starts with it (`sprite` and `character_sprites`).
 fn mentions(text: &str, needle: &str) -> bool {
     text.match_indices(needle).any(|(start, _)| {
         let next = text[start + needle.len()..].chars().next();

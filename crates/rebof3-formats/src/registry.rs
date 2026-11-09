@@ -1,4 +1,12 @@
-//! The format registry.
+//! The format registry: which format an EMI entry holds, and what is known about each format.
+//!
+//! Each format module owns one [`Description`] per format it reads: the name, the evidence, the
+//! rule that selects it and the check that proves its round trip. This module lists them in one
+//! table and answers the lookups the extractor, the coverage table and the editor need, so none of
+//! those holds a `match` over formats.
+//!
+//! Selection reads the entry header (file type plus load address) and one payload property, an
+//! all-zero body, which is the reserved-slot shape the asset census counts on its own. Names and
 //! addresses come from `wiki: formats/area`, `wiki: formats/audio`, `wiki: formats/graphics` and
 //! `wiki: data/text`.
 
@@ -78,7 +86,8 @@ pub enum Selector {
     Load(&'static [u32]),
     /// A type-0 entry loaded inside this address window.
     LoadWindow(RangeInclusive<u32>),
-    /// The header never selects the format.
+    /// The header never selects the format: [`classify`] returns it by a payload property or as
+    /// the fallback.
     Fallback,
 }
 
@@ -287,12 +296,18 @@ impl Format {
     }
 }
 
-/// The file extension an entry's stored bytes are written with.
+/// The file extension an entry's stored bytes are written with: the real format's name where the
+/// game uses one, and the entry's type tag where the container is the game's own.
+///
+/// The names are the formats' own: `img` is the game's VRAM upload, `clut` its CLUT block, `map` its
+/// map bundle, `vh`/`vb` the two halves of a VAB and `seq` a SEP package. The rest are the EMI entry
+/// with its type tag.
 pub fn extension(format: Format) -> &'static str {
     format.describe().extension
 }
 
-/// The format one entry belongs to.
+/// The format one entry belongs to: its file type and load address, with an all-zero payload
+/// counted as a reservation wherever it sits.
 pub fn classify(entry: &Entry, payload: &[u8]) -> Format {
     if entry.file_type == TYPE_DATA && payload.iter().all(|byte| *byte == 0) {
         return Format::Reserve;

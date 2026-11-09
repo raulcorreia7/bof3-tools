@@ -4,8 +4,8 @@
 //!
 //! Where a field actor's sprite goes is set by `Party_LoadMemberSprite` (`emi/etc/game/00@0x801C1254`) for the
 //! party member in slot `s`: texture page 5 (work `+0x25`), sheet row `s * 0x50` (`+0x26`), CLUT
-//! selector `s + 0x78` (`+0x27`), palette kind 2 (`+0x28`), and `GFX_LoadPalette(0x80035600 + s * 0x40.
-//! 0)`. From those.
+//! selector `s + 0x78` (`+0x27`), palette kind 2 (`+0x28`), and `GFX_LoadPalette(0x80035600 + s * 0x40,
+//! 0)`. From those:
 //!
 //! - `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) queues the sheet at VRAM word
 //!   `page << 6`, row `+0x26` (a page above 16 moves to the lower half).
@@ -148,7 +148,9 @@ impl Placement {
         }
     }
 
-    /// The placement `Area_FindSceneRecord` (`exe/slus_004_22@0x8014DD3C`) copies from an area's scene record.
+    /// The placement `Area_FindSceneRecord` (`exe/slus_004_22@0x8014DD3C`) copies from an area's scene
+    /// record: texture page, sheet row, CLUT selector and palette kind. Its sheet is the area's own
+    /// upload, so it stages no palette.
     pub fn scene(page: u8, row: u8, clut_selector: u8, kind: u8, flags: u8) -> Self {
         Self { page, row, clut_selector, palette_stage: 0, kind, flags }
     }
@@ -170,8 +172,8 @@ impl Placement {
         (column, row)
     }
 
-    /// The CLUT `Area_BuildClut` (`exe/slus_004_22@0x8014CE78`) builds.
     /// The CLUT `Area_BuildClut` (`exe/slus_004_22@0x8014CE78`) builds: the row is the base plus the
+    /// selector's high bits, the column in 16-word units its low bits, split by the palette kind.
     pub fn clut(&self) -> Clut {
         let base = ARENA_VRAM_ROW + if self.flags & UPPER_PALETTES != 0 { UPPER_PALETTE_ROWS } else { 0 };
         let selector = u16::from(self.clut_selector);
@@ -192,13 +194,18 @@ impl Placement {
 }
 
 /// The code that reads character sprites, by the family of the archive that streams it.
+///
 /// `EMI_GetArchiveId` (`exe/slus_004_22@0x8016728C`) streams family 0 from `EMI_SLOT_PL`
+/// (`BIN/PLCHAR/PLnnn.EMI`) and families 1 and 2 from `EMI_SLOT_BPLD` and `EMI_SLOT_BPLU`
 /// (`BIN/BPLCHAR/BPLDnnn.EMI`, `BPLUnnn.EMI`), the ones `func_801E7948` (`emi/battle/battle/03@0x801E7948`)
+/// asks for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Reader {
-    /// Party character sprites.
+    /// Party character sprites: `Party_LoadMemberSprite` places it and loads palette [`FIELD_PALETTE`], called from
+    /// `Party_JoinMember` and `Party_BuildBattlers` (`emi/etc/game/00`).
     Field,
-    /// Battle character sprites.
+    /// Battle character sprites: `Battle_LoadPartySprites` streams it and `Party_BuildBattlers(PARTY_ORDER_BATTLE)`
+    /// places it through `Party_LoadMemberSprite`, palette [`FIELD_PALETTE`]; see the module documentation.
     Battle,
     /// No traced loader streams the archive.
     Unknown,
@@ -252,7 +259,8 @@ pub struct Texel {
 }
 
 impl Texel {
-    /// Whether the GPU draws the texel.
+    /// Whether the GPU draws the texel: a colour the palette gives is drawn unless it is `0x0000`; a
+    /// colour from outside the palette is unknown and counts as drawn.
     pub fn drawn(&self) -> bool {
         self.in_sheet && (!self.in_palette || self.word != TRANSPARENT)
     }
@@ -270,7 +278,9 @@ pub struct Stage {
 }
 
 impl Stage {
-    /// Writes sheet `sheet` and palette `palette` of a section into `vram` as the field does.
+    /// Writes sheet `sheet` and palette `palette` of a section into `vram` as the field does: the palette
+    /// with `GFX_LoadPalette` and the next `GFX_UploadPalette`, the sheet with the transfer queue's
+    /// `LoadImage`. The numbers name the writers.
     pub fn new(mut vram: Vram, sheet: (usize, &Image), palette: (usize, &Palette), placement: Placement) -> Self {
         let ((sheet, image), (palette, colours)) = (sheet, palette);
         let palette_writer = Writer::Named(format!("sprite palette {palette}"));
@@ -290,12 +300,16 @@ impl Stage {
         Self { vram, placement, staged: Some((sheet_writer, palette_writer)) }
     }
 
-    /// An actor whose sheet and palette are already in `vram`, a replayed scene.
+    /// An actor whose sheet and palette are already in `vram`, a replayed scene: an area actor placed by
+    /// its scene record. A texel counts as the sheet's when an upload wrote it, and a colour as the
+    /// palette's when any load wrote it.
     pub fn resident(vram: Vram, placement: Placement) -> Self {
         Self { vram, placement, staged: None }
     }
 
-    /// The texel the draw reads at sheet column `u` and cell row `v`, as `Area_DrawObjectSprite` forms it.
+    /// The texel the draw reads at sheet column `u` and cell row `v`, as `Area_DrawObjectSprite` forms
+    /// it: the page column plus `u` at the placement's depth, the page row plus `+0x26` plus `v`, both
+    /// within one byte.
     pub fn texel(&self, u: u8, v: u8) -> Texel {
         let (page_x, page_y) = self.placement.texture_page();
         let per_word = self.placement.depth().texels_per_word();
@@ -381,7 +395,8 @@ pub struct Pixel {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Composite {
     pub bounds: Bounds,
-    /// Row-major over `bounds`:
+    /// Row-major over `bounds`: the top drawn texel, or, where every cell's texel is transparent, the
+    /// top cell's texel; `None` where no cell reaches from the sheet.
     pub pixels: Vec<Option<Pixel>>,
     /// Cell texels that fall outside the sheet, which the frame's other VRAM supplies at run time.
     pub outside: usize,
@@ -436,7 +451,8 @@ mod tests {
     use super::*;
     use crate::sprite::{COLOURS, Encoding};
 
-    /// `g_SpriteSizes` as the retail executable holds it.
+    /// `g_SpriteSizes` as the retail executable holds it: widths 8 to 32 by the low two bits, heights by
+    /// the next two.
     pub(crate) fn sizes() -> SpriteSizes {
         let mut rows = [[0; 2]; SHAPES];
         for (shape, row) in rows.iter_mut().enumerate() {

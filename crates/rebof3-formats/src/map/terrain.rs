@@ -1,6 +1,25 @@
 //! Area terrain as Wavefront OBJ, read from a map bundle.
+//!
+//! The bundle is `AreaMapBundle` in `decomp/include/world/area.h`, the one C
+//! definition of the map header, and its format is
 //! `wiki: formats/area#0x80104000-map-bundle`.
+//!
 //! Each map cell becomes one quad on a unit grid. The mesh builder (`exe/slus_004_22@0x801530D0`)
+//! places the cell's corners at the `(x, z)` offsets `(0, 0)`, `(1, 0)`, `(0, 1)` and `(1, 1)`, where
+//! `x` is the cell column and `z` the cell row. Corner `k` takes record byte `k`. The export writes
+//! `y` as that byte times [`HEIGHT_SCALE`], so a larger byte is higher; the builder stores the same
+//! height negated. The OBJ face walks the perimeter (corners 0, 2, 3, 1), because the stored order
+//! would cross, and that walk gives the face an upward normal.
+//!
+//! [`Mesh::heights`] carries the height-byte table of the 13 payloads that ship one. The mesh
+//! builder never reads it, so the OBJ does not apply it.
+//!
+//! Texture coordinates are the tile's, in bytes of a texture page that no field names: the page
+//! depends on `GetGraphType()`. The corner-order flags of the tile (bits 16-18) are applied. The
+//! material carries no texture, so the MTL file names none.
+//!
+//! [`top_down`] draws the cells flat with their texels, read from a replayed VRAM through the page
+//! and CLUT row of graph type 0 (`rebof3_emi::texture::terrain_descriptor`).
 
 use std::fmt::Write;
 
@@ -13,8 +32,8 @@ use rebof3_emi::texture::terrain_descriptor;
 use crate::error::{Error, Result};
 use crate::gltf::{self, Primitive};
 
-/// Vertex height per corner-height step (`wiki.
 /// Vertex height per corner-height step (`wiki: formats/area#0x80104000-map-bundle`: each cell byte
+/// is scaled by 16).
 pub const HEIGHT_SCALE: i32 = 16;
 /// The side of the texel block a tile with mode `0` names, in texels.
 pub const BLOCK_TEXELS: u16 = 16;
@@ -24,14 +43,15 @@ const SELECTOR_SHIFT: u32 = 28;
 const MODE_SHIFT: u32 = 8;
 /// The bit that picks the quad table over the rectangle table.
 const QUAD_BIT: u32 = 1 << 11;
-/// The corner-order flags.
+/// The corner-order flags. Bit 18 turns the corners a quarter, bit 16 flips them across `x` and bit
 /// 17 across `z` (`@0x80155560`, `:119-157`).
 const TURN_BIT: u32 = 1 << 18;
 const FLIP_X_BIT: u32 = 1 << 16;
 const FLIP_Z_BIT: u32 = 1 << 17;
 /// The `(x, z)` offset of each corner from the cell's near corner, in stored order.
 pub const CORNER_STEPS: [[i32; 2]; 4] = [[0, 0], [1, 0], [0, 1], [1, 1]];
-/// The corners in the order an OBJ face walks them.
+/// The corners in the order an OBJ face walks them: around the perimeter, not in stored order. The
+/// walk runs counter-clockwise seen from above, so the face normal points up.
 const PERIMETER: [usize; 4] = [0, 2, 3, 1];
 /// Texture coordinates are bytes; the OBJ writes them as fractions of this span.
 const COORDINATE_SPAN: f32 = 256.0;
@@ -51,13 +71,15 @@ pub struct Mesh {
     pub columns: usize,
     /// Cell rows.
     pub rows: usize,
-    /// Corner positions `[x, y, z]`, four per cell, in stored order.
+    /// Corner positions `[x, y, z]`, four per cell, in stored order: `x` is the column plus the
+    /// corner's step, `z` the row plus its step, and `y` the corner byte times [`HEIGHT_SCALE`].
     pub positions: Vec<[i32; 3]>,
     /// Texture coordinates per corner, in bytes of a texture page that no field names.
     pub uvs: Vec<[u16; 2]>,
     /// The page selector of each cell: the material it is drawn with.
     pub selectors: Vec<u8>,
-    /// The height-byte table, one signed byte per cell, when the payload ships it.
+    /// The height-byte table, one signed byte per cell, when the payload ships it. The height query
+    /// reads it; the mesh does not.
     pub heights: Option<Vec<i8>>,
 }
 
@@ -131,12 +153,18 @@ pub fn from_payload(payload: &[u8], mtl_name: &str) -> Result<Terrain> {
     Ok(of_mesh(&mesh_from_payload(payload)?, mtl_name))
 }
 
-/// The terrain as a binary glTF (`.glb`), with one primitive per page material and the same corners as the OBJ.
+/// The terrain as a binary glTF (`.glb`), with one primitive per page material and the same
+/// corners as the OBJ. Each quad is two triangles that face up: corners 0, 2, 3 and 0, 3, 1. Returns
+/// `None` when the mesh has no cell.
 pub fn glb_of_mesh(mesh: &Mesh, name: &str) -> Option<Vec<u8>> {
     glb_with(mesh, name, None, &[])
 }
 
-/// The terrain of a bundle as a binary glTF, as [`glb_of_mesh`] writes it, with a vertex colour per corner and
+/// The terrain of a bundle as a binary glTF, as [`glb_of_mesh`] writes it, with a vertex colour per
+/// corner and `nodes` after the mesh. A cell's colour is its descriptor's grey level
+/// (`func_80155560`: `(word >> 16) & 0xF8`) over 255, the byte the GPU multiplies each texel by with
+/// `0x80` as neutral; a cell with no tile is white. The importer reads the mesh alone, so the colours
+/// and the nodes do not change what it writes.
 pub fn glb_of_bundle(bundle: &MapBundle, name: &str, nodes: &[gltf::Node]) -> Option<Vec<u8>> {
     let colours: Vec<[f32; 4]> = (0..bundle.cells.len())
         .flat_map(|cell| {
@@ -148,7 +176,7 @@ pub fn glb_of_bundle(bundle: &MapBundle, name: &str, nodes: &[gltf::Node]) -> Op
     glb_with(&mesh_of_bundle(bundle), name, Some(&colours), nodes)
 }
 
-/// The `cells` node of a bundle's glTF.
+/// The `cells` node of a bundle's glTF: the byte code of every cell, row by row, as
 /// `Area_GetCellCode` (`exe/slus_004_22@0x80166CB0`) reads them.
 pub fn cells_node(bundle: &MapBundle) -> gltf::Node {
     let cells = bundle.cells.len();
@@ -189,6 +217,10 @@ fn glb_with(mesh: &Mesh, name: &str, colours: Option<&[[f32; 4]]>, nodes: &[gltf
 }
 
 /// The page selector and the four texture-coordinate corners of a cell, in corner order.
+///
+/// A cell with grid value `0` is empty and has the zero tile. Otherwise the grid value indexes the
+/// descriptor words. Mode `0` names a 16x16 block from the descriptor's low byte. Otherwise bit 11
+/// picks the rectangle table (index `descriptor & 0xFF`) or the quad table (index `descriptor & 0x7FF`).
 fn tile(bundle: &MapBundle, cell: usize) -> (usize, [[u8; 2]; 4]) {
     match descriptor(bundle, cell) {
         Some(descriptor) => tile_of(bundle, descriptor),
@@ -196,7 +228,8 @@ fn tile(bundle: &MapBundle, cell: usize) -> (usize, [[u8; 2]; 4]) {
     }
 }
 
-/// The page selector and the four texture-coordinate corners of a descriptor word, in corner order
+/// The page selector and the four texture-coordinate corners of a descriptor word, in corner
+/// order (`func_80155560`).
 pub(super) fn tile_of(bundle: &MapBundle, descriptor: u32) -> (usize, [[u8; 2]; 4]) {
     let selector = ((descriptor >> SELECTOR_SHIFT) & 3) as usize;
     let mode = (descriptor >> MODE_SHIFT) & 0xf;
@@ -215,18 +248,21 @@ pub(super) fn tile_of(bundle: &MapBundle, descriptor: u32) -> (usize, [[u8; 2]; 
     (selector, corner_order(descriptor, uvs))
 }
 
-/// The tile descriptor of a cell.
+/// The tile descriptor of a cell: `None` for an empty cell (grid value `0`) or a grid value past the
+/// descriptor table.
 pub(super) fn descriptor(bundle: &MapBundle, cell: usize) -> Option<u32> {
     let value = usize::from(bundle.grid.get(cell).copied().unwrap_or(0));
     bundle.records.get(value).filter(|_| value != 0).copied()
 }
 
-/// The corners of a rectangle in corner order.
+/// The corners of a rectangle in corner order: its near corner, then one extent along `u`, then
+/// along `v`, then both. Coordinates wrap at 256, as the GPU's byte coordinates do.
 fn rectangle_corners(u: u8, v: u8, du: u8, dv: u8) -> [[u8; 2]; 4] {
     [[u, v], [u.wrapping_add(du), v], [u, v.wrapping_add(dv)], [u.wrapping_add(du), v.wrapping_add(dv)]]
 }
 
-/// Applies a tile's corner-order flags to its four corners, in the order `@0x80155560` applies them.
+/// Applies a tile's corner-order flags to its four corners, in the order `@0x80155560` applies them:
+/// the quarter turn (bit 18), the flip across `x` (bit 16), then the flip across `z` (bit 17).
 fn corner_order(descriptor: u32, uvs: [[u8; 2]; 4]) -> [[u8; 2]; 4] {
     let mut uvs = uvs;
     if descriptor & TURN_BIT != 0 {
@@ -248,8 +284,15 @@ const GREY_MASK: u32 = 0xF8;
 /// Pixels per side of a cell in a [`TopDown`] view: one 16x16 block of texels.
 pub const CELL_PIXELS: usize = BLOCK_TEXELS as usize;
 
-/// A map bundle seen from above with its tiles' texels.
+/// A map bundle seen from above with its tiles' texels: each cell is a [`CELL_PIXELS`] square, row
+/// `r` and column `c` at `(16c, 16r)`. A cell's texels come from VRAM through its descriptor's page
+/// and CLUT (the terrain rule, [`terrain_descriptor`]) and its four texture corners.
+///
+/// The square is drawn as the GPU draws the cell's four-corner primitive seen flat: two triangles,
+/// corners 0, 1, 2 and 1, 2, 3, each with affine texture coordinates. Corner `k` sits at the cell's
 /// step `(0, 0)`, `(1, 0)`, `(0, 1)` or `(1, 1)` (the mesh builder `@0x801530D0`). The vertex colour
+/// in descriptor bits 19-23 and the semi-transparency bit 15 are not applied, and neither is the
+/// height: the view is flat.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TopDown {
     pub width: usize,
@@ -263,7 +306,8 @@ pub struct TopDown {
 }
 
 impl TopDown {
-    /// The RGBA view of every pixel.
+    /// The RGBA view of every pixel; a cell with no tile, and the transparent colour `0x0000`, are
+    /// clear.
     pub fn rgba(&self) -> Vec<[u8; 4]> {
         self.words.iter().map(|word| word.map_or([0; 4], psx_formats::clut::word_to_view)).collect()
     }
@@ -306,7 +350,8 @@ pub fn top_down(bundle: &MapBundle, vram: &Vram) -> TopDown {
     view
 }
 
-/// The texture coordinate at pixel `x`, `y` of a cell.
+/// The texture coordinate at pixel `x`, `y` of a cell: affine across the triangle of corners 0, 1,
+/// 2 when `x + y` is at most the cell's last pixel, else across corners 3, 2, 1.
 fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
     let last = (CELL_PIXELS - 1) as f32;
     let (s, t) = (x as f32 / last, y as f32 / last);
@@ -320,6 +365,11 @@ fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
 }
 
 /// The terrain mesh's corner heights, written back into the map bundle it came from.
+///
+/// `mesh` is the binary glTF or the OBJ text that the export writes, and `payload` is that bundle's
+/// stored bytes. A corner's height is its `y` divided by [`HEIGHT_SCALE`]. The mesh does not carry the
+/// tiles, objects or height table, so those sections come from `payload`. A corner that the mesh moves
+/// in `x` or `z` is an error.
 pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let mut bundle = MapBundle::decode(payload)?;
     let positions = if mesh.starts_with(b"glTF") {
@@ -346,7 +396,8 @@ pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     Ok(bundle.encode())
 }
 
-/// The height byte of a corner at `y`.
+/// The height byte of a corner at `y`. `y` is the byte times [`HEIGHT_SCALE`], so it must be a whole step
+/// that an `i8` holds.
 fn height_byte(y: f32) -> Option<i8> {
     let step = y / HEIGHT_SCALE as f32;
     (step.fract() == 0.0 && (-128.0..=127.0).contains(&step)).then_some(step as i8)
@@ -377,7 +428,8 @@ mod top_down_tests {
     use rebof3_emi::replay::Writer;
     use rebof3_emi::texture::{TERRAIN_CLUT_ROW, TERRAIN_PAGE_X, TERRAIN_PAGE_Y};
 
-    /// A VRAM whose terrain page 0 holds one 32x32-word upload with the 8-bit texel `u + 16 * v` at `(u, v)`, and
+    /// A VRAM whose terrain page 0 holds one 32x32-word upload with the 8-bit texel `u + 16 * v`
+    /// at `(u, v)`, and whose first CLUT row maps index `i` to colour `0x100 + i`.
     fn vram() -> Vram {
         let texel = |u: usize, v: usize| ((u + 16 * v) & 0xFF) as u16;
         let payload: Vec<u8> = (0..32 * 32)
@@ -410,6 +462,8 @@ mod top_down_tests {
 
     #[test]
     fn a_block_tile_copies_its_sixteen_texels() {
+        // Mode 0, block 0: texels (0..16, 0..16) of page 0, 8-bit, CLUT row 483, vertex colour 0x80
+        // (descriptor 0 is the empty tile).
         let view = top_down(&bundle(0x0080_0000), &vram());
         assert_eq!((view.width, view.height, view.textured, view.unwritten), (32, 16, 1, 0));
         for (x, y) in [(0, 0), (15, 0), (0, 15), (7, 9), (15, 15)] {

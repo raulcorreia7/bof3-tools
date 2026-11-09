@@ -4,7 +4,7 @@ use psx_formats::adpcm;
 
 use crate::error::{Error, Result};
 
-/// The rate of a VAG at pitch `0x1000`, in hertz.
+/// The rate of a VAG at pitch `0x1000`, in hertz. A VAG has no rate of its own; its samples are written at this one.
 pub const VAG_RATE: u32 = 44_100;
 
 /// The PCM of a VAG as a mono 16-bit WAVE file at [`VAG_RATE`].
@@ -17,13 +17,16 @@ pub fn vag_wav(vag: &[u8]) -> Result<Vec<u8>> {
     pcm_wav(&psx_formats::adpcm::decode_stream(vag))
 }
 
-/// The VAG `index` of a VAB bank as a WAVE file.
+/// The VAG `index` of a VAB bank as a WAVE file: the bank's header and body, and the VAG's index in the
+/// header's VAG table.
 pub fn vab_vag_wav(header: &[u8], body: &[u8], index: u32) -> Result<Vec<u8>> {
     let vab = psx_formats::vab::Bank::parse(header, body)?;
     pcm_wav(&vab.decode_vag(body, index)?)
 }
 
-/// Encodes a WAVE file as a VAG.
+/// Encodes a WAVE file as a VAG: its samples as SPU ADPCM blocks. The file must be mono 16-bit PCM at
+/// [`VAG_RATE`], which is what [`pcm_wav`] writes. ADPCM cannot reproduce every sample, so the
+/// first encode is lossy for those; a second encode of its decoded samples is exact.
 pub fn import(wav: &[u8]) -> Result<Vec<u8>> {
     Ok(adpcm::encode_stream(&read_pcm_wav(wav)?))
 }

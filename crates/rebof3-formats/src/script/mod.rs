@@ -3,10 +3,10 @@
 //!
 //! One archive's script table: a self-sizing directory, then its sections, each a `u16`
 //! record-offset table and the record bytes. The reader is `Actor_BeginScript`
-//! (`exe/slus_004_22@0x8014D6DC`, `decomp/src/engine/slus/Actor_BeginScript.c`).
+//! (`exe/slus_004_22@0x8014D6DC`, `decomp/src/engine/slus/Actor_BeginScript.c`):
 //!
 //! ```c
-//! table = (u8*)g_ScriptBank.
+//! table = (u8*)g_ScriptBank;
 //! table += ((s32*)table)[g_Task->unk_2C];                // section base
 //! g_Task->script = table + ((u16*)table)[g_Task->unk_4B]; // record
 //! ```
@@ -120,13 +120,18 @@ const SMALLEST_TABLE: usize = DIRECTORY_WORD + TABLE_WORD;
 /// One section: its stored offset words and the record bytes they name.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ScriptSection {
-    /// The size of the offset words, in bytes.
+    /// The size of the offset words, in bytes: `2 * M`, M the entry count.
+    /// It is the first stored offset word as well.
     pub table_bytes: u16,
-    /// The M stored offset words, relative to the section base, in table order.
+    /// The M stored offset words, relative to the section base, in table
+    /// order. `offsets[0]` is the stored size word.
     pub offsets: Vec<u16>,
-    /// For each table entry, the index into `records` of the record it names.
+    /// For each table entry, the index into `records` of the record it
+    /// names.
     pub slots: Vec<u16>,
-    /// The record bytes, one per distinct offset, in first-appearance order.
+    /// The record bytes, one per distinct offset, in first-appearance
+    /// order. Record i runs from offset i to offset i + 1; the last runs to
+    /// the section end.
     pub records: Vec<Vec<u8>>,
 }
 
@@ -135,7 +140,8 @@ pub struct ScriptSection {
 pub struct ScriptTable {
     /// The directory's own size, in bytes: `4 * L`, L the section count.
     pub dir_bytes: u32,
-    /// The sections, in directory order.
+    /// The sections, in directory order; the last runs to the end of the
+    /// payload.
     pub sections: Vec<ScriptSection>,
 }
 
@@ -181,7 +187,9 @@ impl ScriptTable {
         self.sections.get(index)
     }
 
-    /// The table as JSON.
+    /// The table as JSON: the directory size and, per section, the stored
+    /// table words, the record bytes as hex, and the record each table
+    /// entry names.
     pub fn json(&self) -> String {
         #[derive(Serialize)]
         struct Section {
@@ -290,7 +298,8 @@ fn hex(bytes: &[u8]) -> String {
     out
 }
 
-/// The script records as JSON and the ops as [`text`].
+/// The script records as JSON and the ops as [`text`]. The reader is `Actor_BeginScript` in
+/// `decomp/src/engine/slus/Actor_BeginScript.c`; the layout is
 /// `wiki: formats/area#0x800d3800-area-script-table`.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
     let table = ScriptTable::decode(payload)?;

@@ -1,6 +1,10 @@
-//! What the field code does with a cell's byte code (`g_AreaCellCodes`, the bundle's `+0x14` section) and with a
+//! What the field code does with a cell's byte code (`g_AreaCellCodes`, the bundle's `+0x14`
 //! section) and with a cell's value in the packed battle grid (`0x80032000`).
+//!
 //! `Area_GetCellCode` (`exe/slus_004_22@0x80166CB0`) returns `codes[y * width + x]`; the walkers and
+//! triggers compare the whole byte or its high nibble. Each meaning below names the function that
+//! tests the value and whether its C matches the retail bytes; a value no reader tests is shown as
+//! unknown.
 
 /// One meaning of a byte code.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -112,7 +116,10 @@ pub fn is_exit(code: u8) -> bool {
     matches!(code, 0xA6 | 0xA7 | 0xAF | 0xC0)
 }
 
-/// What a battle-grid value says, as `func_801C7518` (`emi/etc/game/00@0x801C7518`, matched) and `func_801C7608`
+/// What a battle-grid value says, as `func_801C7518` (`emi/etc/game/00@0x801C7518`, matched) and
+/// `func_801C7608` read it when they place and move battlers: `0` holds no battler, and `1` to `4`,
+/// `5` to `8` and `9` to `12` are the cells a battler of reach 0, 1 or 2 may stand on (`4 * reach + 1`
+/// and up), the offset from that base saying whether there is room in `x` (bit 0) and `y` (bit 1).
 pub fn battle_meaning(value: u8) -> String {
     if value == 0 {
         return "no battler stands here".into();

@@ -1,5 +1,17 @@
-//! Character sprites.
+//! Character sprites: the palette layer.
+//!
+//! Character sprites are a container of three sections (its first word is [`CONTAINER_HEAD`]: `BPLCHAR`, `PLCHAR` and
 //! `ETC/START.EMI` entry 7 at `0x8003B800`), or one section by itself (the section entries at `0x8003B80C` and its
+//! siblings). A section's word at +4 is the offset of its palette table, relative to the section. The table is a
+//! count of palettes written as offsets: the first word is `4n` for `n` palettes, and palette `k` follows the offsets
+//! at `4n + 0x40k`. A palette holds [`COLOURS`] 16-bit colours.
+//!
+//! The rest of a section is its node data, which is not decoded. [`export`] writes the palettes only, and [`import`]
+//! writes them back over the character sprites' own bytes, so every other byte stays as it was.
+//!
+//! The palette index is the `mode` argument of `GFX_StagePalette` (`decomp/src/engine/slus/GFX_StagePalette.c`), which
+//! copies palette `mode` into the palette RAM of a work slot. The section is chosen by `Party_LoadMemberSprite`, which stages
+//! the record at work `+0x4C`. Its callers pass `mode` 0, except `func_8019C664`, which passes 1.
 
 use serde::{Deserialize, Serialize};
 
@@ -57,7 +69,8 @@ impl CharacterSprites {
     }
 }
 
-/// The JSON of the character sprites' palettes.
+/// The JSON of the character sprites' palettes: `{"sections": [{"palettes": [[colour, ...], ...]}, ...]}`, with each colour as four
+/// lowercase hex digits.
 #[derive(Serialize, Deserialize)]
 struct Json {
     sections: Vec<JsonSection>,
@@ -68,7 +81,7 @@ struct JsonSection {
     palettes: Vec<Vec<String>>,
 }
 
-/// The character sprites in `payload`:
+/// The character sprites in `payload`: a container when its first word is [`CONTAINER_HEAD`], otherwise one section at offset 0.
 pub fn parse(payload: &[u8]) -> Result<CharacterSprites> {
     let first = word(payload, 0)?;
     if first != CONTAINER_HEAD {
@@ -114,7 +127,8 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(serde_json::to_vec_pretty(&json).expect("a palette serializes"))
 }
 
-/// The payload with its palettes replaced by the JSON that [`export`] wrote.
+/// The payload with its palettes replaced by the JSON that [`export`] wrote. The JSON must have the character sprites' sections
+/// and the same palette count in each; every byte outside the palettes stays as it was.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let json: Json = serde_json::from_slice(json)
         .map_err(|error| Error::CharacterPalettes(format!("the palettes JSON does not read: {error}")))?;

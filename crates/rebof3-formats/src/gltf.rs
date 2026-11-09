@@ -1,4 +1,10 @@
 //! Binary glTF 2.0 (`.glb`) writer for triangle meshes.
+//!
+//! One mesh, on node 0. The binary chunk packs the positions, the texture coordinates, the vertex
+//! colours when there are any, and one index list per primitive, in that order, each section
+//! starting on a 4-byte boundary. A primitive names one material. Materials carry a name and a white
+//! base colour, and no texture. More nodes, with no mesh, may follow node 0: each has a name, an
+//! optional translation, its `extras` and its children ([`Node`]).
 
 use serde_json::{Value, json};
 
@@ -34,7 +40,8 @@ const UNSIGNED_INT: u32 = 5125;
 const ARRAY_BUFFER: u32 = 34962;
 const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 
-/// Writes a `.glb` with one mesh named `name`.
+/// Writes a `.glb` with one mesh named `name`. Every vertex has one position and one texture
+/// coordinate, and every index names one of them. Returns `None` when there is no triangle.
 pub fn glb(
     name: &str,
     positions: &[[f32; 3]],
@@ -45,7 +52,8 @@ pub fn glb(
     glb_with(name, positions, uvs, None, primitives, materials, &[])
 }
 
-/// Writes a `.glb` like [`glb`], with an RGBA vertex colour per vertex (`COLOR_0`, floats 0 to 1) when `colours`
+/// Writes a `.glb` like [`glb`], with an RGBA vertex colour per vertex (`COLOR_0`, floats 0 to 1) when
+/// `colours` is given, and `nodes` as more root nodes after the mesh's node.
 pub fn glb_with(
     name: &str,
     positions: &[[f32; 3]],
@@ -193,7 +201,9 @@ fn pack(document: &Value, bin: &[u8]) -> Vec<u8> {
     out
 }
 
-/// The POSITION vertices of a binary glTF.
+/// The POSITION vertices of a binary glTF: the first primitive's POSITION accessor, read as `VEC3`
+/// floats from its buffer view. A file with any other layout is an error, so a mesh that this writer
+/// could not have made is refused rather than misread.
 pub fn read_positions(glb: &[u8]) -> Result<Vec<[f32; 3]>, String> {
     let (document, bin) = chunks(glb)?;
     let accessor = document["meshes"][0]["primitives"][0]["attributes"]["POSITION"]

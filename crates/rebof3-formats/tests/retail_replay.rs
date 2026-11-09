@@ -1,4 +1,9 @@
-//! The load replay over the retail archives.
+//! The load replay over the retail archives: every default scene replays, every type-3 entry
+//! lands in the scene that loads it, and the replayed VRAM agrees with the palette joins proven
+//! earlier from the archives alone.
+//!
+//! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the test
+//! skips.
 
 mod support;
 
@@ -140,7 +145,8 @@ fn retail_replay_agrees_with_the_proven_joins() {
 /// A texture's known rows: depth bits and CLUT position.
 type Rows = std::collections::BTreeSet<(u32, u16, u16)>;
 
-/// What the rules join over every default scene, and how the ranked suggestion does on those joins with the
+/// What the rules join over every default scene, and how the ranked suggestion does on those
+/// joins with the joins hidden.
 #[test]
 fn retail_joins_and_the_suggestion_scorer() {
     use psx_formats::gfx::vram::{Descriptor, word_grid};
@@ -224,12 +230,15 @@ fn retail_joins_and_the_suggestion_scorer() {
     assert_eq!(joined.len(), 204, "the textures the rules join in some scene");
 }
 
-/// The battle archives a battle streams part-way.
+/// The battle archives a battle streams part-way: each texture a battle draw site names is joined
+/// in its home scene at the site's depth, with the row the archive's own CLUT block loads.
 #[test]
 fn retail_battle_archive_joins() {
     use rebof3_emi::texture::scene as joins;
 
     let Some(mut disc) = Disc::open() else { return };
+    // (archive, texture slot, depth bits, CLUT x, CLUT y, palette slot): BATL_DRA by
+    // func_800AE9C4 (battle/15), BATL_OVR by func_801EF3B4 (batl_ovr/00).
     let expected = [("BIN/BATTLE/BATL_DRA.EMI", 0, 4, 16, 506, 3), ("BIN/BATTLE/BATL_OVR.EMI", 1, 8, 0, 506, 2)];
     for (archive, slot, bits, x, y, palette) in expected {
         let scene = scenes::home(archive).expect("a home scene");

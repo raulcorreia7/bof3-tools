@@ -50,7 +50,8 @@ pub struct Layout {
     /// Whether bytes 1 and 2 are a big-endian scene id, looked up by `Area_FindSceneRecord`
     /// (`exe/slus_004_22@0x8014DD3C`).
     pub scene: bool,
-    /// The bytes of `x` half, `x` whole, `y` half and `y` whole.
+    /// The bytes of `x` half, `x` whole, `y` half and `y` whole: a coordinate is the whole cell, plus
+    /// half a cell when the half byte is not zero.
     pub position: Option<[usize; 4]>,
     /// Whether the low nibble of byte 0 is the facing (`direction_08 = script[0] & 0xF`).
     pub facing: bool,
@@ -173,7 +174,8 @@ pub fn walk(program: &[u8], start: usize) -> Result<Stream> {
     Ok(Stream { start, end, records: walker.records })
 }
 
-/// The program with `record` moved to `x2`, `y2` half cells.
+/// The program with `record` moved to `x2`, `y2` half cells. A half byte that already says "half"
+/// keeps its value, so an unchanged position writes back the same bytes.
 pub fn with_position(program: &[u8], record: &Record, x2: u16, y2: u16) -> Result<Vec<u8>> {
     let [x_half, x_whole, y_half, y_whole] = record
         .layout()
@@ -207,7 +209,9 @@ pub fn with_facing(program: &[u8], record: &Record, facing: u8) -> Result<Vec<u8
     Ok(program)
 }
 
-/// The program with `record` naming scene id `scene`, which selects the actor's sprite page, CLUT row and script
+/// The program with `record` naming scene id `scene`, which selects the actor's sprite page, CLUT
+/// row and script section (`Area_FindSceneRecord`). The caller checks that the area's scene table
+/// holds the id.
 pub fn with_scene(program: &[u8], record: &Record, scene: u16) -> Result<Vec<u8>> {
     if !record.layout().scene {
         return Err(Error::Field(format!("a kind {:X} record names no scene", record.kind)));
@@ -334,7 +338,8 @@ impl Walker<'_> {
 mod tests {
     use super::*;
 
-    /// A kind 0 record at cell (3.5, 4) facing 2, then an `if` with a kind 9 record in its else branch, then a
+    /// A kind 0 record at cell (3.5, 4) facing 2, then an `if` with a kind 9 record in its else branch,
+    /// then a switch whose case 1 holds a kind E record.
     fn program() -> Vec<u8> {
         let mut bytes = vec![0x02, 0x00, 0x07, 0, 0, 0, 1, 3, 0, 4, 0, 0, 0, 0, 0, 0, 0];
         bytes.extend([IF, 0x22, 5, ELSE, 0x93, 0, 7, 0, 0, 5, 0, 6, 0, 0, 0, 0, 0, END_IF]);

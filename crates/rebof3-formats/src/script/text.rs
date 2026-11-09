@@ -7,7 +7,7 @@
 //! slots 0 1 1
 //!
 //! record 0
-//! s1.
+//! s1:
 //!     show frame 0 ticks 4
 //!     jump s1
 //! frame 0
@@ -53,7 +53,8 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(write(&Program::decode(payload)?).into_bytes())
 }
 
-/// Text from [`export`] back to a payload.
+/// Text from [`export`] back to a payload. The payload may not outgrow `base`, the stored one: what
+/// follows the table in memory is not known to be free.
 pub fn import(text: &[u8], base: &[u8]) -> Result<Vec<u8>> {
     let text = core::str::from_utf8(text).map_err(|_| Error::Import("the script text is not UTF-8".into()))?;
     let bytes = parse(text)?.encode()?;

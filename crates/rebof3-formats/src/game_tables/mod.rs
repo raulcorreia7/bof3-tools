@@ -1,6 +1,14 @@
-//! The fixed data tables of `ETC/GAME.EMI` entry 0.
+//! The fixed data tables of `ETC/GAME.EMI` entry 0: items, vital items, weapons, armor, accessories,
+//! shops, abilities and level growth.
+//!
+//! The entry's payload starts at archive offset [`PAYLOAD_START`]. Each table is a run of fixed-size
 //! records at a fixed archive offset (`wiki: data/records#gameemi-fixed-tables`, "Equipment and shop
+//! data"). The runtime
 //! item base `0x801C8964` is the entry's load address `0x80195800` plus the items' payload offset.
+//!
+//! A name is 12 inline bytes in the name encoding ([`rebof3_emi::text::codec`]). Its text leaves out the zeros that pad
+//! the field, so the stored bytes come back exactly. The other fields keep the documented offsets. Fields the
+//! decompilation has not named are left out.
 
 use rebof3_emi::record::{bytes, u16_at};
 pub use rebof3_emi::text::codec::{name_field, name_text};
@@ -42,12 +50,14 @@ pub const LEVEL_GROWTH: Table = Table { name: "level-growth", archive_offset: 0x
 pub const TABLES: [Table; 8] = [ITEMS, VITAL_ITEMS, WEAPONS, ARMOR, ACCESSORIES, SHOPS, ABILITIES, LEVEL_GROWTH];
 
 impl Table {
-    /// The table's records in an entry payload, one slice per record.
+    /// The table's records in an entry payload, one slice per record. Fails when the payload ends before
+    /// the last record.
     pub fn records(self, payload: &[u8]) -> Result<Vec<&[u8]>> {
         Ok(self.bytes(payload)?.chunks_exact(self.record).collect())
     }
 
-    /// The table's stored bytes in an entry payload.
+    /// The table's stored bytes in an entry payload: all its records, back to back. Fails when the payload ends
+    /// before the last record.
     pub fn bytes(self, payload: &[u8]) -> Result<&[u8]> {
         let start = self.archive_offset - PAYLOAD_START;
         let end = start + self.count * self.record;
@@ -75,7 +85,8 @@ fn deserialize_name<'de, D: serde::Deserializer<'de>>(
 pub struct Item {
     #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
-    /// Flag bits.
+    /// Flag bits: `target_both`, `target_selectable`, `target_enemy_default`, `target_all`, `story_item`,
+    /// `show_name`, `show_animation`, `usable_menu`.
     pub flags: u8,
     pub price: u16,
 }
@@ -121,7 +132,8 @@ pub struct Accessory {
     pub price: u16,
 }
 
-/// One item a shop sells.
+/// One item a shop sells: the item type (`0` item, `1` weapon, `2` armor, `3` accessory, `4` vital item,
+/// `0xFF` empty) and the index in that type's table.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ShopSlot {
     pub item_type: u8,

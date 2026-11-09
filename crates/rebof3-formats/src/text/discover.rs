@@ -1,4 +1,9 @@
-//! Where the game's text sits in a payload.
+//! Where the game's text sits in a payload: the scan the deleted Python text tool ran, ported so
+//! that the Rust tools find the same strings with the same spans.
+//!
+//! A message table holds its own offset table, and its records are its strings ([`table_records`]). Any other payload
+//! holds two kinds of string. A fixed-width name table holds names at a stride, found by the lattice search. Other
+//! text is a record that ends at its terminator, or at the pointer table that reaches it ([`strings`]). The rules
 //! and the evidence for them are in `wiki: data/text`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -56,6 +61,7 @@ pub struct Found {
 }
 
 /// The records of a message table that holds text, or `None` for any other payload and for a table whose records
+/// read as code. Records that are shorter than [`MIN_LENGTH`] are left out.
 pub fn table_records(payload: &[u8]) -> Option<Vec<Found>> {
     let offsets = table_slots(payload)?;
     if !table_holds_text(payload, &offsets) {
@@ -82,7 +88,8 @@ pub fn table_records(payload: &[u8]) -> Option<Vec<Found>> {
     Some(found)
 }
 
-/// The strings of a payload that is not a message table, in offset order.
+/// The strings of a payload that is not a message table, in offset order. `base` is the address the payload loads
+/// at, which the pointer-table test needs; `None` when the payload has none.
 pub fn strings(payload: &[u8], base: Option<u32>) -> Vec<Found> {
     let runs = scan_runs(payload);
     let fields = lattice_fields(payload, &runs);
@@ -127,7 +134,8 @@ fn distinct_sorted(values: &[usize]) -> Vec<usize> {
     values.iter().copied().collect::<BTreeSet<_>>().into_iter().collect()
 }
 
-/// The offset table of a message table.
+/// The offset table of a message table: its first word is the table's length in bytes, and every entry points
+/// inside the payload, in order. `None` when the payload does not start with such a table.
 fn table_slots(payload: &[u8]) -> Option<Vec<usize>> {
     if payload.len() < 8 {
         return None;
@@ -176,7 +184,8 @@ fn record_is_text(record: &[u8]) -> bool {
     (letters >= 4 && letters * 100 >= 40 * body.len()) || (letters >= 3 && fills >= 1)
 }
 
-/// The length of a table record.
+/// The length of a table record: up to and including its terminator, or the whole span when it has none. An
+/// operand may be zero, so a control code and its operand are skipped together.
 fn record_end(span: &[u8]) -> usize {
     let mut index = 0;
     while index < span.len() {
@@ -222,6 +231,7 @@ fn scan_runs(payload: &[u8]) -> Vec<(usize, usize)> {
 }
 
 /// Whether two consecutive words at `position` (or at the next word boundary) point inside the payload, which is
+/// what the pointer table of a string without a terminator looks like.
 fn pointer_table_at(payload: &[u8], position: usize, base: Option<u32>) -> bool {
     let Some(base) = base.map(u64::from) else {
         return false;
@@ -246,7 +256,8 @@ fn pointer_table_at(payload: &[u8], position: usize, base: Option<u32>) -> bool 
     })
 }
 
-/// The records of a payload that begin with a byte the game can draw or run, as `(start, end)` with the
+/// The records of a payload that begin with a byte the game can draw or run, as `(start, end)` with the terminator
+/// included when there is one. A record that holds a byte the game cannot run ends the candidate.
 fn scan_records(payload: &[u8], base: Option<u32>, limit: usize) -> Vec<(usize, usize)> {
     let size = payload.len();
     let mut spans = Vec::new();
@@ -340,7 +351,8 @@ fn lattice_fields(payload: &[u8], runs: &[(usize, usize)]) -> BTreeMap<usize, (u
     fields
 }
 
-/// The candidate tables as `(stride, coverage, positions)`, best first.
+/// The candidate tables as `(stride, coverage, positions)`, best first. A table's stride is a difference between
+/// two record starts, and a candidate explains the starts that fall on its lattice.
 fn field_chains(payload: &[u8], starts: &[usize]) -> Vec<(usize, usize, Vec<usize>)> {
     let span_starts = distinct_sorted(starts);
     // Most seen first, and ties in the order first seen, as `Counter.most_common` lists them.
@@ -418,7 +430,8 @@ fn segments(members: &[usize], stride: usize) -> Vec<Vec<usize>> {
     segments
 }
 
-/// The length of the name in a field at `start`, or `None` when the field does not hold a name.
+/// The length of the name in a field at `start`, or `None` when the field does not hold a name. The name is the
+/// run of printable bytes from the field's start, and it ends at a zero (included) or fills the field.
 fn field_at(payload: &[u8], start: usize, stride: usize) -> Option<usize> {
     if start >= payload.len() {
         return None;

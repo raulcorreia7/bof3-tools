@@ -1,4 +1,3 @@
-//! The shared resource table (`0x8001A000`).
 //! The shared resource table (`0x8001A000`): references the text refers to
 //! (`wiki: data/text#references`).
 

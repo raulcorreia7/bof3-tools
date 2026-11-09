@@ -11,17 +11,17 @@
 //! byte-exact and a section can be edited without touching the header.
 //!
 //! Region order, proven against all 200 payloads (`wiki: formats/area`
-//! records the readers behind every access).
+//! records the readers behind every access):
 //!
 //! ```text
 //! +0x00 u8  width                 +0x01 u8  height
 //! +0x02 u16 grid_off4     = 12 + W*H + align4(W*H)/4
-//! +0x04 u16 rect_off4[4]  rectangle table: 4-byte tile rectangles, stride 4 bytes.
+//! +0x04 u16 rect_off4[4]  rectangle table: 4-byte tile rectangles, stride 4 bytes,
 //!                                  selected by (descriptor >> 28) & 3
 //! +0x06 u16 quad_off4[4]  quad table: 8-byte tile quads, stride 8 bytes, same
 //!                                  selector; the tables interleave in memory as
 //!                                  R[i], Q[i], R[i+1], Q[i+1], ...
-//! +0x14 u16 code_off4     = 12 + W*H: per-cell byte codes, one byte per cell.
+//! +0x14 u16 code_off4     = 12 + W*H: per-cell byte codes, one byte per cell,
 //!                                  row stride `width`
 //! +0x1a u16 colour[2]     runtime colour words (RGB555), index (mask >> 3)
 //! +0x1e u16 scroll_seat   scroll seat; the area init seeds D_80149338 with it
@@ -124,7 +124,8 @@ pub const QUAD_BYTES: usize = 8;
 /// Texture pages a bundle selects between, by `(descriptor >> 28) & 3`.
 pub const SELECTORS: usize = 4;
 
-/// One per-cell record.
+/// One per-cell record: the four signed corner heights of the cell. Every
+/// reader loads all four as `s8` and scales by 16 for the vertex height
 /// (`@0x801530D0`, `@0x8015684C`, `@0x80157CE4`); the height query adds the
 /// height-table byte to the corners (`@0x8015477C`). No 16-bit field exists.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -133,7 +134,9 @@ pub struct Cell {
     pub heights: [i8; CELL_BYTES],
 }
 
-/// One rectangle-table tile record.
+/// One rectangle-table tile record: the texture rectangle the renderer expands into the
+/// quad's four UV pairs. Byte order is `dv`, `du`, `v`, `u`: the renderer takes
+/// byte 3 as `u` and byte 2 as `v`, and adds byte 1 to `u` and byte 0 to `v`
 /// for the far corner (`@0x80155560`, the four-byte rectangle path).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TileRect {
@@ -143,7 +146,9 @@ pub struct TileRect {
     pub dv: u8,
 }
 
-/// One quad-table tile record.
+/// One quad-table tile record: four independent UV pairs, one per quad corner. Each
+/// pair is stored as `(v, u)` bytes, and corner `k` reads the pair at bytes
+/// `(3, 2)`, `(1, 0)`, `(7, 6)` and `(5, 4)` for `k` = 0 to 3, before the
 /// corner-order flags apply (`exe/slus_004_22@0x80155560`, loads at
 /// `0x801555E0` to `0x80155644`).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -152,7 +157,10 @@ pub struct TileQuad {
     pub uvs: [[u8; 2]; 4],
 }
 
-/// One record of a `+0x20`, `+0x22` or `+0x24` body.
+/// One record of a `+0x20`, `+0x22` or `+0x24` body: a header word whose byte 3
+/// is the dispatcher's opcode and whose byte 2 is the record's size in 4-byte
+/// words, counting the header, then the operand words (`size - 1` of them).
+/// Bytes 0-1 are operands the dispatchers read.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ListRecord {
     /// Byte 3 of the header word; the masks differ per region.
@@ -182,7 +190,10 @@ impl ListRecord {
     }
 }
 
-/// One `+0x24` record cell.
+/// One `+0x24` record cell: a head of map coordinates and its record chain.
+/// The runner writes this cell's id into the `D_80141880` grid after the
+/// isometric transform (`Area_IndexCells`), and the two walkers advance through
+/// the chain by each record's size byte (`Area_SetCellPalette`, `Area_DrawCellLayer`).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapCell {
     /// Head byte 0: map row.
@@ -193,7 +204,9 @@ pub struct MapCell {
     pub records: Vec<ListRecord>,
 }
 
-/// One `+0x28` object.
+/// One `+0x28` object: a `u16` tag then the body's words, whose count the
+/// reader takes from the head (`func_801576FC` walks one object's body,
+/// `Area_RunBundleOpcodes`'s second loop walks the objects).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapObject {
     /// The tag `func_801576FC` passes to `Area_TestCondition`.
@@ -203,6 +216,10 @@ pub struct MapObject {
 }
 
 /// One map bundle payload's sections.
+///
+/// The per-cell vectors hold `width * height` entries: `cells` records, `codes`
+/// bytes and `grid` values. A list record holds at most 255 words and a cell at
+/// most 65,535, the ranges their size fields carry.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapBundle {
     pub width: u8,
@@ -213,7 +230,8 @@ pub struct MapBundle {
     pub scroll_seat: u16,
     /// `width * height` per-cell records, row stride `width`.
     pub cells: Vec<Cell>,
-    /// The per-cell byte-code section (`D_8014931C`), `align4(width * height)` bytes.
+    /// The per-cell byte-code section (`D_8014931C`), `align4(width * height)`
+    /// bytes: one code per cell, then up to three pad bytes.
     pub codes: Vec<u8>,
     /// `width * height` grid cells; `0` is empty.
     pub grid: Vec<u16>,
@@ -233,7 +251,9 @@ pub struct MapBundle {
     pub cells_24: Vec<MapCell>,
     /// The height-byte table, when the payload ships it (13 payloads).
     pub heights: Option<Vec<u8>>,
-    /// The five header words that are zero in all 200 payloads and read by nothing (`+0x16`, `+0x18`, `+0x26`,
+    /// The five header words that are zero in all 200 payloads and read by
+    /// nothing (`+0x16`, `+0x18`, `+0x26`, `+0x2c`, `+0x2e`), carried so a
+    /// decode → encode cycle never drops bytes.
     pub reserved: [u16; 5],
 }
 
@@ -324,7 +344,8 @@ impl MapBundle {
         })
     }
 
-    /// The payload bytes, with every header offset and size field derived from the sections.
+    /// The payload bytes, with every header offset and size field derived from
+    /// the sections.
     pub fn encode(&self) -> Vec<u8> {
         let cells = self.width as usize * self.height as usize;
         let grid_off4 = 12 + cells + cells.div_ceil(4);
@@ -442,7 +463,8 @@ impl MapBundle {
     }
 }
 
-/// Reads a `+0x20`/`+0x22` region.
+/// Reads a `+0x20`/`+0x22` region: records until the zero terminator, which
+/// must be the region's last word.
 fn read_list(bytes: &[u8], start: usize, end: usize) -> Result<Vec<ListRecord>, Error> {
     let mut records = Vec::new();
     let mut at = start;
@@ -467,7 +489,8 @@ fn read_list(bytes: &[u8], start: usize, end: usize) -> Result<Vec<ListRecord>, 
     Err(Error::MapBundleShape("a list region has no zero terminator"))
 }
 
-/// Reads a `+0x24` region.
+/// Reads a `+0x24` region: cells until the zero terminator, each holding a
+/// record chain that tiles its body exactly.
 fn read_cells(bytes: &[u8], start: usize, end: usize) -> Result<Vec<MapCell>, Error> {
     let mut cells = Vec::new();
     let mut at = start;
@@ -504,7 +527,8 @@ fn read_cells(bytes: &[u8], start: usize, end: usize) -> Result<Vec<MapCell>, Er
     Err(Error::MapBundleShape("the cell region has no zero terminator"))
 }
 
-/// Reads a `+0x28` region.
+/// Reads a `+0x28` region: objects until the zero terminator, each holding the
+/// body words its head counts.
 fn read_objects(bytes: &[u8], start: usize, end: usize) -> Result<Vec<MapObject>, Error> {
     let mut objects = Vec::new();
     let mut at = start;
@@ -546,7 +570,8 @@ fn object_words(object: &MapObject) -> usize {
     1 + object.words.len()
 }
 
-/// The words a `+0x24` cell takes, head included, terminator excluded.
+/// The words a `+0x24` cell takes, head included, terminator excluded. The
+/// cell's own size field counts its head too (`next = cell + u16[+0x2] * 4`).
 fn cell_words(cell: &MapCell) -> usize {
     1 + list_words(&cell.records)
 }

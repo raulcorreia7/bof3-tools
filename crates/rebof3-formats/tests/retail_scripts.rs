@@ -1,4 +1,8 @@
-//! Every retail script table decodes to its ops and back byte for byte, its text form imports to the stored
+//! Every retail script table decodes to its ops and back byte for byte, its text form imports to the
+//! stored bytes, and every op stays where the step functions would step: a jump lands on a step of
+//! its stream and a shown frame's reads stay in the table.
+//!
+//! Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
 
 mod support;
 
@@ -9,7 +13,8 @@ use rebof3_formats::script::ScriptTable;
 use rebof3_formats::script::program::{Coverage, Op, Program};
 use rebof3_formats::script::text;
 
-/// The pinned reach of the decode, per table format.
+/// The pinned reach of the decode, per table format: tables, records, streams, ops and shown frames
+/// past their frame table.
 struct Pinned {
     format: Format,
     tables: usize,
@@ -70,7 +75,9 @@ fn record_starts(table: &ScriptTable) -> Vec<Vec<usize>> {
 /// Bytes of one frame-table word.
 const FRAME_WORD: usize = 2;
 
-/// The faults of one table.
+/// The faults of one table: a rebuild that differs, a jump off the stream, a frame word off the table.
+/// A shown frame whose cells reach past the table (a frame past the table, whose word the game reads
+/// from the frames after it) is counted in `draws_past_table`, not a fault: the retail data holds it.
 fn check(name: &str, payload: &[u8], failures: &mut Vec<String>, draws_past_table: &mut usize) -> Option<Program> {
     let program = match Program::decode(payload) {
         Ok(program) => program,

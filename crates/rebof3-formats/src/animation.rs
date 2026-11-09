@@ -4,7 +4,7 @@
 //! source: `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) takes `table + table[n]` of a
 //! character sprites section's animation table, and `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) takes
 //! a record of the script table `g_ScriptBank` names. `Actor_SeekScript`
-//! (`exe/slus_004_22@0x8014D910`) then reads it.
+//! (`exe/slus_004_22@0x8014D910`) then reads it:
 //!
 //! | Offset | Size | Field | Meaning |
 //! | -----: | ---: | ----- | ------- |
@@ -19,7 +19,7 @@
 //! delay byte is [`JUMP`] or more is a jump: its second byte is the step to continue at. The three
 //! step functions are in [`Player`].
 //!
-//! A cell is the `SpriteCell` that `Area_DrawObjectSprite` and `Area_DrawSpriteCell` read.
+//! A cell is the `SpriteCell` that `Area_DrawObjectSprite` and `Area_DrawSpriteCell` read:
 //!
 //! | Offset | Size | Field | Meaning |
 //! | -----: | ---: | ----- | ------- |
@@ -33,7 +33,8 @@ use crate::error::{Error, Result};
 
 /// A delay byte at or above this makes the step a jump (`entry[0] >= 0x80` in `Actor_StepAnimLoop`).
 pub const JUMP: u8 = 0x80;
-/// `SYS_Main` (`exe/slus_004_22@0x8014AAC8`) runs one game frame per `VSync(2)`, and a step function runs once a
+/// `SYS_Main` (`exe/slus_004_22@0x8014AAC8`) runs one game frame per `VSync(2)`, and a step function
+/// runs once a frame, so one tick is two NTSC fields of `1001 / 60000` seconds.
 const FIELDS_PER_TICK: f64 = 2.0;
 const MICROS_PER_FIELD: f64 = 1_000_000.0 * 1001.0 / 60_000.0;
 /// One tick in microseconds.
@@ -223,7 +224,8 @@ impl Playback {
     }
 }
 
-/// The stream state an actor keeps.
+/// The stream state an actor keeps: the byte position (work `+0x58`), the delay left (work `+0x4A`)
+/// and the staged frame (work `+0x5A`).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Player {
     /// The byte position in the step stream, two bytes a step.
@@ -427,6 +429,8 @@ mod tests {
             player.tick(&animation, Playback::Reverse);
             shown.push(player.frame());
         }
+        // Step 0 is staged first; its two ticks run out, then the reverse step reads step 0 again,
+        // wraps to the end and shows 2 for three ticks, then 1.
         assert_eq!(shown, [0, 0, 0, 2, 2, 2, 1, 0]);
     }
 }

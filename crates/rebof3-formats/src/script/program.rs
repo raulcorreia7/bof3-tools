@@ -1,6 +1,15 @@
-//! A script table read as the programs its records hold.
+//! A script table read as the programs its records hold: one animation stream per record.
+//!
 //! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points work `+0x50` at a record of the table
 //! `g_ScriptBank` (`exe/slus_004_22@0x801459F0`) names, and `Actor_SeekScript`
+//! (`exe/slus_004_22@0x8014D910`) reads it as an [`Animation`]: two counts, the steps, the frame
+//! table and the frames. No other reader takes a record, so a record is an animation stream and its
+//! ops are the steps. The step functions read the first byte of a step to choose what it does; the
+//! two choices are [`OPCODES`], and every byte value selects one of them.
+//!
+//! A record that does not read as a stream is kept as [`Record::Raw`] with the reason; in the retail
+//! tables only empty records do. The bytes between a stream's end and the next record are its
+//! padding: zeros that keep the next record two-byte aligned for the `u16` frame table reads.
 
 use core::ops::RangeInclusive;
 use std::collections::BTreeMap;
@@ -19,7 +28,8 @@ const STEP_BYTES: usize = 2;
 const FRAME_WORD: usize = 2;
 /// The most steps a stream holds: its step count is one byte (`Actor_SeekScript` stages it at `+0x49`).
 pub const MAX_STEPS: usize = u8::MAX as usize;
-/// The alignment an edit keeps for every record after the edited one.
+/// The alignment an edit keeps for every record after the edited one: the padding grows or shrinks
+/// so the record's stored length keeps its remainder by this.
 const KEPT_ALIGNMENT: usize = 4;
 /// The farthest a record may start from its section base: the table words are `u16`.
 const MAX_RECORD_OFFSET: usize = u16::MAX as usize;
@@ -27,7 +37,8 @@ const MAX_RECORD_OFFSET: usize = u16::MAX as usize;
 /// What a step's byte means to the handler that reads it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Operand {
-    /// Ticks the frame stays on screen.
+    /// Ticks the frame stays on screen: the byte goes to work `+0x4A` and is counted down once a
+    /// tick before it is tested, so 0 lasts 256 ticks.
     Ticks,
     /// The frame to show: an index into the frame table, staged as the frame's offset in work `+0x5A`.
     Frame,
@@ -37,7 +48,8 @@ pub enum Operand {
     Target,
 }
 
-/// One opcode.
+/// One opcode: the first-byte values that select it, its length and its two bytes as the handler
+/// reads them.
 #[derive(Debug)]
 pub struct Opcode {
     /// The name the listing and the text form use.
@@ -56,8 +68,9 @@ pub struct Opcode {
 
 /// The two opcodes of the step stream, read from the step functions.
 pub static OPCODES: [Opcode; 2] = [
-    // `Actor_StageAnimStep` (exe/slus_004_22@0x8014DB98):
     // `Actor_StageAnimStep` (exe/slus_004_22@0x8014DB98): `unk_4A = script[pc]`, `selected = script[pc + 1]`,
+    // `pc += 2`, `unk_5A = frame_table[selected]`. The loop and once step functions call it for every
+    // step whose first byte is under 0x80.
     Opcode {
         mnemonic: "show",
         codes: 0x00..=JUMP - 1,
@@ -66,9 +79,10 @@ pub static OPCODES: [Opcode; 2] = [
         handler: "Actor_StageAnimStep (exe/slus_004_22@0x8014DB98)",
         does: "stages the frame and the ticks it stays",
     },
-    // `Actor_StepAnimLoop` (exe/slus_004_22@0x8014D978) and `Actor_StepAnimOnce` (exe/slus_004_22@0x8014DAEC):
     // `Actor_StepAnimLoop` (exe/slus_004_22@0x8014D978) and `Actor_StepAnimOnce` (exe/slus_004_22@0x8014DAEC): at
+    // an expired delay, `if (script[pc] >= 0x80) pc = script[pc + 1] << 1`, then `Actor_StageAnimStep` stages
     // the step there. `Actor_StepAnimReverse` (exe/slus_004_22@0x8014DA24), which plays a stream backwards,
+    // does not test the byte and shows the step as a frame for 128 or more ticks.
     Opcode {
         mnemonic: "jump",
         codes: JUMP..=0xFF,
@@ -154,7 +168,9 @@ impl Stream {
         COUNTS_BYTES + STEP_BYTES * self.animation.steps.len() + FRAME_WORD * usize::from(frame)
     }
 
-    /// The bytes, from the record start, that drawing `frame` reads.
+    /// The bytes, from the record start, that drawing `frame` reads: its frame-table word, then the
+    /// cell count and the cells at the offset that word holds. `None` when the word itself is past
+    /// the record. A frame past the table reads a word of the frames after it, as the game does.
     pub fn frame_reach(&self, frame: u8) -> Option<core::ops::Range<usize>> {
         let bytes = self.encode();
         let word = self.frame_word(frame);
@@ -302,7 +318,9 @@ impl Program {
         Self { sections }
     }
 
-    /// The payload bytes.
+    /// The payload bytes: the directory, then each section's table words and records. The table
+    /// words and the directory follow from the record sizes, so an unchanged program gives the
+    /// stored bytes.
     pub fn encode(&self) -> Result<Vec<u8>> {
         if self.sections.is_empty() {
             return Err(Error::ScriptTableShape("a table holds at least one section"));
@@ -348,7 +366,8 @@ impl Program {
         Ok(())
     }
 
-    /// Inserts `op` before step `at.step` (or after the last when it equals the step count).
+    /// Inserts `op` before step `at.step` (or after the last when it equals the step count). Every
+    /// jump to a step at or after the insertion moves with it.
     pub fn insert_op(&mut self, at: StepAt, op: Op) -> Result<()> {
         let stream = self.stream_mut(at.section, at.record)?;
         let steps = stream.animation.steps.len();
@@ -375,7 +394,8 @@ impl Program {
         Ok(())
     }
 
-    /// Removes step `at.step`.
+    /// Removes step `at.step`. Refused while a jump names it or when it is the only step; every jump
+    /// past it moves back.
     pub fn remove_op(&mut self, at: StepAt) -> Result<()> {
         let stream = self.stream_mut(at.section, at.record)?;
         if at.step >= stream.animation.steps.len() {
@@ -420,7 +440,8 @@ impl Program {
     }
 }
 
-/// Runs `change` on the stream's animation and sets the padding so the record's stored length keeps its
+/// Runs `change` on the stream's animation and sets the padding so the record's stored length keeps
+/// its remainder by [`KEPT_ALIGNMENT`]: every record after it keeps its alignment.
 fn resized(stream: &mut Stream, change: impl FnOnce(&mut Animation)) {
     let before = stream.encode().len();
     change(&mut stream.animation);
@@ -429,7 +450,8 @@ fn resized(stream: &mut Stream, change: impl FnOnce(&mut Animation)) {
     stream.padding = vec![0; padding];
 }
 
-/// Refuses a jump that names no step of a stream of `steps` steps.
+/// Refuses a jump that names no step of a stream of `steps` steps: the position would land in the
+/// frame table.
 fn check_target(op: Op, steps: usize) -> Result<()> {
     match op {
         Op::Jump { target, .. } if usize::from(target) >= steps => {
@@ -443,7 +465,8 @@ fn refused(reason: &str) -> Error {
     Error::Import(reason.to_string())
 }
 
-/// One section's bytes.
+/// One section's bytes: the table words, then the records. Entry k of the table holds the start of
+/// the record `slots[k]` names.
 fn encode_section(section: &Section) -> Result<Vec<u8>> {
     if section.slots.first() != Some(&0) {
         return Err(Error::ScriptTableShape("a section's first table entry names its first record"));

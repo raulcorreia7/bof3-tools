@@ -1,4 +1,9 @@
 //! Every retail character sprites decodes and encodes to its own bytes, every section's animations stitch
+//! through the VRAM model, and every section's sprite sheet imports back to the stored section.
+//!
+//! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/` and `SLUS_004.22`);
+//! without it the test skips, and `BOF3_REQUIRE_RETAIL=1` makes a skip a failure. The test lives in
+//! this crate because the classifier does.
 
 mod support;
 

@@ -1,8 +1,10 @@
-//! The entries that are not an asset format.
+//! The entries that are not an asset format: code images, reserved slots, and what no rule
+//! classifies.
 
 use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
-/// Load addresses that hold code images.
+/// Load addresses that hold code images: the EMI code targets of `config/emi/**/target.toml`, plus
+/// the two addresses the asset census's code classifier found without a configured target.
 const CODE_ADDRESSES: [u32; 9] = [
     0x8009_6800, // emi/battle/battle/15
     0x800c_1800,
