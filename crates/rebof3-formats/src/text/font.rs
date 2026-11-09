@@ -50,8 +50,7 @@ impl Font {
         let texels = texel_indices(&grid.words, Depth::Four);
         let width = grid.width * Depth::Four.texels_per_word();
         let (text, frame) = (words(text_palette), words(frame_palette));
-        (texels.len() >= width * (TILE_TOP + TILE_SIDE) && frame.len() >= (FRAME_CELL + 1) * CELL_WORDS)
-            .then_some(Self { width, texels, text, frame })
+        (texels.len() >= width * (TILE_TOP + TILE_SIDE) && frame.len() >= (FRAME_CELL + 1) * CELL_WORDS).then_some(Self { width, texels, text, frame })
     }
 
     /// The texel index at `(u, v)` of the font page.

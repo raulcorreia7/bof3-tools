@@ -42,17 +42,8 @@ fn every_form1_sector_of_the_retail_data_track_is_sealed() {
     }
     // A sector past the last file or directory may be unsealed; the disc keeps such a sector as stored.
     let mut image = Image::open(&cue_path).expect("the disc opens");
-    let covered_end = image
-        .entries()
-        .expect("the file table reads")
-        .iter()
-        .map(|entry| u64::from(entry.lba) + entry.sectors())
-        .max()
-        .expect("the disc has entries");
-    eprintln!(
-        "sealed: {form1} Form 1 sectors verify; {form2} Form 2 sectors left as stored; {} unsealed sectors past the last file",
-        unsealed.len()
-    );
+    let covered_end = image.entries().expect("the file table reads").iter().map(|entry| u64::from(entry.lba) + entry.sectors()).max().expect("the disc has entries");
+    eprintln!("sealed: {form1} Form 1 sectors verify; {form2} Form 2 sectors left as stored; {} unsealed sectors past the last file", unsealed.len());
     assert!(unsealed.iter().all(|&lba| lba >= covered_end), "unsealed sectors inside the file system: {unsealed:?}");
     assert!(form1 > 0);
 }
@@ -75,8 +66,7 @@ fn the_retail_disc_patched_with_its_own_files_is_byte_identical() {
     assert_eq!(summary.files, replacements.len());
 
     let source_dir = cue_path.parent().expect("the cue sheet has a directory");
-    let mut names: Vec<PathBuf> =
-        cue::read(&cue_path).expect("the cue sheet reads").tracks.into_iter().map(|t| t.file).collect();
+    let mut names: Vec<PathBuf> = cue::read(&cue_path).expect("the cue sheet reads").tracks.into_iter().map(|t| t.file).collect();
     names.dedup();
     names.push(cue_path.clone());
     for name in names {
@@ -99,12 +89,7 @@ fn the_retail_disc_patched_with_its_own_files_is_byte_identical() {
 fn assert_same_file(original: &Path, patched: &Path) {
     let mut left = BufReader::new(File::open(original).expect("the original file opens"));
     let mut right = BufReader::new(File::open(patched).expect("the patched file opens"));
-    assert_eq!(
-        fs::metadata(original).expect("metadata").len(),
-        fs::metadata(patched).expect("metadata").len(),
-        "{} has another length",
-        original.display()
-    );
+    assert_eq!(fs::metadata(original).expect("metadata").len(), fs::metadata(patched).expect("metadata").len(), "{} has another length", original.display());
     let (mut left_block, mut right_block) = (vec![0_u8; 1 << 20], vec![0_u8; 1 << 20]);
     let mut offset = 0_u64;
     loop {

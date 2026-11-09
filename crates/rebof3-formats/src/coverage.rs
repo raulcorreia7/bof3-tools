@@ -53,12 +53,7 @@ pub struct Report {
 
 impl Report {
     fn new() -> Self {
-        Self {
-            rows: vec![Row::default(); Format::ALL.len()],
-            container: Container::default(),
-            failures: Vec::new(),
-            residual: BTreeMap::new(),
-        }
+        Self { rows: vec![Row::default(); Format::ALL.len()], container: Container::default(), failures: Vec::new(), residual: BTreeMap::new() }
     }
 
     /// The row for one format.
@@ -110,48 +105,21 @@ impl Report {
     /// The scoreboard as text.
     pub fn table(&self) -> String {
         let mut out = String::new();
-        out.push_str(&format!(
-            "{:<48} {:>7} {:>12} {:>10} {:>10}\n",
-            "format", "entries", "bytes", "state", "round-trip"
-        ));
+        out.push_str(&format!("{:<48} {:>7} {:>12} {:>10} {:>10}\n", "format", "entries", "bytes", "state", "round-trip"));
         for format in Format::ALL {
             let row = self.row(format);
             if row.entries == 0 {
                 continue;
             }
-            out.push_str(&format!(
-                "{:<48} {:>7} {:>12} {:>10} {:>10}\n",
-                format.name(),
-                row.entries,
-                row.bytes,
-                format.state().label(),
-                round_trip_cell(format, row),
-            ));
+            out.push_str(&format!("{:<48} {:>7} {:>12} {:>10} {:>10}\n", format.name(), row.entries, row.bytes, format.state().label(), round_trip_cell(format, row),));
         }
         out.push_str(&format!("{:<48} {:>7} {:>12}\n", "TOTAL", self.entries(), self.bytes()));
-        out.push_str(&format!(
-            "{:<48} {:>7} {:>12} {:>10}\n",
-            "codec-covered",
-            self.covered_entries(),
-            self.covered_bytes(),
-            percent(self.covered_bytes(), self.bytes()),
-        ));
+        out.push_str(&format!("{:<48} {:>7} {:>12} {:>10}\n", "codec-covered", self.covered_entries(), self.covered_bytes(), percent(self.covered_bytes(), self.bytes()),));
         for state in [State::Specified, State::Unknown, State::Code, State::Reserve] {
-            out.push_str(&format!(
-                "{:<48} {:>7} {:>12} {:>10}\n",
-                state.label(),
-                self.state_entries(state),
-                self.state_bytes(state),
-                percent(self.state_bytes(state), self.bytes()),
-            ));
+            out.push_str(&format!("{:<48} {:>7} {:>12} {:>10}\n", state.label(), self.state_entries(state), self.state_bytes(state), percent(self.state_bytes(state), self.bytes()),));
         }
         for (address, (entries, bytes)) in &self.residual {
-            out.push_str(&format!(
-                "{:<48} {:>7} {:>12}\n",
-                format!("  unclassified at {address:#010x}"),
-                entries,
-                bytes
-            ));
+            out.push_str(&format!("{:<48} {:>7} {:>12}\n", format!("  unclassified at {address:#010x}"), entries, bytes));
         }
         out.push_str(&format!(
             "container: {}/{} archives byte-identical, {} entries, {} bytes\n",

@@ -92,9 +92,7 @@ pub fn parse(payload: &[u8]) -> Result<CharacterSprites> {
     starts.push(CONTAINER_HEAD as usize);
     for index in 1..CONTAINER_SECTIONS {
         let offset = word(payload, index * WORD)?;
-        starts.push(usize::try_from(offset).map_err(|_| {
-            Error::CharacterPalettes(format!("container section offset {offset:#x} does not fit in memory"))
-        })?);
+        starts.push(usize::try_from(offset).map_err(|_| Error::CharacterPalettes(format!("container section offset {offset:#x} does not fit in memory")))?);
     }
 
     let mut sections = Vec::with_capacity(CONTAINER_SECTIONS);
@@ -115,13 +113,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
         sections: sprites
             .sections
             .iter()
-            .map(|section| JsonSection {
-                palettes: section
-                    .palettes
-                    .iter()
-                    .map(|palette| palette.iter().map(|colour| format!("{colour:04x}")).collect())
-                    .collect(),
-            })
+            .map(|section| JsonSection { palettes: section.palettes.iter().map(|palette| palette.iter().map(|colour| format!("{colour:04x}")).collect()).collect() })
             .collect(),
     };
     Ok(serde_json::to_vec_pretty(&json).expect("a palette serializes"))
@@ -130,31 +122,19 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 /// The payload with its palettes replaced by the JSON that [`export`] wrote. The JSON must have the character sprites' sections
 /// and the same palette count in each; every byte outside the palettes stays as it was.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let json: Json = serde_json::from_slice(json)
-        .map_err(|error| Error::CharacterPalettes(format!("the palettes JSON does not read: {error}")))?;
+    let json: Json = serde_json::from_slice(json).map_err(|error| Error::CharacterPalettes(format!("the palettes JSON does not read: {error}")))?;
     let sprites = parse(payload)?;
     if json.sections.len() != sprites.sections.len() {
-        return Err(Error::CharacterPalettes(format!(
-            "{} sections; the character sprites have {}",
-            json.sections.len(),
-            sprites.sections.len()
-        )));
+        return Err(Error::CharacterPalettes(format!("{} sections; the character sprites have {}", json.sections.len(), sprites.sections.len())));
     }
     let mut out = payload.to_vec();
     for (index, (section, rows)) in sprites.sections.iter().zip(&json.sections).enumerate() {
         if rows.palettes.len() != section.palettes.len() {
-            return Err(Error::CharacterPalettes(format!(
-                "section {index} has {} palettes; the character sprites have {}",
-                rows.palettes.len(),
-                section.palettes.len()
-            )));
+            return Err(Error::CharacterPalettes(format!("section {index} has {} palettes; the character sprites have {}", rows.palettes.len(), section.palettes.len())));
         }
         for (palette, row) in rows.palettes.iter().enumerate() {
             if row.len() != COLOURS {
-                return Err(Error::CharacterPalettes(format!(
-                    "section {index} palette {palette} has {} colours; a palette has {COLOURS}",
-                    row.len()
-                )));
+                return Err(Error::CharacterPalettes(format!("section {index} palette {palette} has {} colours; a palette has {COLOURS}", row.len())));
             }
             let at = section.palette_at(palette);
             for (colour, text) in row.iter().enumerate() {
@@ -168,8 +148,7 @@ pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
 
 /// The section at `start`. Its palette table must be in the layout of the module documentation.
 fn section(payload: &[u8], start: usize, end: usize) -> Result<Section> {
-    let outside =
-        |at: usize| not_character_sprites(start, format!("the word at {at:#x} is past the end of the section"));
+    let outside = |at: usize| not_character_sprites(start, format!("the word at {at:#x} is past the end of the section"));
     let read = |at: usize| {
         let word_end = at.checked_add(WORD).ok_or_else(|| outside(at))?;
         if at < start || word_end > end {
@@ -178,42 +157,27 @@ fn section(payload: &[u8], start: usize, end: usize) -> Result<Section> {
         word(payload, at).map_err(|_| outside(at))
     };
     let table_word = start.checked_add(TABLE_AT).ok_or_else(|| outside(start))?;
-    let table_offset = usize::try_from(read(table_word)?)
-        .map_err(|_| not_character_sprites(start, "its palette-table offset does not fit in memory"))?;
-    let table = start
-        .checked_add(table_offset)
-        .ok_or_else(|| not_character_sprites(start, "its palette-table offset overflows"))?;
-    let first = usize::try_from(read(table)?)
-        .map_err(|_| not_character_sprites(start, "its palette-table size does not fit in memory"))?;
+    let table_offset = usize::try_from(read(table_word)?).map_err(|_| not_character_sprites(start, "its palette-table offset does not fit in memory"))?;
+    let table = start.checked_add(table_offset).ok_or_else(|| not_character_sprites(start, "its palette-table offset overflows"))?;
+    let first = usize::try_from(read(table)?).map_err(|_| not_character_sprites(start, "its palette-table size does not fit in memory"))?;
     if first == 0 || !first.is_multiple_of(WORD) {
         return Err(not_character_sprites(start, format!("its palette table starts with {first:#x}")));
     }
     let count = first / WORD;
-    let table_end =
-        table.checked_add(first).ok_or_else(|| not_character_sprites(start, "its palette table overflows"))?;
+    let table_end = table.checked_add(first).ok_or_else(|| not_character_sprites(start, "its palette table overflows"))?;
     if table_end > end {
         return Err(not_character_sprites(start, "its palette offsets run past the end of the section"));
     }
 
     for index in 0..count {
-        let offset_at = WORD
-            .checked_mul(index)
-            .and_then(|relative| table.checked_add(relative))
-            .ok_or_else(|| not_character_sprites(start, "its palette offset table overflows"))?;
-        let offset = usize::try_from(read(offset_at)?)
-            .map_err(|_| not_character_sprites(start, "a palette offset does not fit in memory"))?;
-        let expected = PALETTE_BYTES
-            .checked_mul(index)
-            .and_then(|bytes| first.checked_add(bytes))
-            .ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
+        let offset_at = WORD.checked_mul(index).and_then(|relative| table.checked_add(relative)).ok_or_else(|| not_character_sprites(start, "its palette offset table overflows"))?;
+        let offset = usize::try_from(read(offset_at)?).map_err(|_| not_character_sprites(start, "a palette offset does not fit in memory"))?;
+        let expected = PALETTE_BYTES.checked_mul(index).and_then(|bytes| first.checked_add(bytes)).ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
         if offset != expected {
             return Err(not_character_sprites(start, format!("palette {index} is at {offset:#x}, not {expected:#x}")));
         }
-        let palette_at =
-            table.checked_add(offset).ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
-        let palette_end = palette_at
-            .checked_add(PALETTE_BYTES)
-            .ok_or_else(|| not_character_sprites(start, "a palette range overflows"))?;
+        let palette_at = table.checked_add(offset).ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
+        let palette_end = palette_at.checked_add(PALETTE_BYTES).ok_or_else(|| not_character_sprites(start, "a palette range overflows"))?;
         if palette_end > end {
             return Err(not_character_sprites(start, format!("palette {index} runs past the end of the section")));
         }
@@ -221,12 +185,8 @@ fn section(payload: &[u8], start: usize, end: usize) -> Result<Section> {
 
     let mut palettes = Vec::with_capacity(count);
     for index in 0..count {
-        let relative = PALETTE_BYTES
-            .checked_mul(index)
-            .and_then(|bytes| first.checked_add(bytes))
-            .ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
-        let at =
-            table.checked_add(relative).ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
+        let relative = PALETTE_BYTES.checked_mul(index).and_then(|bytes| first.checked_add(bytes)).ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
+        let at = table.checked_add(relative).ok_or_else(|| not_character_sprites(start, "a palette offset overflows"))?;
         palettes.push(palette(payload, at)?);
     }
     Ok(Section { start, table, palettes })
@@ -234,12 +194,8 @@ fn section(payload: &[u8], start: usize, end: usize) -> Result<Section> {
 
 /// The palette at `at`.
 fn palette(payload: &[u8], at: usize) -> Result<Palette> {
-    let end = at
-        .checked_add(PALETTE_BYTES)
-        .ok_or_else(|| Error::CharacterPalettes(format!("the palette at {at:#x} runs past the end of the payload")))?;
-    let bytes = payload
-        .get(at..end)
-        .ok_or_else(|| Error::CharacterPalettes(format!("the palette at {at:#x} runs past the end of the payload")))?;
+    let end = at.checked_add(PALETTE_BYTES).ok_or_else(|| Error::CharacterPalettes(format!("the palette at {at:#x} runs past the end of the payload")))?;
+    let bytes = payload.get(at..end).ok_or_else(|| Error::CharacterPalettes(format!("the palette at {at:#x} runs past the end of the payload")))?;
     let mut palette = [0u16; COLOURS];
     for (colour, pair) in palette.iter_mut().zip(bytes.as_chunks::<2>().0) {
         *colour = u16::from_le_bytes(*pair);
@@ -249,13 +205,8 @@ fn palette(payload: &[u8], at: usize) -> Result<Palette> {
 
 /// The little-endian word at `at`.
 fn word(payload: &[u8], at: usize) -> Result<u32> {
-    let end = at
-        .checked_add(WORD)
-        .ok_or_else(|| Error::CharacterPalettes(format!("the payload ends before the word at {at:#x}")))?;
-    payload
-        .get(at..end)
-        .map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-        .ok_or_else(|| Error::CharacterPalettes(format!("the payload ends before the word at {at:#x}")))
+    let end = at.checked_add(WORD).ok_or_else(|| Error::CharacterPalettes(format!("the payload ends before the word at {at:#x}")))?;
+    payload.get(at..end).map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])).ok_or_else(|| Error::CharacterPalettes(format!("the payload ends before the word at {at:#x}")))
 }
 
 /// A colour from its four hex digits.
@@ -292,11 +243,7 @@ mod tests {
 
     /// A container whose three sections hold `counts` palettes each.
     fn container(counts: [usize; CONTAINER_SECTIONS]) -> Vec<u8> {
-        let sections: Vec<Vec<u8>> = counts
-            .iter()
-            .enumerate()
-            .map(|(index, &count)| section_bytes(count, 0x1000 * (index as u16 + 1)))
-            .collect();
+        let sections: Vec<Vec<u8>> = counts.iter().enumerate().map(|(index, &count)| section_bytes(count, 0x1000 * (index as u16 + 1))).collect();
         let mut out = Vec::new();
         let mut start = CONTAINER_HEAD as usize;
         out.extend(CONTAINER_HEAD.to_le_bytes());

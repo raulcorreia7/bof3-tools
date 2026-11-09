@@ -51,19 +51,11 @@ fn round_trip(where_: &str, payload: &[u8]) -> Result<clut::Palette, String> {
 /// Checks the JSON and PNG views of one sampled bank against the documented shape.
 fn check_sample(where_: &str, palette: &clut::Palette) {
     let document: serde_json::Value = serde_json::from_str(&palette.json()).expect("palette JSON parses");
-    assert_eq!(
-        document["colors"].as_array().map(Vec::len),
-        Some(palette.words().len()),
-        "{where_}: palette JSON color count"
-    );
+    assert_eq!(document["colors"].as_array().map(Vec::len), Some(palette.words().len()), "{where_}: palette JSON color count");
     let png = palette.png_strip();
     assert!(png.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]), "{where_}: palette strip is not a PNG");
     let geometry = (&png[16..20], &png[20..24]);
-    assert_eq!(
-        (be_u32(geometry.0), be_u32(geometry.1)),
-        (16 * SWATCH_PIXELS, palette.rows_4bpp() as u32 * SWATCH_PIXELS),
-        "{where_}: palette strip geometry"
-    );
+    assert_eq!((be_u32(geometry.0), be_u32(geometry.1)), (16 * SWATCH_PIXELS, palette.rows_4bpp() as u32 * SWATCH_PIXELS), "{where_}: palette strip geometry");
 }
 
 fn be_u32(bytes: &[u8]) -> u32 {
@@ -105,18 +97,8 @@ fn retail_palettes_round_trip_byte_exactly() {
         }
     }
 
-    assert!(
-        payloads >= CENSUS_PALETTES,
-        "found {payloads} CLUT-band type-0 payloads, fewer than the census {CENSUS_PALETTES}"
-    );
-    assert!(
-        failures.is_empty(),
-        "{}/{} CLUT-band type-0 payloads round-trip byte-exactly; {} failures:\n{}",
-        payloads - failures.len(),
-        payloads,
-        failures.len(),
-        failures.join("\n")
-    );
+    assert!(payloads >= CENSUS_PALETTES, "found {payloads} CLUT-band type-0 payloads, fewer than the census {CENSUS_PALETTES}");
+    assert!(failures.is_empty(), "{}/{} CLUT-band type-0 payloads round-trip byte-exactly; {} failures:\n{}", payloads - failures.len(), payloads, failures.len(), failures.join("\n"));
 
     let (where_, palette) = sample.expect("a sampled band palette");
     check_sample(&where_, &palette);

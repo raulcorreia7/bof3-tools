@@ -40,16 +40,7 @@ const EVIDENCE: &str = "wiki: data/records#area-data (enemy records); wiki: form
 /// The block as JSON.
 fn open_files(site: &Site<'_>) -> Extras {
     match open::export(site.payload()) {
-        Ok(data) => Extras {
-            files: vec![Extra {
-                role: "json",
-                tag: String::new(),
-                extension: "json",
-                evidence: EVIDENCE.to_string(),
-                data,
-            }],
-            skipped: None,
-        },
+        Ok(data) => Extras { files: vec![Extra { role: "json", tag: String::new(), extension: "json", evidence: EVIDENCE.to_string(), data }], skipped: None },
         Err(error) => Extras { files: Vec::new(), skipped: Some(format!("encounters skipped: {error}")) },
     }
 }
@@ -131,10 +122,7 @@ pub struct EncounterBlock {
     pub enemies: Vec<Enemy>,
 }
 
-fn serialize_name<S: serde::Serializer>(
-    name: &[u8; NAME_BYTES],
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
+fn serialize_name<S: serde::Serializer>(name: &[u8; NAME_BYTES], serializer: S) -> std::result::Result<S::Ok, S::Error> {
     serializer.serialize_str(&name_text(name))
 }
 
@@ -147,10 +135,7 @@ impl EncounterBlock {
         let encounters = (0..ENCOUNTERS)
             .map(|index| {
                 let record = &payload[index * ENCOUNTER_BYTES..(index + 1) * ENCOUNTER_BYTES];
-                Encounter {
-                    enemies: record[..ENCOUNTER_ENEMIES].try_into().expect("eight enemy indexes"),
-                    appearance_rate: record[ENCOUNTER_ENEMIES],
-                }
+                Encounter { enemies: record[..ENCOUNTER_ENEMIES].try_into().expect("eight enemy indexes"), appearance_rate: record[ENCOUNTER_ENEMIES] }
             })
             .collect();
         let enemies = (0..ENEMIES)
@@ -193,9 +178,7 @@ fn enemy(record: &[u8]) -> Enemy {
 }
 
 /// Reads an enemy's name from its JSON text, which must fit in [`NAME_BYTES`] bytes.
-fn deserialize_name<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> std::result::Result<[u8; NAME_BYTES], D::Error> {
+fn deserialize_name<'de, D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<[u8; NAME_BYTES], D::Error> {
     let text = <String as serde::Deserialize>::deserialize(deserializer)?;
     let bytes = name_field(&text, NAME_BYTES).map_err(<D::Error as serde::de::Error>::custom)?;
     Ok(bytes.try_into().expect("an enemy name is NAME_BYTES long"))
@@ -268,10 +251,7 @@ mod tests {
     fn a_encounter_block_reads_its_encounters_and_enemies() {
         let parsed = EncounterBlock::parse(&block()).unwrap();
         assert_eq!(parsed.encounters.len(), ENCOUNTERS);
-        assert_eq!(
-            parsed.encounters[0],
-            Encounter { enemies: [0, 1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], appearance_rate: 2 }
-        );
+        assert_eq!(parsed.encounters[0], Encounter { enemies: [0, 1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], appearance_rate: 2 });
         assert_eq!(parsed.enemies.len(), ENEMIES);
         let worker = &parsed.enemies[0];
         assert_eq!(name_text(&worker.name), "Worker");

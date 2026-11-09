@@ -55,17 +55,14 @@ impl<'a> Executable<'a> {
         if bytes.get(..EXE_MAGIC.len()) != Some(&EXE_MAGIC[..]) {
             return Err(Error::Field("the executable is not a PS-X EXE".into()));
         }
-        let text =
-            word_at(bytes, EXE_TEXT_ADDRESS).ok_or_else(|| Error::Field("the executable's header is short".into()))?;
+        let text = word_at(bytes, EXE_TEXT_ADDRESS).ok_or_else(|| Error::Field("the executable's header is short".into()))?;
         Ok(Self { bytes, text })
     }
 
     /// The `length` bytes at RAM `address`.
     pub fn bytes(&self, address: u32, length: usize) -> Result<&'a [u8]> {
         let offset = address.checked_sub(self.text).map(|offset| EXE_TEXT_START + offset as usize);
-        offset
-            .and_then(|offset| self.bytes.get(offset..offset + length))
-            .ok_or_else(|| Error::Field(format!("the executable does not hold {length} bytes at {address:#010X}")))
+        offset.and_then(|offset| self.bytes.get(offset..offset + length)).ok_or_else(|| Error::Field(format!("the executable does not hold {length} bytes at {address:#010X}")))
     }
 
     /// The word at RAM `address`.
@@ -85,10 +82,7 @@ impl<'a> Executable<'a> {
         let bytes = self.bytes(FACING_STEPS, FACINGS * 8)?;
         let mut steps = [[0; 2]; FACINGS];
         for (step, row) in steps.iter_mut().zip(bytes.as_chunks::<8>().0) {
-            *step = [
-                i32::from_le_bytes([row[0], row[1], row[2], row[3]]),
-                i32::from_le_bytes([row[4], row[5], row[6], row[7]]),
-            ];
+            *step = [i32::from_le_bytes([row[0], row[1], row[2], row[3]]), i32::from_le_bytes([row[4], row[5], row[6], row[7]])];
         }
         Ok(steps)
     }
@@ -100,8 +94,7 @@ impl<'a> Executable<'a> {
     pub fn zones(&self, area: usize) -> Result<Vec<Zone>> {
         check_area(area)?;
         let table_end = AREA_ENCOUNTER_ZONES + (ZONE_ROWS * ZONE_BYTES) as u32;
-        let pointers: Vec<u32> =
-            (0..AREAS as u32).map(|index| self.word(ENCOUNTER_ZONES + 4 * index)).collect::<Result<_>>()?;
+        let pointers: Vec<u32> = (0..AREAS as u32).map(|index| self.word(ENCOUNTER_ZONES + 4 * index)).collect::<Result<_>>()?;
         let start = pointers[area];
         if !(AREA_ENCOUNTER_ZONES..table_end).contains(&start) {
             return Err(Error::Field(format!("area {area}'s zone list {start:#010X} is outside g_AreaEncounterZones")));
@@ -114,15 +107,7 @@ impl<'a> Executable<'a> {
             .0
             .iter()
             .enumerate()
-            .map(|(index, row)| Zone {
-                address: start + (index * ZONE_BYTES) as u32,
-                first: [row[0], row[1]],
-                last: [row[2], row[3]],
-                rate: row[4],
-                kind: row[5],
-                seed: row[6],
-                pick: row[7],
-            })
+            .map(|(index, row)| Zone { address: start + (index * ZONE_BYTES) as u32, first: [row[0], row[1]], last: [row[2], row[3]], rate: row[4], kind: row[5], seed: row[6], pick: row[7] })
             .collect())
     }
 }
@@ -131,9 +116,7 @@ impl<'a> Executable<'a> {
 /// loads at [`GAME_CODE`]).
 pub fn facing_scripts(code: &[u8]) -> Result<[[u8; 2]; FACINGS]> {
     let at = (FACING_SCRIPTS - GAME_CODE) as usize;
-    let bytes = code
-        .get(at..at + 2 * FACINGS)
-        .ok_or_else(|| Error::Field("the game code image does not reach D_801C839C".into()))?;
+    let bytes = code.get(at..at + 2 * FACINGS).ok_or_else(|| Error::Field("the game code image does not reach D_801C839C".into()))?;
     let mut scripts = [[0; 2]; FACINGS];
     for (script, pair) in scripts.iter_mut().zip(bytes.as_chunks::<2>().0) {
         *script = *pair;

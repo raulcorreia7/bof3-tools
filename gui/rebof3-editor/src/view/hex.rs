@@ -1,8 +1,6 @@
 //! A hex editor with a value inspector: the bytes at the cursor read as every integer width.
 
-use gpui::{
-    AnyElement, Context, Keystroke, ScrollStrategy, UniformListScrollHandle, div, prelude::*, px, uniform_list,
-};
+use gpui::{AnyElement, Context, Keystroke, ScrollStrategy, UniformListScrollHandle, div, prelude::*, px, uniform_list};
 
 use super::{Entry, Field, input};
 use crate::app::Editor;
@@ -31,8 +29,7 @@ const GOTO_WIDTH: f32 = 80.0;
 const INSPECTOR_WIDTH: f32 = 240.0;
 
 /// The integer widths the inspector reads: label, bytes and signedness.
-const WIDTHS: [(&str, usize, bool); 6] =
-    [("u8", 1, false), ("s8", 1, true), ("u16", 2, false), ("s16", 2, true), ("u32", 4, false), ("s32", 4, true)];
+const WIDTHS: [(&str, usize, bool); 6] = [("u8", 1, false), ("s8", 1, true), ("u16", 2, false), ("s16", 2, true), ("u32", 4, false), ("s32", 4, true)];
 
 #[derive(Default)]
 pub struct State {
@@ -60,14 +57,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let cursor = state.cursor.min(length - 1);
 
     let goto = input(editor, "goto", Field::Goto, &state.goto, "0x0", Some(GOTO_WIDTH), cx);
-    let header = div()
-        .flex()
-        .flex_none()
-        .items_center()
-        .gap(px(GAP))
-        .child("Go to offset")
-        .child(goto)
-        .child(muted("Type hex digits to overwrite the byte at the cursor; arrows move."));
+    let header = div().flex().flex_none().items_center().gap(px(GAP)).child("Go to offset").child(goto).child(muted("Type hex digits to overwrite the byte at the cursor; arrows move."));
 
     let rows = length.div_ceil(ROW_BYTES);
     let grid = uniform_list(
@@ -89,12 +79,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .min_h_0()
         .gap(px(GAP))
         .child(header)
-        .child(div().flex().flex_1().min_h_0().gap(px(GAP_SECTION)).child(grid).child(inspector(
-            editor,
-            entry.payload(),
-            cursor,
-            cx,
-        )))
+        .child(div().flex().flex_1().min_h_0().gap(px(GAP_SECTION)).child(grid).child(inspector(editor, entry.payload(), cursor, cx)))
         .into_any_element()
 }
 
@@ -105,12 +90,7 @@ fn grid_row(editor: &Editor, entry: &Entry<'_>, row: usize, cx: &mut Context<Edi
     let start = row * ROW_BYTES;
     let end = (start + ROW_BYTES).min(payload.len());
 
-    let mut line = div()
-        .flex()
-        .h(px(ROW_HEIGHT))
-        .items_center()
-        .gap(px(BYTE_GAP))
-        .child(div().text_color(color(MUTED)).mr(px(GAP)).child(format!("{start:0OFFSET_DIGITS$X}")));
+    let mut line = div().flex().h(px(ROW_HEIGHT)).items_center().gap(px(BYTE_GAP)).child(div().text_color(color(MUTED)).mr(px(GAP)).child(format!("{start:0OFFSET_DIGITS$X}")));
 
     for (at, &byte) in payload.iter().enumerate().take(end).skip(start) {
         let text = match state.pending {
@@ -133,8 +113,7 @@ fn grid_row(editor: &Editor, entry: &Entry<'_>, row: usize, cx: &mut Context<Edi
         line = line.child(cell);
     }
 
-    let ascii: String =
-        payload[start..end].iter().map(|&byte| if byte.is_ascii_graphic() { byte as char } else { '.' }).collect();
+    let ascii: String = payload[start..end].iter().map(|&byte| if byte.is_ascii_graphic() { byte as char } else { '.' }).collect();
     line.child(div().ml(px(GAP)).text_color(color(MUTED)).child(ascii))
 }
 
@@ -145,8 +124,7 @@ fn inspector(editor: &Editor, payload: &[u8], cursor: usize, cx: &mut Context<Ed
 
     for (row, &(label, width, signed)) in WIDTHS.iter().enumerate() {
         let Some(value) = read(payload, cursor, width, signed) else { continue };
-        let value = input(editor, ("inspector", row), Field::Inspector(row), &value, "", Some(FIELD_WIDTH), cx)
-            .font_family(fonts::mono());
+        let value = input(editor, ("inspector", row), Field::Inspector(row), &value, "", Some(FIELD_WIDTH), cx).font_family(fonts::mono());
         column = column.child(div().flex().items_center().child(div().w(px(LABEL_WIDTH)).child(label)).child(value));
     }
 

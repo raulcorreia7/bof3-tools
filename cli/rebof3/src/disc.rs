@@ -78,13 +78,7 @@ fn run(args: Vec<OsString>) -> Result<i32, String> {
         "verify" => verify(options),
         value => Err(format!("unknown command {value:?}; run `bof3 disc --help` for the commands")),
     };
-    result.map_err(|message| {
-        if message.contains("--help") || message.contains("help`") {
-            message
-        } else {
-            format!("{message}; run `bof3 disc {command} --help`")
-        }
-    })
+    result.map_err(|message| if message.contains("--help") || message.contains("help`") { message } else { format!("{message}; run `bof3 disc {command} --help`") })
 }
 
 /// The focused help for one command.
@@ -115,11 +109,7 @@ fn extract(options: Options) -> Result<i32, String> {
     let project = options.project.unwrap_or_else(|| output.join(format!("{}.xml", file_stem(&input))));
     let entries = open_walk_extract(&input, &output, &project)?;
     if !options.quiet {
-        eprintln!(
-            "extracted {} files to {}",
-            entries.iter().filter(|value| !value.is_directory).count(),
-            output.display()
-        );
+        eprintln!("extracted {} files to {}", entries.iter().filter(|value| !value.is_directory).count(), output.display());
         eprintln!("project XML: {}", project.display());
     }
     Ok(EXIT_OK)
@@ -130,18 +120,10 @@ fn file_stem(path: &Path) -> &str {
 }
 
 fn rebuild(options: Options) -> Result<i32, String> {
-    reject(
-        &options,
-        &[('x', options.extract.is_some()), ('p', options.project.is_some()), ('r', options.raw_root.is_some())],
-    )?;
+    reject(&options, &[('x', options.extract.is_some()), ('p', options.project.is_some()), ('r', options.raw_root.is_some())])?;
     let input = options.input.ok_or("rebuild needs an input folder: pass -i DIR.")?;
     let output = options.output.ok_or("rebuild needs an output file: pass -o IMAGE.iso.")?;
-    psx_cd::rebuild::iso_with_labels(
-        &input,
-        &output,
-        psx_cd::rebuild::VolumeLabels { system: SYSTEM_IDENTIFIER, volume: VOLUME_IDENTIFIER },
-    )
-    .map_err(display_error(&input))?;
+    psx_cd::rebuild::iso_with_labels(&input, &output, psx_cd::rebuild::VolumeLabels { system: SYSTEM_IDENTIFIER, volume: VOLUME_IDENTIFIER }).map_err(display_error(&input))?;
     if !options.quiet {
         eprintln!("wrote synthetic ISO: {}", output.display());
     }
@@ -170,10 +152,7 @@ fn lba_json(options: Options) -> Result<i32, String> {
 }
 
 fn checksum(options: Options) -> Result<i32, String> {
-    reject(
-        &options,
-        &[('p', options.project.is_some()), ('x', options.extract.is_some()), ('r', options.raw_root.is_some())],
-    )?;
+    reject(&options, &[('p', options.project.is_some()), ('x', options.extract.is_some()), ('r', options.raw_root.is_some())])?;
     let input = options.input.ok_or("checksum needs an input folder: pass -i DIR.")?;
     let output = options.output.ok_or("checksum needs an output file: pass -o FILE.json.")?;
     let current = env::current_dir().map_err(|error| error.to_string())?;
@@ -186,10 +165,7 @@ fn checksum(options: Options) -> Result<i32, String> {
 }
 
 fn verify(options: Options) -> Result<i32, String> {
-    reject(
-        &options,
-        &[('p', options.project.is_some()), ('x', options.extract.is_some()), ('r', options.raw_root.is_some())],
-    )?;
+    reject(&options, &[('p', options.project.is_some()), ('x', options.extract.is_some()), ('r', options.raw_root.is_some())])?;
     let input = options.input.ok_or("verify needs an input folder: pass -i DIR.")?;
     let checksums = options.output.ok_or("verify needs the checksums file: pass -o FILE.json.")?;
     let current = env::current_dir().map_err(|error| error.to_string())?;
@@ -217,11 +193,7 @@ fn parse_options(args: &[OsString]) -> Result<Options, String> {
             "-q" | "--quiet" => options.quiet = true,
             "-i" | "--input" | "-o" | "--output" | "-x" | "--extract" | "-p" | "--project" | "-r" | "--raw-root" => {
                 index += 1;
-                let value = PathBuf::from(args.get(index).ok_or_else(|| {
-                    format!(
-                        "option {flag} needs a value, for example -o build/disc; run `bof3 disc help` for the options"
-                    )
-                })?);
+                let value = PathBuf::from(args.get(index).ok_or_else(|| format!("option {flag} needs a value, for example -o build/disc; run `bof3 disc help` for the options"))?);
                 match flag {
                     "-i" | "--input" => options.input = Some(value),
                     "-o" | "--output" => options.output = Some(value),
@@ -261,12 +233,7 @@ fn open_walk_extract(input: &Path, output: &Path, project: &Path) -> Result<Vec<
     let mut image = Image::open(input).map_err(display_error(input))?;
     let entries = image.entries().map_err(display_error(input))?;
     image.extract(output).map_err(display_error(input))?;
-    metadata::write_project(
-        project,
-        &entries,
-        input.file_name().and_then(|value| value.to_str()).unwrap_or("disc.bin"),
-    )
-    .map_err(|error| error.to_string())?;
+    metadata::write_project(project, &entries, input.file_name().and_then(|value| value.to_str()).unwrap_or("disc.bin")).map_err(|error| error.to_string())?;
     Ok(entries)
 }
 

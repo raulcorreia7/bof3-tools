@@ -18,15 +18,13 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use gpui::{
-    AnyElement, Bounds as Area, Context, Div, Pixels, Window, canvas, div, fill, point, prelude::*, px, rgba, size,
-};
+use gpui::{AnyElement, Bounds as Area, Context, Div, Pixels, Window, canvas, div, fill, point, prelude::*, px, rgba, size};
 use rebof3_assets::decode::color_rgba;
 use rebof3_assets::sprites::{self, SpriteSizes};
 use rebof3_emi::replay::Vram;
 use rebof3_formats::sprite::{
-    self as format, Animation, Bounds, COLOURS, CharacterSprites, Frame, Image, Palette, Placement, Playback, Player,
-    Reader, Section, Stage, TICK_MICROS, animation_bounds, cell_rect, compose, duration_ms, frame_bounds, ticks_of,
+    self as format, Animation, Bounds, COLOURS, CharacterSprites, Frame, Image, Palette, Placement, Playback, Player, Reader, Section, Stage, TICK_MICROS, animation_bounds, cell_rect, compose,
+    duration_ms, frame_bounds, ticks_of,
 };
 
 use super::Entry;
@@ -34,9 +32,7 @@ use super::palette::{SWATCH, SWATCH_GAP, Sliders, picker};
 use super::texture::paint_pixels;
 use crate::app::Editor;
 use crate::theme::{BACKGROUND, MUTED, color};
-use crate::widgets::{
-    GAP, GAP_SMALL, button, checkbox, mono, muted, outline, selectable, separator, slider, strong, swatch, tab, tip,
-};
+use crate::widgets::{GAP, GAP_SMALL, button, checkbox, mono, muted, outline, selectable, separator, slider, strong, swatch, tab, tip};
 
 /// The executable in the disc folder that holds `g_SpriteSizes`.
 const EXECUTABLE: &str = "SLUS_004.22";
@@ -175,9 +171,7 @@ impl State {
     }
 
     fn player(&self) -> Option<Player> {
-        self.player
-            .filter(|(section, animation, _)| (*section, *animation) == (self.section, self.animation))
-            .map(|(_, _, player)| player)
+        self.player.filter(|(section, animation, _)| (*section, *animation) == (self.section, self.animation)).map(|(_, _, player)| player)
     }
 
     /// One tick of the shown animation. Returns false when there is none.
@@ -226,15 +220,7 @@ impl State {
     pub fn summary(&self) -> Option<String> {
         let section = self.section()?;
         let player = self.player()?;
-        Some(format!(
-            "section {} of {}, animation {} of {}, frame {}, tick {}",
-            self.section,
-            self.sprites()?.sections.len(),
-            self.animation,
-            section.animations.len(),
-            player.frame(),
-            player.ticks()
-        ))
+        Some(format!("section {} of {}, animation {} of {}, frame {}, tick {}", self.section, self.sprites()?.sections.len(), self.animation, section.animations.len(), player.frame(), player.ticks()))
     }
 }
 
@@ -246,17 +232,14 @@ pub fn prepare(editor: &mut Editor) {
     let key = (entry.archive.path.0.clone(), entry.index, project.revision());
     let disc = project.disc.clone();
     let fresh = editor.views.sprite.loaded.as_ref().is_none_or(|loaded| loaded.key != key).then(|| {
-        let sprites = sprites::unpack(entry.payload())
-            .and_then(|(_, bytes)| Ok(format::decode(&bytes)?))
-            .map_err(|error| error.to_string());
+        let sprites = sprites::unpack(entry.payload()).and_then(|(_, bytes)| Ok(format::decode(&bytes)?)).map_err(|error| error.to_string());
         let reader = Reader::of(&key.0);
         Rc::new(Loaded { key, sprites, reader })
     });
     let state = &mut editor.views.sprite;
 
     if let Some(fresh) = fresh {
-        let same_entry =
-            state.loaded.as_ref().is_some_and(|loaded| (&loaded.key.0, loaded.key.1) == (&fresh.key.0, fresh.key.1));
+        let same_entry = state.loaded.as_ref().is_some_and(|loaded| (&loaded.key.0, loaded.key.1) == (&fresh.key.0, fresh.key.1));
         if !same_entry {
             *state = State { sizes: state.sizes.take(), ..State::default() };
         }
@@ -264,9 +247,7 @@ pub fn prepare(editor: &mut Editor) {
         state.staged = None;
     }
     if state.sizes.as_ref().is_none_or(|(folder, _)| *folder != disc) {
-        let sizes = std::fs::read(disc.join(EXECUTABLE))
-            .map_err(|error| format!("{EXECUTABLE}: {error}"))
-            .and_then(|exe| sprites::sprite_sizes(&exe).map_err(|error| error.to_string()));
+        let sizes = std::fs::read(disc.join(EXECUTABLE)).map_err(|error| format!("{EXECUTABLE}: {error}")).and_then(|exe| sprites::sprite_sizes(&exe).map_err(|error| error.to_string()));
         state.sizes = Some((disc, sizes));
     }
 
@@ -310,46 +291,25 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
     let mut sections = div().flex().flex_wrap().items_center().gap(px(GAP)).child("Section");
     for number in 0..sprites.sections.len() {
-        sections = sections.child(tab(("section", number), number.to_string(), number == state.section).on_click(
-            cx.listener(move |editor, _, _, cx| {
-                let state = &mut editor.views.sprite;
-                (state.section, state.animation, state.colour, state.clock) = (number, 0, (0, 0), None);
-                cx.notify();
-            }),
-        ));
+        sections = sections.child(tab(("section", number), number.to_string(), number == state.section).on_click(cx.listener(move |editor, _, _, cx| {
+            let state = &mut editor.views.sprite;
+            (state.section, state.animation, state.colour, state.clock) = (number, 0, (0, 0), None);
+            cx.notify();
+        })));
     }
     sections = sections.child(separator(true)).child(muted(reader_note(loaded.reader)));
 
-    let body = div()
-        .flex()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(animation_list(state, section, cx))
-        .child(separator(true))
-        .child(player_panel(editor, entry, section, cx));
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(sections)
-        .child(palette_line(state, section, loaded.reader, cx))
-        .child(separator(false))
-        .child(body)
-        .into_any_element()
+    let body = div().flex().flex_1().min_h_0().gap(px(GAP)).child(animation_list(state, section, cx)).child(separator(true)).child(player_panel(editor, entry, section, cx));
+    div().flex().flex_col().flex_1().min_h_0().gap(px(GAP)).child(sections).child(palette_line(state, section, loaded.reader, cx)).child(separator(false)).child(body).into_any_element()
 }
 
 /// What the reader of the sprites proves.
 fn reader_note(reader: Reader) -> String {
     match reader {
         Reader::Field => "Party sprites: Party_LoadMemberSprite places it and loads palette 0.".into(),
-        Reader::Battle => {
-            "Battle sprites: Battle_LoadPartySprites streams it and Party_BuildBattlers places it through \
+        Reader::Battle => "Battle sprites: Battle_LoadPartySprites streams it and Party_BuildBattlers places it through \
                            Party_LoadMemberSprite, palette 0; the battle slot moves it in VRAM, not its colours."
-                .into()
-        }
+            .into(),
         Reader::Unknown => "No traced loader reads this archive; drawn with the field placement.".into(),
     }
 }
@@ -360,20 +320,16 @@ fn palette_line(state: &State, section: &Section, reader: Reader, cx: &mut Conte
     let mut line = div().flex().flex_wrap().items_center().gap(px(GAP)).child("Palette");
     for palette in 0..section.palettes.len() {
         let label = if reader.palette() == Some(palette) { format!("{palette} (loaded)") } else { palette.to_string() };
-        line = line.child(tab(("palette", palette), label, shown == Colours::Palette(palette)).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                editor.views.sprite.palette = Some(palette);
-                cx.notify();
-            },
-        )));
+        line = line.child(tab(("palette", palette), label, shown == Colours::Palette(palette)).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.sprite.palette = Some(palette);
+            cx.notify();
+        })));
     }
     if reader.palette().is_none() {
-        line = line.child(tab("grey", "grey by index", shown == Colours::Grey).on_click(cx.listener(
-            |editor, _, _, cx| {
-                editor.views.sprite.palette = None;
-                cx.notify();
-            },
-        )));
+        line = line.child(tab("grey", "grey by index", shown == Colours::Grey).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.sprite.palette = None;
+            cx.notify();
+        })));
         if shown == Colours::Grey {
             line = line.child(muted(suggestion(section)));
         }
@@ -392,28 +348,16 @@ fn suggestion(section: &Section) -> String {
 fn animation_list(state: &State, section: &Section, cx: &mut Context<Editor>) -> impl IntoElement {
     let mut list = div().id("sprite-animations").flex().flex_col().w(px(LIST_WIDTH)).flex_none().overflow_y_scroll();
     for (index, animation) in section.animations.iter().enumerate() {
-        let records: Vec<String> = section
-            .records
-            .iter()
-            .enumerate()
-            .filter(|(_, record)| usize::from(record.animation) == index)
-            .map(|(record, _)| record.to_string())
-            .collect();
+        let records: Vec<String> = section.records.iter().enumerate().filter(|(_, record)| usize::from(record.animation) == index).map(|(record, _)| record.to_string()).collect();
         let sheet = section.image_of(index).map_or("no record plays it".to_string(), |sheet| format!("sheet {sheet}"));
         let looping = animation.loop_to().map_or(String::new(), |to| format!(", loops to {to}"));
         let records = if records.is_empty() { String::new() } else { format!(", records {}", records.join(" ")) };
-        let line = format!(
-            "{index:>3}  {sheet}, {} frames, {} steps{looping}{records}",
-            animation.frames.len(),
-            animation.steps.len()
-        );
-        list = list.child(selectable(("animation", index), index == state.animation).child(mono(line)).on_click(
-            cx.listener(move |editor, _, _, cx| {
-                editor.views.sprite.animation = index;
-                editor.views.sprite.clock = None;
-                cx.notify();
-            }),
-        ));
+        let line = format!("{index:>3}  {sheet}, {} frames, {} steps{looping}{records}", animation.frames.len(), animation.steps.len());
+        list = list.child(selectable(("animation", index), index == state.animation).child(mono(line)).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.sprite.animation = index;
+            editor.views.sprite.clock = None;
+            cx.notify();
+        })));
     }
     list
 }
@@ -421,15 +365,7 @@ fn animation_list(state: &State, section: &Section, cx: &mut Context<Editor>) ->
 /// The transport, the readout, the frame and sheet, the steps and the palette editor.
 fn player_panel(editor: &Editor, entry: &Entry<'_>, section: &Section, cx: &mut Context<Editor>) -> impl IntoElement {
     let state = &editor.views.sprite;
-    let mut panel = div()
-        .id("sprite-player")
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_w_0()
-        .gap(px(GAP))
-        .overflow_y_scroll()
-        .child(transport(state, entry, cx));
+    let mut panel = div().id("sprite-player").flex().flex_col().flex_1().min_w_0().gap(px(GAP)).overflow_y_scroll().child(transport(state, entry, cx));
 
     let sizes = match &state.sizes {
         Some((_, Ok(sizes))) => Some(*sizes),
@@ -458,28 +394,22 @@ fn transport(state: &State, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div 
     let playing = state.clock.is_some();
     let mut row = div().flex().flex_wrap().items_center().gap(px(GAP));
     row = row
-        .child(button("play", if playing { "Pause" } else { "Play" }, true).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                if editor.views.sprite.clock.is_some() {
-                    editor.views.sprite.clock = None;
-                } else {
-                    play(editor, cx);
-                }
-                cx.notify();
-            },
-        )))
-        .child(button("tick", "Tick", !playing).tooltip(tip("One game tick (two video fields).")).on_click(
-            cx.listener(|editor, _, _, cx| {
-                editor.views.sprite.tick();
-                cx.notify();
-            }),
-        ))
-        .child(button("step", "Step", !playing).tooltip(tip("Play ticks until the next step shows.")).on_click(
-            cx.listener(|editor, _, _, cx| {
-                editor.views.sprite.step();
-                cx.notify();
-            }),
-        ))
+        .child(button("play", if playing { "Pause" } else { "Play" }, true).on_click(cx.listener(move |editor, _, _, cx| {
+            if editor.views.sprite.clock.is_some() {
+                editor.views.sprite.clock = None;
+            } else {
+                play(editor, cx);
+            }
+            cx.notify();
+        })))
+        .child(button("tick", "Tick", !playing).tooltip(tip("One game tick (two video fields).")).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.sprite.tick();
+            cx.notify();
+        })))
+        .child(button("step", "Step", !playing).tooltip(tip("Play ticks until the next step shows.")).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.sprite.step();
+            cx.notify();
+        })))
         .child(button("restart", "Restart", true).on_click(cx.listener(|editor, _, _, cx| {
             editor.views.sprite.restart();
             if editor.views.sprite.clock.is_some() {
@@ -489,14 +419,10 @@ fn transport(state: &State, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div 
         })))
         .child(separator(true));
     for playback in Playback::ALL {
-        row = row.child(
-            tab(("playback", playback as usize), playback.label(), state.playback == playback)
-                .tooltip(tip(playback_rule(playback)))
-                .on_click(cx.listener(move |editor, _, _, cx| {
-                    editor.views.sprite.playback = playback;
-                    cx.notify();
-                })),
-        );
+        row = row.child(tab(("playback", playback as usize), playback.label(), state.playback == playback).tooltip(tip(playback_rule(playback))).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.sprite.playback = playback;
+            cx.notify();
+        })));
     }
     let zoom = slider("sprite-zoom", state.zoom, ZOOM_MIN..=ZOOM_MAX, &state.zoom_slider, cx, |editor, zoom| {
         editor.views.sprite.zoom = zoom;
@@ -558,11 +484,7 @@ fn readout(animation: &Animation, player: Player) -> String {
 fn stage_view(state: &State, section: &Section, animation: &Animation, player: Player, sizes: &SpriteSizes) -> Div {
     let row = div().flex().flex_wrap().items_start().gap(px(GAP));
     let Some(frame) = animation.frames.get(player.frame()) else {
-        return row.child(muted(format!(
-            "Step {} shows frame {}, which the animation lacks.",
-            player.step(),
-            player.frame()
-        )));
+        return row.child(muted(format!("Step {} shows frame {}, which the animation lacks.", player.step(), player.frame())));
     };
     let Some(staged) = state.staged.as_ref() else {
         return row.child(muted("No record plays this animation, so its frame sheet is unknown."));
@@ -574,11 +496,7 @@ fn stage_view(state: &State, section: &Section, animation: &Animation, player: P
     let colours = state.colours();
     let clear = always_clear(section);
     let composite = compose(&staged.stage, frame, sizes, state.mirror, bounds);
-    let pixels: Vec<[u8; 4]> = composite
-        .pixels
-        .iter()
-        .map(|pixel| pixel.map_or(CLEAR, |pixel| pixel_colour(pixel.texel, colours, &clear)))
-        .collect();
+    let pixels: Vec<[u8; 4]> = composite.pixels.iter().map(|pixel| pixel.map_or(CLEAR, |pixel| pixel_colour(pixel.texel, colours, &clear))).collect();
     let mut outlines = Vec::new();
     if state.outlines {
         for &cell in &frame.cells {
@@ -607,31 +525,16 @@ fn stage_view(state: &State, section: &Section, animation: &Animation, player: P
 
     let sheet = &section.images[staged.key.1];
     let sheet_view = sheet_canvas(sheet, section, frame, sizes, colours, &clear, state.zoom);
-    let mut report = format!(
-        "Frame {} of sheet {} ({}×{} texels, {}); actor position marked in red.",
-        player.frame(),
-        staged.key.1,
-        sheet.texel_width(),
-        sheet.height,
-        sheet.encoding.label()
-    );
+    let mut report = format!("Frame {} of sheet {} ({}×{} texels, {}); actor position marked in red.", player.frame(), staged.key.1, sheet.texel_width(), sheet.height, sheet.encoding.label());
     if composite.outside > 0 {
-        report.push_str(&format!(
-            " {} cell texels fall past the sheet: what VRAM holds there depends on the running game.",
-            composite.outside
-        ));
+        report.push_str(&format!(" {} cell texels fall past the sheet: what VRAM holds there depends on the running game.", composite.outside));
     }
     let unresolved = composite.unresolved_colours();
     if unresolved > 0 {
         report.push_str(&format!(" {unresolved} pixels use an index past the palette (marked magenta)."));
     }
 
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(GAP_SMALL))
-        .child(muted(report))
-        .child(row.child(framed(frame_canvas)).child(framed(sheet_view)))
+    div().flex().flex_col().gap(px(GAP_SMALL)).child(muted(report)).child(row.child(framed(frame_canvas)).child(framed(sheet_view)))
 }
 
 /// A canvas on the view background.
@@ -640,21 +543,12 @@ fn framed(child: impl IntoElement) -> Div {
 }
 
 /// The sheet's texels in the shown colours, with the frame's cells outlined at their `u`, `v`.
-fn sheet_canvas(
-    sheet: &Image,
-    section: &Section,
-    frame: &Frame,
-    sizes: &SpriteSizes,
-    colours: Colours,
-    clear: &[bool; COLOURS],
-    zoom: u32,
-) -> impl IntoElement {
+fn sheet_canvas(sheet: &Image, section: &Section, frame: &Frame, sizes: &SpriteSizes, colours: Colours, clear: &[bool; COLOURS], zoom: u32) -> impl IntoElement {
     let palette = match colours {
         Colours::Palette(palette) => section.palettes.get(palette).copied(),
         Colours::Grey => None,
     };
-    let pixels: Vec<[u8; 4]> =
-        sheet.texels().iter().map(|&index| sheet_colour(index, palette.as_ref(), clear)).collect();
+    let pixels: Vec<[u8; 4]> = sheet.texels().iter().map(|&index| sheet_colour(index, palette.as_ref(), clear)).collect();
     let width = sheet.texel_width();
     let height = usize::from(sheet.height);
     let cells: Vec<Bounds> = frame
@@ -721,12 +615,7 @@ fn grey(index: u8) -> [u8; 4] {
 
 /// `rect` moved so `bounds` starts at 0, 0.
 fn offset(rect: Bounds, bounds: Bounds) -> Bounds {
-    Bounds {
-        left: rect.left - bounds.left,
-        top: rect.top - bounds.top,
-        right: rect.right - bounds.left,
-        bottom: rect.bottom - bounds.top,
-    }
+    Bounds { left: rect.left - bounds.left, top: rect.top - bounds.top, right: rect.right - bounds.left, bottom: rect.bottom - bounds.top }
 }
 
 /// A one-pixel outline around `rect`, in texels.
@@ -734,12 +623,9 @@ fn paint_rect(window: &mut Window, area: Area<Pixels>, rect: Bounds, zoom: f32, 
     let origin = point(area.origin.x + px(rect.left as f32 * zoom), area.origin.y + px(rect.top as f32 * zoom));
     let (width, height) = (px(rect.width() as f32 * zoom), px(rect.height() as f32 * zoom));
     let thin = px(LINE);
-    for (at, extent) in [
-        (origin, size(width, thin)),
-        (point(origin.x, origin.y + height - thin), size(width, thin)),
-        (origin, size(thin, height)),
-        (point(origin.x + width - thin, origin.y), size(thin, height)),
-    ] {
+    for (at, extent) in
+        [(origin, size(width, thin)), (point(origin.x, origin.y + height - thin), size(width, thin)), (origin, size(thin, height)), (point(origin.x + width - thin, origin.y), size(thin, height))]
+    {
         window.paint_quad(fill(Area::new(at, extent), rgba(line)));
     }
 }
@@ -758,55 +644,38 @@ fn step_list(animation: &Animation, player: Option<Player>, cx: &mut Context<Edi
     for (index, step) in animation.steps.iter().enumerate() {
         let (label, rule) = match step.jump() {
             Some(target) => (format!("{index}: jump to {target}"), format!("delay byte {:#04X}", step.delay)),
-            None => (
-                format!("{index}: frame {}", step.frame),
-                format!("{} ticks, {} ms", ticks_of(step.delay), duration_ms(step.delay)),
-            ),
+            None => (format!("{index}: frame {}", step.frame), format!("{} ticks, {} ms", ticks_of(step.delay), duration_ms(step.delay))),
         };
         let on_screen = player.is_some_and(|player| player.step() == index);
-        list = list.child(tab(("step", index), label, on_screen).tooltip(tip(rule)).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                editor.views.sprite.clock = None;
-                editor.views.sprite.seek(index);
-                cx.notify();
-            },
-        )));
+        list = list.child(tab(("step", index), label, on_screen).tooltip(tip(rule)).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.sprite.clock = None;
+            editor.views.sprite.seek(index);
+            cx.notify();
+        })));
     }
     div().flex().flex_col().gap(px(GAP_SMALL)).child(strong("Steps")).child(list)
 }
 
 /// Every palette of the section as swatches, and the picker of the chosen colour.
 fn palette_editor(state: &State, section: &Section, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div {
-    let original = sprites::unpack(entry.original())
-        .ok()
-        .and_then(|(_, bytes)| format::decode(&bytes).ok())
-        .and_then(|sprites| sprites.sections.into_iter().nth(state.section));
+    let original = sprites::unpack(entry.original()).ok().and_then(|(_, bytes)| format::decode(&bytes).ok()).and_then(|sprites| sprites.sections.into_iter().nth(state.section));
     let (palette, colour) = state.colour;
     let word = section.palettes.get(palette).and_then(|colours| colours.get(colour)).copied().unwrap_or_default();
 
     let mut rows = div().flex().flex_col().gap(px(SWATCH_GAP));
     for (number, colours) in section.palettes.iter().enumerate() {
-        let mut line = div()
-            .flex()
-            .items_center()
-            .gap(px(SWATCH_GAP))
-            .child(mono(format!("palette {number}")).w(px(LIST_WIDTH / 3.0)).text_color(color(MUTED)));
+        let mut line = div().flex().items_center().gap(px(SWATCH_GAP)).child(mono(format!("palette {number}")).w(px(LIST_WIDTH / 3.0)).text_color(color(MUTED)));
         for (index, &value) in colours.iter().enumerate() {
             let stored = original.as_ref().and_then(|section| section.palettes.get(number)).map(|stored| stored[index]);
             let edited = stored.is_some_and(|stored| stored != value);
             let id = number * COLOURS + index;
             line = line.child(
-                swatch(
-                    ("sprite-colour", id),
-                    color_rgba(value),
-                    SWATCH,
-                    outline((number, index) == state.colour, edited),
-                )
-                .tooltip(tip(format!("palette {number} colour {index}: {value:#06X}")))
-                .on_click(cx.listener(move |editor, _, _, cx| {
-                    editor.views.sprite.colour = (number, index);
-                    cx.notify();
-                })),
+                swatch(("sprite-colour", id), color_rgba(value), SWATCH, outline((number, index) == state.colour, edited))
+                    .tooltip(tip(format!("palette {number} colour {index}: {value:#06X}")))
+                    .on_click(cx.listener(move |editor, _, _, cx| {
+                        editor.views.sprite.colour = (number, index);
+                        cx.notify();
+                    })),
             );
         }
         rows = rows.child(line);
@@ -877,21 +746,10 @@ fn set_colour(editor: &mut Editor, index: usize, change: &dyn Fn(u16) -> u16) {
 }
 
 /// The stored payload with colour `colour` of palette `palette` of section `section` changed by `change`.
-pub fn with_colour(
-    payload: &[u8],
-    section: usize,
-    palette: usize,
-    colour: usize,
-    change: &dyn Fn(u16) -> u16,
-) -> Result<Vec<u8>, String> {
+pub fn with_colour(payload: &[u8], section: usize, palette: usize, colour: usize, change: &dyn Fn(u16) -> u16) -> Result<Vec<u8>, String> {
     let (_, bytes) = sprites::unpack(payload).map_err(|error| error.to_string())?;
     let mut sprites = format::decode(&bytes).map_err(|error| error.to_string())?;
-    let word = sprites
-        .sections
-        .get_mut(section)
-        .and_then(|section| section.palettes.get_mut(palette))
-        .and_then(|colours| colours.get_mut(colour))
-        .ok_or("the colour is not in the sprites")?;
+    let word = sprites.sections.get_mut(section).and_then(|section| section.palettes.get_mut(palette)).and_then(|colours| colours.get_mut(colour)).ok_or("the colour is not in the sprites")?;
     *word = change(*word);
     let encoded = format::encode(&sprites).map_err(|error| error.to_string())?;
     sprites::pack(payload, &encoded).map_err(|error| error.to_string())
@@ -929,12 +787,10 @@ fn export_sheet(editor: &mut Editor, cx: &mut Context<Editor>) {
 fn write_sheet(json_path: &Path, payload: &[u8], section: usize, palette: usize, sizes: &SpriteSizes) -> String {
     let png_path = json_path.with_extension("png");
     let image = png_path.file_name().map_or("sheet.png".into(), |name| name.to_string_lossy().into_owned());
-    let written = sprites::sprite_sheet(payload, section, palette, sizes, &image)
-        .map_err(|error| error.to_string())
-        .and_then(|sheet| {
-            std::fs::write(&png_path, &sheet.png).map_err(|error| format!("{}: {error}", png_path.display()))?;
-            std::fs::write(json_path, &sheet.json).map_err(|error| format!("{}: {error}", json_path.display()))
-        });
+    let written = sprites::sprite_sheet(payload, section, palette, sizes, &image).map_err(|error| error.to_string()).and_then(|sheet| {
+        std::fs::write(&png_path, &sheet.png).map_err(|error| format!("{}: {error}", png_path.display()))?;
+        std::fs::write(json_path, &sheet.json).map_err(|error| format!("{}: {error}", json_path.display()))
+    });
     match written {
         Ok(()) => format!("Wrote {} and {}", json_path.display(), png_path.display()),
         Err(error) => format!("Export: {error}"),
@@ -945,12 +801,7 @@ fn write_sheet(json_path: &Path, payload: &[u8], section: usize, palette: usize,
 /// into the shown entry.
 fn import_sheet(editor: &mut Editor, cx: &mut Context<Editor>) {
     let Some(sizes) = editor.views.sprite.sizes().copied() else { return };
-    let picked = cx.prompt_for_paths(gpui::PathPromptOptions {
-        files: true,
-        directories: false,
-        multiple: false,
-        prompt: Some("Sprite sheet JSON to import".into()),
-    });
+    let picked = cx.prompt_for_paths(gpui::PathPromptOptions { files: true, directories: false, multiple: false, prompt: Some("Sprite sheet JSON to import".into()) });
     cx.spawn(async move |this, cx| {
         let Ok(Ok(Some(paths))) = picked.await else { return };
         let Some(json_path) = paths.into_iter().next() else { return };
@@ -998,11 +849,8 @@ mod tests {
         let texels: Vec<u8> = (0..16 * 8).map(|index| (index % 31 + 1) as u8).collect();
         let sheet = Image::new(8, 8, Encoding::Raw, texels).expect("a sheet").encode();
         let cell = Cell { size: 1, x: -8, y: -4, u: 0, v: 0 };
-        let animation = Animation {
-            steps: vec![Step { delay: 3, frame: 0 }, Step { delay: 2, frame: 1 }],
-            frames: vec![Frame { cells: vec![cell] }, Frame { cells: vec![Cell { u: 8, ..cell }] }],
-        }
-        .encode();
+        let animation =
+            Animation { steps: vec![Step { delay: 3, frame: 0 }, Step { delay: 2, frame: 1 }], frames: vec![Frame { cells: vec![cell] }, Frame { cells: vec![Cell { u: 8, ..cell }] }] }.encode();
         let mut out = vec![0u8; 16];
         let images = out.len();
         out.extend(4u32.to_le_bytes());
@@ -1097,8 +945,7 @@ mod tests {
         editor.update(cx, |editor, _| {
             editor.select_archive(&ArchivePath("BIN/PLCHAR/PL012.EMI".into()));
             let formats = &editor.archive.as_ref().expect("the archive loads").formats;
-            let index =
-                formats.iter().position(|format| matches!(format, rebof3_formats::Format::CharacterSpritesLz77));
+            let index = formats.iter().position(|format| matches!(format, rebof3_formats::Format::CharacterSpritesLz77));
             editor.select_entry(index.expect("the archive has a character sprites"));
             editor.tab = Tab::Sprite;
         });
@@ -1106,11 +953,7 @@ mod tests {
 
         let (before, after) = editor.update(cx, |editor, _| {
             let state = &mut editor.views.sprite;
-            assert_eq!(
-                state.colours(),
-                Colours::Palette(format::FIELD_PALETTE),
-                "party character sprites' palette is proven"
-            );
+            assert_eq!(state.colours(), Colours::Palette(format::FIELD_PALETTE), "party character sprites' palette is proven");
             assert!(state.staged.is_some(), "the first animation's sheet is staged");
             let before = state.summary().expect("the view shows a frame");
             state.step();
@@ -1139,11 +982,9 @@ mod tests {
                 let Ok((_, bytes)) = sprites::unpack(payload) else { continue };
                 count += 1;
 
-                let edited = with_colour(payload, 0, 0, 1, &|word| word ^ 1)
-                    .and_then(|bytes| sprites::unpack(&bytes).map_err(|error| error.to_string()));
+                let edited = with_colour(payload, 0, 0, 1, &|word| word ^ 1).and_then(|bytes| sprites::unpack(&bytes).map_err(|error| error.to_string()));
                 let decoded = format::decode(&bytes).expect("unpacked sprites decode");
-                let at = bytes.len() - format::encode(&decoded).expect("encodes").len()
-                    + palette_offset(&bytes).expect("a palette");
+                let at = bytes.len() - format::encode(&decoded).expect("encodes").len() + palette_offset(&bytes).expect("a palette");
                 let mut expected = bytes.clone();
                 expected[at] ^= 1;
                 if edited.map(|(_, bytes)| bytes).as_ref() != Ok(&expected) {

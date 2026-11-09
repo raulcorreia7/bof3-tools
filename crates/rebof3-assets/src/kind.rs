@@ -224,12 +224,7 @@ impl Selection {
 
     /// Parses a comma-separated kind list.
     pub fn parse(list: &str) -> Result<Self> {
-        let kinds = list
-            .split(',')
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(Kind::parse)
-            .collect::<Result<Vec<_>>>()?;
+        let kinds = list.split(',').map(str::trim).filter(|name| !name.is_empty()).map(Kind::parse).collect::<Result<Vec<_>>>()?;
         if kinds.is_empty() {
             return Err(Error::Usage("--only needs at least one kind".into()));
         }

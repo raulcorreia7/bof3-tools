@@ -41,10 +41,8 @@ pub fn replay(project: &mut Project, scene: &Scene) -> Rc<Replayed> {
     }
     let project = &*project;
     // A replay reads the table with the project's placements, so a moved entry lands where it was moved.
-    let tables: std::collections::BTreeMap<&str, Vec<rebof3_emi::Entry>> = scene
-        .archives()
-        .filter_map(|path| Some((path, project.entries_of(project.loaded(&ArchivePath(path.to_string()))?))))
-        .collect();
+    let tables: std::collections::BTreeMap<&str, Vec<rebof3_emi::Entry>> =
+        scene.archives().filter_map(|path| Some((path, project.entries_of(project.loaded(&ArchivePath(path.to_string()))?)))).collect();
     let vram = Vram::replay(&scene.steps, &mut |path| {
         let loaded = project.loaded(&ArchivePath(path.to_string()))?;
         let payloads = (0..loaded.entries().len()).map(|index| project.payload(loaded, index)).collect();

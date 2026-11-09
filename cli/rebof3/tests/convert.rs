@@ -84,8 +84,6 @@ fn conversions_keep_their_output_and_messages() {
         std::fs::write(&path, &actual).unwrap();
         return;
     }
-    let expected = std::fs::read_to_string(&path)
-        .expect("tests/convert.snap exists; run with UPDATE_SNAPSHOT=1")
-        .replace("\r\n", "\n");
+    let expected = std::fs::read_to_string(&path).expect("tests/convert.snap exists; run with UPDATE_SNAPSHOT=1").replace("\r\n", "\n");
     assert!(actual == expected, "conversion output changed; rerun with UPDATE_SNAPSHOT=1 and read the diff");
 }

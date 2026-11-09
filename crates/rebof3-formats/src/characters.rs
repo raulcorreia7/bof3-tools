@@ -27,12 +27,7 @@ pub struct Character {
 
 /// The characters of an entry payload, in table order.
 pub fn parse(payload: &[u8]) -> Result<Vec<Character>> {
-    Ok(table_bytes(payload)?
-        .as_chunks::<RECORD_BYTES>()
-        .0
-        .iter()
-        .map(|record| Character { name: name_text(&record[..NAME_BYTES]), rest: hex(&record[NAME_BYTES..]) })
-        .collect())
+    Ok(table_bytes(payload)?.as_chunks::<RECORD_BYTES>().0.iter().map(|record| Character { name: name_text(&record[..NAME_BYTES]), rest: hex(&record[NAME_BYTES..]) }).collect())
 }
 
 /// The entry payload with its characters replaced by `characters`, which must be [`CHARACTERS`] records.
@@ -46,12 +41,7 @@ pub fn write(characters: &[Character], payload: &[u8]) -> Result<Vec<u8>> {
         table.extend(name_field(&character.name, NAME_BYTES)?);
         let rest = unhex(&character.rest)?;
         if rest.len() != RECORD_BYTES - NAME_BYTES {
-            return Err(Error::CharacterTable(format!(
-                "{:?} has {} bytes after its name; a record has {}",
-                character.name,
-                rest.len(),
-                RECORD_BYTES - NAME_BYTES
-            )));
+            return Err(Error::CharacterTable(format!("{:?} has {} bytes after its name; a record has {}", character.name, rest.len(), RECORD_BYTES - NAME_BYTES)));
         }
         table.extend(rest);
     }
@@ -67,19 +57,14 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 
 /// The entry payload with its characters replaced by the JSON that [`export`] wrote.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let characters: Vec<Character> = serde_json::from_slice(json)
-        .map_err(|error| Error::CharacterTable(format!("the characters JSON does not read: {error}")))?;
+    let characters: Vec<Character> = serde_json::from_slice(json).map_err(|error| Error::CharacterTable(format!("the characters JSON does not read: {error}")))?;
     write(&characters, payload)
 }
 
 /// The table's bytes in an entry payload. A payload too short for the table is an error.
 fn table_bytes(payload: &[u8]) -> Result<&[u8]> {
     let end = PAYLOAD_OFFSET + CHARACTERS * RECORD_BYTES;
-    payload.get(PAYLOAD_OFFSET..end).ok_or(Error::GameTableShort {
-        table: "characters",
-        bytes: payload.len(),
-        needed: end,
-    })
+    payload.get(PAYLOAD_OFFSET..end).ok_or(Error::GameTableShort { table: "characters", bytes: payload.len(), needed: end })
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -95,12 +80,5 @@ fn unhex(text: &str) -> Result<Vec<u8>> {
     if !text.len().is_multiple_of(2) {
         return Err(not_hex());
     }
-    text.as_bytes()
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|pair| {
-            std::str::from_utf8(pair).ok().and_then(|digits| u8::from_str_radix(digits, 16).ok()).ok_or_else(not_hex)
-        })
-        .collect()
+    text.as_bytes().as_chunks::<2>().0.iter().map(|pair| std::str::from_utf8(pair).ok().and_then(|digits| u8::from_str_radix(digits, 16).ok()).ok_or_else(not_hex)).collect()
 }

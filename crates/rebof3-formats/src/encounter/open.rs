@@ -12,13 +12,9 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 /// The encounter block of an area (`area-encounters`), from its JSON and its stored bytes. `base` is the stored
 /// block: the bytes no field names keep their stored values.
 pub fn import(json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
-    let block: EncounterBlock =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("encounter JSON: {error}")))?;
+    let block: EncounterBlock = serde_json::from_slice(json).map_err(|error| Error::Import(format!("encounter JSON: {error}")))?;
     if base.len() != BLOCK_BYTES || block.encounters.len() != ENCOUNTERS || block.enemies.len() != ENEMIES {
-        return Err(Error::Import(format!(
-            "an encounter block is {} bytes, {} encounters and {} enemies",
-            BLOCK_BYTES, ENCOUNTERS, ENEMIES
-        )));
+        return Err(Error::Import(format!("an encounter block is {} bytes, {} encounters and {} enemies", BLOCK_BYTES, ENCOUNTERS, ENEMIES)));
     }
     let mut bytes = base.to_vec();
     for (index, value) in block.encounters.iter().enumerate() {

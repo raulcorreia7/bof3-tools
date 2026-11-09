@@ -114,12 +114,7 @@ pub struct Placement {
 impl Placement {
     fn of(operand: Option<u8>) -> Self {
         let value = operand.unwrap_or(0);
-        Self {
-            operand,
-            index: value & !(BOX_NO_FRAME | BOX_NARROW),
-            kind: if value & BOX_NARROW != 0 { WindowKind::Narrow } else { WindowKind::Wide },
-            framed: value & BOX_NO_FRAME == 0,
-        }
+        Self { operand, index: value & !(BOX_NO_FRAME | BOX_NARROW), kind: if value & BOX_NARROW != 0 { WindowKind::Narrow } else { WindowKind::Wide }, framed: value & BOX_NO_FRAME == 0 }
     }
 }
 
@@ -381,13 +376,7 @@ impl<'a> Machine<'a> {
 
     /// Resets what `UI_DrawMessageScript` resets at the top of every pass: the cursor and the colour.
     fn start_page(&mut self) {
-        self.pages.push(Page {
-            glyphs: Vec::new(),
-            runtime: Vec::new(),
-            events: Vec::new(),
-            lines: 1,
-            end: PageEnd::End,
-        });
+        self.pages.push(Page { glyphs: Vec::new(), runtime: Vec::new(), events: Vec::new(), lines: 1, end: PageEnd::End });
         (self.x, self.y) = self.origin;
         self.color = 0;
         self.animated = false;

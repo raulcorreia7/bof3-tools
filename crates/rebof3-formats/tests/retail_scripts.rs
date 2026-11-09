@@ -26,33 +26,9 @@ struct Pinned {
 }
 
 const PINNED: [Pinned; 3] = [
-    Pinned {
-        format: Format::AreaScriptTable,
-        tables: 200,
-        records: 13_487,
-        streams: 13_487,
-        ops: 65_816,
-        frames_past_table: 3,
-        draws_past_table: 0,
-    },
-    Pinned {
-        format: Format::BattleScriptTable,
-        tables: 42,
-        records: 1_554,
-        streams: 1_554,
-        ops: 8_316,
-        frames_past_table: 84,
-        draws_past_table: 84,
-    },
-    Pinned {
-        format: Format::MagicScriptTable,
-        tables: 37,
-        records: 95,
-        streams: 72,
-        ops: 820,
-        frames_past_table: 1,
-        draws_past_table: 0,
-    },
+    Pinned { format: Format::AreaScriptTable, tables: 200, records: 13_487, streams: 13_487, ops: 65_816, frames_past_table: 3, draws_past_table: 0 },
+    Pinned { format: Format::BattleScriptTable, tables: 42, records: 1_554, streams: 1_554, ops: 8_316, frames_past_table: 84, draws_past_table: 84 },
+    Pinned { format: Format::MagicScriptTable, tables: 37, records: 95, streams: 72, ops: 820, frames_past_table: 1, draws_past_table: 0 },
 ];
 
 /// Where each record of `table` starts in the payload, per section.

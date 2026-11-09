@@ -39,14 +39,7 @@ pub(crate) fn to_json(archive_version: u32, entries: &[Entry], typed: bool) -> S
         entries: entries
             .iter()
             .enumerate()
-            .map(|(index, entry)| ManifestEntry {
-                first4: entry.first4,
-                index,
-                name: entry_name(index, entry.file_type, typed),
-                ram_ptr: entry.ram_ptr,
-                size: entry.size,
-                file_type: entry.file_type,
-            })
+            .map(|(index, entry)| ManifestEntry { first4: entry.first4, index, name: entry_name(index, entry.file_type, typed), ram_ptr: entry.ram_ptr, size: entry.size, file_type: entry.file_type })
             .collect(),
         version: SCHEMA_VERSION,
     };
@@ -65,12 +58,8 @@ pub(crate) fn to_json(archive_version: u32, entries: &[Entry], typed: bool) -> S
 /// component, when it is missing or not a regular file, or when its resolved
 /// path leaves the canonical input folder (a symlink escape).
 pub fn manifest_entries(folder: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<(Vec<PackEntry>, u32)> {
-    let value: Value = serde_json::from_slice(&fs::read(manifest_path.as_ref())?)
-        .map_err(|_| Error::InvalidArchive("invalid manifest JSON"))?;
-    let entries = value
-        .get("entries")
-        .and_then(Value::as_array)
-        .ok_or(Error::InvalidArchive("manifest entries must be an array"))?;
+    let value: Value = serde_json::from_slice(&fs::read(manifest_path.as_ref())?).map_err(|_| Error::InvalidArchive("invalid manifest JSON"))?;
+    let entries = value.get("entries").and_then(Value::as_array).ok_or(Error::InvalidArchive("manifest entries must be an array"))?;
     let archive_version = json_number(value.get("archive_version"));
     let root = canonical_folder(folder.as_ref())?;
     let mut inputs = Vec::new();
@@ -81,11 +70,7 @@ pub fn manifest_entries(folder: impl AsRef<Path>, manifest_path: impl AsRef<Path
         if name.is_empty() {
             continue;
         }
-        inputs.push(PackEntry {
-            path: manifest_input_path(&root, name)?,
-            file_type: json_number(entry.get("type")),
-            ram_ptr: json_number(entry.get("ram_ptr")),
-        });
+        inputs.push(PackEntry { path: manifest_input_path(&root, name)?, file_type: json_number(entry.get("type")), ram_ptr: json_number(entry.get("ram_ptr")) });
     }
     if inputs.is_empty() {
         return Err(Error::InvalidArchive("manifest has no named entries"));
@@ -96,8 +81,7 @@ pub fn manifest_entries(folder: impl AsRef<Path>, manifest_path: impl AsRef<Path
 /// The canonical input folder: the containment root every manifest name is
 /// compared against as path components.
 fn canonical_folder(folder: &Path) -> Result<PathBuf> {
-    let root = fs::canonicalize(folder)
-        .map_err(|error| Error::ManifestInput(format!("input folder {}: {error}", folder.display())))?;
+    let root = fs::canonicalize(folder).map_err(|error| Error::ManifestInput(format!("input folder {}: {error}", folder.display())))?;
     if !root.is_dir() {
         return Err(Error::ManifestInput(format!("input folder {} is not a directory", folder.display())));
     }
@@ -119,19 +103,12 @@ fn manifest_input_path(root: &Path, name: &str) -> Result<PathBuf> {
         }
     }
     let candidate = root.join(name);
-    let resolved = fs::canonicalize(&candidate)
-        .map_err(|error| Error::ManifestInput(format!("{}: {error}", candidate.display())))?;
+    let resolved = fs::canonicalize(&candidate).map_err(|error| Error::ManifestInput(format!("{}: {error}", candidate.display())))?;
     if !resolved.starts_with(root) {
-        return Err(Error::ManifestInput(format!(
-            "manifest entry {name:?} resolves outside the input folder: {}",
-            resolved.display()
-        )));
+        return Err(Error::ManifestInput(format!("manifest entry {name:?} resolves outside the input folder: {}", resolved.display())));
     }
     if !fs::metadata(&resolved)?.is_file() {
-        return Err(Error::ManifestInput(format!(
-            "manifest entry {name:?} is not a regular file: {}",
-            resolved.display()
-        )));
+        return Err(Error::ManifestInput(format!("manifest entry {name:?} is not a regular file: {}", resolved.display())));
     }
     Ok(resolved)
 }

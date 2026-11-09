@@ -68,8 +68,7 @@ pub fn decode(payload: &[u8]) -> Result<Vec<u8>> {
             out.extend_from_slice(run);
             pos += len;
         } else {
-            let low = (((ctrl & BACK_REFERENCE_DISTANCE_MASK) as usize) << BACK_REFERENCE_DISTANCE_SHIFT)
-                | *stream.get(pos).ok_or(Error::Lz77TruncatedStream)? as usize;
+            let low = (((ctrl & BACK_REFERENCE_DISTANCE_MASK) as usize) << BACK_REFERENCE_DISTANCE_SHIFT) | *stream.get(pos).ok_or(Error::Lz77TruncatedStream)? as usize;
             pos += 1;
             let distance = WINDOW - low;
             let length_code = ctrl & BACK_REFERENCE_LENGTH_MASK;
@@ -132,8 +131,7 @@ pub fn frames(stream: &[u8]) -> Vec<Frame> {
             pos += length as usize;
             out.push(Frame { length, distance: None });
         } else {
-            let low = (((ctrl & BACK_REFERENCE_DISTANCE_MASK) as usize) << BACK_REFERENCE_DISTANCE_SHIFT)
-                | stream[pos] as usize;
+            let low = (((ctrl & BACK_REFERENCE_DISTANCE_MASK) as usize) << BACK_REFERENCE_DISTANCE_SHIFT) | stream[pos] as usize;
             pos += 1;
             let length_code = ctrl & BACK_REFERENCE_LENGTH_MASK;
             let mut length = length_code as u32 + MIN_MATCH;
@@ -211,10 +209,7 @@ impl<'a> Encoder<'a> {
         self.flush_literals();
         let low = WINDOW - distance;
         let extra = length - MIN_MATCH;
-        self.stream.push(
-            (((low >> BACK_REFERENCE_DISTANCE_SHIFT) as u8) & BACK_REFERENCE_DISTANCE_MASK)
-                | extra.min(BACK_REFERENCE_LENGTH_MASK as u32) as u8,
-        );
+        self.stream.push((((low >> BACK_REFERENCE_DISTANCE_SHIFT) as u8) & BACK_REFERENCE_DISTANCE_MASK) | extra.min(BACK_REFERENCE_LENGTH_MASK as u32) as u8);
         self.stream.push(low as u8);
         if extra >= BACK_REFERENCE_LENGTH_MASK as u32 {
             self.stream.push((extra - BACK_REFERENCE_LENGTH_MASK as u32) as u8);

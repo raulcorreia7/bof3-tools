@@ -22,9 +22,7 @@ use psx_formats::gfx::clut::{view_to_word, word_to_view};
 use psx_formats::gfx::png::{self, Picture};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    Animation, Bounds, COLOURS, CharacterSprites, Placement, Section, SpriteSizes, Stage, animation_bounds, compose,
-};
+use super::{Animation, Bounds, COLOURS, CharacterSprites, Placement, Section, SpriteSizes, Stage, animation_bounds, compose};
 use crate::animation::{TICK_MICROS, WRAPPED_TICKS, duration_ms};
 use crate::error::{Error, Result};
 use rebof3_emi::replay::Vram;
@@ -184,10 +182,7 @@ struct Stages<'a> {
 impl<'a> Stages<'a> {
     fn new(section: &'a Section, palette: usize) -> Result<Self> {
         if palette >= section.palettes.len() {
-            return Err(Error::CharacterSprites(format!(
-                "palette {palette} of a section with {}",
-                section.palettes.len()
-            )));
+            return Err(Error::CharacterSprites(format!("palette {palette} of a section with {}", section.palettes.len())));
         }
         Ok(Self { section, palette, built: HashMap::new() })
     }
@@ -208,13 +203,7 @@ fn placed(section: &Section) -> Vec<(usize, usize)> {
 
 /// The PNG and JSON of section `section` of `sprites` drawn with palette `palette`. `image` is the PNG's
 /// file name, which the JSON names.
-pub fn export(
-    sprites: &CharacterSprites,
-    section: usize,
-    palette: usize,
-    sizes: &SpriteSizes,
-    image: &str,
-) -> Result<Sheet> {
+pub fn export(sprites: &CharacterSprites, section: usize, palette: usize, sizes: &SpriteSizes, image: &str) -> Result<Sheet> {
     let part = sprites.sections.get(section).ok_or_else(|| missing("section", section))?;
     export_section(part, section, palette, sizes, image)
 }
@@ -230,13 +219,7 @@ pub fn import(sprites: &CharacterSprites, sizes: &SpriteSizes, json: &[u8], png:
 }
 
 /// The sheet of one section; `number` is the section's place in its sprites, which the JSON records.
-pub fn export_section(
-    section: &Section,
-    number: usize,
-    palette: usize,
-    sizes: &SpriteSizes,
-    image: &str,
-) -> Result<Sheet> {
+pub fn export_section(section: &Section, number: usize, palette: usize, sizes: &SpriteSizes, image: &str) -> Result<Sheet> {
     let mut stages = Stages::new(section, palette)?;
     let placed = placed(section);
     let bounds = placed
@@ -286,19 +269,8 @@ pub fn export_section(
                 duration: duration_ms(delay),
             });
         }
-        tags.push(Tag {
-            name: format!("animation {animation}"),
-            from,
-            to: frames.len() - 1,
-            direction: DIRECTION.into(),
-            color: TAG_COLOUR.into(),
-        });
-        exported.push(Exported {
-            animation,
-            image: sheet,
-            steps: shown.iter().map(|&(position, _, _)| position).collect(),
-            loop_to: section.animations[animation].loop_to(),
-        });
+        tags.push(Tag { name: format!("animation {animation}"), from, to: frames.len() - 1, direction: DIRECTION.into(), color: TAG_COLOUR.into() });
+        exported.push(Exported { animation, image: sheet, steps: shown.iter().map(|&(position, _, _)| position).collect(), loop_to: section.animations[animation].loop_to() });
     }
 
     let unplaced = (0..section.animations.len()).filter(|&animation| section.image_of(animation).is_none()).collect();
@@ -329,8 +301,7 @@ pub fn export_section(
         },
     };
 
-    let png =
-        png::indexed_png(width as u32, height as u32, PNG_BITS, &png_colours(&section.palettes[palette]), &indices);
+    let png = png::indexed_png(width as u32, height as u32, PNG_BITS, &png_colours(&section.palettes[palette]), &indices);
     let json = serde_json::to_vec_pretty(&json).expect("a sheet serializes");
     Ok(Sheet { png, json })
 }
@@ -344,10 +315,7 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
     };
     let (width, height) = (picture.width as usize, picture.height as usize);
     if (width, height) != (json.meta.size.w, json.meta.size.h) {
-        return Err(Error::CharacterSprites(format!(
-            "the PNG is {width}x{height}; the JSON names {}x{}",
-            json.meta.size.w, json.meta.size.h
-        )));
+        return Err(Error::CharacterSprites(format!("the PNG is {width}x{height}; the JSON names {}x{}", json.meta.size.w, json.meta.size.h)));
     }
 
     let extension = &json.meta.bof3;
@@ -356,12 +324,7 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
 
     let palette = &mut out.palettes[extension.palette];
     for (index, colour) in palette.iter_mut().enumerate() {
-        let picked = *picture.colors.get(index).ok_or_else(|| {
-            Error::CharacterSprites(format!(
-                "the PNG palette has {} colours; a palette has {COLOURS}",
-                picture.colors.len()
-            ))
-        })?;
+        let picked = *picture.colors.get(index).ok_or_else(|| Error::CharacterSprites(format!("the PNG palette has {} colours; a palette has {COLOURS}", picture.colors.len())))?;
         if picked != word_to_view(*colour) {
             *colour = view_to_word(picked);
         }
@@ -374,36 +337,25 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
     for pose in &extension.poses {
         let animation = section.animations.get(pose.animation).ok_or_else(|| missing("animation", pose.animation))?;
         let frame = animation.frames.get(pose.frame).ok_or_else(|| missing("frame", pose.frame))?;
-        let sheet = section
-            .image_of(pose.animation)
-            .ok_or_else(|| Error::CharacterSprites(format!("no record plays animation {}", pose.animation)))?;
+        let sheet = section.image_of(pose.animation).ok_or_else(|| Error::CharacterSprites(format!("no record plays animation {}", pose.animation)))?;
         let composite = compose(stages.get(sheet), frame, sizes, false, bounds);
         let place = format!("animation {} frame {}", pose.animation, pose.frame);
 
         for line in 0..bounds.height() {
             for dot in 0..bounds.width() {
                 let (x, y) = (pose.x + dot, pose.y + line);
-                let index = *picture
-                    .indices
-                    .get(y * width + x)
-                    .filter(|_| x < width)
-                    .ok_or_else(|| Error::CharacterSprites(format!("{place} runs past the PNG")))?;
+                let index = *picture.indices.get(y * width + x).filter(|_| x < width).ok_or_else(|| Error::CharacterSprites(format!("{place} runs past the PNG")))?;
                 match composite.pixel(dot, line) {
                     Some(pixel) if pixel.texel.index != index => {
                         let key = (sheet, pixel.u, pixel.v);
                         if let Some((other, by)) = changes.get(&key).filter(|(other, _)| *other != index) {
-                            return Err(Error::CharacterSprites(format!(
-                                "sheet {sheet} texel ({}, {}) is {other} in {by} and {index} in {place}",
-                                pixel.u, pixel.v
-                            )));
+                            return Err(Error::CharacterSprites(format!("sheet {sheet} texel ({}, {}) is {other} in {by} and {index} in {place}", pixel.u, pixel.v)));
                         }
                         changes.insert(key, (index, place.clone()));
                     }
                     Some(_) => {}
                     None if index != BACKGROUND => {
-                        return Err(Error::CharacterSprites(format!(
-                            "{place} pixel ({dot}, {line}) is painted where no cell reaches"
-                        )));
+                        return Err(Error::CharacterSprites(format!("{place} pixel ({dot}, {line}) is painted where no cell reaches")));
                     }
                     None => {}
                 }
@@ -420,33 +372,15 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
         out.images[sheet].set_texels(texels)?;
     }
 
-    let positions: Vec<(usize, usize)> = extension
-        .animations
-        .iter()
-        .flat_map(|exported| exported.steps.iter().map(move |&position| (exported.animation, position)))
-        .collect();
+    let positions: Vec<(usize, usize)> = extension.animations.iter().flat_map(|exported| exported.steps.iter().map(move |&position| (exported.animation, position))).collect();
     if positions.len() != json.frames.len() {
-        return Err(Error::CharacterSprites(format!(
-            "the JSON has {} frames; the section's animations show {}",
-            json.frames.len(),
-            positions.len()
-        )));
+        return Err(Error::CharacterSprites(format!("the JSON has {} frames; the section's animations show {}", json.frames.len(), positions.len())));
     }
     for (&(animation, position), frame) in positions.iter().zip(&json.frames) {
-        let step = out
-            .animations
-            .get_mut(animation)
-            .and_then(|animation| animation.steps.get_mut(position))
-            .ok_or_else(|| missing("step", position))?;
+        let step = out.animations.get_mut(animation).and_then(|animation| animation.steps.get_mut(position)).ok_or_else(|| missing("step", position))?;
         if duration_ms(step.delay) != frame.duration {
             step.delay = delay_of(frame.duration).ok_or_else(|| {
-                Error::CharacterSprites(format!(
-                    "{} lasts {} ms; a step lasts 1 to {} ticks of {:.3} ms",
-                    frame.filename,
-                    frame.duration,
-                    super::JUMP - 1,
-                    TICK_MICROS / MICROS_PER_MILLI
-                ))
+                Error::CharacterSprites(format!("{} lasts {} ms; a step lasts 1 to {} ticks of {:.3} ms", frame.filename, frame.duration, super::JUMP - 1, TICK_MICROS / MICROS_PER_MILLI))
             })?;
         }
     }
@@ -454,8 +388,7 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
 }
 
 fn read_json(json: &[u8]) -> Result<Json> {
-    serde_json::from_slice(json)
-        .map_err(|error| Error::CharacterSprites(format!("the sheet JSON does not read: {error}")))
+    serde_json::from_slice(json).map_err(|error| Error::CharacterSprites(format!("the sheet JSON does not read: {error}")))
 }
 
 /// The PNG file name a sheet's JSON names (`meta.image`).
@@ -470,10 +403,7 @@ fn shown_steps(animation: &Animation, index: usize) -> Result<Vec<(usize, usize,
         .map(|(position, step)| {
             let frame = usize::from(step.frame);
             if frame >= animation.frames.len() {
-                return Err(Error::CharacterSprites(format!(
-                    "animation {index} step {position} shows frame {frame} of {}",
-                    animation.frames.len()
-                )));
+                return Err(Error::CharacterSprites(format!("animation {index} step {position} shows frame {frame} of {}", animation.frames.len())));
             }
             Ok((position, frame, step.delay))
         })
@@ -514,10 +444,7 @@ mod tests {
         let sheet = export(&sprites, 2, 0, &sizes(), "sprites.png").expect("exports");
         assert_eq!(image_name(&sheet.json).expect("names its PNG"), "sprites.png");
         let imported = import(&sprites, &sizes(), &sheet.json, &sheet.png).expect("imports");
-        assert_eq!(
-            crate::sprite::encode(&imported).expect("encodes"),
-            crate::sprite::encode(&sprites).expect("encodes")
-        );
+        assert_eq!(crate::sprite::encode(&imported).expect("encodes"), crate::sprite::encode(&sprites).expect("encodes"));
         assert!(export(&sprites, 3, 0, &sizes(), "sprites.png").is_err());
     }
 
@@ -570,9 +497,7 @@ mod tests {
         let png = repaint(&sheet, 0, (3, 2), 30);
         let imported = import_section(&section, &sizes(), &sheet.json, &png).expect("imports");
         assert_eq!(imported.images[0].texel(3, 2), Some(30));
-        let changed = (0..imported.images[0].texel_count())
-            .filter(|&at| imported.images[0].texels()[at] != section.images[0].texels()[at])
-            .count();
+        let changed = (0..imported.images[0].texel_count()).filter(|&at| imported.images[0].texels()[at] != section.images[0].texels()[at]).count();
         assert_eq!(changed, 1);
         assert!(imported.encode().is_ok());
     }

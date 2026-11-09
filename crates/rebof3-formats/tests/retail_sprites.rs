@@ -57,8 +57,7 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
     let Some(root) = support::retail_disc() else {
         return;
     };
-    let sizes = SpriteSizes::from_executable(&fs::read(root.join(EXECUTABLE)).expect("the executable reads"))
-        .expect("g_SpriteSizes reads");
+    let sizes = SpriteSizes::from_executable(&fs::read(root.join(EXECUTABLE)).expect("the executable reads")).expect("g_SpriteSizes reads");
 
     let (mut entries, mut decoded, mut sections, mut failures) = (0, 0, 0, Vec::new());
     let (mut sheets, mut animations, mut placed, mut frames, mut stitched) = (0, 0, 0, 0, 0);
@@ -74,8 +73,7 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
             let counts = proven.entry(if reader == Reader::Battle { "battle" } else { "field" }).or_default();
             counts.0 += 1;
             counts.1 += sprites.sections.len();
-            counts.2 +=
-                sprites.sections.iter().flat_map(|section| &section.animations).map(|a| a.frames.len()).sum::<usize>();
+            counts.2 += sprites.sections.iter().flat_map(|section| &section.animations).map(|a| a.frames.len()).sum::<usize>();
         }
         match sprite::encode(&sprites) {
             Ok(encoded) if encoded == bytes => {}
@@ -87,9 +85,7 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
             sections += 1;
             sheets += section.images.len();
             for image in &section.images {
-                let fresh = sprite::Image::new(image.width, image.height, image.encoding, image.texels().to_vec())
-                    .expect("same texels")
-                    .encode();
+                let fresh = sprite::Image::new(image.width, image.height, image.encoding, image.texels().to_vec()).expect("same texels").encode();
                 repacked += usize::from(fresh.len() <= image.encode().len());
             }
             animations += section.animations.len();
@@ -118,8 +114,7 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
                     continue;
                 }
             };
-            match sprite::import_section(section, &sizes, &sheet.json, &sheet.png).and_then(|section| section.encode())
-            {
+            match sprite::import_section(section, &sizes, &sheet.json, &sheet.png).and_then(|section| section.encode()) {
                 Ok(encoded) if section.encode().is_ok_and(|stored| stored == encoded) => imported += 1,
                 Ok(_) => failures.push(format!("{place} section {number}: the sheet imports to other bytes")),
                 Err(error) => failures.push(format!("{place} section {number}: import: {error}")),
@@ -136,10 +131,6 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
     eprintln!("proven palette (entries, sections, frames): {proven:?}");
     assert!(failures.is_empty(), "{} failures: {:?}", failures.len(), failures.iter().take(8).collect::<Vec<_>>());
     assert!(decoded > 0 && imported == sections, "{decoded} sprites, {imported} of {sections} sheets");
-    assert_eq!(
-        proven.get("battle"),
-        Some(&(38, 114, 18310)),
-        "battle sprites drawn with the palette their reader loads"
-    );
+    assert_eq!(proven.get("battle"), Some(&(38, 114, 18310)), "battle sprites drawn with the palette their reader loads");
     assert_eq!(proven.get("field"), Some(&(19, 57, 14892)), "field sprites drawn with the palette their reader loads");
 }

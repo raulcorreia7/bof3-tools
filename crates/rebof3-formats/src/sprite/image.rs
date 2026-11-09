@@ -118,13 +118,7 @@ impl Image {
     pub fn new(width: u16, height: u16, encoding: Encoding, texels: Vec<u8>) -> Result<Self> {
         let image = Self { width, height, encoding, kind: encoding.kind(), texels: Vec::new(), stored: None };
         if texels.len() != image.texel_count() {
-            return Err(Error::CharacterSprites(format!(
-                "a {}x{} sheet holds {} texels, not {}",
-                image.texel_width(),
-                height,
-                image.texel_count(),
-                texels.len()
-            )));
+            return Err(Error::CharacterSprites(format!("a {}x{} sheet holds {} texels, not {}", image.texel_width(), height, image.texel_count(), texels.len())));
         }
         Ok(Self { texels, ..image })
     }
@@ -157,11 +151,7 @@ impl Image {
     /// Replaces the texels. A change drops the stored record, so [`Image::encode`] packs the sheet again.
     pub fn set_texels(&mut self, texels: Vec<u8>) -> Result<()> {
         if texels.len() != self.texel_count() {
-            return Err(Error::CharacterSprites(format!(
-                "a sheet of {} texels takes {}",
-                self.texel_count(),
-                texels.len()
-            )));
+            return Err(Error::CharacterSprites(format!("a sheet of {} texels takes {}", self.texel_count(), texels.len())));
         }
         if texels != self.texels {
             self.texels = texels;
@@ -238,8 +228,7 @@ fn pack(texels: &[u8]) -> Option<Vec<u8>> {
     }
     let mut out = Vec::with_capacity(texels.len().div_ceil(PACKED_TEXELS) * 4);
     for group in texels.chunks(PACKED_TEXELS) {
-        let packed =
-            group.iter().zip(PACKED_SHIFTS).fold(0u32, |word, (&texel, shift)| word | u32::from(texel) << shift);
+        let packed = group.iter().zip(PACKED_SHIFTS).fold(0u32, |word, (&texel, shift)| word | u32::from(texel) << shift);
         out.extend(packed.to_le_bytes());
     }
     Some(out)
@@ -250,10 +239,7 @@ fn half(bytes: &[u8], at: usize) -> Result<u16> {
 }
 
 fn word(bytes: &[u8], at: usize) -> Result<u32> {
-    bytes
-        .get(at..at + 4)
-        .map(|quad| u32::from_le_bytes([quad[0], quad[1], quad[2], quad[3]]))
-        .ok_or_else(|| short(at + 4, bytes.len()))
+    bytes.get(at..at + 4).map(|quad| u32::from_le_bytes([quad[0], quad[1], quad[2], quad[3]])).ok_or_else(|| short(at + 4, bytes.len()))
 }
 
 fn short(needed: usize, have: usize) -> Error {

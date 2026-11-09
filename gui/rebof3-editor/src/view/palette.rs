@@ -110,14 +110,12 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         for (column, &word) in colors.iter().enumerate() {
             let index = row * ROW_COLORS + column;
             let edited = original.get(index * 2..index * 2 + 2) != Some(&word.to_le_bytes()[..]);
-            line = line.child(
-                swatch(("color", index), color_rgba(word), SWATCH, outline(index == selected, edited))
-                    .tooltip(tip(format!("{index}: {word:#06X}")))
-                    .on_click(cx.listener(move |editor, _, _, cx| {
-                        editor.views.palette.selected = index;
-                        cx.notify();
-                    })),
-            );
+            line = line.child(swatch(("color", index), color_rgba(word), SWATCH, outline(index == selected, edited)).tooltip(tip(format!("{index}: {word:#06X}"))).on_click(cx.listener(
+                move |editor, _, _, cx| {
+                    editor.views.palette.selected = index;
+                    cx.notify();
+                },
+            )));
         }
         grid = grid.child(line);
     }
@@ -141,42 +139,20 @@ pub fn picker(word: u16, index: usize, sliders: &Sliders, set: SetColor, cx: &mu
 
     for (at, channel) in Channel::ALL.into_iter().enumerate() {
         let value = channel.of(word);
-        let control = slider(
-            ("channel", at),
-            u32::from(value),
-            0..=u32::from(CHANNEL_MAX),
-            &sliders[at],
-            cx,
-            move |editor, value| {
-                let value = u16::try_from(value).unwrap_or(CHANNEL_MAX);
-                set(editor, index, &|word| channel.with(word, value));
-            },
-        );
-        controls = controls.child(
-            div()
-                .flex()
-                .items_center()
-                .gap(px(GAP))
-                .child(div().w(px(CHANNEL_LABEL_WIDTH)).child(channel.label()))
-                .child(control)
-                .child(mono(value.to_string())),
-        );
+        let control = slider(("channel", at), u32::from(value), 0..=u32::from(CHANNEL_MAX), &sliders[at], cx, move |editor, value| {
+            let value = u16::try_from(value).unwrap_or(CHANNEL_MAX);
+            set(editor, index, &|word| channel.with(word, value));
+        });
+        controls = controls.child(div().flex().items_center().gap(px(GAP)).child(div().w(px(CHANNEL_LABEL_WIDTH)).child(channel.label())).child(control).child(mono(value.to_string())));
     }
 
     let stp = word & STP_BIT != 0;
-    controls = controls.child(checkbox("stp", "semi-transparent (STP)", stp).on_click(cx.listener(
-        move |editor, _, _, cx| {
-            set(editor, index, &|word| word ^ STP_BIT);
-            cx.notify();
-        },
-    )));
+    controls = controls.child(checkbox("stp", "semi-transparent (STP)", stp).on_click(cx.listener(move |editor, _, _, cx| {
+        set(editor, index, &|word| word ^ STP_BIT);
+        cx.notify();
+    })));
 
-    div()
-        .flex()
-        .flex_none()
-        .gap(px(GAP))
-        .child(swatch("preview", color_rgba(word), PREVIEW, None).rounded(px(CORNER)))
-        .child(controls)
+    div().flex().flex_none().gap(px(GAP)).child(swatch("preview", color_rgba(word), PREVIEW, None).rounded(px(CORNER))).child(controls)
 }
 
 /// Rewrites color `index` of the shown block.

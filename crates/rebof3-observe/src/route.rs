@@ -99,18 +99,11 @@ impl Route {
         for press in file.press {
             let mut buttons = 0;
             for name in &press.buttons {
-                let bit = BUTTONS
-                    .iter()
-                    .find(|(button, _)| button.eq_ignore_ascii_case(name))
-                    .map(|(_, bit)| *bit)
-                    .ok_or_else(|| Error::Route(format!("unknown button {name:?}")))?;
+                let bit = BUTTONS.iter().find(|(button, _)| button.eq_ignore_ascii_case(name)).map(|(_, bit)| *bit).ok_or_else(|| Error::Route(format!("unknown button {name:?}")))?;
                 buttons |= bit;
             }
             if press.every == 0 || press.hold == 0 || press.hold > press.every {
-                return Err(Error::Route(format!(
-                    "a press from frame {} holds {} of every {} frames; hold 1 to every frames",
-                    press.from, press.hold, press.every
-                )));
+                return Err(Error::Route(format!("a press from frame {} holds {} of every {} frames; hold 1 to every frames", press.from, press.hold, press.every)));
             }
             presses.push(Press { buttons, from: press.from, until: press.until, every: press.every, hold: press.hold });
         }

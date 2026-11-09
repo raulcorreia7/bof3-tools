@@ -18,10 +18,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use gpui::{
-    AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, anchored, canvas,
-    deferred, div, fill, point, prelude::*, px, rgba, size,
-};
+use gpui::{AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, anchored, canvas, deferred, div, fill, point, prelude::*, px, rgba, size};
 use psx_formats::gfx::texture::{Clut, Depth, texel_indices, texel_words};
 use psx_formats::gfx::vram;
 use rebof3_emi::replay::Writer;
@@ -58,8 +55,7 @@ pub(super) enum Bits {
 }
 
 impl Bits {
-    pub(super) const ALL: [(Bits, &'static str); 3] =
-        [(Bits::Four, "4-bit"), (Bits::Eight, "8-bit"), (Bits::Sixteen, "16-bit")];
+    pub(super) const ALL: [(Bits, &'static str); 3] = [(Bits::Four, "4-bit"), (Bits::Eight, "8-bit"), (Bits::Sixteen, "16-bit")];
 
     pub(super) fn depth(self) -> Option<Depth> {
         match self {
@@ -244,10 +240,7 @@ pub fn prepare(editor: &mut Editor) {
                         depth: candidate.depth,
                         words: replayed.vram.clut_words(candidate.clut, candidate.depth),
                         palette: candidate.palette.to_string(),
-                        evidence: format!(
-                            "suggestion, score {:.2}, scene {}; no rule names this row",
-                            candidate.score, replayed.scene.name
-                        ),
+                        evidence: format!("suggestion, score {:.2}, scene {}; no rule names this row", candidate.score, replayed.scene.name),
                     })
                     .collect();
             }
@@ -258,13 +251,7 @@ pub fn prepare(editor: &mut Editor) {
             let payloads: Vec<&[u8]> = (0..entry.archive.entries().len()).map(|at| entry.sibling(at)).collect();
             let rows = joined_rows(&archive, entry.archive.entries(), &payloads);
             for row in rows.get(&index).cloned().unwrap_or_default() {
-                joined.push(Row {
-                    clut: row.clut,
-                    depth: row.depth,
-                    words: row.words,
-                    palette: format!("{} #{}", row.palette_archive, row.palette),
-                    evidence: row.evidence,
-                });
+                joined.push(Row { clut: row.clut, depth: row.depth, words: row.words, palette: format!("{} #{}", row.palette_archive, row.palette), evidence: row.evidence });
             }
             "no scene loads its archive and no archive rule names it".to_string()
         }
@@ -304,16 +291,8 @@ type PaletteRow<'a> = dyn FnMut(&Palette, Clut, Depth) -> Option<Vec<u16>> + 'a;
 /// a palette row in drawing order, and the most-drawn way with its evidence. `words` reads a named
 /// palette's row from the project, so an edited bank shows its edit; a row nothing names keeps the
 /// words the draw found.
-fn observed_rows(
-    cached: &[Observation],
-    archive: &str,
-    slot: usize,
-    words: &mut PaletteRow<'_>,
-) -> (Vec<Row>, Option<(Bits, String)>) {
-    let mut uses: Vec<(&Observation, &rebof3_observe::Texture)> = cached
-        .iter()
-        .flat_map(|observation| observation.of(archive, slot).map(move |used| (observation, used)))
-        .collect();
+fn observed_rows(cached: &[Observation], archive: &str, slot: usize, words: &mut PaletteRow<'_>) -> (Vec<Row>, Option<(Bits, String)>) {
+    let mut uses: Vec<(&Observation, &rebof3_observe::Texture)> = cached.iter().flat_map(|observation| observation.of(archive, slot).map(move |used| (observation, used))).collect();
     uses.sort_by_key(|(_, used)| std::cmp::Reverse(used.draws));
     let mut rows = Vec::new();
     let mut seen = None;
@@ -325,8 +304,7 @@ fn observed_rows(
                     Some(palette) => format!("{} #{}", palette.archive, palette.slot),
                     None => "no entry (the words the draw found)".to_string(),
                 };
-                let words =
-                    used.palette.as_ref().and_then(|palette| words(palette, clut, depth)).unwrap_or(used.words.clone());
+                let words = used.palette.as_ref().and_then(|palette| words(palette, clut, depth)).unwrap_or(used.words.clone());
                 let bits = if depth == Depth::Four { Bits::Four } else { Bits::Eight };
                 let evidence = format!("{evidence}; CLUT {},{} written by {palette}", clut.x, clut.y);
                 (bits, Some(Row { clut, depth, words, palette, evidence }))
@@ -349,18 +327,13 @@ fn live_row(project: &mut crate::project::Project, palette: &Palette, clut: Clut
     let payload = project.payload(&loaded, palette.slot);
     let load_arg = project.load_arg(&loaded, palette.slot);
     match palette.via.as_str() {
-        "arena" => ResidentClutBlock::new(palette.archive.clone(), palette.slot, load_arg, payload)?
-            .row(clut, depth)
-            .map(<[u16]>::to_vec),
+        "arena" => ResidentClutBlock::new(palette.archive.clone(), palette.slot, load_arg, payload)?.row(clut, depth).map(<[u16]>::to_vec),
         _ => {
             let grid = texture_words(load_arg, payload).ok()?;
             let column = usize::from(clut.x).checked_sub(grid.x as usize)?;
             let row = usize::from(clut.y).checked_sub(grid.y as usize)?;
             let start = row * grid.width + column;
-            (column + depth.colors() <= grid.width)
-                .then(|| grid.words.get(start..start + depth.colors()))
-                .flatten()
-                .map(<[u16]>::to_vec)
+            (column + depth.colors() <= grid.width).then(|| grid.words.get(start..start + depth.colors())).flatten().map(<[u16]>::to_vec)
         }
     }
 }
@@ -429,8 +402,7 @@ fn run_route(editor: &mut Editor, route: Route, cx: &mut Context<Editor>) {
     let finished: Finished = Arc::default();
     let observations = &mut editor.views.texture.observations;
     observations.message = None;
-    observations.job =
-        Some(Job { route: route.name.clone(), frames: route.frames, frame: frame.clone(), cancel: cancel.clone() });
+    observations.job = Some(Job { route: route.name.clone(), frames: route.frames, frame: frame.clone(), cancel: cancel.clone() });
 
     let result = finished.clone();
     std::thread::spawn(move || {
@@ -493,9 +465,7 @@ fn palette(entry: &Entry<'_>, state: &State, depth: Depth) -> Vec<u16> {
         Source::Observed(at) => state.observed.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Joined(at) => state.joined.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Suggested(at) => state.suggested.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
-        Source::ClutBlock { block, row } => {
-            words_of(entry.sibling(*block)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
-        }
+        Source::ClutBlock { block, row } => words_of(entry.sibling(*block)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default(),
         Source::Grey => (0..colors).map(|index| grey(index, colors)).collect(),
     }
 }
@@ -521,13 +491,8 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let zoom = state.zoom as f32;
 
     let measure = Rc::clone(&state.image);
-    let image = canvas(
-        move |area, _, _| measure.set(area),
-        move |area, (), window, _| paint_pixels(window, area, &pixels, width, zoom),
-    )
-    .w(px(width as f32 * zoom))
-    .h(px(height as f32 * zoom))
-    .flex_none();
+    let image =
+        canvas(move |area, _, _| measure.set(area), move |area, (), window, _| paint_pixels(window, area, &pixels, width, zoom)).w(px(width as f32 * zoom)).h(px(height as f32 * zoom)).flex_none();
 
     let hover = match state.hover {
         Some((x, y, value)) => format!("x {x}  y {y}  value {value:#X}"),
@@ -578,13 +543,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
 /// Paints the texture's pixels at `zoom` pixels per texel, one quad per run of equal pixels, only for
 /// the rows the window shows.
-pub(super) fn paint_pixels(
-    window: &mut gpui::Window,
-    area: Bounds<Pixels>,
-    pixels: &[[u8; 4]],
-    width: usize,
-    zoom: f32,
-) {
+pub(super) fn paint_pixels(window: &mut gpui::Window, area: Bounds<Pixels>, pixels: &[[u8; 4]], width: usize, zoom: f32) {
     if width == 0 {
         return;
     }
@@ -640,8 +599,7 @@ fn pointer(editor: &mut Editor, position: Point<Pixels>, paints: bool) {
     let Some(entry) = editor.current() else { return };
     let Ok(words) = texture_words(entry.load_arg(), entry.payload()) else { return };
 
-    let round_trips =
-        vram::payload_from_grid(words.width, words.height, &words.words).is_ok_and(|bytes| bytes == entry.payload());
+    let round_trips = vram::payload_from_grid(words.width, words.height, &words.words).is_ok_and(|bytes| bytes == entry.payload());
     if !round_trips {
         editor.status = "This upload does not round-trip through the rectangle writer; painting is off.".into();
         return;
@@ -658,10 +616,7 @@ fn render(entry: &Entry<'_>, state: &State, words: &[u16]) -> (Vec<[u8; 4]>, Vec
         Some(depth) => {
             let colors = palette(entry, state, depth);
             let indices = texel_indices(words, depth);
-            let pixels = indices
-                .iter()
-                .map(|&index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word)))
-                .collect();
+            let pixels = indices.iter().map(|&index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word))).collect();
             (pixels, indices.iter().map(|&index| u16::from(index)).collect())
         }
     }
@@ -695,20 +650,13 @@ fn paint(state: &State, words: &[u16], width: usize, height: usize, x: usize, y:
 fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut Context<Editor>) -> Div {
     let state = &editor.views.texture;
 
-    let mut depth_row = div()
-        .flex()
-        .flex_wrap()
-        .items_center()
-        .gap(px(GAP))
-        .child(mono(format!("VRAM x {} y {}  {}×{} words", words.x, words.y, words.width, words.height)))
-        .child(separator(true))
-        .child("Depth");
+    let mut depth_row =
+        div().flex().flex_wrap().items_center().gap(px(GAP)).child(mono(format!("VRAM x {} y {}  {}×{} words", words.x, words.y, words.width, words.height))).child(separator(true)).child("Depth");
     for (bits, label) in Bits::ALL {
-        depth_row =
-            depth_row.child(tab(label, label, state.bits == bits).on_click(cx.listener(move |editor, _, _, cx| {
-                editor.views.texture.bits = bits;
-                cx.notify();
-            })));
+        depth_row = depth_row.child(tab(label, label, state.bits == bits).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.texture.bits = bits;
+            cx.notify();
+        })));
     }
     let zoom = slider("zoom", state.zoom, ZOOM_MIN..=ZOOM_MAX, &state.zoom_slider, cx, |editor, zoom| {
         editor.views.texture.zoom = zoom;
@@ -724,13 +672,10 @@ fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut C
         })))
         .child(button("import-tim", "Import TIM", true).on_click(cx.listener(move |editor, _, _, cx| {
             let key = key.clone();
-            editor.open_file("TIM file to import", cx, move |editor, bytes| {
-                import_tim(editor, &key, &bytes).unwrap_or_else(|error| error)
-            });
+            editor.open_file("TIM file to import", cx, move |editor, bytes| import_tim(editor, &key, &bytes).unwrap_or_else(|error| error));
         })));
 
-    let mut column =
-        div().flex().flex_col().flex_none().gap(px(GAP)).child(depth_row).child(routes(&state.observations, cx));
+    let mut column = div().flex().flex_col().flex_none().gap(px(GAP)).child(depth_row).child(routes(&state.observations, cx));
     if let Some(line) = evidence(state) {
         column = column.child(muted(line));
     }
@@ -750,30 +695,25 @@ fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut C
         return column.child(muted(format!("Ink: color word {:#06X} (right-click a texel to pick)", state.ink)));
     };
 
-    let chooser = button("colors", format!("{} ▾", describe(&state.source, state)), true).on_click(cx.listener(
-        |editor, _, _, cx| {
-            editor.menu = Some(WindowMenu::View(Menu::Colors));
-            cx.notify();
-        },
-    ));
+    let chooser = button("colors", format!("{} ▾", describe(&state.source, state)), true).on_click(cx.listener(|editor, _, _, cx| {
+        editor.menu = Some(WindowMenu::View(Menu::Colors));
+        cx.notify();
+    }));
     let mut chooser_column = div().flex().flex_col().child(chooser);
     if editing_menu(editor, Menu::Colors) {
-        chooser_column =
-            chooser_column.child(deferred(anchored().snap_to_window().child(sources(editor, entry, depth, cx))));
+        chooser_column = chooser_column.child(deferred(anchored().snap_to_window().child(sources(editor, entry, depth, cx))));
     }
     column = column.child(div().flex().items_center().gap(px(GAP)).child("Colors").child(chooser_column));
 
     let mut inks = div().flex().flex_wrap().items_center().gap(px(SWATCH_GAP)).child(div().mr(px(GAP)).child("Ink"));
     for (index, &word) in palette(entry, state, depth).iter().enumerate() {
         let selected = usize::from(state.ink) == index;
-        inks = inks.child(
-            swatch(("ink", index), color_rgba(word), SWATCH, outline(selected, false))
-                .tooltip(tip(format!("index {index}  word {word:#06X}")))
-                .on_click(cx.listener(move |editor, _, _, cx| {
-                    editor.views.texture.ink = index as u16;
-                    cx.notify();
-                })),
-        );
+        inks = inks.child(swatch(("ink", index), color_rgba(word), SWATCH, outline(selected, false)).tooltip(tip(format!("index {index}  word {word:#06X}"))).on_click(cx.listener(
+            move |editor, _, _, cx| {
+                editor.views.texture.ink = index as u16;
+                cx.notify();
+            },
+        )));
     }
     column.child(inks)
 }
@@ -856,12 +796,10 @@ fn routes(observations: &Observations, cx: &mut Context<Editor>) -> Div {
     if let Some(job) = &observations.job {
         let frame = job.frame.load(Ordering::Relaxed);
         let cancel = job.cancel.clone();
-        return line.child(mono(format!("{}: frame {frame} of {}", job.route, job.frames))).child(
-            button("cancel-route", "Cancel", true).on_click(cx.listener(move |_, _, _, cx| {
-                cancel.store(true, Ordering::Relaxed);
-                cx.notify();
-            })),
-        );
+        return line.child(mono(format!("{}: frame {frame} of {}", job.route, job.frames))).child(button("cancel-route", "Cancel", true).on_click(cx.listener(move |_, _, _, cx| {
+            cancel.store(true, Ordering::Relaxed);
+            cx.notify();
+        })));
     }
     let ready = matches!(observations.lookup, Lookup::Ready { .. });
     for (at, name) in Route::built_in_names().enumerate() {
@@ -911,8 +849,7 @@ fn tim(entry: &Entry<'_>, state: &State) -> Result<Vec<u8>, String> {
         Source::Suggested(at) => state.suggested.get(*at).map(|row| row.clut),
         Source::ClutBlock { block, row } => {
             let load_arg = entry.project.load_arg(entry.archive, *block);
-            ResidentClutBlock::new("", *block, load_arg, entry.sibling(*block))
-                .map(|resident| clut_at(resident.block.arena_word + row * depth.colors()))
+            ResidentClutBlock::new("", *block, load_arg, entry.sibling(*block)).map(|resident| clut_at(resident.block.arena_word + row * depth.colors()))
         }
         Source::Grey => {
             return Err("The grey ramp is no palette row of the game; pick a row or export at 16 bits.".into());
@@ -920,8 +857,7 @@ fn tim(entry: &Entry<'_>, state: &State) -> Result<Vec<u8>, String> {
     }
     .ok_or("This palette row has no place in VRAM; pick another row or export at 16 bits.")?;
     let words = palette(entry, state, depth);
-    texture_vram::texture_tim_of(entry.load_arg(), entry.payload(), depth.bits(), &words, clut.x, clut.y)
-        .map_err(|error| error.to_string())
+    texture_vram::texture_tim_of(entry.load_arg(), entry.payload(), depth.bits(), &words, clut.x, clut.y).map_err(|error| error.to_string())
 }
 
 /// Reads a TIM into entry `key`: its image words become the payload and its image place the load
@@ -959,9 +895,7 @@ fn import_tim(editor: &mut Editor, key: &(ArchivePath, usize), bytes: &[u8]) -> 
 fn suggestion(state: &State) -> Option<String> {
     let (bits, score) = state.depth_hint?;
     let depth = Bits::ALL.iter().find(|(choice, _)| *choice == bits).map_or("?", |(_, label)| label);
-    let row = state.suggested.first().map_or(String::new(), |row| {
-        format!(", then clut {},{} from {} at {}-bit", row.clut.x, row.clut.y, row.palette, row.depth.bits())
-    });
+    let row = state.suggested.first().map_or(String::new(), |row| format!(", then clut {},{} from {} at {}-bit", row.clut.x, row.clut.y, row.palette, row.depth.bits()));
     Some(format!("No rule joins this texture. Suggested, not applied: {depth} (score {score:.2}){row}."))
 }
 
@@ -984,13 +918,7 @@ fn describe(source: &Source, state: &State) -> String {
 mod tests {
     use super::*;
 
-    fn drawn(
-        slot: usize,
-        bits: u32,
-        clut: Option<[u16; 2]>,
-        draws: u64,
-        palette: Option<Palette>,
-    ) -> rebof3_observe::Texture {
+    fn drawn(slot: usize, bits: u32, clut: Option<[u16; 2]>, draws: u64, palette: Option<Palette>) -> rebof3_observe::Texture {
         rebof3_observe::Texture {
             archive: "BIN/BATTLE/BATL_DRA.EMI".into(),
             slot,
@@ -1025,11 +953,7 @@ mod tests {
     #[test]
     fn the_most_drawn_way_opens_the_texture() {
         let bank = Palette { archive: "BIN/BATTLE/BATL_DRA.EMI".into(), slot: 1, via: "arena".into() };
-        let cached = [observation(vec![
-            drawn(0, 8, Some([0, 506]), 3, None),
-            drawn(0, 4, Some([0, 507]), 40, Some(bank)),
-            drawn(2, 4, Some([0, 506]), 99, None),
-        ])];
+        let cached = [observation(vec![drawn(0, 8, Some([0, 506]), 3, None), drawn(0, 4, Some([0, 507]), 40, Some(bank)), drawn(2, 4, Some([0, 506]), 99, None)])];
         let mut live = |_: &Palette, _: Clut, depth: Depth| Some(vec![0x7FFF; depth.colors()]);
         let (rows, seen) = observed_rows(&cached, "BIN/BATTLE/BATL_DRA.EMI", 0, &mut live);
         assert_eq!(rows.len(), 2, "both indexed ways are rows; slot 2 is another entry");

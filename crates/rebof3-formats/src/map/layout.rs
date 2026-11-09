@@ -15,8 +15,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     let cells = usize::from(bundle.width) * usize::from(bundle.height);
     let codes = &bundle.codes[..cells.min(bundle.codes.len())];
     let rows: Vec<&[u8]> = codes.chunks(width).collect();
-    let objects: Vec<serde_json::Value> =
-        bundle.objects.iter().map(|object| serde_json::json!({ "tag": object.tag, "words": object.words })).collect();
+    let objects: Vec<serde_json::Value> = bundle.objects.iter().map(|object| serde_json::json!({ "tag": object.tag, "words": object.words })).collect();
     let document = serde_json::json!({
         "width": bundle.width,
         "height": bundle.height,
@@ -49,15 +48,11 @@ struct LayoutObject {
 /// The stored bytes of a map bundle, from its layout JSON and the stored bundle. The JSON's byte codes, objects and height
 /// table replace the stored ones. Every other section keeps its stored value, because the layout does not name it.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let layout: Layout =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("layout JSON: {error}")))?;
+    let layout: Layout = serde_json::from_slice(json).map_err(|error| Error::Import(format!("layout JSON: {error}")))?;
     let mut bundle = MapBundle::decode(payload)?;
     let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
     if layout.width != bundle.width || layout.height != bundle.height {
-        return Err(Error::Import(format!(
-            "the layout is {}x{}; the bundle is {width}x{height}",
-            layout.width, layout.height
-        )));
+        return Err(Error::Import(format!("the layout is {}x{}; the bundle is {width}x{height}", layout.width, layout.height)));
     }
     if layout.byte_codes.len() != height || layout.byte_codes.iter().any(|row| row.len() != width) {
         return Err(Error::Import(format!("the byte codes are not {height} rows of {width}")));
@@ -68,8 +63,7 @@ pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     if layout.heights.as_ref().is_some_and(|table| table.len() != width * height) {
         return Err(Error::Import(format!("the height table is not {} bytes", width * height)));
     }
-    bundle.objects =
-        layout.objects.into_iter().map(|object| MapObject { tag: object.tag, words: object.words }).collect();
+    bundle.objects = layout.objects.into_iter().map(|object| MapObject { tag: object.tag, words: object.words }).collect();
     bundle.heights = layout.heights;
     Ok(bundle.encode())
 }

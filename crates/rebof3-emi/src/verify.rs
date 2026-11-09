@@ -36,27 +36,13 @@ impl Container {
         self.entries += archive.entries().len();
         self.bytes += archive.entries().iter().map(|entry| u64::from(entry.size)).sum::<u64>();
 
-        let payloads: Result<Vec<Payload>> = archive
-            .entries()
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| {
-                Ok(Payload {
-                    bytes: archive.payload(bytes, index)?,
-                    file_type: entry.file_type,
-                    ram_ptr: entry.ram_ptr,
-                })
-            })
-            .collect();
+        let payloads: Result<Vec<Payload>> =
+            archive.entries().iter().enumerate().map(|(index, entry)| Ok(Payload { bytes: archive.payload(bytes, index)?, file_type: entry.file_type, ram_ptr: entry.ram_ptr })).collect();
         let packed = payloads.and_then(|payloads| pack_payloads(archive.version(), &payloads));
         match packed {
             Ok(packed) => {
                 if let Some(offset) = first_difference(bytes, &packed) {
-                    self.failures.push(format!(
-                        "{label}: differs at 0x{offset:X} (retail {} bytes, repacked {} bytes)",
-                        bytes.len(),
-                        packed.len()
-                    ));
+                    self.failures.push(format!("{label}: differs at 0x{offset:X} (retail {} bytes, repacked {} bytes)", bytes.len(), packed.len()));
                 }
             }
             Err(error) => self.failures.push(format!("{label}: pack failed: {error}")),

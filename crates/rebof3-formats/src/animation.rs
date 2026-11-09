@@ -145,13 +145,7 @@ impl Animation {
             let cells = (0..cells)
                 .map(|cell| {
                     let at = start + 1 + CELL_BYTES * cell;
-                    Ok(Cell {
-                        size: byte(at)?,
-                        x: byte(at + 1)? as i8,
-                        y: byte(at + 2)? as i8,
-                        u: byte(at + 3)?,
-                        v: byte(at + 4)?,
-                    })
+                    Ok(Cell { size: byte(at)?, x: byte(at + 1)? as i8, y: byte(at + 2)? as i8, u: byte(at + 3)?, v: byte(at + 4)? })
                 })
                 .collect::<Result<Vec<_>>>()?;
             end = end.max(start + 1 + CELL_BYTES * cells.len());
@@ -160,9 +154,7 @@ impl Animation {
 
         let animation = Self { steps, frames };
         if animation.encode() != bytes[..end] {
-            return Err(Error::AnimationStream(
-                "an animation's frames are not laid out in table order after its offsets".into(),
-            ));
+            return Err(Error::AnimationStream("an animation's frames are not laid out in table order after its offsets".into()));
         }
         Ok((animation, end))
     }
@@ -314,8 +306,7 @@ impl Player {
                     self.ended = true;
                 }
                 self.position = self.position.saturating_sub(STEP_BYTES);
-                let step =
-                    animation.steps.get(self.position / STEP_BYTES).copied().unwrap_or(Step { delay: 0, frame: 0 });
+                let step = animation.steps.get(self.position / STEP_BYTES).copied().unwrap_or(Step { delay: 0, frame: 0 });
                 self.delay = step.delay;
                 self.frame = usize::from(step.frame);
                 self.step = self.position / STEP_BYTES;
@@ -354,12 +345,7 @@ mod tests {
     /// Three frames: steps 0, 1, 2 with delays 2, 1, 3, then a jump back to step 1.
     fn walk() -> Animation {
         Animation {
-            steps: vec![
-                Step { delay: 2, frame: 0 },
-                Step { delay: 1, frame: 1 },
-                Step { delay: 3, frame: 2 },
-                Step { delay: JUMP, frame: 1 },
-            ],
+            steps: vec![Step { delay: 2, frame: 0 }, Step { delay: 1, frame: 1 }, Step { delay: 3, frame: 2 }, Step { delay: JUMP, frame: 1 }],
             frames: vec![Frame { cells: vec![cell(0)] }, Frame { cells: vec![cell(16), cell(32)] }, Frame::default()],
         }
     }

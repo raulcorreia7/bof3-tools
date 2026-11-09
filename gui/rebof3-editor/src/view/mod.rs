@@ -191,44 +191,20 @@ struct FormatViews {
 
 /// The views of each format; a format without a row has only Info, Hex and what its payload offers.
 static VIEWS: &[FormatViews] = &[
-    FormatViews {
-        format: Format::VramUpload,
-        tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
-        prepare: Some(Reset { tab: None, run: texture::prepare }),
-    },
+    FormatViews { format: Format::VramUpload, tabs: &[Tab::Texture, Tab::Vram, Tab::Layout], prepare: Some(Reset { tab: None, run: texture::prepare }) },
     FormatViews { format: Format::ClutBlock, tabs: &[Tab::Palette, Tab::Vram, Tab::Layout], prepare: None },
     FormatViews { format: Format::VabHeader, tabs: &[Tab::Sound], prepare: None },
     FormatViews { format: Format::VabBody, tabs: &[Tab::Sound], prepare: None },
     FormatViews { format: Format::SepPackage, tabs: &[Tab::Sound], prepare: None },
-    FormatViews {
-        format: Format::AreaMapBundle,
-        tabs: &[Tab::Map, Tab::Area],
-        prepare: Some(Reset { tab: None, run: prepare_area }),
-    },
-    FormatViews {
-        format: Format::CharacterSpritesLz77,
-        tabs: &[Tab::Sprite],
-        prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
-    },
-    FormatViews {
-        format: Format::CharacterSprites,
-        tabs: &[Tab::Sprite],
-        prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
-    },
-    FormatViews {
-        format: Format::AreaMessageTable,
-        tabs: &[],
-        prepare: Some(Reset { tab: Some(Tab::Text), run: compose::prepare }),
-    },
+    FormatViews { format: Format::AreaMapBundle, tabs: &[Tab::Map, Tab::Area], prepare: Some(Reset { tab: None, run: prepare_area }) },
+    FormatViews { format: Format::CharacterSpritesLz77, tabs: &[Tab::Sprite], prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }) },
+    FormatViews { format: Format::CharacterSprites, tabs: &[Tab::Sprite], prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }) },
+    FormatViews { format: Format::AreaMessageTable, tabs: &[], prepare: Some(Reset { tab: Some(Tab::Text), run: compose::prepare }) },
     FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
     FormatViews { format: Format::AreaScriptTable, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::BattleScriptTable, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::MagicScriptTable, tabs: &[Tab::Script], prepare: None },
-    FormatViews {
-        format: Format::AreaEncounterTable,
-        tabs: &[Tab::Formation],
-        prepare: Some(Reset { tab: Some(Tab::Formation), run: formation::prepare }),
-    },
+    FormatViews { format: Format::AreaEncounterTable, tabs: &[Tab::Formation], prepare: Some(Reset { tab: Some(Tab::Formation), run: formation::prepare }) },
 ];
 
 /// Draws the map bundle's shown view: the top-down map or the area in 3D.
@@ -307,12 +283,10 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
 
     let mut bar = div().flex().flex_none().gap(px(GAP_SMALL));
     for candidate in available {
-        bar = bar.child(tab(candidate.label(), candidate.label(), candidate == shown).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                editor.tab = candidate;
-                cx.notify();
-            },
-        )));
+        bar = bar.child(tab(candidate.label(), candidate.label(), candidate == shown).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.tab = candidate;
+            cx.notify();
+        })));
     }
 
     let body = match shown {
@@ -333,16 +307,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Area => area::show(editor, &entry, cx),
         Tab::Formation => formation::show(editor, &entry, cx),
     };
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP_SMALL))
-        .child(bar)
-        .child(separator(false))
-        .child(body)
-        .into_any_element()
+    div().flex().flex_col().flex_1().min_h_0().gap(px(GAP_SMALL)).child(bar).child(separator(false)).child(body).into_any_element()
 }
 
 /// The line edit of `field` while it has the keyboard.
@@ -352,15 +317,7 @@ pub fn editing(editor: &Editor, field: Field) -> Option<&LineEdit> {
 
 /// The text field of `which`: it shows `text`, or `hint` while `text` is empty, and a click gives it the
 /// keyboard, starting from `text`.
-pub fn input(
-    editor: &Editor,
-    id: impl Into<ElementId>,
-    which: Field,
-    text: &str,
-    hint: &str,
-    width: Option<f32>,
-    cx: &mut Context<Editor>,
-) -> Stateful<Div> {
+pub fn input(editor: &Editor, id: impl Into<ElementId>, which: Field, text: &str, hint: &str, width: Option<f32>, cx: &mut Context<Editor>) -> Stateful<Div> {
     let draft = text.to_string();
     field(id, text, hint, editing(editor, which), width).on_click(cx.listener(move |editor, _, _, cx| {
         editor.start_editing(WindowField::View(which), draft.clone());
@@ -477,12 +434,9 @@ mod tests {
     fn every_view_survives_a_bad_payload(cx: &mut TestAppContext) {
         let noise = noise();
         for (name, payload) in [("empty", &[][..]), ("short", &SHORT[..]), ("noise", &noise[..])] {
-            let entries: Vec<DiscEntry<'_>> =
-                PLACES.iter().map(|&(file_type, ram_ptr)| DiscEntry { file_type, ram_ptr, bytes: payload }).collect();
+            let entries: Vec<DiscEntry<'_>> = PLACES.iter().map(|&(file_type, ram_ptr)| DiscEntry { file_type, ram_ptr, bytes: payload }).collect();
             let game = [DiscEntry { file_type: 0, ram_ptr: GAME_CODE, bytes: payload }];
-            let start: Vec<DiscEntry<'_>> = (0..=schema::START_PARTY_ENTRY)
-                .map(|_| DiscEntry { file_type: 0, ram_ptr: 0, bytes: payload })
-                .collect();
+            let start: Vec<DiscEntry<'_>> = (0..=schema::START_PARTY_ENTRY).map(|_| DiscEntry { file_type: 0, ram_ptr: 0, bytes: payload }).collect();
             let archives = [(ARCHIVE, &entries[..]), (schema::GAME, &game[..]), (schema::START, &start[..])];
             let disc = Disc::with_archives(&format!("bad-{name}"), &archives);
             let (disc_folder, project_folder) = (disc.disc(), disc.project());
@@ -525,13 +479,7 @@ mod tests {
         let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc), Some(project), cx));
         editor.update(cx, |editor, _| {
             editor.select_archive(&ArchivePath("BIN/WORLD00/AREA001.EMI".into()));
-            let index = editor
-                .archive
-                .as_ref()
-                .expect("the area loads")
-                .formats
-                .iter()
-                .position(|format| *format == Format::AreaMapBundle);
+            let index = editor.archive.as_ref().expect("the area loads").formats.iter().position(|format| *format == Format::AreaMapBundle);
             editor.select_entry(index.expect("the area has a map bundle"));
             editor.tab = Tab::Map;
         });

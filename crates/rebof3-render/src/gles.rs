@@ -132,41 +132,23 @@ impl Gles {
         egl.initialize(display).map_err(|error| format!("EGL does not initialize: {error}"))?;
         egl.bind_api(egl::OPENGL_ES_API).map_err(|error| format!("EGL has no OpenGL ES: {error}"))?;
         let attributes = [egl::RENDERABLE_TYPE, egl::OPENGL_ES3_BIT, egl::SURFACE_TYPE, egl::PBUFFER_BIT, egl::NONE];
-        let config = egl
-            .choose_first_config(display, &attributes)
-            .map_err(|error| error.to_string())?
-            .ok_or("EGL has no OpenGL ES 3 configuration")?;
-        let context = egl
-            .create_context(display, config, None, &[egl::CONTEXT_MAJOR_VERSION, 3, egl::NONE])
-            .map_err(|error| format!("EGL makes no OpenGL ES 3 context: {error}"))?;
+        let config = egl.choose_first_config(display, &attributes).map_err(|error| error.to_string())?.ok_or("EGL has no OpenGL ES 3 configuration")?;
+        let context = egl.create_context(display, config, None, &[egl::CONTEXT_MAJOR_VERSION, 3, egl::NONE]).map_err(|error| format!("EGL makes no OpenGL ES 3 context: {error}"))?;
         let surface = if egl.make_current(display, None, None, Some(context)).is_ok() {
             None
         } else {
-            let surface = egl
-                .create_pbuffer_surface(display, config, &[egl::WIDTH, 16, egl::HEIGHT, 16, egl::NONE])
-                .map_err(|error| format!("EGL makes no pbuffer: {error}"))?;
-            egl.make_current(display, Some(surface), Some(surface), Some(context))
-                .map_err(|error| format!("EGL cannot make the context current: {error}"))?;
+            let surface = egl.create_pbuffer_surface(display, config, &[egl::WIDTH, 16, egl::HEIGHT, 16, egl::NONE]).map_err(|error| format!("EGL makes no pbuffer: {error}"))?;
+            egl.make_current(display, Some(surface), Some(surface), Some(context)).map_err(|error| format!("EGL cannot make the context current: {error}"))?;
             Some(surface)
         };
         // SAFETY: the context is current on this thread, and every name resolves through EGL.
-        let gl = unsafe {
-            glow::Context::from_loader_function(|name| {
-                egl.get_proc_address(name).map_or(std::ptr::null(), |function| function as *const _)
-            })
-        };
+        let gl = unsafe { glow::Context::from_loader_function(|name| egl.get_proc_address(name).map_or(std::ptr::null(), |function| function as *const _)) };
         // SAFETY: the context is current; every object made here belongs to it.
         unsafe { Self::build(egl, display, context, surface, Arc::new(gl)) }
     }
 
     /// Compiles the program and makes the VRAM texture and the vertex buffer.
-    unsafe fn build(
-        egl: egl::DynamicInstance<egl::EGL1_5>,
-        display: egl::Display,
-        context: egl::Context,
-        surface: Option<egl::Surface>,
-        gl: Arc<glow::Context>,
-    ) -> Result<Self, String> {
+    unsafe fn build(egl: egl::DynamicInstance<egl::EGL1_5>, display: egl::Display, context: egl::Context, surface: Option<egl::Surface>, gl: Arc<glow::Context>) -> Result<Self, String> {
         // SAFETY: the caller made the context current.
         unsafe {
             let program = gl.create_program()?;
@@ -192,17 +174,7 @@ impl Gles {
                 gl.tex_parameter_i32(glow::TEXTURE_2D, parameter, glow::NEAREST as i32);
             }
             let zero = vec![0u8; VRAM_WIDTH * VRAM_HEIGHT * 2];
-            gl.tex_image_2d(
-                glow::TEXTURE_2D,
-                0,
-                glow::R16UI as i32,
-                VRAM_WIDTH as i32,
-                VRAM_HEIGHT as i32,
-                0,
-                glow::RED_INTEGER,
-                glow::UNSIGNED_SHORT,
-                glow::PixelUnpackData::Slice(Some(&zero)),
-            );
+            gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::R16UI as i32, VRAM_WIDTH as i32, VRAM_HEIGHT as i32, 0, glow::RED_INTEGER, glow::UNSIGNED_SHORT, glow::PixelUnpackData::Slice(Some(&zero)));
             let buffer = gl.create_buffer()?;
             let array = gl.create_vertex_array()?;
             gl.bind_vertex_array(Some(array));
@@ -214,38 +186,18 @@ impl Gles {
                 gl.vertex_attrib_pointer_f32(location as u32, size, glow::FLOAT, false, stride, offset);
                 offset += size * 4;
             }
-            Ok(Self {
-                egl,
-                display,
-                context,
-                surface,
-                gl,
-                program,
-                vram,
-                uploaded: vec![0; VRAM_WIDTH * VRAM_HEIGHT],
-                target: None,
-                buffer,
-                array,
-            })
+            Ok(Self { egl, display, context, surface, gl, program, vram, uploaded: vec![0; VRAM_WIDTH * VRAM_HEIGHT], target: None, buffer, array })
         }
     }
 
     /// Draws `scene` through `camera` into a `width` x `height` frame.
     pub fn draw(&mut self, scene: &Scene, camera: &Camera, width: usize, height: usize) -> Result<Frame, String> {
-        self.egl
-            .make_current(self.display, self.surface, self.surface, Some(self.context))
-            .map_err(|error| format!("EGL cannot make the context current: {error}"))?;
+        self.egl.make_current(self.display, self.surface, self.surface, Some(self.context)).map_err(|error| format!("EGL cannot make the context current: {error}"))?;
         // SAFETY: the context is current, and every object used was made in it.
         unsafe { self.draw_current(scene, camera, width.max(1), height.max(1)) }
     }
 
-    unsafe fn draw_current(
-        &mut self,
-        scene: &Scene,
-        camera: &Camera,
-        width: usize,
-        height: usize,
-    ) -> Result<Frame, String> {
+    unsafe fn draw_current(&mut self, scene: &Scene, camera: &Camera, width: usize, height: usize) -> Result<Frame, String> {
         // SAFETY: the caller made the context current.
         unsafe {
             let gl = Arc::clone(&self.gl);
@@ -253,25 +205,11 @@ impl Gles {
             if scene.vram.len() == VRAM_WIDTH * VRAM_HEIGHT && scene.vram != self.uploaded {
                 gl.bind_texture(glow::TEXTURE_2D, Some(self.vram));
                 let bytes: Vec<u8> = scene.vram.iter().flat_map(|word| word.to_le_bytes()).collect();
-                gl.tex_sub_image_2d(
-                    glow::TEXTURE_2D,
-                    0,
-                    0,
-                    0,
-                    VRAM_WIDTH as i32,
-                    VRAM_HEIGHT as i32,
-                    glow::RED_INTEGER,
-                    glow::UNSIGNED_SHORT,
-                    glow::PixelUnpackData::Slice(Some(&bytes)),
-                );
+                gl.tex_sub_image_2d(glow::TEXTURE_2D, 0, 0, 0, VRAM_WIDTH as i32, VRAM_HEIGHT as i32, glow::RED_INTEGER, glow::UNSIGNED_SHORT, glow::PixelUnpackData::Slice(Some(&bytes)));
                 self.uploaded.clone_from(&scene.vram);
             }
             let textures = self.upload_images(scene)?;
-            let images: Vec<(glow::Texture, [i32; 2])> = textures
-                .iter()
-                .zip(&scene.images)
-                .map(|(&texture, image)| (texture, [image.width.max(1) as i32, image.height.max(1) as i32]))
-                .collect();
+            let images: Vec<(glow::Texture, [i32; 2])> = textures.iter().zip(&scene.images).map(|(&texture, image)| (texture, [image.width.max(1) as i32, image.height.max(1) as i32])).collect();
 
             gl.viewport(0, 0, width as i32, height as i32);
             let [red, green, blue, _] = scene.background.map(|channel| f32::from(channel) / 255.0);
@@ -300,11 +238,7 @@ impl Gles {
             let order = draw_order(scene, camera);
             let pass = gl.get_uniform_location(self.program, "u_pass");
             // The opaque texels of every depth-tested primitive but the alpha overlays.
-            let solid: Vec<&Primitive> = order
-                .iter()
-                .map(|&index| &scene.primitives[index])
-                .filter(|primitive| primitive.depth_test && primitive.blend != Blend::Alpha)
-                .collect();
+            let solid: Vec<&Primitive> = order.iter().map(|&index| &scene.primitives[index]).filter(|primitive| primitive.depth_test && primitive.blend != Blend::Alpha).collect();
             gl.disable(glow::BLEND);
             gl.depth_mask(true);
             gl.uniform_1_i32(pass.as_ref(), 0);
@@ -322,15 +256,10 @@ impl Gles {
             gl.uniform_1_i32(pass.as_ref(), 2);
             gl.blend_equation(glow::FUNC_ADD);
             gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
-            let alpha: Vec<&Primitive> = order
-                .iter()
-                .map(|&index| &scene.primitives[index])
-                .filter(|primitive| primitive.depth_test && primitive.blend == Blend::Alpha)
-                .collect();
+            let alpha: Vec<&Primitive> = order.iter().map(|&index| &scene.primitives[index]).filter(|primitive| primitive.depth_test && primitive.blend == Blend::Alpha).collect();
             self.draw_run(&alpha, camera, &images);
             gl.disable(glow::DEPTH_TEST);
-            let top: Vec<&Primitive> =
-                order.iter().map(|&index| &scene.primitives[index]).filter(|primitive| !primitive.depth_test).collect();
+            let top: Vec<&Primitive> = order.iter().map(|&index| &scene.primitives[index]).filter(|primitive| !primitive.depth_test).collect();
             for run in runs(&top, |primitive| primitive.blend) {
                 match run[0].blend {
                     Blend::Psx(mode) => psx_blend(&gl, mode),
@@ -345,15 +274,7 @@ impl Gles {
             }
 
             let mut rgba = vec![0u8; width * height * 4];
-            gl.read_pixels(
-                0,
-                0,
-                width as i32,
-                height as i32,
-                glow::RGBA,
-                glow::UNSIGNED_BYTE,
-                glow::PixelPackData::Slice(Some(&mut rgba)),
-            );
+            gl.read_pixels(0, 0, width as i32, height as i32, glow::RGBA, glow::UNSIGNED_BYTE, glow::PixelPackData::Slice(Some(&mut rgba)));
             for texture in textures {
                 gl.delete_texture(texture);
             }
@@ -423,17 +344,7 @@ impl Gles {
                 let (width, height) = (image.width.max(1), image.height.max(1));
                 let mut bytes = image.rgba.clone();
                 bytes.resize(width * height * 4, 0);
-                gl.tex_image_2d(
-                    glow::TEXTURE_2D,
-                    0,
-                    glow::RGBA8 as i32,
-                    width as i32,
-                    height as i32,
-                    0,
-                    glow::RGBA,
-                    glow::UNSIGNED_BYTE,
-                    glow::PixelUnpackData::Slice(Some(&bytes)),
-                );
+                gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::RGBA8 as i32, width as i32, height as i32, 0, glow::RGBA, glow::UNSIGNED_BYTE, glow::PixelUnpackData::Slice(Some(&bytes)));
                 textures.push(texture);
             }
             Ok(textures)
@@ -500,9 +411,7 @@ fn open_display(egl: &egl::DynamicInstance<egl::EGL1_5>) -> Result<egl::Display,
     let extensions = egl.query_string(None, egl::EXTENSIONS).map(|text| text.to_string_lossy().into_owned());
     if extensions.is_ok_and(|text| text.contains("EGL_MESA_platform_surfaceless")) {
         // SAFETY: the surfaceless platform takes no native display.
-        if let Ok(display) =
-            unsafe { egl.get_platform_display(PLATFORM_SURFACELESS_MESA, egl::DEFAULT_DISPLAY, &[egl::ATTRIB_NONE]) }
-        {
+        if let Ok(display) = unsafe { egl.get_platform_display(PLATFORM_SURFACELESS_MESA, egl::DEFAULT_DISPLAY, &[egl::ATTRIB_NONE]) } {
             return Ok(display);
         }
     }

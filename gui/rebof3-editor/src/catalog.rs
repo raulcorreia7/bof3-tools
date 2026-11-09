@@ -41,18 +41,7 @@ pub enum Which {
 
 impl Which {
     /// Every group, in display order.
-    pub const ALL: [Which; 10] = [
-        Which::Characters,
-        Which::Enemies,
-        Which::Areas,
-        Which::Battle,
-        Which::Interface,
-        Which::Audio,
-        Which::Text,
-        Which::DataTables,
-        Which::Other,
-        Which::Unsorted,
-    ];
+    pub const ALL: [Which; 10] = [Which::Characters, Which::Enemies, Which::Areas, Which::Battle, Which::Interface, Which::Audio, Which::Text, Which::DataTables, Which::Other, Which::Unsorted];
 
     /// The group's title.
     pub fn title(self) -> &'static str {
@@ -164,13 +153,7 @@ static RULES: &[Rule] = &[
         label: Label::EnemyArchive,
         source: "EMI_SLOT_ENEMY; the battle start streams slot 9 + g_GameAreaId (wiki: formats/emi)",
     },
-    Rule {
-        pick: Pick::Series("BOSS"),
-        group: Which::Enemies,
-        section: "Boss battles",
-        label: Label::Boss,
-        source: "EMI_SLOT_BOSS",
-    },
+    Rule { pick: Pick::Series("BOSS"), group: Which::Enemies, section: "Boss battles", label: Label::Boss, source: "EMI_SLOT_BOSS" },
     Rule {
         pick: Pick::Format(Format::AreaEncounterTable),
         group: Which::Enemies,
@@ -179,30 +162,16 @@ static RULES: &[Rule] = &[
         source: "the area encounter table is the formation data; rebof3_formats::encounter",
     },
     // Areas and maps.
-    Rule {
-        pick: Pick::Series("AREA"),
-        group: Which::Areas,
-        section: "Areas",
-        label: Label::Area,
-        source: "EMI_SLOT_AREA: one archive per area, slot area + 0x2AB",
-    },
+    Rule { pick: Pick::Series("AREA"), group: Which::Areas, section: "Areas", label: Label::Area, source: "EMI_SLOT_AREA: one archive per area, slot area + 0x2AB" },
     // Battle.
     Rule {
-        pick: Pick::Any(&[
-            "BATL_DRA", "BATL_END", "BATL_OVR", "BATL_RE2", "BATL_RET", "BATL_SE", "BATTLE", "BATTLE2", "COMN_SE",
-        ]),
+        pick: Pick::Any(&["BATL_DRA", "BATL_END", "BATL_OVR", "BATL_RE2", "BATL_RET", "BATL_SE", "BATTLE", "BATTLE2", "COMN_SE"]),
         group: Which::Battle,
         section: "Battle overlays, backgrounds and effects",
         label: Label::Stem,
         source: "EMI_SLOT_BATL_DRA to EMI_SLOT_COMN_SE (the BATTLE block)",
     },
-    Rule {
-        pick: Pick::Series("MAGIC"),
-        group: Which::Battle,
-        section: "Magic effects",
-        label: Label::Spell,
-        source: "EMI_SLOT_MAGIC; BMAGIC holds the spell effect overlays (wiki: formats/disc)",
-    },
+    Rule { pick: Pick::Series("MAGIC"), group: Which::Battle, section: "Magic effects", label: Label::Spell, source: "EMI_SLOT_MAGIC; BMAGIC holds the spell effect overlays (wiki: formats/disc)" },
     Rule {
         pick: Pick::Any(&["KAIZAR_D", "KAIZAR_F", "KAIZAR_N"]),
         group: Which::Battle,
@@ -210,20 +179,8 @@ static RULES: &[Rule] = &[
         label: Label::Stem,
         source: "BMAGIC holds the three KAIZAR effect blocks (wiki: formats/disc)",
     },
-    Rule {
-        pick: Pick::Any(&["SCE10EFF"]),
-        group: Which::Battle,
-        section: "Scenario effects",
-        label: Label::Stem,
-        source: "SCE10EFF, SCE15EF0-3 are effect controllers (wiki: formats/emi)",
-    },
-    Rule {
-        pick: Pick::Series("SCE15EF"),
-        group: Which::Battle,
-        section: "Scenario effects",
-        label: Label::Stem,
-        source: "SCE10EFF, SCE15EF0-3 are effect controllers (wiki: formats/emi)",
-    },
+    Rule { pick: Pick::Any(&["SCE10EFF"]), group: Which::Battle, section: "Scenario effects", label: Label::Stem, source: "SCE10EFF, SCE15EF0-3 are effect controllers (wiki: formats/emi)" },
+    Rule { pick: Pick::Series("SCE15EF"), group: Which::Battle, section: "Scenario effects", label: Label::Stem, source: "SCE10EFF, SCE15EF0-3 are effect controllers (wiki: formats/emi)" },
     // Interface.
     Rule {
         pick: Pick::Format(Format::AreaAuxWindow),
@@ -254,34 +211,10 @@ static RULES: &[Rule] = &[
         source: "EMI_SLOT_GAME holds the resident program and the title overlay (wiki: concepts/architecture)",
     },
     // Audio.
-    Rule {
-        pick: Pick::Series("BGM"),
-        group: Which::Audio,
-        section: "Music",
-        label: Label::Stem,
-        source: "EMI_SLOT_BGM",
-    },
-    Rule {
-        pick: Pick::Series("BGMBAT"),
-        group: Which::Audio,
-        section: "Music",
-        label: Label::Stem,
-        source: "BGMBAT00-06 are the battle music files of the BGM folder",
-    },
-    Rule {
-        pick: Pick::Any(&["BGMEND", "BGMOPN", "BGMSPC"]),
-        group: Which::Audio,
-        section: "Music",
-        label: Label::Stem,
-        source: "the BGM folder",
-    },
-    Rule {
-        pick: Pick::Any(&["A085SE2", "A108SE2"]),
-        group: Which::Audio,
-        section: "Area sound effects",
-        label: Label::Stem,
-        source: "EMI_SLOT_A085SE2, EMI_SLOT_A108SE2; wiki: guides/sound",
-    },
+    Rule { pick: Pick::Series("BGM"), group: Which::Audio, section: "Music", label: Label::Stem, source: "EMI_SLOT_BGM" },
+    Rule { pick: Pick::Series("BGMBAT"), group: Which::Audio, section: "Music", label: Label::Stem, source: "BGMBAT00-06 are the battle music files of the BGM folder" },
+    Rule { pick: Pick::Any(&["BGMEND", "BGMOPN", "BGMSPC"]), group: Which::Audio, section: "Music", label: Label::Stem, source: "the BGM folder" },
+    Rule { pick: Pick::Any(&["A085SE2", "A108SE2"]), group: Which::Audio, section: "Area sound effects", label: Label::Stem, source: "EMI_SLOT_A085SE2, EMI_SLOT_A108SE2; wiki: guides/sound" },
     // Text.
     Rule {
         pick: Pick::Format(Format::SharedResourceTable),
@@ -298,28 +231,10 @@ static RULES: &[Rule] = &[
         source: "AFLDKWA#0 is a shared resource table (wiki: guides/text)",
     },
     // Movies and other.
-    Rule {
-        pick: Pick::Any(&["DEMO"]),
-        group: Which::Other,
-        section: "Demo",
-        label: Label::Stem,
-        source: "EMI_SLOT_DEMO",
-    },
-    Rule {
-        pick: Pick::Series("SCENA"),
-        group: Which::Other,
-        section: "Scenario overlays",
-        label: Label::Stem,
-        source: "EMI_SLOT_SCENA: slot scenario_id + 661 (wiki: formats/disc)",
-    },
+    Rule { pick: Pick::Any(&["DEMO"]), group: Which::Other, section: "Demo", label: Label::Stem, source: "EMI_SLOT_DEMO" },
+    Rule { pick: Pick::Series("SCENA"), group: Which::Other, section: "Scenario overlays", label: Label::Stem, source: "EMI_SLOT_SCENA: slot scenario_id + 661 (wiki: formats/disc)" },
     Rule { pick: Pick::Series("COMMU"), group: Which::Other, section: "ETC programs", label: Label::Stem, source: ETC },
-    Rule {
-        pick: Pick::Any(&["BATE", "SHISU", "SISYOU"]),
-        group: Which::Other,
-        section: "ETC programs",
-        label: Label::Stem,
-        source: ETC,
-    },
+    Rule { pick: Pick::Any(&["BATE", "SHISU", "SISYOU"]), group: Which::Other, section: "ETC programs", label: Label::Stem, source: ETC },
     // Unsorted: placed by the table, but with no known place.
     Rule {
         pick: Pick::Any(&["MTEST", "RTEST"]),
@@ -331,19 +246,7 @@ static RULES: &[Rule] = &[
 ];
 
 /// The names of the stored character ids, `CharacterId` in `include/game/character.h`; the index is the id.
-const CHARACTER_IDS: [&str; 11] = [
-    "Ryu (young)",
-    "Nina (young)",
-    "Garr",
-    "Teepo",
-    "Rei",
-    "Momo",
-    "Peco",
-    "Ryu (adult)",
-    "Nina (adult)",
-    "Ryu (pajamas)",
-    "Whelp",
-];
+const CHARACTER_IDS: [&str; 11] = ["Ryu (young)", "Nina (young)", "Garr", "Teepo", "Rei", "Momo", "Peco", "Ryu (adult)", "Nina (adult)", "Ryu (pajamas)", "Whelp"];
 
 /// One entry as the catalog places it.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -387,11 +290,7 @@ impl Group {
 
     /// The archives the group holds entries of, an archive counted once.
     pub fn archives(&self) -> usize {
-        self.sections
-            .iter()
-            .flat_map(|section| section.units.iter().map(|unit| &unit.archive))
-            .collect::<BTreeSet<_>>()
-            .len()
+        self.sections.iter().flat_map(|section| section.units.iter().map(|unit| &unit.archive)).collect::<BTreeSet<_>>().len()
     }
 }
 
@@ -419,8 +318,7 @@ pub struct Scanned {
 
 /// Reads every archive once and keeps only what the catalog needs, so no archive stays in memory.
 pub fn scan(disc: &Path, archives: &[ArchivePath]) -> Result<Vec<Scanned>, String> {
-    let sheets: Vec<_> =
-        schema::sheets().into_iter().filter(|sheet| matches!(sheet.place, Place::Entry { .. })).collect();
+    let sheets: Vec<_> = schema::sheets().into_iter().filter(|sheet| matches!(sheet.place, Place::Entry { .. })).collect();
     let mut scanned = Vec::with_capacity(archives.len());
     for path in archives {
         let bytes = fs::read(disc.join(&path.0)).map_err(|error| format!("{}: {error}", path.0))?;
@@ -429,11 +327,7 @@ pub fn scan(disc: &Path, archives: &[ArchivePath]) -> Result<Vec<Scanned>, Strin
             .map(|index| {
                 let payload = archive.payload(&bytes, index).unwrap_or(&[]);
                 let format = classify(&archive.entries()[index], payload);
-                let names: Vec<_> = sheets
-                    .iter()
-                    .filter(|sheet| sheet.applies(&path.0, index, format))
-                    .map(|sheet| sheet.name)
-                    .collect();
+                let names: Vec<_> = sheets.iter().filter(|sheet| sheet.applies(&path.0, index, format)).map(|sheet| sheet.name).collect();
                 let table = (!names.is_empty()).then(|| table_note(&path.0, index, &names, payload));
                 ScannedEntry { format, table }
             })
@@ -489,21 +383,12 @@ impl Catalog {
                 let key = (place.group, section_order(place.group, place.section, place.row), place.section);
                 let (_, units) = sections.entry(key).or_insert_with(|| (place.source, BTreeMap::new()));
                 let unit_key = UnitKey::new(place.row, stem, &archive.path);
-                let unit = units.entry(unit_key).or_insert_with(|| Unit {
-                    archive: archive.path.clone(),
-                    title: title(place.label, place.prefix, parent, stem),
-                    entries: Vec::new(),
-                });
-                unit.entries.push(Placed {
-                    index,
-                    format: entry.format,
-                    note: entry.table.clone().unwrap_or_default(),
-                });
+                let unit = units.entry(unit_key).or_insert_with(|| Unit { archive: archive.path.clone(), title: title(place.label, place.prefix, parent, stem), entries: Vec::new() });
+                unit.entries.push(Placed { index, format: entry.format, note: entry.table.clone().unwrap_or_default() });
             }
         }
 
-        let mut groups: Vec<Group> =
-            Which::ALL.iter().map(|which| Group { which: *which, sections: Vec::new() }).collect();
+        let mut groups: Vec<Group> = Which::ALL.iter().map(|which| Group { which: *which, sections: Vec::new() }).collect();
         for ((group, _, title), (source, units)) in sections {
             let at = Which::ALL.iter().position(|which| *which == group).expect("every group is listed");
             groups[at].sections.push(Section { title, source, units: units.into_values().collect() });
@@ -514,11 +399,7 @@ impl Catalog {
 
     /// Every entry of the catalog, as `(archive, index)`, in display order.
     pub fn placements(&self) -> impl Iterator<Item = (&ArchivePath, usize)> {
-        self.groups.iter().flat_map(|group| {
-            group.sections.iter().flat_map(|section| {
-                section.units.iter().flat_map(|unit| unit.entries.iter().map(move |entry| (&unit.archive, entry.index)))
-            })
-        })
+        self.groups.iter().flat_map(|group| group.sections.iter().flat_map(|section| section.units.iter().flat_map(|unit| unit.entries.iter().map(move |entry| (&unit.archive, entry.index)))))
     }
 
     /// The entries the catalog holds.
@@ -576,8 +457,7 @@ fn place(folder: &str, stem: &str, entry: &ScannedEntry) -> Placement {
             prefix: "",
         };
     }
-    let by_format =
-        RULES.iter().enumerate().find(|(_, row)| matches!(row.pick, Pick::Format(format) if format == entry.format));
+    let by_format = RULES.iter().enumerate().find(|(_, row)| matches!(row.pick, Pick::Format(format) if format == entry.format));
     let by_name = || {
         RULES.iter().enumerate().find(|(_, row)| match row.pick {
             Pick::Series(prefix) => series(stem, prefix).is_some(),
@@ -591,14 +471,7 @@ fn place(folder: &str, stem: &str, entry: &ScannedEntry) -> Placement {
             let prefix = if let Pick::Series(prefix) = row.pick { prefix } else { "" };
             Placement { group: row.group, row: at, section: row.section, source: row.source, label: row.label, prefix }
         }
-        None => Placement {
-            group: Which::Unsorted,
-            row: RULES.len(),
-            section: NO_ROW,
-            source: NO_ROW,
-            label: Label::Stem,
-            prefix: "",
-        },
+        None => Placement { group: Which::Unsorted, row: RULES.len(), section: NO_ROW, source: NO_ROW, label: Label::Stem, prefix: "" },
     }
 }
 
@@ -619,11 +492,7 @@ fn title(label: Label, prefix: &str, folder: &str, stem: &str) -> String {
 
 /// The party an archive name spells: each character after the prefix is a character id in hex.
 fn members(stem: &str, prefix: &str) -> Option<String> {
-    let names: Option<Vec<&str>> = stem
-        .strip_prefix(prefix)?
-        .chars()
-        .map(|digit| digit.to_digit(16).and_then(|id| CHARACTER_IDS.get(id as usize).copied()))
-        .collect();
+    let names: Option<Vec<&str>> = stem.strip_prefix(prefix)?.chars().map(|digit| digit.to_digit(16).and_then(|id| CHARACTER_IDS.get(id as usize).copied())).collect();
     names.filter(|names| !names.is_empty()).map(|names| names.join(", "))
 }
 
@@ -728,11 +597,7 @@ impl Catalog {
                         tip: unit.archive.0.clone(),
                     });
                     if is_open {
-                        let shown: Vec<&Placed> = if forced && !unit_hit && !section_hit && !group_hit {
-                            matching
-                        } else {
-                            unit.entries.iter().collect()
-                        };
+                        let shown: Vec<&Placed> = if forced && !unit_hit && !section_hit && !group_hit { matching } else { unit.entries.iter().collect() };
                         section_rows.extend(shown.into_iter().map(|entry| Line {
                             depth: 3,
                             key: format!("{unit_key}#{}", entry.index),
@@ -793,11 +658,7 @@ impl Catalog {
 
 /// The text of an entry's line: its slot, its format and its note.
 fn entry_label(entry: &Placed) -> String {
-    if entry.note.is_empty() {
-        format!("{:>2}  {}", entry.index, entry.format.name())
-    } else {
-        format!("{:>2}  {}: {}", entry.index, entry.format.name(), entry.note)
-    }
+    if entry.note.is_empty() { format!("{:>2}  {}", entry.index, entry.format.name()) } else { format!("{:>2}  {}: {}", entry.index, entry.format.name(), entry.note) }
 }
 
 #[cfg(test)]
@@ -865,11 +726,7 @@ mod tests {
             assert!(seen.insert((archive.clone(), index)), "{} entry {index} is filed twice", archive.0);
         }
         let project = Project::open(&disc.disc(), &disc.project()).expect("project opens");
-        let expected = scan(&disc.disc(), &project.archives)
-            .expect("scan reads")
-            .iter()
-            .map(|archive| archive.entries.len())
-            .sum::<usize>();
+        let expected = scan(&disc.disc(), &project.archives).expect("scan reads").iter().map(|archive| archive.entries.len()).sum::<usize>();
         assert_eq!((seen.len(), catalog.entries()), (expected, expected));
         assert_eq!(expected, 3 * 4 + 3 + 3 + 3 + 3 + 2 + 1 + 1 + 1);
     }
@@ -880,10 +737,7 @@ mod tests {
 
         assert_eq!(titles(&catalog, Which::Areas), ["Area 2 (WORLD00)", "Area 10 (WORLD00)", "Area 100 (WORLD01)"]);
         assert_eq!(titles(&catalog, Which::Enemies)[0], "Area 1 enemy archive (ENEMY001)");
-        assert_eq!(
-            titles(&catalog, Which::Characters),
-            ["PL012: Ryu (young), Nina (young), Garr", "PL27A: Garr, Ryu (adult), Whelp"]
-        );
+        assert_eq!(titles(&catalog, Which::Characters), ["PL012: Ryu (young), Nina (young), Garr", "PL27A: Garr, Ryu (adult), Whelp"]);
         assert_eq!(titles(&catalog, Which::Audio), ["BGM002A"]);
     }
 
@@ -893,22 +747,11 @@ mod tests {
 
         // The encounter tables are the formations; the auxiliary windows are interface; the shared
         // resource tables are text; the area keeps its terrain and messages.
-        assert_eq!(
-            titles(&catalog, Which::Enemies)
-                .iter()
-                .filter(|title| title.starts_with("Area") && title.contains("WORLD"))
-                .count(),
-            3
-        );
+        assert_eq!(titles(&catalog, Which::Enemies).iter().filter(|title| title.starts_with("Area") && title.contains("WORLD")).count(), 3);
         assert_eq!(titles(&catalog, Which::Interface).len(), 3 + 1);
         assert_eq!(titles(&catalog, Which::Text), ["AFLDKWA"]);
         let areas = catalog.groups.iter().find(|group| group.which == Which::Areas).expect("areas");
-        assert!(
-            areas.sections[0].units[0]
-                .entries
-                .iter()
-                .all(|entry| { !matches!(entry.format, Format::AreaEncounterTable | Format::AreaAuxWindow) })
-        );
+        assert!(areas.sections[0].units[0].entries.iter().all(|entry| { !matches!(entry.format, Format::AreaEncounterTable | Format::AreaAuxWindow) }));
     }
 
     #[test]
@@ -931,10 +774,7 @@ mod tests {
 
         let group = catalog.groups.iter().find(|group| group.which == Which::Unsorted).expect("unsorted");
         let reasons: Vec<_> = group.sections.iter().map(|section| (section.title, titles_of(section))).collect();
-        assert_eq!(
-            reasons,
-            [("No caller found in the decomp", vec!["MTEST".to_string()]), (NO_ROW, vec!["ZZZZ".to_string()])]
-        );
+        assert_eq!(reasons, [("No caller found in the decomp", vec!["MTEST".to_string()]), (NO_ROW, vec!["ZZZZ".to_string()])]);
     }
 
     fn titles_of(section: &Section) -> Vec<String> {

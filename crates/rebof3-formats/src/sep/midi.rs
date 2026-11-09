@@ -10,9 +10,6 @@ pub fn export(package: &[u8], index: usize) -> Result<Vec<u8>> {
 /// A sequence package (`.seq`) from Standard MIDI Files, one sequence per part and in order. Each part is a MIDI
 /// file that [`export`] writes, with the sequence id the package gives it.
 pub fn import(parts: &[(&[u8], u16)]) -> Result<Vec<u8>> {
-    let sequences = parts
-        .iter()
-        .map(|&(midi, seq_id)| psx_formats::sep::Sequence::from_midi(midi, seq_id))
-        .collect::<psx_formats::Result<Vec<_>>>()?;
+    let sequences = parts.iter().map(|&(midi, seq_id)| psx_formats::sep::Sequence::from_midi(midi, seq_id)).collect::<psx_formats::Result<Vec<_>>>()?;
     Ok(psx_formats::sep::Package { sequences }.encode())
 }

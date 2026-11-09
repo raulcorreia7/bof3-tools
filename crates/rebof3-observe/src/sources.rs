@@ -94,14 +94,11 @@ impl Sources {
                 continue;
             }
             let [minute, second, sector] = [0, 1, 2].map(|at| from_bcd(record.parameters[at]));
-            let Some(sector) =
-                ((minute * SECONDS_PER_MINUTE + second) * SECTORS_PER_SECOND + sector).checked_sub(LEAD_IN_SECTORS)
-            else {
+            let Some(sector) = ((minute * SECONDS_PER_MINUTE + second) * SECTORS_PER_SECOND + sector).checked_sub(LEAD_IN_SECTORS) else {
                 continue;
             };
             let Some(entry) = self.file_at(sector).cloned() else { continue };
-            let is_archive =
-                entry.path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case(ARCHIVE_EXTENSION));
+            let is_archive = entry.path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case(ARCHIVE_EXTENSION));
             if !is_archive {
                 continue;
             }
@@ -157,12 +154,7 @@ impl Sources {
         if usize::from(width) != RECTANGLE_SIDE || usize::from(height) != RECTANGLE_SIDE {
             return None;
         }
-        self.chunks
-            .get(&(x, y, hash(pixels)))?
-            .iter()
-            .filter(|chunk| *chunk.words == *pixels)
-            .max_by_key(|chunk| self.files[chunk.entry.file].last_read)
-            .map(|chunk| chunk.entry)
+        self.chunks.get(&(x, y, hash(pixels)))?.iter().filter(|chunk| *chunk.words == *pixels).max_by_key(|chunk| self.files[chunk.entry.file].last_read).map(|chunk| chunk.entry)
     }
 
     /// The arena bank that holds `words` as the CLUT row at `clut`, or `None` when no file read

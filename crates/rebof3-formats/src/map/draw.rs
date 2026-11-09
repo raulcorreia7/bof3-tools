@@ -76,8 +76,7 @@ pub struct GameCamera {
 }
 
 /// The camera every area opens with.
-pub const GAME_CAMERA: GameCamera =
-    GameCamera { angle: [-682, 0, 0x200], focal: 1000, offset: [160, 120], distance: 0x1194 };
+pub const GAME_CAMERA: GameCamera = GameCamera { angle: [-682, 0, 0x200], focal: 1000, offset: [160, 120], distance: 0x1194 };
 
 /// A model point in the GTE's world space: `x` and `z` move to the GTE's `x` and `y`, and up is the
 /// GTE's negative `z` (`func_801530D0`: `vz = -corner * 16`). The cell origin offset is left out:
@@ -94,13 +93,7 @@ pub fn to_gte(model: [i32; 3]) -> [i32; 3] {
 pub fn ground(bundle: &MapBundle, x2: u16, y2: u16) -> i32 {
     let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
     let (x, y) = (usize::from(x2 / 2), usize::from(y2 / 2));
-    let corner = |column: usize, row: usize, index: usize| {
-        bundle
-            .cells
-            .get(row * width + column)
-            .filter(|_| column < width && row < height)
-            .map_or(0, |cell| i32::from(cell.heights[index]))
-    };
+    let corner = |column: usize, row: usize, index: usize| bundle.cells.get(row * width + column).filter(|_| column < width && row < height).map_or(0, |cell| i32::from(cell.heights[index]));
     if x >= width || y >= height {
         return 0;
     }
@@ -189,12 +182,7 @@ impl Tile {
     /// which leaves every texel but the transparent one black.
     pub fn of(bundle: &MapBundle, index: usize) -> Option<Self> {
         let descriptor = *bundle.records.get(index)?;
-        let (page_x, page_y, clut, depth) = terrain_descriptor(descriptor).unwrap_or((
-            TERRAIN_PAGE_X,
-            TERRAIN_PAGE_Y,
-            Clut { x: 0, y: TERRAIN_CLUT_ROW },
-            Depth::Eight,
-        ));
+        let (page_x, page_y, clut, depth) = terrain_descriptor(descriptor).unwrap_or((TERRAIN_PAGE_X, TERRAIN_PAGE_Y, Clut { x: 0, y: TERRAIN_CLUT_ROW }, Depth::Eight));
         let (_, uvs) = tile_of(bundle, descriptor);
         Some(Self {
             descriptor,
@@ -241,20 +229,7 @@ pub enum TileField {
 }
 
 impl TileField {
-    pub const ALL: [TileField; 12] = [
-        Self::Tile,
-        Self::Shade,
-        Self::Clut,
-        Self::Page,
-        Self::FourBit,
-        Self::Semi,
-        Self::BlendMode,
-        Self::FlipX,
-        Self::FlipZ,
-        Self::Turn,
-        Self::Sorted,
-        Self::Front,
-    ];
+    pub const ALL: [TileField; 12] = [Self::Tile, Self::Shade, Self::Clut, Self::Page, Self::FourBit, Self::Semi, Self::BlendMode, Self::FlipX, Self::FlipZ, Self::Turn, Self::Sorted, Self::Front];
 
     /// The field's first bit and width.
     pub fn bits(self) -> (u32, u32) {
@@ -367,9 +342,7 @@ pub fn descriptor_indices(bundle: &MapBundle, cell: usize) -> Vec<(Face, usize)>
 pub fn is_drawn(bundle: &MapBundle, cell: usize) -> bool {
     let (width, height) = (usize::from(bundle.width), usize::from(bundle.height));
     let (column, row) = (cell % width.max(1), cell / width.max(1));
-    (1..width.saturating_sub(1)).contains(&column)
-        && (1..height.saturating_sub(1)).contains(&row)
-        && descriptor(bundle, cell).is_some()
+    (1..width.saturating_sub(1)).contains(&column) && (1..height.saturating_sub(1)).contains(&row) && descriptor(bundle, cell).is_some()
 }
 
 /// Appends the quads of `cell`.
@@ -390,8 +363,7 @@ fn push_cell(bundle: &MapBundle, cell: usize, quads: &mut Vec<Quad>) {
         next += 1;
     }
     let south = corners(bundle, cell + width);
-    if (south[0][1] < here[2][1] || south[1][1] < here[3][1]) && bundle.records.get(next).is_some_and(|&word| word != 0)
-    {
+    if (south[0][1] < here[2][1] || south[1][1] < here[3][1]) && bundle.records.get(next).is_some_and(|&word| word != 0) {
         let corners = [here[2], here[3], south[0], south[1]];
         quads.push(Quad { cell, face: Face::South, corners, tile: Tile::of(bundle, next) });
     }
@@ -439,10 +411,7 @@ mod tests {
     fn a_raised_cell_has_an_east_and_a_south_wall() {
         let quads = quads(&bundle());
         let faces: Vec<(usize, Face)> = quads.iter().map(|quad| (quad.cell, quad.face)).collect();
-        assert_eq!(
-            faces,
-            [(5, Face::Top), (5, Face::East), (5, Face::South), (6, Face::Top), (9, Face::Top), (10, Face::Top)]
-        );
+        assert_eq!(faces, [(5, Face::Top), (5, Face::East), (5, Face::South), (6, Face::Top), (9, Face::Top), (10, Face::Top)]);
         let east = quads[1];
         assert_eq!(east.corners, [[256, 32, 256], [256, 32, 128], [256, 0, 256], [256, 0, 128]]);
         let south = quads[2];

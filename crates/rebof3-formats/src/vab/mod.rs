@@ -17,18 +17,15 @@ const EVIDENCE: &str = "wiki: formats/audio#bank-layout (header and body share a
 /// header's load argument.
 fn open(site: &Site<'_>) -> Extras {
     let (entry, payload) = (site.entry(), site.payload());
-    let body = site.entries.iter().enumerate().find_map(|(other, candidate)| {
-        (candidate.ram_ptr == entry.ram_ptr && classify(candidate, site.payloads[other]) == Format::VabBody)
-            .then_some(site.payloads[other])
-    });
+    let body = site
+        .entries
+        .iter()
+        .enumerate()
+        .find_map(|(other, candidate)| (candidate.ram_ptr == entry.ram_ptr && classify(candidate, site.payloads[other]) == Format::VabBody).then_some(site.payloads[other]));
     let Some(body) = body else {
-        return Extras {
-            files: Vec::new(),
-            skipped: Some("soundfont skipped: no body shares the header's load argument".to_string()),
-        };
+        return Extras { files: Vec::new(), skipped: Some("soundfont skipped: no body shares the header's load argument".to_string()) };
     };
-    let extra =
-        |role, extension, data| Extra { role, tag: String::new(), extension, evidence: EVIDENCE.to_string(), data };
+    let extra = |role, extension, data| Extra { role, tag: String::new(), extension, evidence: EVIDENCE.to_string(), data };
     let whole = standard_file(payload, body);
     let mut extras = Extras { files: vec![extra("vab", "vab", whole)], skipped: None };
     match soundfont::export(payload, body, &format!("{}/{}", site.stem, site.slot)) {
@@ -68,10 +65,7 @@ pub fn split_file(file: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
         .ok_or_else(|| Error::Import("not a VAB file: it does not open with the pBAV header".into()))?;
     let size = TONE_TABLE + count * TONE_BLOCK + SIZE_TABLE;
     if file.len() < size {
-        return Err(Error::Import(format!(
-            "the VAB file is {} bytes; its header declares {count} programs and needs {size}",
-            file.len()
-        )));
+        return Err(Error::Import(format!("the VAB file is {} bytes; its header declares {count} programs and needs {size}", file.len())));
     }
     let (header, body) = file.split_at(size);
     check_pair(header, body)?;

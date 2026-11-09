@@ -50,8 +50,7 @@ impl Disc {
         let archives = &self.archives;
         Vram::replay(&scene.steps, &mut |path| {
             let (bytes, archive) = archives.get(path)?;
-            let payloads =
-                (0..archive.entries().len()).map(|slot| archive.payload(bytes, slot).unwrap_or(&[])).collect();
+            let payloads = (0..archive.entries().len()).map(|slot| archive.payload(bytes, slot).unwrap_or(&[])).collect();
             Some(replay::Archive { entries: archive.entries(), payloads })
         })
     }
@@ -110,11 +109,7 @@ fn retail_scenes_replay_and_place_every_upload() {
                 .collect::<Vec<_>>()
         })
         .collect();
-    let homeless: Vec<&String> = paths
-        .iter()
-        .filter(|path| scenes::home(path).is_none())
-        .filter(|path| disc.archives[*path].1.entries().iter().any(|entry| entry.file_type == 3))
-        .collect();
+    let homeless: Vec<&String> = paths.iter().filter(|path| scenes::home(path).is_none()).filter(|path| disc.archives[*path].1.entries().iter().any(|entry| entry.file_type == 3)).collect();
     eprintln!("{uploads} uploads; {} placed; unplaced {unplaced:?}; no scene {homeless:?}", placed.len());
     // FIRST's entry 12, (832, 256) four rectangles wide, covers all of entry 4 at (896, 256).
     assert_eq!(unplaced, ["BIN/ETC/FIRST.EMI #4"], "uploads no scene shows");
@@ -179,18 +174,13 @@ fn retail_joins_and_the_suggestion_scorer() {
             let Some((archive, slot)) = join.texture.as_entry() else { continue };
             joined.insert((archive.to_string(), slot));
             if scenes::home(archive).is_some_and(|home| home == scene) {
-                known.entry((archive.to_string(), slot)).or_default().insert((
-                    join.depth.bits(),
-                    join.clut.x,
-                    join.clut.y,
-                ));
+                known.entry((archive.to_string(), slot)).or_default().insert((join.depth.bits(), join.clut.x, join.clut.y));
             }
         }
     }
     eprintln!("textures joined: {} of 593", joined.len());
 
-    let (mut depth_hits, mut row_hits, mut top5_hits, mut four_bit_hits, mut eight_bit_hits, mut first_row_hits) =
-        (0, 0, 0, 0, 0, 0);
+    let (mut depth_hits, mut row_hits, mut top5_hits, mut four_bit_hits, mut eight_bit_hits, mut first_row_hits) = (0, 0, 0, 0, 0, 0);
     for ((archive, slot), truth) in &known {
         let (bytes, table) = &disc.archives[archive];
         let entry = &table.entries()[*slot];
@@ -213,9 +203,7 @@ fn retail_joins_and_the_suggestion_scorer() {
                 first_row_hits += usize::from(truth.contains(&(first.depth.bits(), first.clut.x, first.clut.y)));
             }
         }
-        top5_hits += usize::from(
-            suggestion.cluts.iter().take(5).any(|row| truth.contains(&(row.depth.bits(), row.clut.x, row.clut.y))),
-        );
+        top5_hits += usize::from(suggestion.cluts.iter().take(5).any(|row| truth.contains(&(row.depth.bits(), row.clut.x, row.clut.y))));
         if let Some(best) = suggestion.best() {
             row_hits += usize::from(truth.contains(&(best.depth.bits(), best.clut.x, best.clut.y)));
         }
