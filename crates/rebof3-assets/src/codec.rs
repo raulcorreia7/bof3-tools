@@ -165,6 +165,36 @@ pub static CODECS: &[Codec] = &[
         import: None,
     },
     Codec {
+        kind: "vab",
+        export: Some(Op {
+            files: 2,
+            ..Op::new("export vab needs a header (.vh) and a body (.vb) file", "vab", |job| {
+                rebof3_formats::vab::check_pair(job.input, companion(job))?;
+                Ok(rebof3_formats::vab::standard_file(job.input, companion(job)))
+            })
+        }),
+        import: None,
+    },
+    Codec {
+        kind: "sep",
+        export: Some(Op::new("export sep needs a sequence package (.seq) file", "sep", |job| {
+            Ok(rebof3_formats::sep::period::export_sep(job.input)?)
+        })),
+        import: Some(Op::new("import sep needs a SEP file", "bin", |job| {
+            Ok(rebof3_formats::sep::period::import_sep(job.input)?)
+        })),
+    },
+    Codec {
+        kind: "seq",
+        export: Some(Op {
+            index: Index::Optional,
+            ..Op::new("export seq needs a sequence package (.seq) file", "{index}.seq", |job| {
+                Ok(rebof3_formats::sep::period::export_seq(job.input, job.index.unwrap_or(0) as usize)?)
+            })
+        }),
+        import: None,
+    },
+    Codec {
         kind: "message",
         export: Some(Op::new("export message needs a message bank payload", "json", |job| {
             Ok(bank::export(job.input)?)

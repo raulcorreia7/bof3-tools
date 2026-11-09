@@ -6,6 +6,7 @@ mod cells;
 mod decoded;
 mod hex;
 mod info;
+mod layout;
 mod map;
 mod message;
 mod palette;
@@ -43,6 +44,7 @@ pub enum Tab {
     Cells,
     Vram,
     Script,
+    Layout,
 }
 
 impl Tab {
@@ -61,6 +63,7 @@ impl Tab {
             Tab::Cells => "Cell grid",
             Tab::Vram => "VRAM",
             Tab::Script => "Script",
+            Tab::Layout => "Layout",
         }
     }
 }
@@ -123,6 +126,7 @@ pub struct Views {
     pub cells: cells::State,
     pub vram: vram::State,
     pub script: script::State,
+    pub layout: layout::State,
 }
 
 impl Views {
@@ -137,6 +141,9 @@ pub fn prepare(editor: &mut Editor) {
     let Some(entry) = editor.current() else { return };
     if editor.tab == Tab::Vram && tabs(&entry).contains(&Tab::Vram) {
         vram::prepare(editor);
+    }
+    if editor.tab == Tab::Layout && tabs(&editor.current().unwrap_or_else(|| unreachable!())).contains(&Tab::Layout) {
+        layout::prepare(editor);
     }
     let Some(entry) = editor.current() else { return };
     let format = entry.format();
@@ -171,10 +178,10 @@ struct FormatViews {
 static VIEWS: [FormatViews; 12] = [
     FormatViews {
         format: Format::VramUpload,
-        tabs: &[Tab::Texture, Tab::Vram],
+        tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
         prepare: Some(Reset { tab: None, run: texture::prepare }),
     },
-    FormatViews { format: Format::ClutBank, tabs: &[Tab::Palette, Tab::Vram], prepare: None },
+    FormatViews { format: Format::ClutBank, tabs: &[Tab::Palette, Tab::Vram, Tab::Layout], prepare: None },
     FormatViews { format: Format::VabHeader, tabs: &[Tab::Sound], prepare: None },
     FormatViews { format: Format::VabBody, tabs: &[Tab::Sound], prepare: None },
     FormatViews { format: Format::SepPackage, tabs: &[Tab::Sound], prepare: None },
@@ -216,8 +223,9 @@ impl Entry<'_> {
         self.archive.formats[self.index]
     }
 
+    /// The entry's load argument, with the project's placement when it moved the entry.
     pub fn load_arg(&self) -> u32 {
-        self.archive.entries()[self.index].ram_ptr
+        self.project.load_arg(self.archive, self.index)
     }
 
     pub fn payload(&self) -> &[u8] {
@@ -287,6 +295,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Cells => cells::show(editor, &entry, cx),
         Tab::Vram => vram::show(editor, &entry, cx),
         Tab::Script => script::show(editor, &entry, cx),
+        Tab::Layout => layout::show(editor, &entry, cx),
     };
     div()
         .flex()

@@ -151,6 +151,35 @@ every byte the open form does not name.
 
 Cue tables, area cells, actor definitions, XA and STR streams and CDDA tracks have no import verb. An import verb that does not exist for a kind fails with a usage error.
 
+## Period files
+
+A 1997 PlayStation studio kept its textures as TIM files from TIMTOOL, its sound banks as VAB, VH and
+VB files from VABTOOL, and its sequences as SEQ files, or SEP files for several, from smf2seq. The
+tools write and read these beside the modern formats. The layouts follow Sony's *File Formats*
+manual (`FileFormat47.pdf`: TIM in chapter 2, VAB in chapter 3, SEQ and SEP in chapter 4) and
+[psx-spx](https://psx-spx.consoledev.net/). A studio's tool reads the files by those layouts; this
+repository does not run those tools.
+
+- **TIM.** `export tim PAYLOAD --load-arg HEX` writes a type-3 texture as a TIM whose image block
+  sits at the VRAM place the load argument names. A texture a draw site joins takes `--depth 4|8 --clut X,Y --palette BANK
+  --palette-offset WORDS`: the TIM then has a CLUT block at `X,Y` and the matching 4 or 8 bpp image.
+  Without `--depth` the TIM is 16 bpp with no CLUT. `--clut` is required with `--depth` and is
+  never guessed. `import tim FILE [--load-arg HEX] [--palette OUT] [--bank BANK --palette-offset
+  WORDS]` reads the image back to the stored payload, its place to a load argument, and the CLUT to
+  the colour words; with `--bank` they are spliced into the bank. An image that is not on the
+  32-word, 32-row grid the loader uploads in is refused. An unchanged export imports to the stored
+  bytes. The extractor writes a plain 16 bpp `.tim` for a type-3 texture no row joins.
+- **VAB.** `export vab HEADER BODY` writes one `.vab` file, the header followed by the body, as
+  VABTOOL writes it; `--mode` still writes the `.vh` and `.vb` pair. `import vab FILE.vab -o OUT.vh
+  --body OUT.vb` splits a file back. A pair is checked first: the header's size, the `pBAV` magic and
+  the sample sizes against the body.
+- **SEQ and SEP.** `export sep PACKAGE` writes the package as a SEP file; the stored `.seq` entry is
+  already one. `export seq PACKAGE --index N` writes one sequence as a SEQ file. `import sep` and
+  `import seq FILE.seq:ID...` check the file against the package rules and write a package. The SEQ
+  version word is written as 1: the manual gives no value for it.
+
+An unchanged file of each kind comes back byte for byte.
+
 ## Round-trip coverage
 
 `assets coverage` reads every EMI entry on the disc and prints one line per kind: the entries and
@@ -169,6 +198,9 @@ The other kinds round trip through their own commands. Results over the retail d
 | texture, 16 bpp view                             | every view reads back to the stored words     | lossless |
 | texture, indexed PNG                             | all 882 joined rows                           | lossless |
 | palette                                          | every palette reads back to its words         | lossless |
+| texture through TIM                              | all 202 joined textures (882 rows); 593 uploads | lossless |
+| sound bank through one VAB file or VH and VB     | 1,020 of 1,020 banks                          | lossless |
+| sequences through SEP and SEQ                    | 119 packages, 476 sequences                   | lossless |
 | sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |
 | sound bank with `--mode raw`                     | 1,020 of 1,020 banks                          | lossless |
 | VAG sample through WAVE                          | no sample comes back byte for byte            | lossy    |
