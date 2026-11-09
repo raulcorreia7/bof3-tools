@@ -24,10 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Linux covers Unix and Windows covers its paths; the release workflow builds macOS.
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    # gpui, the editor's toolkit, makes a cold build long; the player's CI allows the same.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
