@@ -1,4 +1,5 @@
-//! The container round trip: parse a container, repack its payloads, and compare the bytes with the original.
+//! The container round trip: parse a container, repack its payloads, and compare the bytes with
+//! the original.
 
 use std::fs;
 use std::path::Path;
@@ -21,7 +22,8 @@ pub struct Container {
 }
 
 impl Container {
-    /// Repacks one container's payloads and compares the bytes with the original.
+    /// Repacks one container's payloads and compares the bytes with the original. `label` names it
+    /// in failures. Returns the parsed table when the container opens.
     pub fn check(&mut self, label: &str, bytes: &[u8]) -> Option<Archive> {
         self.archives += 1;
         let archive = match Archive::parse(bytes) {
@@ -63,7 +65,8 @@ impl Container {
     }
 }
 
-/// Repacks every archive under `root` from its parsed table and compares the bytes with the retail container.
+/// Repacks every archive under `root` from its parsed table and compares the bytes with the
+/// retail container.
 pub fn container_round_trip(root: &Path) -> Result<Container> {
     let mut container = Container::default();
     for path in archives_under(root) {

@@ -1,4 +1,11 @@
-//! Whole-archive audio gate: every VAB header/body pair and every sequence package parses, breaks none of the format, and encodes back to its bytes. Counts pinned here are `wiki: formats/audio`'s: 1,020 headers (4,904,832 B), 1,020 bodies (79,157,504 B) and 119 packages (1,836,303 B). Like `tests/retail_repack.rs`, the gate skips when it cannot find the retail archives; `support::retail_root` owns the lookup and honours `BOF3_DISC_DIR` (the archives are `BIN/` below it).
+//! Whole-archive audio gate: every VAB header/body pair and every sequence
+//! package parses, breaks none of the format, and encodes back to its bytes.
+//!
+//! Counts pinned here are `wiki: formats/audio`'s: 1,020
+//! headers (4,904,832 B), 1,020 bodies (79,157,504 B) and 119 packages
+//! (1,836,303 B). Like `tests/retail_repack.rs`, the gate skips when it cannot find
+//! the retail archives; `support::retail_root` owns the lookup and honours
+//! `BOF3_DISC_DIR` (the archives are `BIN/` below it).
 
 mod support;
 
@@ -15,10 +22,15 @@ const BODY_BYTES: u64 = 79_157_504;
 const PACKAGES: usize = 119;
 const PACKAGE_BYTES: u64 = 1_836_303;
 
-/// The retail archives' one dangling tone reference: `BPLCHAR/DRG04_00#0` declares ten tones over a two-VAG size table, and its third block's tone names VAG 3, whose size-table unit is zero.
+/// The retail archives' one dangling tone reference: `BPLCHAR/DRG04_00#0` declares ten
+/// tones over a two-VAG size table, and its third block's tone names VAG 3,
+/// whose size-table unit is zero. The renderer drops such a tone; the crate
+/// reports it, and the gate keeps it as the named exception rather than a
+/// failure. Nothing else in the retail archives reports a problem.
 const DANGLING_TONES: &[(&str, usize)] = &[("DRG04_00.EMI", 0)];
 
-/// Where the entry with the named exception sits in [`DANGLING_TONES`], if the container and index are the pair the retail archives record.
+/// Where the entry with the named exception sits in [`DANGLING_TONES`], if the
+/// container and index are the pair the retail archives record.
 fn explained(container: &Path, index: usize) -> Option<usize> {
     DANGLING_TONES.iter().position(|(name, at)| *at == index && container.ends_with(name))
 }
@@ -141,7 +153,9 @@ struct Totals {
     events: usize,
 }
 
-/// Parses one header with its body, checks the format rules and encodes both back: the header's own bytes must return, and the body the header was paired with must be the range its size table describes.
+/// Parses one header with its body, checks the format rules and encodes both
+/// back: the header's own bytes must return, and the body the header was
+/// paired with must be the range its size table describes.
 fn check_bank(path: &Path, entries: &[Entry], index: usize, counted: &mut Totals) -> Result<Vec<Problem>, String> {
     let header = read_entry(path, index).map_err(|error| error.to_string())?;
     let body_index = rebof3_emi::entry::vab_body_index(entries, index).map_err(|error| error.to_string())?;
@@ -159,7 +173,8 @@ fn check_bank(path: &Path, entries: &[Entry], index: usize, counted: &mut Totals
     Ok(bank.problems())
 }
 
-/// Parses one package and encodes it back; the event stream must tile the payload its header declares, so the bytes are the input again.
+/// Parses one package and encodes it back; the event stream must tile the
+/// payload its header declares, so the bytes are the input again.
 fn check_package(path: &Path, index: usize, counted: &mut Totals) -> Result<Vec<sep::Problem>, String> {
     let payload = read_entry(path, index).map_err(|error| error.to_string())?;
     let package = rebof3_emi::entry::sep(path, index).map_err(|error| error.to_string())?;
@@ -171,7 +186,8 @@ fn check_package(path: &Path, index: usize, counted: &mut Totals) -> Result<Vec<
     Ok(package.problems())
 }
 
-/// A problem of the one shape the retail archives leave: a tone naming a VAG the size table does not cover.
+/// A problem of the one shape the retail archives leave: a tone naming a VAG the size
+/// table does not cover.
 fn is_dangling_tone(problem: &Problem) -> bool {
     matches!(problem, Problem::ToneVag { .. })
 }

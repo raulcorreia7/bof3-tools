@@ -1,4 +1,7 @@
 //! Decoders applied to one entry of an EMI container on disk.
+//!
+//! The format modules in `psx-formats` work on bytes and know
+//! nothing of the container; this module joins them to [`Archive`].
 
 use std::path::Path;
 
@@ -8,7 +11,8 @@ use psx_formats::clut::Palette;
 use psx_formats::sep::Package;
 use psx_formats::vab::{BODY_TYPE, Bank};
 
-/// The container entry holding the body of the VAB header at `index`: the type-7 entry that shares its load argument.
+/// The container entry holding the body of the VAB header at `index`: the
+/// type-7 entry that shares its load argument.
 pub fn vab_body_index(entries: &[Entry], index: usize) -> Result<usize> {
     let entry = entries.get(index).ok_or(Error::EntryOutOfRange { index, count: entries.len() })?;
     let bodies: Vec<usize> = entries
@@ -23,7 +27,8 @@ pub fn vab_body_index(entries: &[Entry], index: usize) -> Result<usize> {
     }
 }
 
-/// Parses entry `index` as a VAB header, with the body entry that shares its load argument beside it.
+/// Parses entry `index` as a VAB header, with the body entry that shares its
+/// load argument beside it.
 pub fn vab(archive_path: impl AsRef<Path>, index: usize) -> Result<Bank> {
     let path = archive_path.as_ref();
     let archive = Archive::open(path)?;

@@ -1,4 +1,5 @@
-//! Writing containers: byte-exact repacking of an extracted folder, a manifest or an explicit file list (`wiki: formats/emi#padding`).
+//! Writing containers: byte-exact repacking of an extracted folder, a manifest
+//! or an explicit file list (`wiki: formats/emi#padding`).
 
 use std::fs::{self, File};
 use std::io::{BufWriter, Cursor, Read, Seek, Write};
@@ -9,9 +10,11 @@ use crate::error::{Error, Result};
 use crate::manifest::manifest_entries;
 use psx_formats::{sep, vab};
 
-/// TOC padding value and the byte that fills the space between the TOC and the first payload in the US `Breath of Fire III (USA)` archives.
+/// TOC padding value and the byte that fills the space between the TOC and the
+/// first payload in the US `Breath of Fire III (USA)` archives.
 const HEADER_PAD: u16 = 0x2e2e;
-/// Byte that fills the space between a payload and the next sector boundary in the US `Breath of Fire III (USA)` archives.
+/// Byte that fills the space between a payload and the next sector boundary in
+/// the US `Breath of Fire III (USA)` archives.
 const PAYLOAD_PAD: u8 = 0x5f;
 /// Most entries a pack accepts.
 const MAX_PACK_ENTRIES: usize = 255;
@@ -130,11 +133,14 @@ pub fn pack(output: impl AsRef<Path>, inputs: &[PackEntry], archive_version: u32
 }
 
 /// Rebuilds an EMI container from its own entries, with the entries named in `replace` swapped for new payloads.
+/// Every entry keeps its type and load address, and the container keeps its version. With no replacement the
+/// result is the container as its entries pack.
 pub fn rebuild(container: &[u8], replace: &[(usize, &[u8])]) -> Result<Vec<u8>> {
     rebuild_placed(container, replace, &[])
 }
 
-/// [`rebuild`] with a new load address for each entry named in `placed`: the one field of the table a texture or palette move changes.
+/// [`rebuild`] with a new load address for each entry named in `placed`: the one field of the table a
+/// texture or palette move changes. An entry not named keeps its load address.
 pub fn rebuild_placed(container: &[u8], replace: &[(usize, &[u8])], placed: &[(usize, u32)]) -> Result<Vec<u8>> {
     let archive = Archive::parse(container)?;
     let count = archive.entries().len();

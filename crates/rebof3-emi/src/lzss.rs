@@ -1,4 +1,20 @@
-//! The LZSS codec of the transfer queue's packed images. `GFX_UpdateTransferQueue` (`exe/slus_004_22@0x8014E6D0`) hands an image record of kind 2 to `GFX_DecodeLzss` (`exe/slus_004_22@0x8014E8FC`), which unpacks the stream into the shared image buffer before its `LoadImage`. The stream is a classic LZSS: two-byte back-reference. from ring position `pos`, one byte at a time, so a copy may read bytes it has just written. zeroes ring bytes `0..RING_START`; the rest hold whatever the scratchpad held, so a stream that reads them before writing them has no defined result and [`decode`] refuses it.
+//! The LZSS codec of the transfer queue's packed images.
+//!
+//! `GFX_UpdateTransferQueue` (`exe/slus_004_22@0x8014E6D0`) hands an image record of kind 2 to
+//! `GFX_DecodeLzss` (`exe/slus_004_22@0x8014E8FC`), which unpacks the stream into the shared image
+//! buffer before its `LoadImage`. The stream is a classic LZSS:
+//!
+//! - A flag byte gives the kind of the next eight tokens, low bit first: 1 is a literal byte, 0 a
+//!   two-byte back-reference.
+//! - A back-reference is `pos_low, (pos_high << 4) | length_code`: it copies `length_code + 3` bytes
+//!   from ring position `pos`, one byte at a time, so a copy may read bytes it has just written.
+//! - Every output byte also goes into a [`RING`]-byte ring that starts at [`RING_START`]. The decoder
+//!   zeroes ring bytes `0..RING_START`; the rest hold whatever the scratchpad held, so a stream that
+//!   reads them before writing them has no defined result and [`decode`] refuses it.
+//!
+//! The decoder stops once it has written the image's byte count. [`encode`] writes a stream that
+//! decoder reads back to the same bytes; it is not the retail packer, so a stored stream is kept as
+//! stored and only an edited image is packed again.
 
 use crate::{Error, Result};
 
@@ -8,7 +24,8 @@ pub const RING: usize = 0x200;
 pub const RING_START: usize = 0x1EE;
 /// Tokens one flag byte describes.
 const TOKENS_PER_FLAG: u32 = 8;
-/// The flag bits after a fresh flag byte: the byte in the low half, a marker in the high half that tells when all eight have been shifted out (`flags = c | 0xFF00`, tested with `& 0x100`).
+/// The flag bits after a fresh flag byte: the byte in the low half, a marker in the high half that
+/// tells when all eight have been shifted out (`flags = c | 0xFF00`, tested with `& 0x100`).
 const FLAG_MARKER: u16 = 0xFF00;
 const FLAG_SPENT: u16 = 0x100;
 /// The bits of a back-reference's second byte: the high bits of the position and the length code.
@@ -46,6 +63,9 @@ impl Ring {
 }
 
 /// The `count` bytes the stream decodes to, and the stream bytes it read.
+///
+/// The stream must define every ring byte it reads and must not end before `count` bytes. A
+/// back-reference that runs past `count` is cut there, as the upload reads only `count` bytes.
 pub fn decode(stream: &[u8], count: usize) -> Result<(Vec<u8>, usize)> {
     let truncated = || Error::Lzss(format!("the stream ends before its {count} bytes"));
     let mut ring = Ring::new();
@@ -131,6 +151,7 @@ fn longest_match(ring: &Ring, ahead: &[u8]) -> (usize, usize) {
         let mut length = 0;
         while length < limit {
             let from = (position + length) % RING;
+            // A copy reads what it has written itself once it reaches the write position.
             let written = (from + RING - ring.at) % RING;
             let byte = if written < length {
                 ahead[written]
@@ -179,6 +200,7 @@ mod tests {
 
     #[test]
     fn a_copy_reads_the_bytes_it_writes() {
+        // A literal, then one back-reference that repeats it from the byte it has just written.
         let stream = [0b0000_0001, 9, RING_START as u8, ((RING_START >> 8) << 4) as u8 | 5];
         let (decoded, _) = decode(&stream, 9).expect("decodes");
         assert_eq!(decoded, [9; 9]);

@@ -1,4 +1,31 @@
-//! The VRAM a scene leaves behind: the game's archive loads replayed in order. `EMI_LoadToVram` and uploaded one 2,048-byte sector at a time by `EMI_UploadSectorImage`, a `LoadImage` of a 32×32 rectangle that is skipped unless `x < 1001` and `y < 501`. A type-0 entry is copied to its RAM address by `EMI_LoadToRam`, so one that lands in the arena (`0x80033800..0x80037800`) changes the palette RAM but not yet VRAM. working copy at `0x80037800`. column 240 to the working copy. of `rect(0, 480, 256, 32)` whenever a copy raised `g_GfxPalettePending`. A scene replay does not run the per-frame transfer queue (`GFX_UpdateTransferQueue`), palette fades and cycling, or the palettes actors load at run time: they change what a frame shows, not what the archives load. A caller that knows an actor's upload adds it with [`Vram::load_image`] and [`Vram::load_palette`] (`GFX_LoadPalette`), as `crate::sprite` does for a character sprites.
+//! The VRAM a scene leaves behind: the game's archive loads replayed in order.
+//!
+//! The model holds the 1024×512 VRAM words, the 16 KB palette arena in RAM and its working copy,
+//! and, for every VRAM word, the archive entry that wrote it. A [`Step`] is one thing the game's
+//! loaders do:
+//!
+//! - **Clear.** `SYS_StartFrontend` clears the whole frame buffer with `GFX_ClearRect(0, 0, 1024,
+//!   512)` before it streams `FIRST`.
+//! - **Load.** `EMI_LoadArchive` streams the entries in table order. A type-3 entry is unpacked by
+//!   `EMI_LoadToVram` and uploaded one 2,048-byte sector at a time by `EMI_UploadSectorImage`, a
+//!   `LoadImage` of a 32×32 rectangle that is skipped unless `x < 1001` and `y < 501`. A type-0
+//!   entry is copied to its RAM address by `EMI_LoadToRam`, so one that lands in the arena
+//!   (`0x80033800..0x80037800`) changes the palette RAM but not yet VRAM.
+//! - **Reset palette.** `GFX_ResetPalette` zeroes arena rows 28-31 and copies all 32 rows to the
+//!   working copy at `0x80037800`.
+//! - **Copy palette.** `GFX_CopyPalette(row)` copies one 256-word arena row to the working copy.
+//! - **Copy words.** `func_801D1228` (the battle reset) copies the 16 words at arena row 15,
+//!   column 240 to the working copy.
+//! - **Upload palette.** `GFX_UploadPalette` sends the working copy to VRAM with one `LoadImage`
+//!   of `rect(0, 480, 256, 32)` whenever a copy raised `g_GfxPalettePending`.
+//!
+//! A palette word in VRAM is owned by the entry that wrote that arena word, carried through the
+//! working copy. Which steps make up a scene is in [`scenes`].
+//!
+//! A scene replay does not run the per-frame transfer queue (`GFX_UpdateTransferQueue`), palette
+//! fades and cycling, or the palettes actors load at run time: they change what a frame shows, not
+//! what the archives load. A caller that knows an actor's upload adds it with [`Vram::load_image`]
+//! and [`Vram::load_palette`] (`GFX_LoadPalette`), as `crate::sprite` does for a character sprites.
 
 pub mod scenes;
 
@@ -158,7 +185,8 @@ impl Vram {
         }
     }
 
-    /// Replays `steps` in order.
+    /// Replays `steps` in order. `disc` returns an archive by disc path; an archive it cannot
+    /// give is recorded in [`Vram::missing`] and skipped.
     pub fn replay<'a, D>(steps: &[Step], disc: &mut D) -> Self
     where
         D: FnMut(&str) -> Option<Archive<'a>>,
@@ -194,7 +222,8 @@ impl Vram {
         self.owners.fill(NOBODY);
     }
 
-    /// Streams one archive: uploads its type-3 entries and copies the arena part of its RAM entries, in table order.
+    /// Streams one archive: uploads its type-3 entries and copies the arena part of its RAM
+    /// entries, in table order.
     pub fn load(&mut self, archive: &str, entries: &[Entry], payloads: &[&[u8]]) {
         for (slot, (entry, payload)) in entries.iter().zip(payloads).enumerate() {
             let writer = Writer::entry(archive, slot);
@@ -254,7 +283,9 @@ impl Vram {
         self.pending = false;
     }
 
-    /// `GFX_LoadPalette` (`exe/slus_004_22@0x80166C48`): writes `words` at RAM `ram` of the arena and at the same place of the working copy (`dst` and `dst + 0x4000`), and raises `g_GfxPalettePending` so the next [`Vram::upload_palette`] sends them.
+    /// `GFX_LoadPalette` (`exe/slus_004_22@0x80166C48`): writes `words` at RAM `ram` of the arena and at
+    /// the same place of the working copy (`dst` and `dst + 0x4000`), and raises `g_GfxPalettePending`
+    /// so the next [`Vram::upload_palette`] sends them. Words outside the arena are dropped.
     pub fn load_palette(&mut self, ram: u32, words: &[u16], writer: Writer) {
         let owner = self.owner(writer, Kind::Palette);
         for (index, &word) in words.iter().enumerate() {
@@ -310,7 +341,8 @@ impl Vram {
         owner.checked_sub(1).and_then(|index| self.kinds.get(index as usize).copied())
     }
 
-    /// The one entry that wrote every word of the rectangle, or `None` when a word is unwritten, the rectangle leaves VRAM, or two entries share it.
+    /// The one entry that wrote every word of the rectangle, or `None` when a word is unwritten,
+    /// the rectangle leaves VRAM, or two entries share it.
     pub fn sole_writer(&self, x: usize, y: usize, width: usize, height: usize) -> Option<&Writer> {
         if width == 0 || height == 0 || x + width > VRAM_WIDTH || y + height > VRAM_HEIGHT {
             return None;
@@ -335,7 +367,8 @@ impl Vram {
         self.words.get(start..end).map(<[u16]>::to_vec).unwrap_or_default()
     }
 
-    /// The texel indices of the `width`×`height` word rectangle at `x`, `y`, read at `depth`, row-major, `width * depth.texels_per_word()` per row.
+    /// The texel indices of the `width`×`height` word rectangle at `x`, `y`, read at `depth`,
+    /// row-major, `width * depth.texels_per_word()` per row. Words outside VRAM read zero.
     pub fn texels(&self, x: usize, y: usize, width: usize, height: usize, depth: Depth) -> Vec<u8> {
         let mut indices = Vec::with_capacity(width * height * depth.texels_per_word());
         for row in y..y + height {
@@ -345,7 +378,11 @@ impl Vram {
         indices
     }
 
-    /// The colour word a textured primitive reads at texel `u`, `v` of the page whose top-left word is `page_x`, `page_y`, through the CLUT at `clut`: the GPU's texture fetch without a texture window.
+    /// The colour word a textured primitive reads at texel `u`, `v` of the page whose top-left
+    /// word is `page_x`, `page_y`, through the CLUT at `clut`: the GPU's texture fetch without a
+    /// texture window. A 4-bit texel is the `u % 4`-th nibble of word `u / 4`, an 8-bit texel the
+    /// `u % 2`-th byte of word `u / 2`, low first. Coordinates wrap at the VRAM edges, as the GPU's
+    /// do.
     pub fn fetch(&self, page_x: u16, page_y: u16, clut: Clut, depth: Depth, u: u8, v: u8) -> u16 {
         let per_word = depth.texels_per_word();
         let bits = depth.bits() as usize;
@@ -359,6 +396,8 @@ impl Vram {
 
     /// The rectangles each entry wrote, merged from per-row runs, in VRAM order.
     pub fn regions(&self) -> Vec<Region> {
+        // Runs of one owner per row, keyed by owner and column span, extended while the next row
+        // repeats the same run.
         let mut open: BTreeMap<(u32, usize, usize), (usize, usize)> = BTreeMap::new();
         let mut done: Vec<(u32, usize, usize, usize, usize)> = Vec::new();
         for y in 0..VRAM_HEIGHT {
@@ -511,6 +550,7 @@ mod tests {
     #[test]
     fn a_fetch_reads_a_texel_through_its_clut() {
         let mut vram = Vram::new();
+        // Word 0x4321 holds 4-bit texels 1, 2, 3, 4 and 8-bit texels 0x21, 0x43.
         vram.load_image(320, 256, 1, 1, &[0x4321], Writer::Named("page".into()));
         let colors: Vec<u16> = (0..256).map(|index| 0x1000 + index).collect();
         vram.load_image(0, 483, 256, 1, &colors, Writer::Named("clut".into()));
@@ -546,6 +586,7 @@ mod tests {
     #[test]
     fn the_loader_skips_a_rectangle_that_leaves_the_frame_buffer() {
         let mut vram = Vram::new();
+        // Column 32 is x 1024 and row 16 is y 512: both outside.
         load(&mut vram, "A.EMI", &[upload(32, 0, 1), upload(0, 16, 1), upload(31, 15, 7)]);
         assert_eq!(vram.skipped(), 2);
         assert_eq!(vram.word(1023, 511), 7);
@@ -554,6 +595,7 @@ mod tests {
     #[test]
     fn a_palette_reaches_vram_only_after_a_copy_and_an_upload() {
         let mut vram = Vram::new();
+        // Arena row 3 (VRAM row 483).
         load(&mut vram, "A.EMI", &[block(ARENA_BASE + 3 * 0x200, 16, 0x7C00)]);
         vram.upload_palette();
         assert_eq!(vram.word(0, 483), 0, "nothing was pending");

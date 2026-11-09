@@ -1,4 +1,14 @@
 //! Texture joins resolved in a replayed VRAM.
+//!
+//! A rule names a texture page and a CLUT row; the replay says which entries wrote them. The
+//! texture is the upload that wrote the page's first word, and the palette is the one entry that
+//! wrote the whole row, `depth.colors()` words. A row with words from two entries, or none, does
+//! not join. Because the replay keeps load order, a block another archive loaded serves a row only
+//! when it is the one the scene left there.
+//!
+//! The rules are the ones in [`crate::texture`]: the literal draw sites ([`super::SITES`]) of the
+//! archives the scene loads, and the world-map tile descriptors (`func_80155560`) the caller reads
+//! from the scene's area map bundles.
 
 use psx_formats::gfx::texture::{Clut, Color, Depth, Tpage};
 
@@ -55,7 +65,9 @@ pub fn resolve(vram: &Vram, page_x: u16, page_y: u16, clut: Clut, depth: Depth) 
     Some((texture.clone(), palette.clone()))
 }
 
-/// Every join the rules prove in a replayed scene: the sites of the archives it loads and the tile `descriptors` of its area map bundles.
+/// Every join the rules prove in a replayed scene: the sites of the archives it loads and the
+/// tile `descriptors` of its area map bundles. Repeated joins of one texture, row and depth are
+/// kept once.
 pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32]) -> Vec<Join> {
     let mut joins: Vec<Join> = Vec::new();
     let mut push = |join: Join| {
@@ -98,6 +110,7 @@ mod tests {
     fn a_page_and_a_row_resolve_to_their_writers() {
         let mut vram = Vram::new();
         let sheet: Vec<u8> = vec![0x11; 2048];
+        // Rectangle column 22, row 8: VRAM (704, 256).
         let block: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
         let entries = [entry(3, (22 << 24) | (8 << 16) | (1 << 8), sheet.len()), entry(0, 0x8003_3F40, block.len())];
         vram.load("BIN/WORLD00/AREA024.EMI", &entries, &[&sheet, &block]);

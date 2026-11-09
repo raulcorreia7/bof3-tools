@@ -1,4 +1,7 @@
 //! Type-1 codec scoreboard: decode, re-encode, and compare all 65 payloads.
+//!
+//! It checks semantic round-trip and classifies the first differing frame
+//! against each retail stream.
 
 mod support;
 

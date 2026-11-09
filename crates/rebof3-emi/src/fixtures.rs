@@ -1,4 +1,6 @@
 //! A tiny archive builder for the tests of the crates built on this one.
+//!
+//! Enabled by the `fixtures` feature; this crate's own tests always have it.
 
 use alloc::vec;
 use alloc::vec::Vec;

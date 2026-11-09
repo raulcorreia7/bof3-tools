@@ -1,4 +1,14 @@
-//! Type-1 LZ77 payload codec. The control stream is the codec the game decompresses in `src/engine/slus/LZ77_DecodeStep.c`; a frame is either a literal run or a back-reference into the last [`WINDOW`] decoded bytes: 16 adds one length byte; `0xFF` ends the stream.
+//! Type-1 LZ77 payload codec.
+//!
+//! A type-1 EMI entry is `[u32 LE decoded size][u16 0xFFFF][control stream]`.
+//! The control stream is the codec the game decompresses in
+//! `src/engine/slus/LZ77_DecodeStep.c`; a frame is either a literal run or a
+//! back-reference into the last [`WINDOW`] decoded bytes:
+//!
+//! - `ctrl & 0x10` set: literal run of `0x20 - (ctrl & 0x1F)` bytes; a count of
+//!   16 adds one length byte; `0xFF` ends the stream.
+//! - otherwise: distance `0x800 - (((ctrl & 0xE0) << 3) | byte)`, length
+//!   `(ctrl & 0x0F) + 3`, extended by one byte when the low nibble is 15.
 
 use std::collections::HashMap;
 
@@ -137,7 +147,16 @@ pub fn frames(stream: &[u8]) -> Vec<Frame> {
     out
 }
 
-/// Stateful type-1 encoder. This is the closest measured approximation of the retail encoder, not a reproduction; `wiki: formats/lz77` records the residual.
+/// Stateful type-1 encoder.
+///
+/// Search rule: the longest match in the window wins, the nearest candidate
+/// wins a length tie, and a match shorter than the one starting at the next
+/// byte is deferred (lazy matching). The position is in the search structure
+/// before the lookahead runs, and every consumed byte is indexed.
+///
+/// This is the closest measured approximation of the retail encoder, not a
+/// reproduction; `wiki: formats/lz77` records the residual. The
+/// 65-entry gate in `tests/lz77.rs` reports each first-token divergence.
 pub struct Encoder<'a> {
     input: &'a [u8],
     chain: HashMap<u32, Vec<u32>>,
@@ -200,6 +219,7 @@ impl<'a> Encoder<'a> {
         if extra >= BACK_REFERENCE_LENGTH_MASK as u32 {
             self.stream.push((extra - BACK_REFERENCE_LENGTH_MASK as u32) as u8);
         }
+        // The frame start was indexed before lookahead; index the remaining bytes.
         for offset in self.pos + 1..self.pos + length as usize {
             self.insert(offset);
         }
@@ -227,7 +247,8 @@ impl<'a> Encoder<'a> {
         }
     }
 
-    /// Longest match in the window, nearest distance on a length tie; `(0, 0)` when no candidate reaches [`MIN_MATCH`].
+    /// Longest match in the window, nearest distance on a length tie;
+    /// `(0, 0)` when no candidate reaches [`MIN_MATCH`].
     fn best(&self, pos: usize) -> (u32, usize) {
         let Some(positions) = key(self.input, pos).and_then(|key| self.chain.get(&key)) else {
             return (0, 0);

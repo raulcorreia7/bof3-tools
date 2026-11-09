@@ -1,4 +1,5 @@
-//! The EMI container table from the `emi` crate, bound to this crate's error so game code has one error type to match on.
+//! The EMI container table from the `emi` crate, bound to this crate's error so
+//! game code has one error type to match on.
 
 use crate::error::Result;
 
@@ -31,7 +32,8 @@ impl Archive {
         self.0.entries()
     }
 
-    /// The payload of entry `index` inside `container`, the bytes this table was parsed from.
+    /// The payload of entry `index` inside `container`, the bytes this table was
+    /// parsed from.
     pub fn payload<'a>(&self, container: &'a [u8], index: usize) -> Result<&'a [u8]> {
         Ok(self.0.payload(container, index)?)
     }
@@ -44,12 +46,14 @@ impl Archive {
         Ok(Self(::emi::Archive::open(path)?))
     }
 
-    /// Reads and validates the table of a container read from `reader`; only the first sector is read.
+    /// Reads and validates the table of a container read from `reader`; only the
+    /// first sector is read. Payloads are read later with [`Archive::read_payload`].
     pub fn from_reader<R: Read + Seek>(reader: &mut R) -> Result<Self> {
         Ok(Self(::emi::Archive::from_reader(reader)?))
     }
 
-    /// The payload of entry `index`, read from `reader`: the stream this table was read from.
+    /// The payload of entry `index`, read from `reader`: the stream this table was
+    /// read from.
     pub fn read_payload<R: Read + Seek>(&self, reader: &mut R, index: usize) -> Result<Vec<u8>> {
         Ok(self.0.read_payload(reader, index)?)
     }

@@ -1,4 +1,10 @@
-//! Whole-archive type-3 gate: decode, re-encode and place every VRAM upload. Point `BOF3_DISC_DIR` at an extracted disc to run it; `BOF3_REQUIRE_RETAIL=1` makes a skip a failure.
+//! Whole-archive type-3 gate: decode, re-encode and place every VRAM upload.
+//!
+//! The test skips when it cannot find the retail archives. Point `BOF3_DISC_DIR`
+//! at an extracted disc to run it; `BOF3_REQUIRE_RETAIL=1` makes a skip a failure.
+//!
+//! `bof3 emi vram -o <page.png> <archive.EMI>` dumps one archive's page set as
+//! a raw 16-bit PNG for a visual check.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -103,7 +109,8 @@ fn check_upload(
     check_placed_words(&rectangles, payload, page_set)
 }
 
-/// Checks each rectangle against the format's destination arithmetic and books the rectangles the frame buffer cannot hold.
+/// Checks each rectangle against the format's destination arithmetic and books
+/// the rectangles the frame buffer cannot hold. Returns the dropped count.
 fn check_destinations(rectangles: &[Rectangle], descriptor: Descriptor, report: &mut Report) -> Result<usize, String> {
     let column = descriptor.column as usize;
     let row = descriptor.row as usize;
@@ -127,12 +134,14 @@ fn check_destinations(rectangles: &[Rectangle], descriptor: Descriptor, report: 
     Ok(dropped)
 }
 
-/// The format's destination for rectangle `index`: `column` rectangles into the row, one rectangle row down every `per_row` rectangles.
+/// The format's destination for rectangle `index`: `column` rectangles into the
+/// row, one rectangle row down every `per_row` rectangles.
 fn destination(column: usize, row: usize, per_row: usize, index: usize) -> (usize, usize) {
     ((column + index % per_row) * RECTANGLE_SIDE, (row + index / per_row) * RECTANGLE_SIDE)
 }
 
-/// Checks that every rectangle the frame buffer holds reads back the payload's words at its destination.
+/// Checks that every rectangle the frame buffer holds reads back the payload's
+/// words at its destination.
 fn check_placed_words(rectangles: &[Rectangle], payload: &[u8], page_set: &Plane) -> Result<(), String> {
     for (index, rectangle) in rectangles.iter().enumerate() {
         if rectangle.x + RECTANGLE_SIDE > VRAM_WIDTH || rectangle.y + RECTANGLE_SIDE > VRAM_HEIGHT {
@@ -156,7 +165,7 @@ fn check_placed_words(rectangles: &[Rectangle], payload: &[u8], page_set: &Plane
     Ok(())
 }
 
-/// The entry's payload bytes.
+/// The entry's payload bytes. `Archive::open` validated the range.
 fn payload_of(retail: &[u8], offset: u64, size: u32) -> &[u8] {
     let start = offset as usize;
     &retail[start..start + size as usize]
