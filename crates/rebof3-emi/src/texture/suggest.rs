@@ -1,17 +1,4 @@
 //! Ranked depth and CLUT suggestions for a texture no rule joins.
-//!
-//! The suggestion is computed from the texture's words and the scene's palette rows; it is shown
-//! as a suggestion and never applied as a join.
-//!
-//! - **Depth.** Each depth reads the words as a texel image. Drawn images repeat a texel next to
-//!   itself far more often than chance; the wrong depth splits or merges texels and loses that.
-//!   The score is the agreement of each texel with its right and lower neighbours, corrected
-//!   for the agreement the image's own histogram gives by chance (Cohen's kappa).
-//! - **CLUT.** A candidate is a row of the palette band that one entry wrote: column 0 of each
-//!   row at 8 bits, each 16-word column at 4 bits. Neighbouring texels with different indices
-//!   should get close colours, so the score is one minus their mean colour distance, less the
-//!   share of texels that land on a transparent `0x0000` word, plus a bonus when the texture's
-//!   own archive wrote the row.
 
 use psx_formats::gfx::texture::{Clut, Depth, texel_indices};
 
@@ -63,8 +50,7 @@ impl Suggestion {
     }
 }
 
-/// Suggests a depth and a row for the `width`×`height` words of a texture, from the palette rows
-/// of `vram`. `archive` is the texture's own archive.
+/// Suggests a depth and a row for the `width`×`height` words of a texture, from the palette rows of `vram`.
 pub fn suggest(vram: &Vram, words: &[u16], width: usize, height: usize, archive: &str) -> Suggestion {
     let depths = depth_scores(words, width, height);
     let indexed = depths.iter().find_map(|score| score.depth).unwrap_or(Depth::Four);
@@ -232,7 +218,6 @@ mod tests {
 
     #[test]
     fn the_smooth_row_ranks_above_the_noisy_one() {
-        // Row 480 holds a grey ramp; row 481 alternates black and white.
         let ramp: Vec<u8> = (0..16u16).flat_map(|level| (0x8000 | (level * 2 * 0x421)).to_le_bytes()).collect();
         let noise: Vec<u8> = (0..16u16).flat_map(|level| (0x8000 | ((level % 2) * 0x7FFF)).to_le_bytes()).collect();
         let entries = [

@@ -1,33 +1,4 @@
-//! Which palette row a texture is drawn with: the palette arena, the texture sheets, and the
-//! draw rules that name both.
-//!
-//! The palette arena is a 16 KB band of RAM. The engine copies it to a working copy and
-//! uploads that copy with one `LoadImage` of `rect(0, 480, 256, 32)` (exe `GFX_UploadPalette`,
-//! `src/engine/slus/GFX_UploadPalette.c`). A type-0 palette loaded at RAM `ram` therefore
-//! sits at arena word `(ram - ARENA_BASE) / 2`, which is VRAM column `% 256` and row
-//! `480 + / 256`. A type-3 entry is a texture sheet placed by its load argument
-//! ([`sheet`]).
-//!
-//! A texture's palette is named by a draw rule, never by the texture payload:
-//!
-//! - [`SITES`] lists the functions whose texture page and CLUT are both literals. A site joins
-//!   when its page is covered by exactly one sheet and its CLUT row is held by exactly one block.
-//! - [`terrain_joins`] applies the world-map tile-descriptor rule: bit 31 selects the depth,
-//!   bits 24-27 the CLUT index and bits 28-29 the texture page. It joins the same way.
-//!
-//! [`scene`] resolves the same rules in a replayed VRAM ([`crate::replay`]), where load order
-//! decides which upload and which block a page and a row hold. [`suggest`] ranks a depth and rows
-//! for a texture no rule joins; a suggestion is never a join.
-//!
-//! Blocks are looked up over the resident set of CLUT blocks ([`ResidentClutBlock`]) the caller
-//! loaded, so a block one archive carries can serve another archive's texture (the battle icon
-//! rows). The texture's own archive wins when it holds the row; otherwise identical blocks
-//! collapse and disagreeing blocks make the row ambiguous. The rule never guesses: more than one
-//! sheet or more than one distinct block leaves the texture unjoined.
-//!
-//! The encoded words are the graph-type-0 encoding, the runtime the US disc selects
-//! (`GetGraphType()` reads `D_8018B15C`; `SetVideoMode(MODE_NTSC)` and `_reset(3)` leave it
-//! zero). A site that switches on the graph type is listed with its graph-type-0 word only.
+//! Which palette row a texture is drawn with: the palette arena, the texture sheets, and the draw rules that name both. The engine copies it to a working copy and uploads that copy with one `LoadImage` of `rect(0, 480, 256, 32)` (exe `GFX_UploadPalette`, `src/engine/slus/GFX_UploadPalette.c`). A type-0 palette loaded at RAM `ram` therefore sits at arena word `(ram - ARENA_BASE) / 2`, which is VRAM column `% 256` and row `480 + / 256`. The encoded words are the graph-type-0 encoding, the runtime the US disc selects (`GetGraphType()` reads `D_8018B15C`; `SetVideoMode(MODE_NTSC)` and `_reset(3)` leave it zero).
 
 pub mod scene;
 pub mod suggest;
@@ -72,8 +43,7 @@ pub struct ClutBlock {
 }
 
 impl ClutBlock {
-    /// The block loaded from a type-0 entry at `ram` with `payload_bytes` bytes, or `None`
-    /// when it does not load into the arena.
+    /// The block loaded from a type-0 entry at `ram` with `payload_bytes` bytes, or `None` when it does not load into the arena.
     pub fn new(slot: usize, ram: u32, payload_bytes: usize) -> Option<Self> {
         if !(ARENA_BASE..ARENA_BASE + ARENA_BYTES).contains(&ram) {
             return None;
@@ -91,9 +61,6 @@ impl ClutBlock {
 }
 
 /// A CLUT block with the archive that loads it and the color words it holds.
-///
-/// A caller builds the resident set by loading the archives it has; nothing here assumes which
-/// archives those are. Blocks that load the same words at the same arena position are one block.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResidentClutBlock {
     /// Disc path of the archive that loads the block (`BIN/BATTLE/BATL_OVR.EMI`).
@@ -105,8 +72,7 @@ pub struct ResidentClutBlock {
 }
 
 impl ResidentClutBlock {
-    /// The block a type-0 payload loaded at `ram` holds, or `None` when it does not load into
-    /// the arena.
+    /// The block a type-0 payload loaded at `ram` holds, or `None` when it does not load into the arena.
     pub fn new(archive: impl Into<String>, slot: usize, ram: u32, payload: &[u8]) -> Option<Self> {
         let block = ClutBlock::new(slot, ram, payload.len())?;
         let (pairs, _) = payload.as_chunks::<2>();
@@ -164,8 +130,7 @@ impl Sheet {
     }
 }
 
-/// The sheet a type-3 entry uploads, from its load argument and payload length, or `None`
-/// when the payload is not a whole number of rectangle rows.
+/// The sheet a type-3 entry uploads, from its load argument and payload length, or `None` when the payload is not a whole number of rectangle rows.
 pub fn sheet(slot: usize, load_arg: u32, payload_bytes: usize) -> Option<Sheet> {
     let descriptor = Descriptor::from_load_argument(load_arg);
     let per_row = usize::from(descriptor.chunks_per_row);
@@ -198,8 +163,7 @@ pub struct Site {
     pub tpage: u16,
     /// The `clut` word the function writes.
     pub clut: u16,
-    /// The archive whose upload the draw reads, when the overlay names it: the one its own loader
-    /// streams and follows with the copy of the site's CLUT row. `None` accepts any upload.
+    /// The archive whose upload the draw reads, when the overlay names it: the one its own loader streams and follows with the copy of the site's CLUT row.
     pub page_writer: Option<&'static str>,
 }
 
@@ -237,12 +201,7 @@ impl Site {
 /// The world-map HUD sprite: `Area_DrawHudSprite`, one body that eleven area overlays include.
 const HUD_SPRITE: &str = "src/overlays/area/Area_DrawHudSprite.h:8-11";
 
-/// Draw sites with a literal page and CLUT in the same function, and no runtime condition, read
-/// from the decompilation's current sources. Sites outside this table are in
-/// `wiki: formats/assets#texture-evidence`.
-///
-/// A row enters the table only with its page and CLUT literal in the cited source. A rule that reads
-/// the page and CLUT from data the game reads, or a capture of the game's own draw calls, replaces it.
+/// Draw sites with a literal page and CLUT in the same function, and no runtime condition, read from the decompilation's current sources. Sites outside this table are in `wiki: formats/assets#texture-evidence`.
 pub const SITES: &[Site] = &[
     literal(
         "WORLD00/AREA024.EMI",
@@ -252,8 +211,6 @@ pub const SITES: &[Site] = &[
         0x003B,
         0x78CA,
     ),
-    // The world-map HUD sprites: an 8bpp page at (768, 256) with CLUT (0, 494), one copy per
-    // overlay.
     literal("WORLD00/AREA016.EMI", 13, 0x801F_39D8, HUD_SPRITE, 0x009C, 0x7B80),
     literal("WORLD00/AREA033.EMI", 13, 0x801F_390C, HUD_SPRITE, 0x009C, 0x7B80),
     literal("WORLD01/AREA045.EMI", 13, 0x801F_39D8, HUD_SPRITE, 0x009C, 0x7B80),
@@ -265,7 +222,6 @@ pub const SITES: &[Site] = &[
     literal("WORLD03/AREA121.EMI", 14, 0x801F_39F0, HUD_SPRITE, 0x009C, 0x7B80),
     literal("WORLD03/AREA151.EMI", 13, 0x801F_3948, HUD_SPRITE, 0x009C, 0x7B80),
     literal("WORLD04/AREA152.EMI", 13, 0x801F_389C, HUD_SPRITE, 0x009C, 0x7B80),
-    // AREA016's cloud cell, AREA030's backdrop quads, fish arrow and menu icons.
     literal(
         "WORLD00/AREA016.EMI",
         13,
@@ -299,11 +255,6 @@ pub const SITES: &[Site] = &[
         0x001D,
         0x7887,
     ),
-    // The battle panel quads: `GetTPage(0, 0, 0x380, 0x100)`, a 4bpp page at (896, 256), and
-    // `setClut(16, STAGE_PALETTE_Y + 26)`. The same overlay's `Battle_LoadDraArchive` streams
-    // `BATL_DRA`, which uploads the page and loads arena row 26, and `Battle_FinishDraLoad` copies
-    // rows 26 and 27. Other archives that write the page (`FIRST`, the `BMAGIC` effects) are not
-    // proven to be what the panel reads, so only `BATL_DRA`'s upload joins.
     streamed(
         "BATTLE/BATTLE.EMI",
         15,
@@ -312,10 +263,7 @@ pub const SITES: &[Site] = &[
         (0x001E, 0x7E81),
         "BATTLE/BATL_DRA.EMI",
     ),
-    // The battle-end panel: `GetTPage(1, 0, 0x340, 0x100)`, an 8bpp page at (832, 256), and
-    // `GetClut(0, 0x1FA)`, arena row 26; `BATL_OVR` uploads both. From retail assembly.
     literal("BATTLE/BATL_OVR.EMI", 0, 0x801E_F3B4, "asm/emi/battle/batl_ovr/00/func_801EF3B4.s:15-36", 0x009D, 0x7E80),
-    // MAGIC218's effect page and CLUT, from retail assembly.
     literal(
         "BMAGIC/MAGIC218.EMI",
         3,
@@ -350,15 +298,7 @@ pub struct Join<'a> {
     pub rule: Rule,
 }
 
-/// The joins of one archive, given its texture sheets and the resident CLUT blocks.
-///
-/// A site joins only when exactly one sheet covers its page and exactly one distinct block holds
-/// its CLUT row. Anything else is left out, so the result never guesses between candidates.
-///
-/// The texture's own archive wins when it holds the row; otherwise the resident set is
-/// consulted and identical blocks collapse. A cross-archive block is what serves the battle icon
-/// rows, whose pages are in `BATTLE.EMI` and whose palettes are in `BATL_OVR.EMI` and
-/// `BATL_DRA.EMI`.
+/// The joins of one archive, given its texture sheets and the resident CLUT blocks. A cross-archive block is what serves the battle icon rows, whose pages are in `BATTLE.EMI` and whose palettes are in `BATL_OVR.EMI` and `BATL_DRA.EMI`.
 pub fn joins<'a>(archive: &str, sheets: &[Sheet], blocks: &[&'a ResidentClutBlock]) -> Vec<Join<'a>> {
     SITES
         .iter()
@@ -380,12 +320,6 @@ pub fn joins<'a>(archive: &str, sheets: &[Sheet], blocks: &[&'a ResidentClutBloc
 }
 
 /// The joins implied by a world-map bundle's tile descriptor words.
-///
-/// Each descriptor names one row and one page (`func_80155560`): bit 31 selects the depth,
-/// bits 24-27 the CLUT index, and bits 28-29 the texture page. In 8bpp the CLUT is
-/// `(0, 483 + index)`; in 4bpp it is `(16 * index, 483)`. The page is
-/// `(320 + 128 * block, 256)`. The same uniqueness rule applies: one covering sheet and one
-/// holding block, or no join. Repeated descriptors yield one join.
 pub fn terrain_joins<'a>(
     archive: &str,
     records: &[u32],
@@ -486,14 +420,12 @@ mod tests {
 
     #[test]
     fn a_terrain_descriptor_splits_into_depth_page_and_clut() {
-        // 8bpp, CLUT index 5, page 2: page (576, 256), row 488.
         let descriptor = (2 << 28) | (5 << 24);
         let (page_x, page_y, clut, depth) = terrain_descriptor(descriptor).expect("a live descriptor");
         assert_eq!((page_x, page_y), (576, 256));
         assert_eq!((clut.x, clut.y), (0, 488));
         assert_eq!(depth, Depth::Eight);
 
-        // 4bpp, CLUT index 3, page 1: page (448, 256), column 48.
         let descriptor = (1 << 31) | (1 << 28) | (3 << 24);
         let (page_x, _, clut, depth) = terrain_descriptor(descriptor).expect("a live descriptor");
         assert_eq!(page_x, 448);

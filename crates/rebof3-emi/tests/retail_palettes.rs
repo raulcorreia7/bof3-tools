@@ -1,10 +1,4 @@
-//! Whole-archive CLUT gate: every palette payload decodes and re-encodes to the
-//! same bytes.
-//!
-//! The gate covers every type-0 entry whose load argument lands in the CLUT band
-//! (`wiki: formats/graphics#palette`), whichever archive family it comes
-//! from. Like `tests/retail_repack.rs`, the gate skips when it cannot find the retail
-//! archives; `support::retail_root` owns the lookup and honours `BOF3_DISC_DIR` (the archives are `BIN/` below it).
+//! Whole-archive CLUT gate: every palette payload decodes and re-encodes to the same bytes. The gate covers every type-0 entry whose load argument lands in the CLUT band (`wiki: formats/graphics#palette`), whichever archive family it comes from. Like `tests/retail_repack.rs`, the gate skips when it cannot find the retail archives; `support::retail_root` owns the lookup and honours `BOF3_DISC_DIR` (the archives are `BIN/` below it).
 
 mod support;
 
@@ -17,8 +11,7 @@ use rebof3_emi::{Archive, Entry};
 
 /// Type-0 entries load here as CLUT blocks (`wiki: formats/graphics#palette`).
 const CLUT_BAND: std::ops::RangeInclusive<u32> = 0x8003_3800..=0x8003_6e00;
-/// Palette entries the asset census counts in that band (575 entries,
-/// 1,119,296 bytes); the band also holds 45 other type-0 payloads.
+/// Palette entries the asset census counts in that band (575 entries, 1,119,296 bytes); the band also holds 45 other type-0 payloads.
 const CENSUS_PALETTES: usize = 575;
 /// Payload size of the palette shape the census documents in `wiki: formats/emi`.
 const SAMPLE_PAYLOAD: u32 = 512;
@@ -33,8 +26,7 @@ fn read_payload(archive_path: &Path, entry: &Entry) -> Vec<u8> {
     payload
 }
 
-/// Decodes one payload and checks what the codec promises for it: the encoded
-/// bank is the payload again, and the RGBA view loses nothing but STP.
+/// Decodes one payload and checks what the codec promises for it: the encoded bank is the payload again, and the RGBA view loses nothing but STP.
 fn round_trip(where_: &str, payload: &[u8]) -> Result<clut::Palette, String> {
     let palette = clut::Palette::decode(payload).map_err(|error| format!("{where_}: {error}"))?;
     if palette.encode() != payload {
@@ -125,7 +117,6 @@ fn retail_palettes_round_trip_byte_exactly() {
     support::write(&out, "sample-palette-colors.json", palette.json());
     support::write(&out, "sample-source.txt", &where_);
 
-    // Shapes the band does not carry: a bank is a whole number of 16-color rows.
     assert!(matches!(clut::Palette::decode(&[0; 30]), Err(Error::PaletteNotRowAligned(15))));
     assert!(matches!(clut::Palette::decode(&[0; 31]), Err(Error::PaletteOddByteCount(31))));
 

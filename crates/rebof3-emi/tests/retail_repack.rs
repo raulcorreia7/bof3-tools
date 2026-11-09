@@ -1,9 +1,4 @@
-//! Whole-archive pack gate: extract, repack, and compare every retail archive.
-//!
-//! The test skips when it cannot find the retail archives; `support::retail_root`
-//! owns the lookup and reads `BOF3_DISC_DIR`. Two walks run: the on-disk one
-//! (extract to files, write `emi.json`, `pack_manifest`) and the in-memory one
-//! the `coverage` verb runs (`verify::container_round_trip`).
+//! Whole-archive pack gate: extract, repack, and compare every retail archive. The test skips when it cannot find the retail archives; `support::retail_root` owns the lookup and reads `BOF3_DISC_DIR`.
 
 mod support;
 

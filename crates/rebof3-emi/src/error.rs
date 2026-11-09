@@ -50,9 +50,7 @@ pub enum Error {
         distance: usize,
         produced: usize,
     },
-    /// A manifest input is unusable: an absolute or parent-relative name, an
-    /// entry that is missing or not a regular file, or a name whose resolved
-    /// path leaves the input folder. The message names the entry and the file.
+    /// A manifest input is unusable: an absolute or parent-relative name, an entry that is missing or not a regular file, or a name whose resolved path leaves the input folder.
     #[cfg(feature = "std")]
     ManifestInput(String),
     /// A game text cannot be encoded: a character or tag the encoding does not have, or an operand that does not fit.

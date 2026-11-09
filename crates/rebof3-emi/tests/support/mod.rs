@@ -1,7 +1,4 @@
 //! Shared fixtures and retail-archive discovery for the integration tests.
-//!
-//! Each integration test compiles its own copy of this module and uses a subset
-//! of it, so unused items are expected.
 
 #![allow(dead_code)]
 
@@ -90,12 +87,6 @@ pub fn out_dir(test: &str) -> PathBuf {
 pub fn write(dir: &Path, file: &str, bytes: impl AsRef<[u8]>) {
     fs::write(dir.join(file), bytes).unwrap_or_else(|error| panic!("cannot write {file}: {error}"));
 }
-
-// ---- Retail inputs ----------------------------------------------------------------------------
-//
-// Two variables name the retail data: `BOF3_DISC_DIR` (the extracted disc, which holds `BIN/`) and
-// `BOF3_DISC_IMAGE` (the disc's cue sheet). Unset, a retail test skips with a message. Set but
-// invalid, it panics with the path. `BOF3_REQUIRE_RETAIL=1` turns every skip into a failure.
 
 /// The variable that names the extracted disc.
 pub const DISC_DIR_VARIABLE: &str = "BOF3_DISC_DIR";

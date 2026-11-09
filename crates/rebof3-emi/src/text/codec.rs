@@ -1,8 +1,4 @@
-//! The game's text encodings: each byte is a character, a control code or a `{TAG}` marker.
-//!
-//! `decode` never drops a byte. A code without a known meaning is `{RAW:xx}`, and `encode` writes that tag back as
-//! its byte, so `encode(decode(bytes)) == bytes` for every byte string. The meanings and the evidence for them are in
-//! `wiki: data/text`.
+//! The game's text encodings: each byte is a character, a control code or a `{TAG}` marker. The meanings and the evidence for them are in `wiki: data/text`.
 
 use std::fmt::Write as _;
 
@@ -19,8 +15,7 @@ pub enum Encoding {
     Ascii,
 }
 
-/// Punctuation that draws as one byte. The high slots `0x8D` and `0x8F` are spelled with the fullwidth characters,
-/// so each slot keeps its own spelling.
+/// Punctuation that draws as one byte.
 const PUNCTUATION: &[(u8, char)] = &[
     (0x3A, ':'),
     (0x3B, ';'),
@@ -55,7 +50,7 @@ const MESSAGE_SINGLE: &[(u8, &str)] = &[
 const NAME_SINGLE: &[(u8, &str)] = &[(0x00, "END")];
 const ASCII_SINGLE: &[(u8, &str)] = &[(0x00, "END"), (0x09, "TAB"), (0x0A, "NEWLINE"), (0x0D, "CR")];
 
-/// Codes followed by one operand byte, with their tags. The operand is written as two hex digits.
+/// Codes followed by one operand byte, with their tags.
 const OPERAND: &[(u8, &str)] = &[
     (0x04, "INSERT"),
     (0x05, "COLOR"),
@@ -121,7 +116,7 @@ fn code_for(table: &[(u8, &'static str)], tag: &str) -> Option<u8> {
     table.iter().find(|(_, name)| *name == tag).map(|(byte, _)| *byte)
 }
 
-/// Renders `raw` as text with `{TAG}` markers. Never drops a byte.
+/// Renders `raw` as text with `{TAG}` markers.
 pub fn decode(encoding: Encoding, raw: &[u8]) -> String {
     let mut out = String::with_capacity(raw.len());
     let mut at = 0;
@@ -138,7 +133,6 @@ pub fn decode(encoding: Encoding, raw: &[u8]) -> String {
             continue;
         }
         match encoding.glyph(code) {
-            // A brace opens a tag in the text, so the ASCII brace is written as its byte.
             Some(glyph) if glyph != '{' => out.push(glyph),
             _ => {
                 let _ = write!(out, "{{RAW:{code:02x}}}");
@@ -156,8 +150,7 @@ struct Tag {
     end: usize,
 }
 
-/// The marker that opens at `at`, if the characters there form one. `{` `BODY` is an uppercase letter followed by
-/// uppercase letters or digits; an operand is `:` and one or more hex digits.
+/// The marker that opens at `at`, if the characters there form one.
 fn read_tag(chars: &[char], at: usize) -> Option<Tag> {
     let mut end = at + 1;
     if !chars.get(end)?.is_ascii_uppercase() {
@@ -183,8 +176,7 @@ fn read_tag(chars: &[char], at: usize) -> Option<Tag> {
     (chars.get(end) == Some(&'}')).then_some(Tag { body, operand, end: end + 1 })
 }
 
-/// Whether a marker names something this encoding writes back: `RAW` with a byte, a single-byte code, or a code with
-/// an operand.
+/// Whether a marker names something this encoding writes back: `RAW` with a byte, a single-byte code, or a code with an operand.
 fn is_known(encoding: Encoding, tag: &Tag) -> bool {
     match (tag.body.as_str(), &tag.operand) {
         ("RAW", operand) => operand.is_some(),
@@ -243,15 +235,13 @@ fn byte_of(hex: &str, body: &str) -> Result<u8> {
     u8::from_str_radix(hex, 16).map_err(|_| Error::Text(format!("{{{body}:{hex}}} does not fit one byte")))
 }
 
-/// The text of a name field: its bytes in the name encoding, without the zeros that pad the field. A name keeps
-/// its colour codes and every other byte it holds; [`name_field`] writes them back.
+/// The text of a name field: its bytes in the name encoding, without the zeros that pad the field.
 pub fn name_text(field: &[u8]) -> String {
     let end = field.iter().rposition(|byte| *byte != 0).map_or(0, |last| last + 1);
     decode(Encoding::Name, &field[..end])
 }
 
-/// The bytes of a name field `width` bytes wide whose text is `text`: the encoded text, then zeros. It is the
-/// inverse of [`name_text`] for every field, so a name read and written back keeps its stored bytes.
+/// The bytes of a name field `width` bytes wide whose text is `text`: the encoded text, then zeros.
 pub fn name_field(text: &str, width: usize) -> Result<Vec<u8>> {
     let mut bytes = encode(Encoding::Name, text)?;
     if bytes.len() > width {

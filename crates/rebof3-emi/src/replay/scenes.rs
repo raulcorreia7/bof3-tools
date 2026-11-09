@@ -1,13 +1,4 @@
-//! The default resident sets: which archives a scene has loaded, in order, and the palette steps
-//! between them.
-//!
-//! This is the one place that lists them. Each list is read from the loader in the decompilation
-//! and named in the function's doc comment; it stands in until those loaders run themselves. What
-//! the loads write comes only from the archives' tables ([`Vram::load`](super::Vram::load)).
-//!
-//! Not listed: the party archives (`PL`, `BPLD`, `BPLU`), which write no VRAM or palette arena;
-//! `SCENA17` and `ENDKANJI`, whose loaders are not read; and leftovers of an earlier screen,
-//! which depend on the route the player took. A scene starts from the cleared frame buffer.
+//! The default resident sets: which archives a scene has loaded, in order, and the palette steps between them.
 
 use super::Step;
 
@@ -18,8 +9,7 @@ pub const DEMO: &str = "BIN/ETC/DEMO.EMI";
 /// The battle archive below scenario 8 (`EMI_SLOT_BATTLE`).
 pub const BATTLE: &str = "BIN/BATTLE/BATTLE.EMI";
 
-/// The areas whose `AreaLoad` flag byte (`+0x32`) has bit 0 set, the world map
-/// (`wiki: data/programs#map-kinds`). The flags live in the executable, not in an archive.
+/// The areas whose `AreaLoad` flag byte (`+0x32`) has bit 0 set, the world map (`wiki: data/programs#map-kinds`).
 pub const WORLD_MAP_AREAS: [u16; 11] = [16, 33, 45, 65, 87, 88, 104, 115, 121, 151, 152];
 
 /// What kind of screen a scene is.
@@ -87,8 +77,7 @@ impl Scene {
     }
 }
 
-/// `SYS_StartFrontend`: `GFX_ClearRect(0, 0, 1024, 512)`, stream `FIRST`, `GFX_ResetPalette`;
-/// `SYS_Main` then runs `GFX_UploadPalette`.
+/// `SYS_StartFrontend`: `GFX_ClearRect(0, 0, 1024, 512)`, stream `FIRST`, `GFX_ResetPalette`; `SYS_Main` then runs `GFX_UploadPalette`.
 pub fn frontend() -> Scene {
     Scene {
         name: "Frontend".into(),
@@ -112,15 +101,7 @@ pub fn field(area: &str) -> Scene {
     )
 }
 
-/// A menu overlay over `base`. The open handler streams the archive, then copies the palette:
-///
-/// - `START`: `Game_LoadCampMenu` runs `GFX_ResetPalette`.
-/// - `STATUS`, `SHOP`, `BATE`, `SHISU`: `Game_LoadMenuOverlay`, `Game_LoadShopOverlay`,
-///   `Game_LoadAbilityMenu` and `Game_LoadStatusMenu` (`GAME_START_STREAM_AND_STAGE_PALETTE`)
-///   run `GFX_CopyPalette(1)` and `GFX_CopyPalette(2)`.
-/// - `SISYOU`: `Menu_OpenMaster` runs `GFX_CopyPalette(2)`.
-///
-/// Returns `None` for an archive that is not a menu overlay.
+/// A menu overlay over `base`. The open handler streams the archive, then copies the palette: `Game_LoadAbilityMenu` and `Game_LoadStatusMenu` (`GAME_START_STREAM_AND_STAGE_PALETTE`) run `GFX_CopyPalette(1)` and `GFX_CopyPalette(2)`.
 pub fn menu(base: Scene, archive: &str) -> Option<Scene> {
     let copies: &[Step] = match stem(archive) {
         "START" => &[Step::ResetPalette],
@@ -135,17 +116,13 @@ pub fn menu(base: Scene, archive: &str) -> Option<Scene> {
     Some(base.then(Kind::Menu, name, steps))
 }
 
-/// A Fairy Village event over `base`: `Fairy_LoadCommu01` to `Fairy_LoadCommu05` stream
-/// `COMMU01` to `COMMU05`, and `Fairy_FinishEventLoad (commu00/00)` runs `GFX_ResetPalette` once the
-/// stream is ready.
+/// A Fairy Village event over `base`: `Fairy_LoadCommu01` to `Fairy_LoadCommu05` stream `COMMU01` to `COMMU05`, and `Fairy_FinishEventLoad (commu00/00)` runs `GFX_ResetPalette` once the stream is ready.
 pub fn village(base: Scene, archive: &str) -> Scene {
     let name = format!("{}: {}", Kind::Village.label(), stem(archive));
     base.then(Kind::Village, name, [Step::Load(archive.into()), Step::ResetPalette, Step::UploadPalette])
 }
 
-/// A battle over `base`. `Battle_LoadBattleArchive` streams `BATTLE`, `BATTLE2` or a `BOSS`
-/// archive; the battle reset `func_801D1228 (battle/03)` copies the 16 words at arena row 15,
-/// column 240, then rows 26 and 27 (`GFX_CopyPalette(0x1A)`, `GFX_CopyPalette(0x1B)`).
+/// A battle over `base`. `Battle_LoadBattleArchive` streams `BATTLE`, `BATTLE2` or a `BOSS` archive; the battle reset `func_801D1228 (battle/03)` copies the 16 words at arena row 15, column 240, then rows 26 and 27 (`GFX_CopyPalette(0x1A)`, `GFX_CopyPalette(0x1B)`).
 pub fn battle(base: Scene, archive: &str) -> Scene {
     let name = format!("{}: {}", Kind::Battle.label(), stem(archive));
     base.then(
@@ -161,19 +138,7 @@ pub fn battle(base: Scene, archive: &str) -> Scene {
     )
 }
 
-/// An archive a battle streams part-way, over the battle `base`, with the copy its ready step
-/// runs:
-///
-/// - `BATL_DRA`: `Battle_LoadDraArchive` streams it; `Battle_FinishDraLoad` copies rows 26 and 27.
-/// - `BATL_RE2`: `Battle_LoadRe2Archive` streams it; `Battle_FinishRe2Load` copies row 27.
-/// - `BATL_RET`: `func_801D3E80` streams it; `Battle_FinishEffectLoad` copies row 26.
-/// - `BATL_OVR`: `Battle_LoadEndOverlay` streams it; its `Battle_StartGameOver (batl_ovr/00)` copies row 26.
-/// - `BATL_SE`, `COMN_SE`: `func_801D25A0` and `func_801D656C` stream them; they carry no palette.
-/// - `BMAGIC` archives (slots `0x122` to `0x1B1`, `KAIZAR_*` and `MAGIC*`):
-///   `Battle_LoadSelectionEffect (battle/15)` streams one; `Battle_FinishEffectLoad` clears the
-///   effect-loading state and copies row 26 once the stream is ready.
-///
-/// Returns `None` for an archive a battle does not stream.
+/// An archive a battle streams part-way, over the battle `base`, with the copy its ready step runs.
 pub fn in_battle(base: Scene, archive: &str) -> Option<Scene> {
     let name = stem(archive);
     let (kind, copies): (Kind, &[u8]) = match name {

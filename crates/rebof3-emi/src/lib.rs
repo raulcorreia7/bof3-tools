@@ -1,22 +1,9 @@
 //! The EMI container and the game formats stored in it.
-//!
-//! The container table and the type-8 cue records come from the `emi` crate, which reads them
-//! from bytes alone (`no_std + alloc`); this crate binds them to the game's formats.
-//!
-//! | Module | Format | Spec |
-//! | --- | --- | --- |
 //! | [`emi`], `pack`, `manifest` | container, repacking, `emi.json` | `wiki: formats/emi` |
 //! | `lz77` | type-1 payload codec | `wiki: formats/lz77` |
-//! | `lzss` | the transfer queue's packed images (`GFX_DecodeLzss`) | |
 //! | `record`, `text` | the record readers and the game's text codec | `wiki: data/text` |
 //! | [`cue`] | type-8 cue tables | `wiki: formats/audio#emi-type-8-cue-records` |
-//! | `entry` | decoders applied to one entry on disk | |
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
-//!
-//! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`; the game's
-//! formats (character sprites, maps, scripts, tables) live in `rebof3-formats`. The
-//! crate is `no_std + alloc` without the `std` feature, which keeps [`emi`] (the container table
-//! read from bytes) and [`cue`].
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
