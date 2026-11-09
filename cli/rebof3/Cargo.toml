@@ -26,6 +26,7 @@ bof3player = { workspace = true, features = ["std", "ogg", "bundled-names"], opt
 clap.workspace = true
 rebof3-emi = { workspace = true, features = ["std"] }
 rebof3-formats.workspace = true
+rebof3-observe.workspace = true
 psx-cd.workspace = true
 psx-formats = { workspace = true, features = ["std"] }
 serde_json.workspace = true

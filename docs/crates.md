@@ -9,6 +9,7 @@ disc and bundled-names libraries.
 | `rebof3-emi`    | EMI container, game records and area formats, LZ77, cue tables.           |
 | `rebof3-formats`| One module per entry format (codec, open files, description), the registry and the coverage table. |
 | `rebof3-assets` | The all-assets extractor: classify every file and EMI slot, write a tree. |
+| `rebof3-observe`| Runs the disc on a route in `psx-machine` and records how the game draws each texture. |
 | `rebof3-render` | Draws field scenes with the GPU's texturing rules, offscreen through OpenGL ES (the `gles` feature) or in software ([ADR 0003](adr/0003-area-3d-rendering.md)). |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 
@@ -42,6 +43,18 @@ rows, read over a whole archive), `text` (the string scan, the strings of a payl
 of a string), `gltf`, and `field` (the area setup stream that places the actors, and the
 executable's encounter zones and facing steps). The SoundFont conversion is in `vab::soundfont`, which is why the crate
 depends on `bof3player` for the SPU envelope steps.
+
+## rebof3-observe
+
+The game's own draws as evidence for the texture joins. It is not a format and no format imports
+it. `run` boots the disc image in `psx-machine` (bof3-player, pinned by revision with the other
+bof3-player crates), plays a `Route` (a TOML button script, `routes/*.toml`), and joins the GPU log
+to the EMI entries: `sources` maps each `Setloc` to the file read and each 32×32 upload to the
+type-3 entry that holds it; `record` keeps an owner for every VRAM word and proves an entry's depth
+when one entry wrote every word a textured draw samples. `cache` keeps the result per disc and route
+below `build/cache/observe/`, and `compare` sets it against the archive and scene rules. A run uses
+one thread. The retail test (`tests/retail.rs`, `BOF3_DISC_IMAGE`) pins the `new-game` route's
+counts and its comparison with the rules. The editor and `bof3 observe` use it.
 
 ## rebof3-assets
 

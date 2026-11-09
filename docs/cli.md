@@ -1,6 +1,6 @@
 # The bof3 command line
 
-`bof3` provides the `disc`, `emi` and `assets` commands. The subcommands parse arguments and
+`bof3` provides the `disc`, `emi`, `assets` and `observe` commands. The subcommands parse arguments and
 print; the libraries hold the logic ([crates](crates.md)). `--help` lists each command's purpose,
 every switch with its default, and runnable examples. A command with verbs (`disc extract`,
 `emi pack`, `assets import texture`) has its own focused `--help`. Errors name what failed and the
@@ -21,6 +21,7 @@ bin/bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
 | `bof3 disc`   | Extract, checksum, verify and rebuild a PlayStation disc image | [Disc](#disc)     |
 | `bof3 emi`    | List, extract, pack and inspect EMI archives                   | [EMI](#emi)       |
 | `bof3 assets` | Extract the disc's assets or convert one asset                 | [Assets](#assets) |
+| `bof3 observe` | Run the disc on a route and record how the game draws each texture | [Observe](#observe) |
 
 Switch names match across commands: `-i/--input`, `-o/--output`, `--list`, `--json`, `-q/--quiet`.
 Without `-i`, a command that reads a disc image looks for one in `inputs/external`, then in `./disk`.
@@ -170,3 +171,18 @@ folder per step below `DIR` (default `build/extract`).
 `DIR/index.json` and `DIR/index.md` list every file with its step, kind, size and SHA-256. Named steps
 rerun only those steps; the others keep their files and index rows. `assets` needs the folder the
 `disc` step writes. Exit status 0 is success, 1 means a step had failures, and 2 an error.
+
+## observe
+
+`observe --route NAME|FILE.toml [-i IMAGE] [--root DIR] [--force] [-q]` boots the disc image in
+`psx-machine`, plays the route's buttons and records which depth and CLUT row the game draws each
+texture upload with ([editor](editor.md#observed-draws)). The result goes to
+`DIR/build/cache/observe/<disc sha256>/<route>.json` (`DIR` defaults to the current folder; pass the
+editor's project folder to share it); a fresh cache is read instead of running again unless
+`--force`. The command prints the entries observed by archive and every row where a draw rule and
+the draws disagree. A route is a TOML file: `name`, `frames` and `[[press]]` tables with `buttons`,
+`from`, `until`, `every` and `hold`; `new-game` is built in.
+
+```sh
+target/release/bof3 observe --route new-game --root my-mod
+```
