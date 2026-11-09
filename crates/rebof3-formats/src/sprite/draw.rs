@@ -31,7 +31,7 @@ use psx_formats::gfx::texture::{Clut, Depth};
 
 use super::{Animation, Cell, Frame, Image, Palette};
 use crate::error::{Error, Result};
-use rebof3_emi::replay::{Vram, Writer};
+use rebof3_emi::replay::{Kind, Vram, Writer};
 use rebof3_emi::texture::ARENA_VRAM_ROW;
 
 /// The address of `g_SpriteSizes` (`exe/slus_004_22@0x8017F53C`): one width and height per shape.
@@ -62,17 +62,20 @@ const PAGES_PER_ROW: u8 = 16;
 /// The row a lower-half page starts at, and the tpage's row shift (`(page / 16) << 8`).
 const LOWER_HALF_ROW: u16 = 0x100;
 const PAGE_ROW_SHIFT: u32 = 8;
-/// `Area_BuildClut` for kind 2: the selector's row (`sel >> 3`) and its 32-colour column (`(sel & 7) * 2`
-/// 16-word CLUT units).
-const CLUT_SELECTOR_ROW_SHIFT: u32 = 3;
-const CLUT_SELECTOR_COLUMN_MASK: u8 = 7;
-const CLUT_UNITS_PER_SELECTOR: u16 = 2;
+/// `Area_BuildClut`'s palette kinds (work `+0x28`, `PALETTE_KIND_*` in `include/gfx/vram.h`).
+pub const KIND_CELL: u8 = 0;
+pub const KIND_ROW: u8 = 1;
+pub const KIND_CELLS_2: u8 = 2;
+pub const KIND_CELLS_4: u8 = 3;
+/// `Area_BuildClut` starts at row `STAGE_PALETTE_Y + 16` when work `+0x24` has this bit.
+pub const UPPER_PALETTES: u8 = 0x04;
+const UPPER_PALETTE_ROWS: u16 = 16;
+/// Words in one CLUT unit: a CLUT column counts in 16-word steps.
 const CLUT_ROW_SHIFT: u32 = 6;
+/// The work `+0x24` flags `Party_LoadMemberSprite` sets (`active_flags = 1`).
+const FIELD_FLAGS: u8 = 1;
 /// The colour word the GPU never draws.
 pub const TRANSPARENT: u16 = 0;
-/// Texels in one VRAM word at 8 bits.
-const TEXELS_PER_WORD: usize = 2;
-const BYTE_BITS: usize = 8;
 
 /// `g_SpriteSizes`: the width and height of each cell shape, in texels.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -126,6 +129,10 @@ pub struct Placement {
     pub clut_selector: u8,
     /// The RAM `GFX_LoadPalette` writes the palette to.
     pub palette_stage: u32,
+    /// The palette kind `Area_BuildClut` and the tpage depth read (work `+0x28`).
+    pub kind: u8,
+    /// The work flags whose [`UPPER_PALETTES`] bit moves the CLUT 16 rows down (work `+0x24`).
+    pub flags: u8,
 }
 
 impl Placement {
@@ -136,7 +143,16 @@ impl Placement {
             row: slot.wrapping_mul(FIELD_SLOT_ROWS),
             clut_selector: FIELD_CLUT_SELECTOR.wrapping_add(slot),
             palette_stage: FIELD_PALETTE_STAGE + u32::from(slot) * FIELD_PALETTE_STRIDE,
+            kind: KIND_CELLS_2,
+            flags: FIELD_FLAGS,
         }
+    }
+
+    /// The placement `Area_FindSceneRecord` (`exe/slus_004_22@0x8014DD3C`) copies from an area's scene
+    /// record: texture page, sheet row, CLUT selector and palette kind. Its sheet is the area's own
+    /// upload, so it stages no palette.
+    pub fn scene(page: u8, row: u8, clut_selector: u8, kind: u8, flags: u8) -> Self {
+        Self { page, row, clut_selector, palette_stage: 0, kind, flags }
     }
 
     /// Where `Actor_SelectScriptBank` queues the sheet: VRAM word column and row.
@@ -156,16 +172,24 @@ impl Placement {
         (column, row)
     }
 
-    /// The CLUT `Area_BuildClut` builds for palette kind 2.
+    /// The CLUT `Area_BuildClut` (`exe/slus_004_22@0x8014CE78`) builds: the row is the base plus the
+    /// selector's high bits, the column in 16-word units its low bits, split by the palette kind.
     pub fn clut(&self) -> Clut {
-        let row = ARENA_VRAM_ROW + u16::from(self.clut_selector >> CLUT_SELECTOR_ROW_SHIFT);
-        let column = u16::from(self.clut_selector & CLUT_SELECTOR_COLUMN_MASK) * CLUT_UNITS_PER_SELECTOR;
-        Clut::from_word(row << CLUT_ROW_SHIFT | column)
+        let base = ARENA_VRAM_ROW + if self.flags & UPPER_PALETTES != 0 { UPPER_PALETTE_ROWS } else { 0 };
+        let selector = u16::from(self.clut_selector);
+        let (row, units) = match self.kind {
+            KIND_CELL => (selector >> 4, selector & 0xF),
+            KIND_ROW => (selector, 0),
+            KIND_CELLS_2 => (selector >> 3, (selector & 7) * 2),
+            KIND_CELLS_4 => (selector >> 2, (selector & 3) * 4),
+            _ => (selector >> 1, (selector & 1) * 8),
+        };
+        Clut::from_word((base + row) << CLUT_ROW_SHIFT | units)
     }
 
-    /// The texel depth: the tpage's 8-bit mode, set because work `+0x28` is nonzero.
+    /// The texel depth `Area_DrawObjectSprite` sets: 8-bit for a nonzero palette kind, else 4-bit.
     pub fn depth(&self) -> Depth {
-        Depth::Eight
+        if self.kind == KIND_CELL { Depth::Four } else { Depth::Eight }
     }
 }
 
@@ -249,8 +273,8 @@ pub struct Stage {
     pub vram: Vram,
     /// Where they went.
     pub placement: Placement,
-    sheet: Writer,
-    palette: Writer,
+    /// The writers of the staged sheet and palette; `None` reads what a scene's loads left there.
+    staged: Option<(Writer, Writer)>,
 }
 
 impl Stage {
@@ -273,26 +297,37 @@ impl Stage {
             &image.words(),
             sheet_writer.clone(),
         );
-        Self { vram, placement, sheet: sheet_writer, palette: palette_writer }
+        Self { vram, placement, staged: Some((sheet_writer, palette_writer)) }
+    }
+
+    /// An actor whose sheet and palette are already in `vram`, a replayed scene: an area actor placed by
+    /// its scene record. A texel counts as the sheet's when an upload wrote it, and a colour as the
+    /// palette's when any load wrote it.
+    pub fn resident(vram: Vram, placement: Placement) -> Self {
+        Self { vram, placement, staged: None }
     }
 
     /// The texel the draw reads at sheet column `u` and cell row `v`, as `Area_DrawObjectSprite` forms
-    /// it: the page column plus `u`, the page row plus `+0x26` plus `v`, both within one byte.
+    /// it: the page column plus `u` at the placement's depth, the page row plus `+0x26` plus `v`, both
+    /// within one byte.
     pub fn texel(&self, u: u8, v: u8) -> Texel {
         let (page_x, page_y) = self.placement.texture_page();
-        let column = page_x + usize::from(u) / TEXELS_PER_WORD;
+        let per_word = self.placement.depth().texels_per_word();
+        let bits = self.placement.depth().bits() as usize;
+        let column = page_x + usize::from(u) / per_word;
         let row = page_y + usize::from(self.placement.row.wrapping_add(v));
-        let byte = usize::from(u) % TEXELS_PER_WORD;
-        let index = (self.vram.word(column, row) >> (BYTE_BITS * byte)) as u8;
+        let shift = (usize::from(u) % per_word) * bits;
+        let index = ((self.vram.word(column, row) >> shift) & ((1 << bits) - 1)) as u8;
 
         let clut = self.placement.clut();
         let (clut_x, clut_y) = (usize::from(clut.x) + usize::from(index), usize::from(clut.y));
-        Texel {
-            index,
-            word: self.vram.word(clut_x, clut_y),
-            in_sheet: self.vram.writer(column, row) == Some(&self.sheet),
-            in_palette: self.vram.writer(clut_x, clut_y) == Some(&self.palette),
-        }
+        let (in_sheet, in_palette) = match &self.staged {
+            Some((sheet, palette)) => {
+                (self.vram.writer(column, row) == Some(sheet), self.vram.writer(clut_x, clut_y) == Some(palette))
+            }
+            None => (self.vram.kind(column, row) == Some(Kind::Upload), self.vram.writer(clut_x, clut_y).is_some()),
+        };
+        Texel { index, word: self.vram.word(clut_x, clut_y), in_sheet, in_palette }
     }
 }
 
@@ -504,6 +539,38 @@ mod tests {
         let composite = compose(&stage, &frame, &sizes(), false, frame_bounds(&frame, &sizes(), false).unwrap());
         assert_eq!(composite.outside, 8 * 8, "rows 8 to 15 are past the 8-row sheet");
         assert_eq!(composite.unresolved_colours(), 1, "index 40 is past the 32-colour palette");
+    }
+
+    #[test]
+    fn a_scene_placement_builds_every_clut_kind() {
+        // Kind 0: row base + sel >> 4, column (sel & 15) * 16, 4-bit; the 0x04 flag moves it 16 rows down.
+        let cell = Placement::scene(7, 0x40, 0xB3, KIND_CELL, UPPER_PALETTES);
+        assert_eq!((cell.clut().x, cell.clut().y), (48, 496 + 11));
+        assert_eq!(cell.depth(), Depth::Four);
+        let row = Placement::scene(7, 0, 5, KIND_ROW, 0);
+        assert_eq!((row.clut().x, row.clut().y), (0, 485));
+        let four = Placement::scene(7, 0, 0x0B, KIND_CELLS_4, 0);
+        assert_eq!((four.clut().x, four.clut().y, four.depth()), (192, 482, Depth::Eight));
+        let eight = Placement::scene(7, 0, 0x0B, 4, 0);
+        assert_eq!((eight.clut().x, eight.clut().y), (128, 485));
+    }
+
+    #[test]
+    fn a_resident_stage_reads_4_bit_texels_any_upload_wrote() {
+        let mut vram = Vram::new();
+        // Page 7 is VRAM column 448; texel u 5 is the second nibble of word 1.
+        let sheet: Vec<u8> = vec![0x21; 2048];
+        vram.load(
+            "BIN/WORLD00/AREA003.EMI",
+            &[rebof3_emi::Entry { size: 2048, offset: 0, ram_ptr: (14 << 24) | (1 << 8), first4: 0, file_type: 3 }],
+            &[&sheet],
+        );
+        let stage = Stage::resident(vram, Placement::scene(7, 0, 0, KIND_CELL, 0));
+        let texel = stage.texel(5, 3);
+        assert_eq!(texel.index, 2);
+        assert!(texel.in_sheet);
+        assert!(!texel.in_palette, "no load wrote the CLUT row");
+        assert!(!stage.texel(0, 40).in_sheet, "row 40 is past the 32-row upload");
     }
 
     #[test]
