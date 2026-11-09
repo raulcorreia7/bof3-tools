@@ -36,11 +36,7 @@ fn skip(variable: &str) -> Option<PathBuf> {
 pub fn retail_disc() -> Option<PathBuf> {
     let Some(value) = std::env::var_os(DISC_DIR_VARIABLE) else { return skip(DISC_DIR_VARIABLE) };
     let disc = PathBuf::from(value);
-    assert!(
-        disc.join(ARCHIVE_FOLDER).is_dir(),
-        "{DISC_DIR_VARIABLE}={} is not an extracted disc: it has no {ARCHIVE_FOLDER}/ folder",
-        disc.display()
-    );
+    assert!(disc.join(ARCHIVE_FOLDER).is_dir(), "{DISC_DIR_VARIABLE}={} is not an extracted disc: it has no {ARCHIVE_FOLDER}/ folder", disc.display());
     Some(disc)
 }
 

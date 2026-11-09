@@ -109,8 +109,7 @@ impl Part {
             Part::Beats => u8::try_from(number).ok().filter(|&beats| beats > 0).map(|beats| {
                 sequence.time_num = beats;
             }),
-            Part::BeatNote => (number.is_power_of_two() && number.trailing_zeros() <= BEAT_NOTE_EXPONENT_LIMIT)
-                .then(|| sequence.time_den = number.trailing_zeros() as u8),
+            Part::BeatNote => (number.is_power_of_two() && number.trailing_zeros() <= BEAT_NOTE_EXPONENT_LIMIT).then(|| sequence.time_den = number.trailing_zeros() as u8),
         };
         valid.ok_or_else(|| self.rule().to_string())
     }
@@ -164,8 +163,7 @@ fn stem(entry: &Entry<'_>) -> String {
 
 /// A row of fixed-width cells.
 fn grid_row(cells: impl IntoIterator<Item = AnyElement>, striped: bool) -> Div {
-    let mut row =
-        div().flex().items_center().gap(px(GAP)).min_h(px(ROW_HEIGHT)).when(striped, |row| row.bg(color(RAISED)));
+    let mut row = div().flex().items_center().gap(px(GAP)).min_h(px(ROW_HEIGHT)).when(striped, |row| row.bg(color(RAISED)));
     for cell in cells {
         row = row.child(div().w(px(COLUMN_WIDTH)).flex_none().child(cell));
     }
@@ -192,10 +190,12 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let title = format!("{}-{header_index}", stem(entry));
     let state = &editor.views.sound;
 
-    let mut top = div().flex().flex_none().items_center().gap(px(GAP)).child(mono(format!(
-        "VAB id {}  {} programs  {} tones  {} samples  volume {}  pan {}",
-        bank.id, bank.program_count, bank.tone_count, bank.vag_count, bank.master_vol, bank.master_pan
-    )));
+    let mut top = div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .gap(px(GAP))
+        .child(mono(format!("VAB id {}  {} programs  {} tones  {} samples  volume {}  pan {}", bank.id, bank.program_count, bank.tone_count, bank.vag_count, bank.master_vol, bank.master_pan)));
     let (soundfont_header, soundfont_body, soundfont_title) = (header.to_vec(), body.to_vec(), title.clone());
     top = top.child(button("soundfont", "Export SoundFont…", true).on_click(cx.listener(move |editor, _, _, cx| {
         let bytes = soundfont(&soundfont_header, &soundfont_body, &soundfont_title).map_err(|error| error.to_string());
@@ -209,11 +209,9 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     }
 
     let mut samples = div().flex().flex_col().font_family(fonts::mono());
-    samples = samples
-        .child(grid_row(["#", "bytes", "frames", "loop"].map(|heading| strong(heading).into_any_element()), false));
+    samples = samples.child(grid_row(["#", "bytes", "frames", "loop"].map(|heading| strong(heading).into_any_element()), false));
     for (at, vag) in bank.vags.iter().filter(|vag| !vag.is_empty()).enumerate() {
-        let looped =
-            if vag.has_loop { format!("{}..{}", vag.loop_start_frame, vag.loop_end_frame) } else { "-".into() };
+        let looped = if vag.has_loop { format!("{}..{}", vag.loop_start_frame, vag.loop_end_frame) } else { "-".into() };
         let (sample, wave_name) = (vag.index, format!("{title}-{}.wav", vag.index));
 
         let play = button(("play", sample), "▶ Play", true).on_click(cx.listener(move |editor, _, _, cx| {
@@ -226,33 +224,20 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             let bytes = raw_sample(editor, sample).and_then(|pcm| pcm_wav(&pcm).map_err(|error| error.to_string()));
             editor.save_file(wave_name.clone(), bytes, cx);
         }));
-        let replace =
-            button(("import-wave", sample), "Import WAVE…", true).on_click(cx.listener(move |editor, _, _, cx| {
-                import_sample(editor, header_index, body_index, sample, cx);
-                cx.notify();
-            }));
-        let cells = [
-            text(vag.index),
-            text(vag.size),
-            text(vag.frames),
-            text(looped),
-            play.into_any_element(),
-            wave.into_any_element(),
-            replace.into_any_element(),
-        ];
+        let replace = button(("import-wave", sample), "Import WAVE…", true).on_click(cx.listener(move |editor, _, _, cx| {
+            import_sample(editor, header_index, body_index, sample, cx);
+            cx.notify();
+        }));
+        let cells = [text(vag.index), text(vag.size), text(vag.frames), text(looped), play.into_any_element(), wave.into_any_element(), replace.into_any_element()];
         samples = samples.child(grid_row(cells, at % 2 == 1));
     }
 
     let arrow = if state.tones_open { "▾" } else { "▸" };
-    let tones_title =
-        div().id("tones").cursor_pointer().child(strong(format!("{arrow} Tones ({})", bank.tones.len()))).on_click(
-            cx.listener(|editor, _, _, cx| {
-                editor.views.sound.tones_open = !editor.views.sound.tones_open;
-                cx.notify();
-            }),
-        );
-    let mut tones =
-        div().id("tone-list").flex().flex_col().max_h(px(TONES_HEIGHT)).overflow_y_scroll().font_family(fonts::mono());
+    let tones_title = div().id("tones").cursor_pointer().child(strong(format!("{arrow} Tones ({})", bank.tones.len()))).on_click(cx.listener(|editor, _, _, cx| {
+        editor.views.sound.tones_open = !editor.views.sound.tones_open;
+        cx.notify();
+    }));
+    let mut tones = div().id("tone-list").flex().flex_col().max_h(px(TONES_HEIGHT)).overflow_y_scroll().font_family(fonts::mono());
     if state.tones_open {
         let headings = ["program", "sample", "notes", "center", "volume", "pan", "mode", "play note"];
         tones = tones.child(grid_row(headings.map(|heading| strong(heading).into_any_element()), false));
@@ -352,17 +337,9 @@ fn play_note(editor: &mut Editor, block: u8, slot: u8, program: bool) -> Result<
     let pcm = {
         let (entry, header_index, header, body) = shown_bank(editor)?;
         let bank = Bank::parse(&header, &body).map_err(|error| error.to_string())?;
-        let tone = bank
-            .tones
-            .iter()
-            .find(|tone| tone.storage_block == block && tone.tone_slot == slot)
-            .ok_or("the bank has no such tone")?;
+        let tone = bank.tones.iter().find(|tone| tone.storage_block == block && tone.tone_slot == slot).ok_or("the bank has no such tone")?;
         let note = editor.views.sound.note(&tone_key(&entry, header_index, tone), tone);
-        let keys = if program {
-            Keys::Program(u8::try_from(tone.program).map_err(|_| "the tone names no program")?)
-        } else {
-            Keys::Tone { block, slot }
-        };
+        let keys = if program { Keys::Program(u8::try_from(tone.program).map_err(|_| "the tone names no program")?) } else { Keys::Tone { block, slot } };
         note_pcm(&header, &body, &Note { keys, note, hold: hold(&bank, tone, note) })?
     };
     editor.views.sound.player.play(&pcm)
@@ -380,9 +357,7 @@ pub fn note_changed(editor: &mut Editor, block: u8, slot: u8, text: &str) -> Opt
         let tone = bank.tones.iter().find(|tone| tone.storage_block == block && tone.tone_slot == slot)?;
         let rule = format!("The tone answers notes {} to {}.", tone.min_note, tone.max_note);
         match text.trim().parse::<u8>() {
-            Ok(note) if note <= NOTE_LIMIT && (tone.min_note..=tone.max_note).contains(&note) => {
-                (tone_key(&entry, header_index, tone), note)
-            }
+            Ok(note) if note <= NOTE_LIMIT && (tone.min_note..=tone.max_note).contains(&note) => (tone_key(&entry, header_index, tone), note),
             _ => return Some(rule),
         }
     };
@@ -397,8 +372,7 @@ fn with_sample(header: &[u8], body: &[u8], index: u32, vag: &[u8]) -> Result<(Ve
         return Err("sample 0 is the bank's null sample".into());
     }
     let mut bank = Bank::parse(header, body).map_err(|error| error.to_string())?;
-    let (offset, size) =
-        bank.vag(index).map(|old| (old.offset as usize, old.size as usize)).map_err(|error| error.to_string())?;
+    let (offset, size) = bank.vag(index).map(|old| (old.offset as usize, old.size as usize)).map_err(|error| error.to_string())?;
     let (start, end) = (offset, offset + size);
     if end > body.len() {
         return Err(format!("sample {index} runs past the body"));
@@ -407,12 +381,7 @@ fn with_sample(header: &[u8], body: &[u8], index: u32, vag: &[u8]) -> Result<(Ve
     let units = u16::try_from(vag.len() / SAMPLE_SIZE_UNIT)
         .ok()
         .filter(|_| vag.len().is_multiple_of(SAMPLE_SIZE_UNIT))
-        .ok_or_else(|| {
-            format!(
-                "a sample is a multiple of {SAMPLE_SIZE_UNIT} bytes, at most {} bytes",
-                usize::from(u16::MAX) * SAMPLE_SIZE_UNIT
-            )
-        })?;
+        .ok_or_else(|| format!("a sample is a multiple of {SAMPLE_SIZE_UNIT} bytes, at most {} bytes", usize::from(u16::MAX) * SAMPLE_SIZE_UNIT))?;
     let grown = i64::from(bank.file_size) + vag.len() as i64 - size as i64;
     bank.file_size = u32::try_from(grown).map_err(|_| "the bank size does not fit its word".to_string())?;
     bank.size_table[index as usize] = units;
@@ -447,8 +416,7 @@ fn play_sequence(editor: &mut Editor, sequence: u16) -> Result<(), String> {
     let entry = editor.current().ok_or("no entry")?;
     let archive = entry.project.current_archive(entry.archive)?;
     let path = entry.archive.path.0.clone();
-    let pcm = sequence_pcm(&path, &archive, u32::from(sequence), SEQUENCE_PREVIEW_SECONDS)
-        .map_err(|error| error.to_string())?;
+    let pcm = sequence_pcm(&path, &archive, u32::from(sequence), SEQUENCE_PREVIEW_SECONDS).map_err(|error| error.to_string())?;
     editor.views.sound.player.play(&pcm)
 }
 
@@ -491,11 +459,9 @@ pub fn header_changed(editor: &mut Editor, index: usize, part: Part, text: &str)
 fn import_midi(editor: &mut Editor, index: usize, cx: &mut Context<Editor>) {
     let Some(entry) = editor.current() else { return };
     let (archive, entry_index) = (entry.archive.path.clone(), entry.index);
-    editor.open_file("MIDI file to import", cx, move |editor, midi| {
-        match editor.rewrite_entry(&archive, entry_index, |payload| with_midi(payload, index, &midi)) {
-            Ok(()) => format!("Imported sequence {index} from MIDI."),
-            Err(error) => format!("Import: {error}"),
-        }
+    editor.open_file("MIDI file to import", cx, move |editor, midi| match editor.rewrite_entry(&archive, entry_index, |payload| with_midi(payload, index, &midi)) {
+        Ok(()) => format!("Imported sequence {index} from MIDI."),
+        Err(error) => format!("Import: {error}"),
     });
 }
 
@@ -507,8 +473,7 @@ fn sequences(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> An
     };
     let title = format!("{}-{}", stem(entry), entry.index);
 
-    let mut top =
-        div().flex().items_center().gap(px(GAP)).child(strong(format!("{} sequences", package.sequences.len())));
+    let mut top = div().flex().items_center().gap(px(GAP)).child(strong(format!("{} sequences", package.sequences.len())));
     if editor.views.sound.player.is_playing() {
         top = top.child(button("stop", "Stop", true).on_click(cx.listener(|editor, _, _, cx| {
             editor.views.sound.player.stop();
@@ -526,35 +491,24 @@ fn sequences(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> An
             editor.save_file(name.clone(), bytes, cx);
         }));
         let id = sequence.seq_id;
-        let play = button(("play-sequence", index), "▶ Play", sequence.has_notes()).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                if let Err(error) = play_sequence(editor, id) {
-                    editor.status = format!("Play: {error}");
-                }
-                cx.notify();
-            },
-        ));
-        let import =
-            button(("import-midi", index), "Import MIDI…", true).on_click(cx.listener(move |editor, _, _, cx| {
-                import_midi(editor, index, cx);
-                cx.notify();
-            }));
+        let play = button(("play-sequence", index), "▶ Play", sequence.has_notes()).on_click(cx.listener(move |editor, _, _, cx| {
+            if let Err(error) = play_sequence(editor, id) {
+                editor.status = format!("Play: {error}");
+            }
+            cx.notify();
+        }));
+        let import = button(("import-midi", index), "Import MIDI…", true).on_click(cx.listener(move |editor, _, _, cx| {
+            import_midi(editor, index, cx);
+            cx.notify();
+        }));
 
         let mut cells = vec![text(index), text(id)];
         for part in Part::ALL {
             let which = Field::SequenceHeader { index, part };
             let id = ("sequence-header", index * Part::ALL.len() + part as usize);
-            cells.push(
-                input(editor, id, which, &part.text(sequence), "", Some(HEADER_FIELD_WIDTH), cx).into_any_element(),
-            );
+            cells.push(input(editor, id, which, &part.text(sequence), "", Some(HEADER_FIELD_WIDTH), cx).into_any_element());
         }
-        cells.extend([
-            text(bpm(sequence.tempo_us)),
-            text(if sequence.has_notes() { "notes" } else { "silent" }),
-            play.into_any_element(),
-            midi.into_any_element(),
-            import.into_any_element(),
-        ]);
+        cells.extend([text(bpm(sequence.tempo_us)), text(if sequence.has_notes() { "notes" } else { "silent" }), play.into_any_element(), midi.into_any_element(), import.into_any_element()]);
         list = list.child(grid_row(cells, index % 2 == 1));
     }
     list.into_any_element()
@@ -574,14 +528,7 @@ mod tests {
     fn package() -> Vec<u8> {
         let note = Event { status: NOTE_ON, data1: 60, data2: 100, status_byte: true, ..Event::default() };
         let end = Event { status: 0xFF, meta_type: END_OF_TRACK, status_byte: true, ..Event::default() };
-        let sequence = Sequence {
-            seq_id: 3,
-            resolution: 48,
-            tempo_us: 500_000,
-            time_num: 4,
-            time_den: 2,
-            events: vec![note, end],
-        };
+        let sequence = Sequence { seq_id: 3, resolution: 48, tempo_us: 500_000, time_num: 4, time_den: 2, events: vec![note, end] };
         Package { sequences: vec![sequence] }.encode()
     }
 
@@ -657,15 +604,9 @@ mod tests {
     #[test]
     fn a_header_value_out_of_range_is_refused() {
         let payload = package();
-        for (part, text) in [
-            (Part::Resolution, "0"),
-            (Part::Resolution, "65536"),
-            (Part::Tempo, "16777216"),
-            (Part::Beats, "256"),
-            (Part::BeatNote, "6"),
-            (Part::BeatNote, "256"),
-            (Part::Tempo, "fast"),
-        ] {
+        for (part, text) in
+            [(Part::Resolution, "0"), (Part::Resolution, "65536"), (Part::Tempo, "16777216"), (Part::Beats, "256"), (Part::BeatNote, "6"), (Part::BeatNote, "256"), (Part::Tempo, "fast")]
+        {
             assert_eq!(with_header(&payload, 0, part, text), Err(part.rule().to_string()), "{part:?} {text}");
         }
         assert!(with_header(&payload, 1, Part::Tempo, "1").is_err(), "no second sequence");
@@ -726,10 +667,7 @@ mod tests {
                 let package = Package::parse(payload).expect("a retail package parses");
                 for sequence in 0..package.sequences.len() {
                     sequences += 1;
-                    let back = package
-                        .to_midi(sequence)
-                        .map_err(|error| error.to_string())
-                        .and_then(|midi| with_midi(payload, sequence, &midi));
+                    let back = package.to_midi(sequence).map_err(|error| error.to_string()).and_then(|midi| with_midi(payload, sequence, &midi));
                     if back.as_deref() != Ok(payload) {
                         failures.push(format!("{}#{index} sequence {sequence}", path.0));
                     }

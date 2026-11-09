@@ -51,11 +51,7 @@ fn retail_vram_uploads_round_trip() {
         report.failures.len(),
         report.failures.join("\n")
     );
-    assert_eq!(
-        report.dropped_nonzero_rectangles, 0,
-        "the frame buffer drops {} rectangles that hold live data",
-        report.dropped_nonzero_rectangles
-    );
+    assert_eq!(report.dropped_nonzero_rectangles, 0, "the frame buffer drops {} rectangles that hold live data", report.dropped_nonzero_rectangles);
     eprintln!(
         "type-3 gate: {}/{} entries round-trip byte-exact; {} rectangles, \
          {} outside the frame buffer",
@@ -87,12 +83,7 @@ fn check_archive(path: &Path, report: &mut Report, page_set: &mut Plane) {
 }
 
 /// Decodes one payload, checks it against the format, and places it.
-fn check_upload(
-    payload: &[u8],
-    descriptor: Descriptor,
-    page_set: &mut Plane,
-    report: &mut Report,
-) -> Result<(), String> {
+fn check_upload(payload: &[u8], descriptor: Descriptor, page_set: &mut Plane, report: &mut Report) -> Result<(), String> {
     let rectangles = decode(payload, descriptor).map_err(|error| error.to_string())?;
     if let Some(offset) = first_mismatch(&encode(&rectangles), payload) {
         return Err(format!("re-encoded payload differs at 0x{offset:X}"));

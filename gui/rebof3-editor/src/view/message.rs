@@ -53,8 +53,7 @@ fn tag(text: &str) -> Option<(Piece<'_>, usize)> {
         Some((body, hex)) => (body, Some(u8::from_str_radix(hex, 16).ok()?)),
         None => (inner, None),
     };
-    let named = body.starts_with(|c: char| c.is_ascii_uppercase())
-        && body.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
+    let named = body.starts_with(|c: char| c.is_ascii_uppercase()) && body.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
     named.then_some((Piece::Tag { body, operand }, close + 1))
 }
 
@@ -105,9 +104,7 @@ impl Layout {
         let color = self.color;
         let line = self.line();
         match line.last_mut() {
-            Some(run) if run.color == color && run.placeholder == placeholder && !placeholder => {
-                run.text.push_str(text)
-            }
+            Some(run) if run.color == color && run.placeholder == placeholder && !placeholder => run.text.push_str(text),
             _ => line.push(Run { text: text.into(), color, placeholder }),
         }
     }
@@ -167,15 +164,7 @@ fn run_color(run: &Run) -> u32 {
 pub fn window(text: &str) -> Div {
     let mut boxes = div().flex().flex_wrap().gap(px(GAP_SMALL));
     for page in pages(text) {
-        let mut lines = div()
-            .flex()
-            .flex_col()
-            .w(px(WINDOW_WIDTH))
-            .p(px(GAP))
-            .rounded(px(CORNER))
-            .bg(color(PANEL))
-            .border_1()
-            .border_color(color(BORDER));
+        let mut lines = div().flex().flex_col().w(px(WINDOW_WIDTH)).p(px(GAP)).rounded(px(CORNER)).bg(color(PANEL)).border_1().border_color(color(BORDER));
         for line in page {
             let mut row = div().flex().min_h(px(LINE_HEIGHT)).whitespace_nowrap();
             for run in line {

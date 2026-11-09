@@ -30,11 +30,7 @@ pub fn convert(pcm: &Pcm, rate: u32, channels: usize) -> Result<Vec<f32>, String
         let first = f32::from(frame[0]) / SAMPLE_SCALE;
         stereo.extend([first, frame.get(1).map_or(first, |&second| f32::from(second) / SAMPLE_SCALE)]);
     }
-    let resampled = if pcm.sample_rate == rate || pcm.sample_rate == 0 || rate == 0 || stereo.is_empty() {
-        stereo
-    } else {
-        resample(&stereo, pcm.sample_rate, rate)?
-    };
+    let resampled = if pcm.sample_rate == rate || pcm.sample_rate == 0 || rate == 0 || stereo.is_empty() { stereo } else { resample(&stereo, pcm.sample_rate, rate)? };
 
     let mut out = Vec::with_capacity(resampled.len() / 2 * channels);
     for frame in resampled.as_chunks::<2>().0 {
@@ -53,8 +49,7 @@ pub fn convert(pcm: &Pcm, rate: u32, channels: usize) -> Result<Vec<f32>, String
 /// Interleaved stereo at `from` Hz resampled to `to` Hz: the filter's delay trimmed, and as long as the clip.
 fn resample(stereo: &[f32], from: u32, to: u32) -> Result<Vec<f32>, String> {
     let frames = stereo.len() / 2;
-    let mut resampler = Fft::<f32>::new(from as usize, to as usize, RESAMPLE_CHUNK, 2, FixedSync::Input)
-        .map_err(|error| format!("resampling {from} Hz to {to} Hz: {error}"))?;
+    let mut resampler = Fft::<f32>::new(from as usize, to as usize, RESAMPLE_CHUNK, 2, FixedSync::Input).map_err(|error| format!("resampling {from} Hz to {to} Hz: {error}"))?;
     let input = InterleavedSlice::new(stereo, 2, frames).map_err(|error| error.to_string())?;
     let output = resampler.process_all(&input, frames, None).map_err(|error| error.to_string())?;
     let mut out = output.take_data();
@@ -157,9 +152,7 @@ mod tests {
 
     /// One second of a sine at `hertz`, mono at `rate`.
     fn sine(hertz: f64, rate: u32) -> Vec<i16> {
-        (0..rate)
-            .map(|n| (8000.0 * (std::f64::consts::TAU * hertz * f64::from(n) / f64::from(rate)).sin()) as i16)
-            .collect()
+        (0..rate).map(|n| (8000.0 * (std::f64::consts::TAU * hertz * f64::from(n) / f64::from(rate)).sin()) as i16).collect()
     }
 
     /// Rising zero crossings a second of `samples` holds.

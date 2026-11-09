@@ -57,13 +57,7 @@ pub struct Layout {
     pub facing: bool,
 }
 
-const fn layout(
-    length: usize,
-    handler: &'static str,
-    scene: bool,
-    position: Option<[usize; 4]>,
-    facing: bool,
-) -> Layout {
+const fn layout(length: usize, handler: &'static str, scene: bool, position: Option<[usize; 4]>, facing: bool) -> Layout {
     Layout { length, handler, scene, position, facing }
 }
 
@@ -177,10 +171,7 @@ pub fn walk(program: &[u8], start: usize) -> Result<Stream> {
 /// The program with `record` moved to `x2`, `y2` half cells. A half byte that already says "half"
 /// keeps its value, so an unchanged position writes back the same bytes.
 pub fn with_position(program: &[u8], record: &Record, x2: u16, y2: u16) -> Result<Vec<u8>> {
-    let [x_half, x_whole, y_half, y_whole] = record
-        .layout()
-        .position
-        .ok_or_else(|| Error::Field(format!("a kind {:X} record has no position", record.kind)))?;
+    let [x_half, x_whole, y_half, y_whole] = record.layout().position.ok_or_else(|| Error::Field(format!("a kind {:X} record has no position", record.kind)))?;
     let (x, y) = (x2 / 2, y2 / 2);
     let (Ok(x), Ok(y)) = (u8::try_from(x), u8::try_from(y)) else {
         return Err(Error::Field(format!("cell ({x}, {y}) does not fit the record's bytes")));
@@ -228,17 +219,11 @@ struct Walker<'a> {
 
 impl Walker<'_> {
     fn byte(&self, at: usize) -> Result<u8> {
-        self.program
-            .get(at)
-            .copied()
-            .ok_or_else(|| Error::Field(format!("the setup stream runs past the program at {at:#X}")))
+        self.program.get(at).copied().ok_or_else(|| Error::Field(format!("the setup stream runs past the program at {at:#X}")))
     }
 
     fn hang(&self, at: usize, place: &str) -> Error {
-        Error::Field(format!(
-            "byte {:#04X} at {at:#X} {place}; the game would hang there",
-            self.program.get(at).copied().unwrap_or(0)
-        ))
+        Error::Field(format!("byte {:#04X} at {at:#X} {place}; the game would hang there", self.program.get(at).copied().unwrap_or(0)))
     }
 
     fn stream(&mut self, mut at: usize) -> Result<usize> {
@@ -356,10 +341,7 @@ mod tests {
         assert_eq!(kinds, [0, 9, 0xE]);
         let placement = stream.records[0].placement(&program).expect("a position");
         assert_eq!(placement, Placement { x2: 7, y2: 8, facing: Some(2), scene: Some(7) });
-        assert_eq!(
-            stream.records[1].guards,
-            [Guard::If { at: 17, test: 2, operand: 5, negated: false, otherwise: true }]
-        );
+        assert_eq!(stream.records[1].guards, [Guard::If { at: 17, test: 2, operand: 5, negated: false, otherwise: true }]);
         assert_eq!(stream.records[2].guards, [Guard::Case { at: 35, test: 8, value: Some(1) }]);
         assert_eq!(stream.records[2].placement(&program).unwrap().facing, None);
     }
@@ -368,11 +350,7 @@ mod tests {
     fn a_position_and_a_facing_edit_their_bytes_alone() {
         let program = program();
         let record = &walk(&program, 0).unwrap().records[0];
-        assert_eq!(
-            with_position(&program, record, 7, 8).unwrap(),
-            program,
-            "an unchanged position writes the same bytes"
-        );
+        assert_eq!(with_position(&program, record, 7, 8).unwrap(), program, "an unchanged position writes the same bytes");
         let moved = with_position(&program, record, 10, 9).unwrap();
         let changed: Vec<usize> = (0..program.len()).filter(|&at| moved[at] != program[at]).collect();
         assert_eq!(changed, [6, 7, 8], "x half, x whole and y half");

@@ -59,11 +59,7 @@ pub fn import(text: &[u8], base: &[u8]) -> Result<Vec<u8>> {
     let text = core::str::from_utf8(text).map_err(|_| Error::Import("the script text is not UTF-8".into()))?;
     let bytes = parse(text)?.encode()?;
     if bytes.len() > base.len() {
-        return Err(Error::Import(format!(
-            "the table grows to {} bytes from {}: what follows it in memory is not known to be free",
-            bytes.len(),
-            base.len()
-        )));
+        return Err(Error::Import(format!("the table grows to {} bytes from {}: what follows it in memory is not known to be free", bytes.len(), base.len())));
     }
     Ok(bytes)
 }
@@ -71,16 +67,10 @@ pub fn import(text: &[u8], base: &[u8]) -> Result<Vec<u8>> {
 /// The text of a program.
 pub fn write(program: &Program) -> String {
     let mut out = String::new();
-    let _ = writeln!(
-        out,
-        "; A script table: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)"
-    );
+    let _ = writeln!(out, "; A script table: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)");
     let _ = writeln!(out, "; points an actor at a record and Actor_SeekScript (exe/slus_004_22@0x8014D910) plays it.");
     let _ = writeln!(out, "; show: stage a frame for its ticks (Actor_StageAnimStep; a tick is 33.4 ms, 0 lasts 256).");
-    let _ = writeln!(
-        out,
-        "; jump: continue at a step (Actor_StepAnimLoop, Actor_StepAnimOnce). Labels name the steps jumps reach."
-    );
+    let _ = writeln!(out, "; jump: continue at a step (Actor_StepAnimLoop, Actor_StepAnimOnce). Labels name the steps jumps reach.");
     let _ = writeln!(out, "{MAGIC} {VERSION}");
     for (index, section) in program.sections.iter().enumerate() {
         let _ = writeln!(out, "\nsection {index}");
@@ -115,10 +105,7 @@ fn write_stream(out: &mut String, stream: &Stream) {
         let line = match op {
             Op::Show { ticks, frame } => {
                 let past = if usize::from(frame) >= frames { ", past the frame table" } else { "" };
-                format!(
-                    "show frame {frame} ticks {ticks}{INDENT}{COMMENT} step {index}, {} ms{past}",
-                    duration_ms(ticks)
-                )
+                format!("show frame {frame} ticks {ticks}{INDENT}{COMMENT} step {index}, {} ms{past}", duration_ms(ticks))
             }
             Op::Jump { code, target } => {
                 let code = if code == JUMP { String::new() } else { format!(" code {code:#04X}") };
@@ -210,8 +197,7 @@ impl Draft {
 
 /// Reads the text form back to a program.
 pub fn parse(text: &str) -> Result<Program> {
-    let mut lines =
-        text.lines().enumerate().map(|(index, line)| (index + 1, strip(line))).filter(|(_, line)| !line.is_empty());
+    let mut lines = text.lines().enumerate().map(|(index, line)| (index + 1, strip(line))).filter(|(_, line)| !line.is_empty());
     match lines.next() {
         Some((_, line)) if line.split_whitespace().eq([MAGIC, VERSION]) => {}
         _ => return Err(Error::Import(format!("the script text does not start with `{MAGIC} {VERSION}`"))),
@@ -313,13 +299,7 @@ fn record_line(record: &mut Draft, keyword: &str, rest: &[&str], line: usize) ->
                     shape | if fields.flag("flip") { FLIP } else { 0 }
                 }
             };
-            frame.cells.push(Cell {
-                size,
-                x: fields.number("x")?,
-                y: fields.number("y")?,
-                u: fields.number("u")?,
-                v: fields.number("v")?,
-            });
+            frame.cells.push(Cell { size, x: fields.number("x")?, y: fields.number("y")?, u: fields.number("u")?, v: fields.number("v")? });
         }
         "pad" => record.padding.extend(hex(rest, line)?),
         "raw" => record.raw.get_or_insert_with(Vec::new).extend(hex(rest, line)?),
@@ -394,10 +374,7 @@ fn number<T: TryFrom<i64>>(word: &str, line: usize) -> Result<T> {
 }
 
 fn hex(words: &[&str], line: usize) -> Result<Vec<u8>> {
-    words
-        .iter()
-        .map(|word| u8::from_str_radix(word, 16).map_err(|_| at(line, &format!("`{word}` is not a hex byte"))))
-        .collect()
+    words.iter().map(|word| u8::from_str_radix(word, 16).map_err(|_| at(line, &format!("`{word}` is not a hex byte")))).collect()
 }
 
 fn expect_index(rest: &[&str], expected: usize, line: usize, part: &str) -> Result<()> {
@@ -425,10 +402,7 @@ mod tests {
     fn table() -> Vec<u8> {
         let animation = Animation {
             steps: vec![Step { delay: 4, frame: 0 }, Step { delay: 0, frame: 1 }, Step { delay: 0x81, frame: 1 }],
-            frames: vec![
-                Frame { cells: vec![Cell { size: 0x85, x: -8, y: -16, u: 0, v: 0 }] },
-                Frame { cells: vec![Cell { size: 0x13, x: 4, y: 2, u: 9, v: 7 }] },
-            ],
+            frames: vec![Frame { cells: vec![Cell { size: 0x85, x: -8, y: -16, u: 0, v: 0 }] }, Frame { cells: vec![Cell { size: 0x13, x: 4, y: 2, u: 9, v: 7 }] }],
         };
         let stream = [animation.encode(), vec![0, 0]].concat();
         let start = 6 + stream.len() as u16;
@@ -457,17 +431,11 @@ mod tests {
     fn an_added_step_moves_the_jump_through_its_label() {
         let payload = table();
         let text = String::from_utf8(export(&payload).expect("exports")).expect("UTF-8");
-        let grown = text
-            .replacen("    show frame 0 ticks 4", "    show frame 0 ticks 4\n    show frame 0 ticks 2", 1)
-            .replacen("pad 00 00\n", "", 1);
+        let grown = text.replacen("    show frame 0 ticks 4", "    show frame 0 ticks 4\n    show frame 0 ticks 2", 1).replacen("pad 00 00\n", "", 1);
         let program = parse(&grown).expect("parses");
         let stream = program.stream(0, 0).expect("a stream");
         assert_eq!(stream.animation.steps[3], Step { delay: 0x81, frame: 2 });
-        assert_eq!(
-            import(grown.as_bytes(), &payload).expect("imports").len(),
-            payload.len(),
-            "the new step takes the pad"
-        );
+        assert_eq!(import(grown.as_bytes(), &payload).expect("imports").len(), payload.len(), "the new step takes the pad");
     }
 
     #[test]

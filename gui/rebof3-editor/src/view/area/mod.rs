@@ -17,10 +17,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use gpui::{
-    AnyElement, Bounds, Context, Corners, Div, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
-    Point, RenderImage, ScrollWheelEvent, canvas, div, prelude::*, px,
-};
+use gpui::{AnyElement, Bounds, Context, Corners, Div, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, RenderImage, ScrollWheelEvent, canvas, div, prelude::*, px};
 use rebof3_emi::replay::scenes;
 use rebof3_emi::text::codec::name_text;
 use rebof3_formats::encounter::ENCOUNTER_ENEMIES;
@@ -236,17 +233,10 @@ impl State {
 }
 
 /// Reads area entry `index` of `archive` with every source beside it.
-pub fn read_area(
-    project: &mut Project,
-    archive: &ArchivePath,
-    index: usize,
-    cache: &mut Cache,
-) -> Result<Area, String> {
+pub fn read_area(project: &mut Project, archive: &ArchivePath, index: usize, cache: &mut Cache) -> Result<Area, String> {
     let scene = scenes::home(&archive.0);
     let replayed = match (&scene, &cache.replay) {
-        (Some(scene), Some((replayed, revision))) if replayed.scene == *scene && *revision == project.revision() => {
-            Some(Rc::clone(replayed))
-        }
+        (Some(scene), Some((replayed, revision))) if replayed.scene == *scene && *revision == project.revision() => Some(Rc::clone(replayed)),
         (Some(scene), _) => Some(super::scene::replay(project, scene)),
         (None, _) => None,
     };
@@ -258,14 +248,8 @@ pub fn read_area(
     let loaded = project.load(archive)?;
 
     let project = &*project;
-    let entries: Vec<(u32, &[u8])> = (0..loaded.entries().len())
-        .map(|entry| (project.load_arg(&loaded, entry), project.payload(&loaded, entry)))
-        .collect();
-    let game_code = game.as_ref().and_then(|game| {
-        (0..game.entries().len())
-            .find(|&entry| project.load_arg(game, entry) == GAME_CODE)
-            .map(|entry| project.payload(game, entry))
-    });
+    let entries: Vec<(u32, &[u8])> = (0..loaded.entries().len()).map(|entry| (project.load_arg(&loaded, entry), project.payload(&loaded, entry))).collect();
+    let game_code = game.as_ref().and_then(|game| (0..game.entries().len()).find(|&entry| project.load_arg(game, entry) == GAME_CODE).map(|entry| project.payload(game, entry)));
     let bundle = entries.get(index).ok_or("no such entry")?.1;
     let sources = Sources {
         bundle,
@@ -366,9 +350,7 @@ fn render_image(frame: rebof3_render::Frame) -> Option<Arc<RenderImage>> {
 /// The hit of a target in the read area.
 fn hit_of(area: &Area, target: Target) -> Option<Hit> {
     match target {
-        Target::Face { cell, face } => {
-            area.quads.iter().position(|quad| quad.cell == cell && quad.face == face).map(Hit::Quad)
-        }
+        Target::Face { cell, face } => area.quads.iter().position(|quad| quad.cell == cell && quad.face == face).map(Hit::Quad),
         Target::Actor(index) => (index < area.actor_list().len()).then_some(Hit::Actor(index)),
     }
 }
@@ -663,9 +645,7 @@ fn stroke(editor: &mut Editor, hit: Option<Hit>) {
         }
         Tool::PaintBattle => {
             let ink = state.battle_ink;
-            rewrite_sibling(editor, area.battle.as_ref().map(|(index, _)| *index), "battle grid", |grid| {
-                model::with_battle(grid, cell, ink)
-            })
+            rewrite_sibling(editor, area.battle.as_ref().map(|(index, _)| *index), "battle grid", |grid| model::with_battle(grid, cell, ink))
         }
         Tool::Raise => rewrite_bundle(editor, |payload| model::with_raised(payload, cell, 1)),
         Tool::Lower => rewrite_bundle(editor, |payload| model::with_raised(payload, cell, -1)),
@@ -691,12 +671,7 @@ fn rewrite_bundle(editor: &mut Editor, edit: impl FnOnce(&[u8]) -> Result<Vec<u8
 }
 
 /// Rewrites entry `index` of the shown archive.
-fn rewrite_sibling(
-    editor: &mut Editor,
-    index: Option<usize>,
-    what: &str,
-    edit: impl FnOnce(&[u8]) -> Result<Vec<u8>, String>,
-) -> Result<(), String> {
+fn rewrite_sibling(editor: &mut Editor, index: Option<usize>, what: &str, edit: impl FnOnce(&[u8]) -> Result<Vec<u8>, String>) -> Result<(), String> {
     let index = index.ok_or_else(|| format!("the area has no {what}"))?;
     let archive = editor.archive.as_ref().ok_or("no archive is open")?.path.clone();
     let before = revision(editor);
@@ -706,11 +681,7 @@ fn rewrite_sibling(
 }
 
 /// Rewrites the area program with an edit computed from the read area.
-fn rewrite_program(
-    editor: &mut Editor,
-    area: &Area,
-    edit: impl FnOnce(&Area) -> Result<Vec<u8>, String>,
-) -> Result<(), String> {
+fn rewrite_program(editor: &mut Editor, area: &Area, edit: impl FnOnce(&Area) -> Result<Vec<u8>, String>) -> Result<(), String> {
     let index = area.program.as_ref().map(|(index, _)| *index);
     let payload = edit(area)?;
     rewrite_sibling(editor, index, "area program", |_| Ok(payload))
@@ -761,34 +732,16 @@ fn controls(editor: &Editor, cx: &mut Context<Editor>) -> Div {
     }
     row = row.child(separator(true));
     for tool in Tool::ALL {
-        row = row.child(tab(tool.label(), tool.label(), state.tool == tool).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                editor.views.area.tool = tool;
-                cx.notify();
-            },
-        )));
+        row = row.child(tab(tool.label(), tool.label(), state.tool == tool).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.area.tool = tool;
+            cx.notify();
+        })));
     }
     row = row
         .child(muted("Code ink"))
-        .child(input(
-            editor,
-            "area-code-ink",
-            Field::Area(Part::CodeInk),
-            &format!("{:#04X}", state.code_ink),
-            "",
-            Some(NUMBER_WIDTH),
-            cx,
-        ))
+        .child(input(editor, "area-code-ink", Field::Area(Part::CodeInk), &format!("{:#04X}", state.code_ink), "", Some(NUMBER_WIDTH), cx))
         .child(muted("Battle ink"))
-        .child(input(
-            editor,
-            "area-battle-ink",
-            Field::Area(Part::BattleInk),
-            &state.battle_ink.to_string(),
-            "",
-            Some(NUMBER_WIDTH),
-            cx,
-        ))
+        .child(input(editor, "area-battle-ink", Field::Area(Part::BattleInk), &state.battle_ink.to_string(), "", Some(NUMBER_WIDTH), cx))
         .child(separator(true));
 
     let backend = match state.renderer.as_ref().map(Renderer::backend) {
@@ -799,12 +752,10 @@ fn controls(editor: &Editor, cx: &mut Context<Editor>) -> Div {
         },
         None => "none yet".into(),
     };
-    row.child(checkbox("area-software", "Software renderer", state.software).on_click(cx.listener(
-        |editor, _, _, cx| {
-            editor.views.area.software = !editor.views.area.software;
-            cx.notify();
-        },
-    )))
+    row.child(checkbox("area-software", "Software renderer", state.software).on_click(cx.listener(|editor, _, _, cx| {
+        editor.views.area.software = !editor.views.area.software;
+        cx.notify();
+    })))
     .child(muted(format!("Drawn by {backend}.")))
     .child(separator(true))
     .child(button("area-export", "Export glTF", true).on_click(cx.listener(|editor, _, _, cx| {
@@ -861,22 +812,13 @@ fn follow(area: &Area, picked: Option<Target>) -> View {
 
 /// The picked record's fields and the area's encounter rows.
 fn panel(editor: &Editor, area: &Area, cx: &mut Context<Editor>) -> impl IntoElement {
-    let mut panel =
-        div().id("area-panel").flex().flex_col().flex_none().w(px(PANEL_WIDTH)).gap(px(GAP_SMALL)).overflow_y_scroll();
+    let mut panel = div().id("area-panel").flex().flex_col().flex_none().w(px(PANEL_WIDTH)).gap(px(GAP_SMALL)).overflow_y_scroll();
     panel = match editor.views.area.picked {
-        Some(Target::Face { cell, face }) if cell < area.bundle.cells.len() => {
-            panel.child(cell_fields(editor, area, cell, face, cx))
-        }
-        Some(Target::Actor(index)) if index < area.actor_list().len() => {
-            panel.child(actor_fields(editor, area, index, cx))
-        }
+        Some(Target::Face { cell, face }) if cell < area.bundle.cells.len() => panel.child(cell_fields(editor, area, cell, face, cx)),
+        Some(Target::Actor(index)) if index < area.actor_list().len() => panel.child(actor_fields(editor, area, index, cx)),
         _ => panel.child(muted("Nothing picked. Click a cell or an actor.")),
     };
-    panel
-        .child(separator(false))
-        .child(encounter_fields(editor, area, cx))
-        .child(separator(false))
-        .child(zone_list(area))
+    panel.child(separator(false)).child(encounter_fields(editor, area, cx)).child(separator(false)).child(zone_list(area))
 }
 
 /// A label and a field on one line.
@@ -886,34 +828,16 @@ fn labelled(label: impl Into<gpui::SharedString>, field: impl IntoElement) -> Di
 
 fn cell_fields(editor: &Editor, area: &Area, cell: usize, face: Face, cx: &mut Context<Editor>) -> Div {
     let (column, row) = area.column_row(cell);
-    let mut fields = div()
-        .flex()
-        .flex_col()
-        .gap(px(GAP_SMALL))
-        .child(strong(format!("Cell x {column} y {row}, {} face", face.label())));
+    let mut fields = div().flex().flex_col().gap(px(GAP_SMALL)).child(strong(format!("Cell x {column} y {row}, {} face", face.label())));
     for corner in 0..CELL_BYTES {
         let text = area.bundle.cells[cell].heights[corner].to_string();
-        let field = input(
-            editor,
-            ("area-corner", corner),
-            Field::Area(Part::Corner(corner)),
-            &text,
-            "",
-            Some(NUMBER_WIDTH),
-            cx,
-        );
+        let field = input(editor, ("area-corner", corner), Field::Area(Part::Corner(corner)), &text, "", Some(NUMBER_WIDTH), cx);
         fields = fields.child(labelled(format!("Corner {corner}"), field));
     }
     let code = area.bundle.codes.get(cell).copied().unwrap_or(0);
-    fields = fields.child(labelled(
-        "Code",
-        input(editor, "area-code", Field::Area(Part::Code), &format!("{code:#04X}"), "", Some(NUMBER_WIDTH), cx),
-    ));
+    fields = fields.child(labelled("Code", input(editor, "area-code", Field::Area(Part::Code), &format!("{code:#04X}"), "", Some(NUMBER_WIDTH), cx)));
     if let Some(value) = area.battle_value(cell) {
-        fields = fields.child(labelled(
-            "Battle grid",
-            input(editor, "area-battle", Field::Area(Part::Battle), &value.to_string(), "", Some(NUMBER_WIDTH), cx),
-        ));
+        fields = fields.child(labelled("Battle grid", input(editor, "area-battle", Field::Area(Part::Battle), &value.to_string(), "", Some(NUMBER_WIDTH), cx)));
     }
 
     let Some(quad) = area.quads.iter().find(|quad| quad.cell == cell && quad.face == face) else {
@@ -922,68 +846,33 @@ fn cell_fields(editor: &Editor, area: &Area, cell: usize, face: Face, cx: &mut C
     let Some(tile) = quad.tile else {
         return fields.child(muted("The face's descriptor is past the bundle's table."));
     };
-    fields = fields.child(strong(format!("Descriptor {} = {:#010X}", tile.index, tile.descriptor))).child(muted(
-        format!("{} drawn quads share it; an edit changes them all (func_80155560).", model::sharers(area, tile.index)),
-    ));
+    fields = fields
+        .child(strong(format!("Descriptor {} = {:#010X}", tile.index, tile.descriptor)))
+        .child(muted(format!("{} drawn quads share it; an edit changes them all (func_80155560).", model::sharers(area, tile.index))));
     for field in TileField::ALL {
         let text = field.get(tile.descriptor).to_string();
         let id = ("area-tile", field as usize);
-        fields = fields.child(labelled(
-            field.label(),
-            input(editor, id, Field::Area(Part::Tile(field)), &text, "", Some(NUMBER_WIDTH), cx),
-        ));
+        fields = fields.child(labelled(field.label(), input(editor, id, Field::Area(Part::Tile(field)), &text, "", Some(NUMBER_WIDTH), cx)));
     }
     fields
 }
 
 fn actor_fields(editor: &Editor, area: &Area, index: usize, cx: &mut Context<Editor>) -> Div {
     let actor = &area.actor_list()[index];
-    let mut fields = div()
-        .flex()
-        .flex_col()
-        .gap(px(GAP_SMALL))
-        .child(strong(format!("Actor {index}: kind {:X} at program +{:#06X}", actor.record.kind, actor.record.at)));
+    let mut fields = div().flex().flex_col().gap(px(GAP_SMALL)).child(strong(format!("Actor {index}: kind {:X} at program +{:#06X}", actor.record.kind, actor.record.at)));
     for line in model::describe(area, Hit::Actor(index)) {
         fields = fields.child(muted(line));
     }
     let placement = actor.placement;
     fields = fields
-        .child(labelled(
-            "Cell x",
-            input(
-                editor,
-                "area-actor-x",
-                Field::Area(Part::ActorX),
-                &model::half(placement.x2),
-                "",
-                Some(NUMBER_WIDTH),
-                cx,
-            ),
-        ))
-        .child(labelled(
-            "Cell y",
-            input(
-                editor,
-                "area-actor-y",
-                Field::Area(Part::ActorY),
-                &model::half(placement.y2),
-                "",
-                Some(NUMBER_WIDTH),
-                cx,
-            ),
-        ));
+        .child(labelled("Cell x", input(editor, "area-actor-x", Field::Area(Part::ActorX), &model::half(placement.x2), "", Some(NUMBER_WIDTH), cx)))
+        .child(labelled("Cell y", input(editor, "area-actor-y", Field::Area(Part::ActorY), &model::half(placement.y2), "", Some(NUMBER_WIDTH), cx)));
     if let Some(facing) = placement.facing {
         let hint = format!("0 to {}", FACINGS - 1);
-        fields = fields.child(labelled(
-            "Facing",
-            input(editor, "area-facing", Field::Area(Part::Facing), &facing.to_string(), &hint, Some(NUMBER_WIDTH), cx),
-        ));
+        fields = fields.child(labelled("Facing", input(editor, "area-facing", Field::Area(Part::Facing), &facing.to_string(), &hint, Some(NUMBER_WIDTH), cx)));
     }
     if let Some(scene) = placement.scene {
-        fields = fields.child(labelled(
-            "Scene id",
-            input(editor, "area-scene", Field::Area(Part::Scene), &format!("{scene:#06X}"), "", Some(WIDE_WIDTH), cx),
-        ));
+        fields = fields.child(labelled("Scene id", input(editor, "area-scene", Field::Area(Part::Scene), &format!("{scene:#06X}"), "", Some(WIDE_WIDTH), cx)));
         let ids: Vec<String> = area.scenes.iter().map(|scene| format!("{:#06X}", scene.id)).collect();
         fields = fields.child(muted(format!("The scene table holds {}.", ids.join(", "))));
     }
@@ -995,28 +884,14 @@ fn encounter_fields(editor: &Editor, area: &Area, cx: &mut Context<Editor>) -> D
     let Some(block) = area.encounter_block() else {
         return fields.child(muted("The archive has no encounter block at 0x800E4000."));
     };
-    let names: Vec<String> =
-        block.enemies.iter().enumerate().map(|(index, enemy)| format!("{index} {}", name_text(&enemy.name))).collect();
+    let names: Vec<String> = block.enemies.iter().enumerate().map(|(index, enemy)| format!("{index} {}", name_text(&enemy.name))).collect();
     fields = fields.child(muted(format!("Enemies: {}. 255 is an empty slot.", names.join(", "))));
     for (row, encounter) in block.encounters.iter().enumerate() {
-        let mut line = div()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .gap(px(GAP_SMALL))
-            .child(div().w(px(GAP * 2.0)).child(row.to_string()));
+        let mut line = div().flex().flex_wrap().items_center().gap(px(GAP_SMALL)).child(div().w(px(GAP * 2.0)).child(row.to_string()));
         for slot in 0..=ENCOUNTER_ENEMIES {
             let value = if slot < ENCOUNTER_ENEMIES { encounter.enemies[slot] } else { encounter.appearance_rate };
             let id = ("area-encounter", row * (ENCOUNTER_ENEMIES + 1) + slot);
-            line = line.child(input(
-                editor,
-                id,
-                Field::Area(Part::Encounter { row, slot }),
-                &value.to_string(),
-                "",
-                Some(px_width(slot)),
-                cx,
-            ));
+            line = line.child(input(editor, id, Field::Area(Part::Encounter { row, slot }), &value.to_string(), "", Some(px_width(slot)), cx));
         }
         fields = fields.child(line);
     }
@@ -1035,19 +910,10 @@ fn zone_list(area: &Area) -> Div {
             for (index, zone) in zones.iter().enumerate() {
                 list = list.child(mono(format!(
                     "{index}: ({}, {})-({}, {}) rate {} kind {} music {} {}",
-                    zone.first[0],
-                    zone.first[1],
-                    zone.last[0],
-                    zone.last[1],
-                    zone.rate,
-                    zone.kind,
-                    zone.seed,
-                    zone.pick
+                    zone.first[0], zone.first[1], zone.last[0], zone.last[1], zone.rate, zone.kind, zone.seed, zone.pick
                 )));
             }
-            list.child(muted(
-                "The zones live in SLUS_004.22, which the project does not rebuild, so they are read only.",
-            ))
+            list.child(muted("The zones live in SLUS_004.22, which the project does not rebuild, so they are read only."))
         }
         Err(error) => list.child(muted(format!("Unknown: {error}."))),
     }
@@ -1087,19 +953,13 @@ pub fn field_changed(editor: &mut Editor, part: Part, text: &str) -> Option<Stri
             None => Err("A code is a byte, 0 to 0xFF.".into()),
         },
         (Part::Battle, Some(Target::Face { cell, .. })) => match byte() {
-            Some(value) => {
-                rewrite_sibling(editor, area.battle.as_ref().map(|(index, _)| *index), "battle grid", |grid| {
-                    model::with_battle(grid, cell, value)
-                })
-            }
+            Some(value) => rewrite_sibling(editor, area.battle.as_ref().map(|(index, _)| *index), "battle grid", |grid| model::with_battle(grid, cell, value)),
             None => Err("A battle grid value is a nibble, 0 to 15.".into()),
         },
         (Part::Tile(field), Some(Target::Face { cell, face })) => {
             let tile = area.quads.iter().find(|quad| quad.cell == cell && quad.face == face).and_then(|quad| quad.tile);
             match (tile, number(text)) {
-                (Some(tile), Some(value)) => {
-                    rewrite_bundle(editor, |payload| model::with_tile_field(payload, tile.index, field, value))
-                }
+                (Some(tile), Some(value)) => rewrite_bundle(editor, |payload| model::with_tile_field(payload, tile.index, field, value)),
                 (None, _) => Err("The face has no descriptor.".into()),
                 (_, None) => Err(format!("{} is a number.", field.label())),
             }
@@ -1126,11 +986,7 @@ pub fn field_changed(editor: &mut Editor, part: Part, text: &str) -> Option<Stri
             None => Err("A scene id is a 16-bit number.".into()),
         },
         (Part::Encounter { row, slot }, _) => match byte() {
-            Some(value) => {
-                rewrite_sibling(editor, area.encounters.as_ref().map(|(index, _)| *index), "encounter block", |block| {
-                    model::with_encounter(block, row, slot, value)
-                })
-            }
+            Some(value) => rewrite_sibling(editor, area.encounters.as_ref().map(|(index, _)| *index), "encounter block", |block| model::with_encounter(block, row, slot, value)),
             None => Err("An encounter slot is a byte, 0 to 255.".into()),
         },
         _ => Ok(()),

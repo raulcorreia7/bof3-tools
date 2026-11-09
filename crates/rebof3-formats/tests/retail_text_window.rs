@@ -23,8 +23,7 @@ fn font(root: &std::path::Path) -> Font {
     let bytes = std::fs::read(root.join("ETC/FIRST.EMI")).expect("FIRST.EMI");
     let archive = Archive::parse(&bytes).expect("archive");
     let payload = |index: usize| archive.payload(&bytes, index).expect("payload").to_vec();
-    Font::new(&payload(SHEET), archive.entries()[SHEET].ram_ptr, &payload(TEXT_PALETTE), &payload(FRAME_PALETTE))
-        .expect("the font decodes")
+    Font::new(&payload(SHEET), archive.entries()[SHEET].ram_ptr, &payload(TEXT_PALETTE), &payload(FRAME_PALETTE)).expect("the font decodes")
 }
 
 #[test]
@@ -68,14 +67,7 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
                             missing_glyphs.insert(byte);
                         }
                     }
-                    let image = render::window(
-                        &font,
-                        page,
-                        laid.placement.kind.size(),
-                        laid.placement.framed,
-                        usize::MAX,
-                        [0; 3],
-                    );
+                    let image = render::window(&font, page, laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
                     blank += usize::from(image.pixels.chunks(4).all(|p| p[..3] == image.pixels[..3]));
                 }
             }
@@ -104,8 +96,7 @@ fn a_retail_window_renders_to_png() {
     let payload = archive.payload(&bytes, 18).unwrap();
     let parsed = table::parse(payload).unwrap();
     let laid = layout::layout(&parsed.messages[1], Context { table: Some(payload), runtime: None });
-    let image =
-        render::window(&font, &laid.pages[0], laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
+    let image = render::window(&font, &laid.pages[0], laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
     let png = psx_formats::gfx::png::rgba_png(image.width as u32, image.height as u32, &image.pixels);
     support::write(&support::out_dir("retail_text_window"), "window.png", png);
 }

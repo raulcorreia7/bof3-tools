@@ -8,10 +8,7 @@
 use std::cell::Cell as Shared;
 use std::rc::Rc;
 
-use gpui::{
-    AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, canvas, div,
-    prelude::*, px,
-};
+use gpui::{AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, canvas, div, prelude::*, px};
 use rebof3_formats::Format;
 
 use super::Entry;
@@ -103,13 +100,10 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let pixels = cell_colors(entry.payload(), width, height);
 
     let measure = Rc::clone(&state.image);
-    let image = canvas(
-        move |area, _, _| measure.set(area),
-        move |area, (), window, _| paint_pixels(window, area, &pixels, width, CELL_PIXELS),
-    )
-    .w(px(width as f32 * CELL_PIXELS))
-    .h(px(height as f32 * CELL_PIXELS))
-    .flex_none();
+    let image = canvas(move |area, _, _| measure.set(area), move |area, (), window, _| paint_pixels(window, area, &pixels, width, CELL_PIXELS))
+        .w(px(width as f32 * CELL_PIXELS))
+        .h(px(height as f32 * CELL_PIXELS))
+        .flex_none();
 
     let hover = match state.hover {
         Some((x, y)) => format!("x {x}  y {y}  value {}", value(entry.payload(), width, x, y)),
@@ -167,19 +161,12 @@ fn inks(ink: u8, cx: &mut Context<Editor>) -> Div {
     for value in 0..VALUES as u8 {
         let [red, green, blue] = VALUE_COLOURS[usize::from(value)];
         let picked = value == ink;
-        row = row.child(
-            div()
-                .flex()
-                .flex_col()
-                .items_center()
-                .child(swatch(("ink", usize::from(value)), [red, green, blue, OPAQUE], INK_SWATCH, None))
-                .child(tab(("ink-value", usize::from(value)), value.to_string(), picked).on_click(cx.listener(
-                    move |editor, _, _, cx| {
-                        editor.views.cells.ink = value;
-                        cx.notify();
-                    },
-                ))),
-        );
+        row = row.child(div().flex().flex_col().items_center().child(swatch(("ink", usize::from(value)), [red, green, blue, OPAQUE], INK_SWATCH, None)).child(
+            tab(("ink-value", usize::from(value)), value.to_string(), picked).on_click(cx.listener(move |editor, _, _, cx| {
+                editor.views.cells.ink = value;
+                cx.notify();
+            })),
+        ));
     }
     row
 }

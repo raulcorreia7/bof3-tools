@@ -6,10 +6,7 @@ use std::fmt::Write as _;
 use crate::kind::{Handling, Kind};
 
 /// Keys of each `assets.jsonl` object, in column order.
-pub const COLUMNS: [&str; 15] = [
-    "source", "slot", "offset", "size", "type", "load_arg", "format", "kind", "state", "role", "output", "bytes",
-    "sha256", "evidence", "note",
-];
+pub const COLUMNS: [&str; 15] = ["source", "slot", "offset", "size", "type", "load_arg", "format", "kind", "state", "role", "output", "bytes", "sha256", "evidence", "note"];
 /// Marks a column that does not apply to the row.
 pub const NONE: &str = "-";
 /// The `format` of a file rendered from a `bof3player` catalog item. Such a file is an output of the
@@ -95,20 +92,14 @@ pub struct Report {
 impl Report {
     /// Orders the rows: by source, slot, then output name.
     pub fn sort(&mut self) {
-        self.rows.sort_by(|left, right| {
-            (&left.source, left.slot, &left.output).cmp(&(&right.source, right.slot, &right.output))
-        });
+        self.rows.sort_by(|left, right| (&left.source, left.slot, &left.output).cmp(&(&right.source, right.slot, &right.output)));
     }
 
     /// The `assets.jsonl` text: one JSON object per row, keyed by [`COLUMNS`].
     pub fn jsonl(&self) -> String {
         let mut out = String::new();
         for row in &self.rows {
-            let record: serde_json::Map<String, serde_json::Value> = COLUMNS
-                .iter()
-                .zip(row.cells())
-                .map(|(key, cell)| ((*key).to_string(), serde_json::Value::String(cell)))
-                .collect();
+            let record: serde_json::Map<String, serde_json::Value> = COLUMNS.iter().zip(row.cells()).map(|(key, cell)| ((*key).to_string(), serde_json::Value::String(cell))).collect();
             out.push_str(&serde_json::Value::Object(record).to_string());
             out.push('\n');
         }
@@ -136,48 +127,23 @@ impl Report {
     pub fn summary(&self) -> String {
         let tallies = self.payloads();
         let mut out = String::new();
-        let _ = writeln!(
-            out,
-            "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} handling",
-            "kind", "entries", "bytes", "files", "written", "state"
-        );
+        let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} handling", "kind", "entries", "bytes", "files", "written", "state");
         let mut total = Tally::default();
         for kind in Kind::ALL {
             let Some(tally) = tallies.get(kind) else {
                 continue;
             };
-            let _ = writeln!(
-                out,
-                "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} {}",
-                kind.name(),
-                tally.entries,
-                tally.bytes,
-                tally.files,
-                tally.written,
-                tally.state,
-                kind.handling().label(),
-            );
+            let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} {}", kind.name(), tally.entries, tally.bytes, tally.files, tally.written, tally.state, kind.handling().label(),);
             total.entries += tally.entries;
             total.bytes += tally.bytes;
             total.files += tally.files;
             total.written += tally.written;
         }
-        let _ = writeln!(
-            out,
-            "{:<17} {:>7} {:>13} {:>7} {:>13}",
-            "TOTAL", total.entries, total.bytes, total.files, total.written
-        );
+        let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}", "TOTAL", total.entries, total.bytes, total.files, total.written);
         let coverage = self.coverage(&tallies);
         let _ = writeln!(out, "{coverage}");
         let unknown = self.unknown_entries();
-        let _ = writeln!(
-            out,
-            "classified: {} of {} entries, {} of {} bytes",
-            total.entries.saturating_sub(unknown.total),
-            total.entries,
-            total.bytes.saturating_sub(unknown.bytes),
-            total.bytes
-        );
+        let _ = writeln!(out, "classified: {} of {} entries, {} of {} bytes", total.entries.saturating_sub(unknown.total), total.entries, total.bytes.saturating_sub(unknown.bytes), total.bytes);
         let _ = writeln!(out, "unknown entries: {} ({} bytes), all listed:", unknown.total, unknown.bytes);
         for row in &unknown.rows {
             let _ = writeln!(
@@ -210,24 +176,17 @@ impl Report {
         }
         let parts: Vec<String> = [Handling::Decoded, Handling::Raw, Handling::Nothing]
             .iter()
-            .filter_map(|handling| {
-                by_handling
-                    .get(handling.label())
-                    .map(|(entries, bytes)| format!("{} {entries} entries/{bytes} bytes", handling.label()))
-            })
+            .filter_map(|handling| by_handling.get(handling.label()).map(|(entries, bytes)| format!("{} {entries} entries/{bytes} bytes", handling.label())))
             .collect();
         format!("coverage: {}", parts.join("; "))
     }
 
     /// Every entry no rule classifies, largest first.
     fn unknown_entries(&self) -> Unknown<'_> {
-        let mut rows: Vec<&Row> =
-            self.rows.iter().filter(|row| matches!(row.kind, Kind::Unknown) && row.role == "raw").collect();
+        let mut rows: Vec<&Row> = self.rows.iter().filter(|row| matches!(row.kind, Kind::Unknown) && row.role == "raw").collect();
         let total = rows.len();
         let bytes = rows.iter().map(|row| row.size).sum();
-        rows.sort_by(|left, right| {
-            right.size.cmp(&left.size).then_with(|| (&left.source, left.slot).cmp(&(&right.source, right.slot)))
-        });
+        rows.sort_by(|left, right| right.size.cmp(&left.size).then_with(|| (&left.source, left.slot).cmp(&(&right.source, right.slot))));
         Unknown { total, bytes, rows }
     }
 }

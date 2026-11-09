@@ -70,11 +70,7 @@ impl Canvas {
     }
 
     fn rgba(&self) -> Rgba {
-        let pixels = self
-            .words
-            .iter()
-            .flat_map(|c| [c[0] << 3 | c[0] >> 2, c[1] << 3 | c[1] >> 2, c[2] << 3 | c[2] >> 2, 255])
-            .collect();
+        let pixels = self.words.iter().flat_map(|c| [c[0] << 3 | c[0] >> 2, c[1] << 3 | c[1] >> 2, c[2] << 3 | c[2] >> 2, 255]).collect();
         Rgba { width: self.width as usize, height: self.height as usize, pixels }
     }
 }
@@ -150,13 +146,7 @@ fn draw(font: &Font, canvas: &mut Canvas, glyph: &Glyph, offset: (i32, i32)) {
     for row in 0..CELL_HEIGHT {
         for column in 0..CELL_WIDTH.min(GLYPH_ADVANCE as usize) {
             let word = font.text_word(glyph.color, font.texel(u + column, v + row));
-            canvas.texel(
-                offset.0 + glyph.x + column as i32,
-                offset.1 + glyph.y + row as i32,
-                word,
-                NEUTRAL,
-                Blend::Add,
-            );
+            canvas.texel(offset.0 + glyph.x + column as i32, offset.1 + glyph.y + row as i32, word, NEUTRAL, Blend::Add);
         }
     }
 }

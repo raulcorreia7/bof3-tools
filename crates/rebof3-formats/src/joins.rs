@@ -30,12 +30,7 @@ pub fn joined_rows(source: &str, entries: &[rebof3_emi::Entry], payloads: &[&[u8
 /// own block when it has one; otherwise a resident block may serve it, provided every block at that
 /// arena position agrees on the words. Blocks of `source` itself are ignored here because
 /// [`joined_rows_in`] builds them from `entries`.
-pub fn joined_rows_in(
-    source: &str,
-    entries: &[rebof3_emi::Entry],
-    payloads: &[&[u8]],
-    resident: &[draw::ResidentClutBlock],
-) -> HashMap<usize, Vec<RowUse>> {
+pub fn joined_rows_in(source: &str, entries: &[rebof3_emi::Entry], payloads: &[&[u8]], resident: &[draw::ResidentClutBlock]) -> HashMap<usize, Vec<RowUse>> {
     let mut sheets = Vec::new();
     let mut own = Vec::new();
     let mut bundles = Vec::new();
@@ -72,19 +67,15 @@ fn push_row(rows: &mut HashMap<usize, Vec<RowUse>>, source: &str, join: draw::Jo
         return;
     };
     let texture = join.texture;
-    let repeated = rows.get(&texture).is_some_and(|rows| {
-        rows.iter()
-            .any(|row| row.clut == join.clut && row.depth == join.depth && row.palette_archive == join.palette.archive)
-    });
+    let repeated = rows.get(&texture).is_some_and(|rows| rows.iter().any(|row| row.clut == join.clut && row.depth == join.depth && row.palette_archive == join.palette.archive));
     if repeated {
         return;
     }
     let colors = words.iter().map(|&word| clut::color_rgba(word)).collect();
     let mut evidence = match join.rule {
-        draw::Rule::Site(site) => format!(
-            "{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {:#06x}, sheet slot {}",
-            site.archive, site.overlay, site.function, site.source, site.tpage, site.clut, texture
-        ),
+        draw::Rule::Site(site) => {
+            format!("{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {:#06x}, sheet slot {}", site.archive, site.overlay, site.function, site.source, site.tpage, site.clut, texture)
+        }
         draw::Rule::Terrain { page_x, page_y } => format!(
             "world-map terrain rule (func_80155560): page ({page_x}, {page_y}), depth {}bpp, \
              clut ({}, {}), sheet slot {texture}",

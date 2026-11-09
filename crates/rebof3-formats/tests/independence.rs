@@ -37,10 +37,7 @@ fn sources(source: &Path, format: &str) -> Vec<String> {
     if file.is_file() {
         return vec![fs::read_to_string(file).expect("the format module")];
     }
-    fs::read_dir(source.join(format))
-        .expect("the format folder")
-        .map(|entry| fs::read_to_string(entry.expect("a source file").path()).expect("a readable source"))
-        .collect()
+    fs::read_dir(source.join(format)).expect("the format folder").map(|entry| fs::read_to_string(entry.expect("a source file").path()).expect("a readable source")).collect()
 }
 
 /// Whether `text` names the path `needle`, not a longer name that starts with it (`sprite` and `character_sprites`).

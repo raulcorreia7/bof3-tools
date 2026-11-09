@@ -101,14 +101,7 @@ mod tests {
     }
 
     fn sequence(seq_id: u16) -> Sequence {
-        Sequence {
-            seq_id,
-            resolution: 48,
-            tempo_us: 500_000,
-            time_num: 4,
-            time_den: 2,
-            events: vec![note(0, 0x90), note(24, 0x80), end()],
-        }
+        Sequence { seq_id, resolution: 48, tempo_us: 500_000, time_num: 4, time_den: 2, events: vec![note(0, 0x90), note(24, 0x80), end()] }
     }
 
     fn package() -> Vec<u8> {

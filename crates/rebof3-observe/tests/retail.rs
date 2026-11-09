@@ -26,11 +26,7 @@ fn the_new_game_route_proves_texture_depths_and_rows() {
     let observation = run(&image, &route, &sha, |_| true).expect("the route runs without a halt");
     eprintln!(
         "{} frames in {:.1} s: {} uploads, {} from an entry, {} textured draws",
-        observation.frames,
-        observation.seconds,
-        observation.uploads,
-        observation.attributed_uploads,
-        observation.textured_draws
+        observation.frames, observation.seconds, observation.uploads, observation.attributed_uploads, observation.textured_draws
     );
 
     assert_eq!(observation.files.len(), FILES_READ, "files read: {:#?}", observation.files);

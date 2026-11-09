@@ -87,8 +87,7 @@ fn files_under(directory: &Path) -> Vec<PathBuf> {
 
 /// The files under `root` whose path ends with `suffix`, in path order.
 fn with_suffix(root: &Path, suffix: &str) -> Vec<PathBuf> {
-    let mut found: Vec<PathBuf> =
-        files_under(root).into_iter().filter(|path| path.to_string_lossy().ends_with(suffix)).collect();
+    let mut found: Vec<PathBuf> = files_under(root).into_iter().filter(|path| path.to_string_lossy().ends_with(suffix)).collect();
     found.sort();
     found
 }
@@ -96,9 +95,7 @@ fn with_suffix(root: &Path, suffix: &str) -> Vec<PathBuf> {
 /// The file beside `path` with exactly this file name.
 fn beside(path: &Path, name: &str) -> Option<PathBuf> {
     let directory = path.parent()?;
-    files_under(directory)
-        .into_iter()
-        .find(|other| other.file_name().is_some_and(|file| file.to_string_lossy() == name))
+    files_under(directory).into_iter().find(|other| other.file_name().is_some_and(|file| file.to_string_lossy() == name))
 }
 
 #[test]
@@ -117,10 +114,7 @@ fn the_catalog_hashes_match_the_disc_slices() {
     let mut current: Option<(&str, Option<Vec<u8>>)> = None;
     for row in extracted.report.rows.iter().filter(|row| row.role == "raw" && row.slot.is_some()) {
         if current.as_ref().is_none_or(|(source, _)| *source != row.source) {
-            let bytes = entries
-                .iter()
-                .find(|entry| entry.path.to_string_lossy() == row.source)
-                .map(|entry| disc.read_file(entry).expect("the file reads"));
+            let bytes = entries.iter().find(|entry| entry.path.to_string_lossy() == row.source).map(|entry| disc.read_file(entry).expect("the file reads"));
             current = Some((&row.source, bytes));
         }
         let Some((_, Some(bytes))) = &current else {
@@ -129,13 +123,7 @@ fn the_catalog_hashes_match_the_disc_slices() {
         let start = row.offset as usize;
         let end = start + row.size as usize;
         let slice = bytes.get(start..end).expect("the slice is inside the file");
-        assert_eq!(
-            sha256_hex(slice),
-            row.sha256,
-            "{} slot {:?}: the hash of the disc slice matches the catalog",
-            row.source,
-            row.slot
-        );
+        assert_eq!(sha256_hex(slice), row.sha256, "{} slot {:?}: the hash of the disc slice matches the catalog", row.source, row.slot);
         checked += 1;
     }
     eprintln!("checked {checked} hashes against the disc");
@@ -197,8 +185,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(layout) = beside(&path, &format!("{slot}.layout.json")) else { continue };
         let document = fs::read(layout).unwrap();
-        let same =
-            rebof3_formats::map::layout::import(&document, &payload).map(|back| back == payload).unwrap_or(false);
+        let same = rebof3_formats::map::layout::import(&document, &payload).map(|back| back == payload).unwrap_or(false);
         record("area-map", same);
     }
 
@@ -236,8 +223,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
             continue;
         }
         let payload = fs::read(&path).unwrap();
-        let same =
-            rebof3_formats::scene::SceneTable::decode(&payload).map(|table| table.encode() == payload).unwrap_or(false);
+        let same = rebof3_formats::scene::SceneTable::decode(&payload).map(|table| table.encode() == payload).unwrap_or(false);
         record("area-actor-defs", same);
     }
 
@@ -338,28 +324,20 @@ fn raw_mode_writes_the_disc_bytes_of_every_kind() {
     let roles: BTreeSet<&str> = report.rows.iter().map(|row| row.role).collect();
     assert!(roles.is_subset(&BTreeSet::from(["raw", "vab", "vag", "none"])), "raw mode wrote {roles:?}");
     let listed: BTreeSet<String> = report.rows.iter().filter_map(|row| row.output.clone()).collect();
-    let found: BTreeSet<String> = files_under(&options.out)
-        .iter()
-        .map(|path| path.strip_prefix(&options.out).unwrap().to_string_lossy().replace('\\', "/"))
-        .collect();
+    let found: BTreeSet<String> = files_under(&options.out).iter().map(|path| path.strip_prefix(&options.out).unwrap().to_string_lossy().replace('\\', "/")).collect();
     assert_eq!(found, listed, "the tree holds exactly the files the catalog lists");
 
     let mut disc = Image::open(&image).expect("the disc opens");
     let entries = disc.entries().expect("the file table reads");
     let license = disc.license().expect("the license sectors read");
     let sheet = psx_cd::cue::read(&image).ok();
-    let written =
-        |row: &rebof3_assets::report::Row| fs::read(options.out.join(row.output.as_deref().unwrap())).unwrap();
+    let written = |row: &rebof3_assets::report::Row| fs::read(options.out.join(row.output.as_deref().unwrap())).unwrap();
     let mut current: Option<(String, Vec<u8>)> = None;
     let mut exact: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for row in report.rows.iter().filter(|row| row.role == "raw") {
         let stored: Vec<u8> = if row.kind == Kind::Cdda {
             let sheet = sheet.as_ref().expect("a disc with audio tracks has a cue sheet");
-            let position = sheet
-                .tracks
-                .iter()
-                .position(|track| format!("track{:02}", track.number) == row.source)
-                .expect("the catalog names a track of the sheet");
+            let position = sheet.tracks.iter().position(|track| format!("track{:02}", track.number) == row.source).expect("the catalog names a track of the sheet");
             let (start, end) = psx_cd::cue::audio_track_range(sheet, position).unwrap();
             let bin = fs::read(&sheet.tracks[position].file).unwrap();
             bin[(start * 2352) as usize..(end * 2352) as usize].to_vec()
@@ -367,18 +345,11 @@ fn raw_mode_writes_the_disc_bytes_of_every_kind() {
             license.clone().expect("the image has license sectors")
         } else {
             if current.as_ref().is_none_or(|(source, _)| *source != row.source) {
-                let entry = entries
-                    .iter()
-                    .find(|entry| entry.path.to_string_lossy().replace('\\', "/") == row.source)
-                    .unwrap_or_else(|| panic!("{} is a disc file", row.source));
+                let entry = entries.iter().find(|entry| entry.path.to_string_lossy().replace('\\', "/") == row.source).unwrap_or_else(|| panic!("{} is a disc file", row.source));
                 current = Some((row.source.clone(), disc.read_file(entry).expect("the file reads")));
             }
             let bytes = &current.as_ref().unwrap().1;
-            if row.slot.is_some() {
-                bytes[row.offset as usize..(row.offset + row.size) as usize].to_vec()
-            } else {
-                bytes.clone()
-            }
+            if row.slot.is_some() { bytes[row.offset as usize..(row.offset + row.size) as usize].to_vec() } else { bytes.clone() }
         };
         let counts = exact.entry(row.kind.name()).or_default();
         counts.0 += 1;
@@ -391,18 +362,9 @@ fn raw_mode_writes_the_disc_bytes_of_every_kind() {
         let body_row = report
             .rows
             .iter()
-            .find(|row| {
-                row.role == "raw"
-                    && row.file_type == Some(7)
-                    && row.source == header_row.source
-                    && row.load_arg == header_row.load_arg
-            })
+            .find(|row| row.role == "raw" && row.file_type == Some(7) && row.source == header_row.source && row.load_arg == header_row.load_arg)
             .expect("every VAB header has its body");
-        let whole_row = report
-            .rows
-            .iter()
-            .find(|row| row.role == "vab" && row.source == header_row.source && row.slot == header_row.slot)
-            .expect("every VAB header has its whole bank");
+        let whole_row = report.rows.iter().find(|row| row.role == "vab" && row.source == header_row.source && row.slot == header_row.slot).expect("every VAB header has its whole bank");
         let (header, body) = (written(header_row), written(body_row));
         banks += 1;
         let counts = exact.entry("audio-bank (header followed by body)").or_default();
@@ -420,8 +382,7 @@ fn raw_mode_writes_the_disc_bytes_of_every_kind() {
     for row in report.rows.iter().filter(|row| row.role == "vag") {
         let counts = exact.entry("audio-bank (sample)").or_default();
         counts.0 += 1;
-        counts.1 +=
-            usize::from(samples.get(row.source.as_str()).is_some_and(|set| set.contains(&sha256_hex(&written(row)))));
+        counts.1 += usize::from(samples.get(row.source.as_str()).is_some_and(|set| set.contains(&sha256_hex(&written(row)))));
     }
 
     for (kind, (count, same)) in &exact {

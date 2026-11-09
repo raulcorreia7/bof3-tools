@@ -17,9 +17,7 @@ use rebof3_formats::clut::color_rgba;
 use rebof3_formats::formation::{self, DIRECTIONS, Offsets, Placed};
 use rebof3_formats::scene::SceneTable;
 use rebof3_formats::script::program::Program;
-use rebof3_formats::sprite::{
-    Animation, Bounds, Playback, Player, SpriteSizes, Stage, TICK_MICROS, animation_bounds, compose,
-};
+use rebof3_formats::sprite::{Animation, Bounds, Playback, Player, SpriteSizes, Stage, TICK_MICROS, animation_bounds, compose};
 use rebof3_formats::{Format, classify};
 
 use super::Entry;
@@ -88,10 +86,7 @@ pub fn prepare(editor: &mut Editor) {
         (0..entry.archive.entries().len())
             .find(|&index| {
                 let payload = entry.sibling(index);
-                project
-                    .entries_of(entry.archive)
-                    .get(index)
-                    .is_some_and(|table| table.ram_ptr == load && classify(table, payload) != Format::Reserve)
+                project.entries_of(entry.archive).get(index).is_some_and(|table| table.ram_ptr == load && classify(table, payload) != Format::Reserve)
             })
             .map(|index| entry.sibling(index).to_vec())
     };
@@ -109,8 +104,7 @@ pub fn prepare(editor: &mut Editor) {
 
     let enemies = offsets.and_then(|offsets| {
         let (encounter, direction, record) = (key.3, key.4, key.5);
-        let placed = formation::place(&block, table.as_ref(), encounter, &offsets, direction)
-            .map_err(|error| error.to_string())?;
+        let placed = formation::place(&block, table.as_ref(), encounter, &offsets, direction).map_err(|error| error.to_string())?;
         Ok(placed
             .into_iter()
             .map(|placed| {
@@ -126,11 +120,8 @@ pub fn prepare(editor: &mut Editor) {
 
     let state = &mut editor.views.formation;
     if state.sizes.is_none() {
-        state.sizes = Some(
-            std::fs::read(disc.join(EXECUTABLE))
-                .map_err(|error| format!("{EXECUTABLE}: {error}"))
-                .and_then(|exe| SpriteSizes::from_executable(&exe).map_err(|error| error.to_string())),
-        );
+        state.sizes =
+            Some(std::fs::read(disc.join(EXECUTABLE)).map_err(|error| format!("{EXECUTABLE}: {error}")).and_then(|exe| SpriteSizes::from_executable(&exe).map_err(|error| error.to_string())));
     }
     state.loaded = Some(Rc::new(Loaded { key, enemies, scene: scene.name }));
 }
@@ -141,25 +132,18 @@ pub fn show(editor: &Editor, _entry: &Entry<'_>, cx: &mut Context<Editor>) -> An
 
     let mut encounters = div().flex().flex_wrap().items_center().gap(px(GAP)).child("Encounter");
     for number in 0..rebof3_formats::encounter::ENCOUNTERS {
-        encounters =
-            encounters.child(tab(("encounter", number), number.to_string(), number == state.encounter).on_click(
-                cx.listener(move |editor, _, _, cx| {
-                    editor.views.formation.encounter = number;
-                    editor.views.formation.clock = None;
-                    cx.notify();
-                }),
-            ));
+        encounters = encounters.child(tab(("encounter", number), number.to_string(), number == state.encounter).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.formation.encounter = number;
+            editor.views.formation.clock = None;
+            cx.notify();
+        })));
     }
     encounters = encounters.child(separator(true)).child("Scroll direction");
     for direction in 0..DIRECTIONS {
-        encounters = encounters.child(
-            tab(("direction", usize::from(direction)), direction.to_string(), direction == state.direction).on_click(
-                cx.listener(move |editor, _, _, cx| {
-                    editor.views.formation.direction = direction;
-                    cx.notify();
-                }),
-            ),
-        );
+        encounters = encounters.child(tab(("direction", usize::from(direction)), direction.to_string(), direction == state.direction).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.formation.direction = direction;
+            cx.notify();
+        })));
     }
 
     let playing = state.clock.is_some();
@@ -168,16 +152,14 @@ pub fn show(editor: &Editor, _entry: &Entry<'_>, cx: &mut Context<Editor>) -> An
         .flex_wrap()
         .items_center()
         .gap(px(GAP))
-        .child(button("formation-play", if playing { "Pause" } else { "Play" }, true).on_click(cx.listener(
-            |editor, _, _, cx| {
-                if editor.views.formation.clock.is_some() {
-                    editor.views.formation.clock = None;
-                } else {
-                    play(editor, cx);
-                }
-                cx.notify();
-            },
-        )))
+        .child(button("formation-play", if playing { "Pause" } else { "Play" }, true).on_click(cx.listener(|editor, _, _, cx| {
+            if editor.views.formation.clock.is_some() {
+                editor.views.formation.clock = None;
+            } else {
+                play(editor, cx);
+            }
+            cx.notify();
+        })))
         .child(separator(true))
         .child("Script entry")
         .child(button("record-down", "−", state.record > 0).on_click(cx.listener(|editor, _, _, cx| {
@@ -234,13 +216,8 @@ fn formation_view(enemies: &[Shown], sizes: &SpriteSizes, mirror: bool, scene: &
     let mut boxes = Vec::new();
     for shown in enemies {
         let (x, y) = place(shown);
-        let bounds = shown
-            .sprite
-            .as_ref()
-            .and_then(|(_, animation)| animation_bounds(animation, sizes, mirror))
-            .unwrap_or(Bounds { left: -1, top: -1, right: 1, bottom: 1 });
-        let moved =
-            Bounds { left: bounds.left + x, top: bounds.top + y, right: bounds.right + x, bottom: bounds.bottom + y };
+        let bounds = shown.sprite.as_ref().and_then(|(_, animation)| animation_bounds(animation, sizes, mirror)).unwrap_or(Bounds { left: -1, top: -1, right: 1, bottom: 1 });
+        let moved = Bounds { left: bounds.left + x, top: bounds.top + y, right: bounds.right + x, bottom: bounds.bottom + y };
         total = total.union(moved);
         boxes.push((bounds, moved));
     }
@@ -260,11 +237,7 @@ fn formation_view(enemies: &[Shown], sizes: &SpriteSizes, mirror: bool, scene: &
             f64::from(placed.y) / f64::from(1 << CELL_SHIFT)
         );
         let (Some((stage, animation)), Some(player)) = (&shown.sprite, shown.player) else {
-            let why = if placed.scene.is_none() {
-                "the area has no scene record with this id"
-            } else {
-                "the script entry is not a stream"
-            };
+            let why = if placed.scene.is_none() { "the area has no scene record with this id" } else { "the script entry is not a stream" };
             lines.push(format!("{name}: not drawn, {why}"));
             continue;
         };
@@ -278,18 +251,11 @@ fn formation_view(enemies: &[Shown], sizes: &SpriteSizes, mirror: bool, scene: &
                 *slot = color_rgba(pixel.texel.word);
             }
         }
-        let record = placed.scene.as_ref().map(|record| {
-            format!(
-                "page {} row {} CLUT selector {:#04X} kind {} section {}",
-                record.texture_page, record.texture_v, record.clut_select, record.texture_mode, record.script_section
-            )
-        });
-        lines.push(format!(
-            "{name}: frame {} of {}, {}",
-            player.frame(),
-            animation.frames.len(),
-            record.unwrap_or_default()
-        ));
+        let record = placed
+            .scene
+            .as_ref()
+            .map(|record| format!("page {} row {} CLUT selector {:#04X} kind {} section {}", record.texture_page, record.texture_v, record.clut_select, record.texture_mode, record.script_section));
+        lines.push(format!("{name}: frame {} of {}, {}", player.frame(), animation.frames.len(), record.unwrap_or_default()));
     }
 
     let origin = (-total.left, -total.top);
@@ -299,14 +265,8 @@ fn formation_view(enemies: &[Shown], sizes: &SpriteSizes, mirror: bool, scene: &
             paint_pixels(window, area, &pixels, width, ZOOM);
             let centre = point(area.origin.x + px(origin.0 as f32 * ZOOM), area.origin.y + px(origin.1 as f32 * ZOOM));
             let (arm, thin) = (px(CROSS), px(LINE));
-            window.paint_quad(fill(
-                gpui::Bounds::new(point(centre.x - arm, centre.y), size(arm * 2.0, thin)),
-                rgba(ORIGIN_LINE),
-            ));
-            window.paint_quad(fill(
-                gpui::Bounds::new(point(centre.x, centre.y - arm), size(thin, arm * 2.0)),
-                rgba(ORIGIN_LINE),
-            ));
+            window.paint_quad(fill(gpui::Bounds::new(point(centre.x - arm, centre.y), size(arm * 2.0, thin)), rgba(ORIGIN_LINE)));
+            window.paint_quad(fill(gpui::Bounds::new(point(centre.x, centre.y - arm), size(thin, arm * 2.0)), rgba(ORIGIN_LINE)));
         },
     )
     .w(px(width as f32 * ZOOM))
@@ -317,12 +277,7 @@ fn formation_view(enemies: &[Shown], sizes: &SpriteSizes, mirror: bool, scene: &
     for line in lines {
         list = list.child(mono(line));
     }
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(GAP))
-        .child(div().flex_none().p(px(GAP_SMALL)).bg(color(BACKGROUND)).child(picture))
-        .child(list)
+    div().flex().flex_col().gap(px(GAP)).child(div().flex_none().p(px(GAP_SMALL)).bg(color(BACKGROUND)).child(picture)).child(list)
 }
 
 /// Starts the shared clock: every enemy steps its stream once a tick.
@@ -399,13 +354,7 @@ mod tests {
         let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc), Some(project), cx));
         editor.update(cx, |editor, _| {
             editor.select_archive(&ArchivePath("BIN/WORLD00/AREA003.EMI".into()));
-            let index = editor
-                .archive
-                .as_ref()
-                .expect("the area loads")
-                .formats
-                .iter()
-                .position(|format| *format == Format::AreaEncounterTable);
+            let index = editor.archive.as_ref().expect("the area loads").formats.iter().position(|format| *format == Format::AreaEncounterTable);
             editor.select_entry(index.expect("the area has an encounter block"));
             editor.tab = Tab::Formation;
             editor.views.formation.encounter = 2;

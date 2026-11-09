@@ -26,9 +26,7 @@ impl fmt::Display for Error {
             Self::Disc(error) => write!(f, "{error}"),
             Self::Formats(error) => write!(f, "{error}"),
             Self::Bank(error) => write!(f, "{error}"),
-            Self::Usage(message) | Self::Text(message) | Self::Audio(message) | Self::Import(message) => {
-                f.write_str(message)
-            }
+            Self::Usage(message) | Self::Text(message) | Self::Audio(message) | Self::Import(message) => f.write_str(message),
         }
     }
 }

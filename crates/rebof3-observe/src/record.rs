@@ -213,15 +213,7 @@ impl Recorder {
     }
 
     /// Counts one draw of `entry`, and returns the index of its use.
-    fn count(
-        &mut self,
-        entry: EntryRef,
-        depth: Option<Depth>,
-        clut: Clut,
-        area: [u16; 4],
-        frame: u64,
-        opcode: u8,
-    ) -> usize {
+    fn count(&mut self, entry: EntryRef, depth: Option<Depth>, clut: Clut, area: [u16; 4], frame: u64, opcode: u8) -> usize {
         let clut = depth.map(|_| clut);
         let words = match (depth, clut) {
             (Some(depth), Some(clut)) => self.row(clut, depth),
@@ -231,17 +223,7 @@ impl Recorder {
         let at = match self.by_use.get(&key) {
             Some(&at) => at,
             None => {
-                self.uses.push(Use {
-                    entry,
-                    depth,
-                    clut,
-                    words: words.clone(),
-                    palette: None,
-                    frame,
-                    opcode,
-                    draws: 0,
-                    area,
-                });
+                self.uses.push(Use { entry, depth, clut, words: words.clone(), palette: None, frame, opcode, draws: 0, area });
                 self.by_use.insert(key, self.uses.len() - 1);
                 self.uses.len() - 1
             }
@@ -255,12 +237,7 @@ impl Recorder {
         }
         let used = &mut self.uses[at];
         used.draws += 1;
-        used.area = [
-            used.area[0].min(area[0]),
-            used.area[1].min(area[1]),
-            used.area[2].max(area[2]),
-            used.area[3].max(area[3]),
-        ];
+        used.area = [used.area[0].min(area[0]), used.area[1].min(area[1]), used.area[2].max(area[2]), used.area[3].max(area[3])];
         at
     }
 
@@ -297,11 +274,7 @@ fn uv_bounds(draw: &Draw, window: TextureWindow) -> Option<([u16; 2], [u16; 2])>
         Shape::Rect { width, height } => {
             let span = |start: u8, length: u16, flipped: bool| -> [u16; 2] {
                 let start = u16::from(start);
-                if flipped {
-                    [start.saturating_sub(length.saturating_sub(1)), start + 1]
-                } else {
-                    [start, (start + length).min(256)]
-                }
+                if flipped { [start.saturating_sub(length.saturating_sub(1)), start + 1] } else { [start, (start + length).min(256)] }
             };
             let texture = draw.texture?;
             (span(first.u, width, texture.flip_x), span(first.v, height, texture.flip_y))

@@ -113,19 +113,12 @@ pub fn pack(output: impl AsRef<Path>, inputs: &[PackEntry], archive_version: u32
     table_end(inputs.len())?;
     let mut slots = Vec::with_capacity(inputs.len());
     for input in inputs {
-        let size = u32::try_from(fs::metadata(&input.path)?.len())
-            .map_err(|_| Error::InvalidArchive("entry exceeds 4 GiB"))?;
+        let size = u32::try_from(fs::metadata(&input.path)?.len()).map_err(|_| Error::InvalidArchive("entry exceeds 4 GiB"))?;
         let mut file = File::open(&input.path)?;
         let mut head = [0; 4];
         let count = file.read(&mut head)?;
         file.rewind()?;
-        slots.push(Slot {
-            file_type: input.file_type,
-            ram_ptr: input.ram_ptr,
-            size,
-            first4: first_word(&head[..count]),
-            source: file,
-        });
+        slots.push(Slot { file_type: input.file_type, ram_ptr: input.ram_ptr, size, first4: first_word(&head[..count]), source: file });
     }
     ensure_parent(output.as_ref())?;
     let mut out = BufWriter::new(File::create(output.as_ref())?);
@@ -185,11 +178,7 @@ pub fn pack_manifest(output: impl AsRef<Path>, manifest_path: impl AsRef<Path>) 
 }
 
 /// Packs the entries `manifest_path` names, resolved against `folder`.
-pub fn pack_manifest_from(
-    output: impl AsRef<Path>,
-    folder: impl AsRef<Path>,
-    manifest_path: impl AsRef<Path>,
-) -> Result<()> {
+pub fn pack_manifest_from(output: impl AsRef<Path>, folder: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<()> {
     let (inputs, archive_version) = manifest_entries(folder, manifest_path)?;
     pack(output, &inputs, archive_version)
 }
@@ -204,20 +193,14 @@ pub fn pack_folder(output: impl AsRef<Path>, folder: impl AsRef<Path>, options: 
         }
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if !options.include_patterns.is_empty()
-            && !options.include_patterns.iter().any(|pattern| glob_match(pattern, &name))
-        {
+        if !options.include_patterns.is_empty() && !options.include_patterns.iter().any(|pattern| glob_match(pattern, &name)) {
             continue;
         }
         if options.exclude_patterns.iter().any(|pattern| glob_match(pattern, &name)) {
             continue;
         }
         let guessed = guess_type(entry.path());
-        inputs.push(PackEntry {
-            path: entry.path(),
-            file_type: guessed.or(options.default_type).unwrap_or(UNKNOWN_TYPE),
-            ram_ptr: 0,
-        });
+        inputs.push(PackEntry { path: entry.path(), file_type: guessed.or(options.default_type).unwrap_or(UNKNOWN_TYPE), ram_ptr: 0 });
     }
     inputs.sort_by(|left, right| left.path.cmp(&right.path));
     pack(output, &inputs, 0)

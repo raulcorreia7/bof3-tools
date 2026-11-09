@@ -15,10 +15,7 @@ use std::ops::RangeInclusive;
 use rebof3_emi::Entry;
 
 use crate::vram::RowUse;
-use crate::{
-    cells, character_sprites, clut, cue, encounter, map, message, residue, resources, scene, script, sep, vab, vram,
-    window,
-};
+use crate::{cells, character_sprites, clut, cue, encounter, map, message, residue, resources, scene, script, sep, vab, vram, window};
 
 /// The entry type of a code or data image: the load address picks the format.
 pub const TYPE_DATA: u16 = 0;
@@ -312,10 +309,7 @@ pub fn classify(entry: &Entry, payload: &[u8]) -> Format {
     if entry.file_type == TYPE_DATA && payload.iter().all(|byte| *byte == 0) {
         return Format::Reserve;
     }
-    REGISTRY
-        .iter()
-        .find(|description| description.selector.matches(entry))
-        .map_or(Format::Unclassified, |description| description.format)
+    REGISTRY.iter().find(|description| description.selector.matches(entry)).map_or(Format::Unclassified, |description| description.format)
 }
 
 #[cfg(test)]

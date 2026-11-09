@@ -6,9 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{
-    Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, PromptLevel, UniformListScrollHandle, Window,
-};
+use gpui::{Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, PromptLevel, UniformListScrollHandle, Window};
 
 use crate::catalog::{self, Catalog, Mode};
 use crate::edit::{LineEdit, Outcome};
@@ -78,8 +76,7 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(disc: Option<PathBuf>, folder: Option<PathBuf>, cx: &mut Context<Self>) -> Self {
-        let folder =
-            folder.or_else(|| disc.as_ref().and_then(|disc| disc.parent()).map(|parent| parent.join(PROJECT_FOLDER)));
+        let folder = folder.or_else(|| disc.as_ref().and_then(|disc| disc.parent()).map(|parent| parent.join(PROJECT_FOLDER)));
         let mut editor = Self {
             project: None,
             disc_field: disc.as_ref().map(|path| path.display().to_string()).unwrap_or_default(),
@@ -124,12 +121,7 @@ impl Editor {
     pub fn open(&mut self) {
         match Project::open(self.disc_field.trim().as_ref(), self.folder_field.trim().as_ref()) {
             Ok(mut project) => {
-                self.status = format!(
-                    "{} archives, {} saved edits. Disc files are read only; edits go to {}.",
-                    project.archives.len(),
-                    project.edit_count(),
-                    project.folder.display()
-                );
+                self.status = format!("{} archives, {} saved edits. Disc files are read only; edits go to {}.", project.archives.len(), project.edit_count(), project.folder.display());
                 // The tables' reference columns read item and ability names from the game tables.
                 let _ = project.load(&ArchivePath(schema::GAME.into()));
                 self.mode = Mode::read(&project.folder);
@@ -196,8 +188,7 @@ impl Editor {
 
     /// Replaces the payload of the shown entry; undo, save and export see the change.
     pub fn set_payload(&mut self, bytes: Vec<u8>) {
-        if let (Some(project), Some(archive), Some(index)) =
-            (self.project.as_mut(), self.archive.as_deref(), self.entry)
+        if let (Some(project), Some(archive), Some(index)) = (self.project.as_mut(), self.archive.as_deref(), self.entry)
             && project.payload(archive, index) != bytes.as_slice()
         {
             project.set(archive, index, bytes);
@@ -206,23 +197,13 @@ impl Editor {
 
     /// Rewrites the payload of entry `index` of `archive` with `rewrite`. A prompt names the entry before it
     /// opens, so the change lands there even when the selection moved meanwhile.
-    pub fn rewrite_entry(
-        &mut self,
-        archive: &ArchivePath,
-        index: usize,
-        rewrite: impl FnOnce(&[u8]) -> Result<Vec<u8>, String>,
-    ) -> Result<(), String> {
+    pub fn rewrite_entry(&mut self, archive: &ArchivePath, index: usize, rewrite: impl FnOnce(&[u8]) -> Result<Vec<u8>, String>) -> Result<(), String> {
         self.rewrite_entries(archive, &[index], |payloads| Ok(vec![rewrite(payloads[0])?]))
     }
 
     /// Rewrites the payloads of entries `indices` of `archive` with `rewrite`, as one undo step. `rewrite`
     /// gets the payloads in the order of `indices` and returns the new ones in the same order.
-    pub fn rewrite_entries(
-        &mut self,
-        archive: &ArchivePath,
-        indices: &[usize],
-        rewrite: impl FnOnce(Vec<&[u8]>) -> Result<Vec<Vec<u8>>, String>,
-    ) -> Result<(), String> {
+    pub fn rewrite_entries(&mut self, archive: &ArchivePath, indices: &[usize], rewrite: impl FnOnce(Vec<&[u8]>) -> Result<Vec<Vec<u8>>, String>) -> Result<(), String> {
         let project = self.project.as_mut().ok_or("no project is open")?;
         let loaded = project.load(archive)?;
         let payloads = indices.iter().map(|&index| project.payload(&loaded, index)).collect();
@@ -280,23 +261,12 @@ impl Editor {
 
     /// Runs `then` when no edit would be lost: at once when every edit is saved, otherwise after the user
     /// saves or discards them. Cancel, or a save that fails, leaves everything as it was.
-    pub fn when_saved(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-        then: fn(&mut Self, &mut Window, &mut Context<Self>),
-    ) {
+    pub fn when_saved(&mut self, window: &mut Window, cx: &mut Context<Self>, then: fn(&mut Self, &mut Window, &mut Context<Self>)) {
         if !self.has_unsaved_edits() {
             then(self, window, cx);
             return;
         }
-        let answer = window.prompt(
-            PromptLevel::Warning,
-            "Save the edits before closing?",
-            Some("Discard drops every edit made since the last save."),
-            &UNSAVED_ANSWERS,
-            cx,
-        );
+        let answer = window.prompt(PromptLevel::Warning, "Save the edits before closing?", Some("Discard drops every edit made since the last save."), &UNSAVED_ANSWERS, cx);
         cx.spawn_in(window, async move |this, cx| {
             let Ok(answer) = answer.await else { return };
             let _ = this.update_in(cx, |editor, window, cx| {
@@ -340,11 +310,7 @@ impl Editor {
         if let Some(project) = self.project.as_mut() {
             self.status = match project.export() {
                 Ok(files) if files.is_empty() => "Nothing to export: no entry is edited.".into(),
-                Ok(files) => format!(
-                    "Rebuilt and verified {} archives in {}",
-                    files.len(),
-                    project.folder.join("disc").display()
-                ),
+                Ok(files) => format!("Rebuilt and verified {} archives in {}", files.len(), project.folder.join("disc").display()),
                 Err(error) => format!("Export failed: {error}"),
             };
         }
@@ -431,12 +397,7 @@ impl Editor {
             Field::Disc => "Extracted disc folder",
             _ => "Project folder for edits",
         };
-        let picked = cx.prompt_for_paths(PathPromptOptions {
-            files: false,
-            directories: true,
-            multiple: false,
-            prompt: Some(prompt.into()),
-        });
+        let picked = cx.prompt_for_paths(PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some(prompt.into()) });
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = picked.await else { return };
             let Some(folder) = paths.into_iter().next() else { return };
@@ -484,18 +445,8 @@ impl Editor {
 
     /// Asks for a file and hands its bytes to `then`. The status line shows what `then` returns, or why the
     /// file cannot be read.
-    pub fn open_file(
-        &mut self,
-        prompt: &'static str,
-        cx: &mut Context<Self>,
-        then: impl FnOnce(&mut Self, Vec<u8>) -> String + 'static,
-    ) {
-        let picked = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some(prompt.into()),
-        });
+    pub fn open_file(&mut self, prompt: &'static str, cx: &mut Context<Self>, then: impl FnOnce(&mut Self, Vec<u8>) -> String + 'static) {
+        let picked = cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: false, prompt: Some(prompt.into()) });
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = picked.await else { return };
             let Some(path) = paths.into_iter().next() else { return };

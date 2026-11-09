@@ -62,8 +62,7 @@ fn png(image: &Rgba) -> (Arc<Image>, (usize, usize)) {
 fn load_font(project: &mut Project) -> Result<Font, String> {
     let loaded = project.load(&ArchivePath(FONT_ARCHIVE.into()))?;
     let payload = |index: usize| project.payload(&loaded, index).to_vec();
-    Font::new(&payload(SHEET), project.load_arg(&loaded, SHEET), &payload(TEXT_PALETTE), &payload(FRAME_PALETTE))
-        .ok_or_else(|| "the font sheet in FIRST.EMI does not decode".to_string())
+    Font::new(&payload(SHEET), project.load_arg(&loaded, SHEET), &payload(TEXT_PALETTE), &payload(FRAME_PALETTE)).ok_or_else(|| "the font sheet in FIRST.EMI does not decode".to_string())
 }
 
 /// Loads the font once and builds the preview of the selected message and page when either changed.
@@ -120,15 +119,11 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             continue;
         }
         let head: String = text.chars().take(ROW_GLYPHS).collect();
-        list = list.child(
-            selectable(("compose-message", index), index == selected)
-                .child(mono(format!("{index:3} {head}")).whitespace_nowrap())
-                .on_click(cx.listener(move |editor, _, _, cx| {
-                    editor.views.compose.selected = index;
-                    editor.views.compose.page = 0;
-                    cx.notify();
-                })),
-        );
+        list = list.child(selectable(("compose-message", index), index == selected).child(mono(format!("{index:3} {head}")).whitespace_nowrap()).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.compose.selected = index;
+            editor.views.compose.page = 0;
+            cx.notify();
+        })));
     }
 
     let Some(shown) = state.shown.as_ref().filter(|shown| shown.key.3 == selected) else {
@@ -136,8 +131,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     };
     let pages = shown.layout.pages.len();
     let page = state.page.min(pages - 1);
-    let text =
-        parsed.messages.get(selected).map(|message| codec::decode(Encoding::Message, message)).unwrap_or_default();
+    let text = parsed.messages.get(selected).map(|message| codec::decode(Encoding::Message, message)).unwrap_or_default();
     let used = payload.len();
 
     let step = |id: &'static str, label: &'static str, enabled: bool, next: bool, cx: &mut Context<Editor>| {
@@ -156,32 +150,21 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             .child(strong(format!("Message {selected}, page {} of {pages}", page + 1)))
             .child(step("compose-prev", "Previous", page > 0, false, cx))
             .child(step("compose-next", "Next", page + 1 < pages, true, cx))
-            .child(muted(format!(
-                "table {used} of {} bytes{}",
-                table::LIMIT,
-                shown.layout.placement.operand.map_or(String::new(), |operand| format!(", window {operand:02X}"))
-            ))),
+            .child(muted(format!("table {used} of {} bytes{}", table::LIMIT, shown.layout.placement.operand.map_or(String::new(), |operand| format!(", window {operand:02X}"))))),
     );
     if let Some(window) = &shown.window {
         let (w, h) = shown.window_size;
-        preview = preview
-            .child(img(Arc::clone(window)).w(px(w as f32 * SCALE)).h(px(h as f32 * SCALE)).object_fit(ObjectFit::Fill));
+        preview = preview.child(img(Arc::clone(window)).w(px(w as f32 * SCALE)).h(px(h as f32 * SCALE)).object_fit(ObjectFit::Fill));
     }
     if let Some((answers, (w, h))) = &shown.answers {
-        preview = preview.child(muted("Answers")).child(
-            img(Arc::clone(answers)).w(px(*w as f32 * SCALE)).h(px(*h as f32 * SCALE)).object_fit(ObjectFit::Fill),
-        );
+        preview = preview.child(muted("Answers")).child(img(Arc::clone(answers)).w(px(*w as f32 * SCALE)).h(px(*h as f32 * SCALE)).object_fit(ObjectFit::Fill));
     }
     let field = input(editor, ("compose-text", selected), Field::Message(selected), &text, "", None, cx);
     preview = preview.child(field);
     for problem in shown.problems.iter().filter(|problem| problem.page == page) {
         preview = preview.child(div().text_color(color(EDITED)).child(problem.text.clone()));
     }
-    preview = preview.child(
-        div().text_color(color(MUTED)).child(
-            "Portraits are not drawn: no message code selects a face sheet in the game's text code; {BOX} picks the window's place only.",
-        ),
-    );
+    preview = preview.child(div().text_color(color(MUTED)).child("Portraits are not drawn: no message code selects a face sheet in the game's text code; {BOX} picks the window's place only."));
     div().flex().gap(px(GAP)).child(list).child(preview).into_any_element()
 }
 

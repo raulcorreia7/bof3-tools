@@ -95,14 +95,8 @@ impl SpriteSizes {
         if exe.get(..EXE_MAGIC.len()) != Some(&EXE_MAGIC[..]) {
             return Err(not_exe("it is not a PS-X EXE"));
         }
-        let text = exe
-            .get(EXE_TEXT_ADDRESS..EXE_TEXT_ADDRESS + 4)
-            .map(|word| u32::from_le_bytes([word[0], word[1], word[2], word[3]]))
-            .ok_or_else(|| not_exe("its header is short"))?;
-        let offset = SPRITE_SIZES
-            .checked_sub(text)
-            .map(|offset| EXE_TEXT_START + offset as usize)
-            .ok_or_else(|| not_exe("its text starts after the table"))?;
+        let text = exe.get(EXE_TEXT_ADDRESS..EXE_TEXT_ADDRESS + 4).map(|word| u32::from_le_bytes([word[0], word[1], word[2], word[3]])).ok_or_else(|| not_exe("its header is short"))?;
+        let offset = SPRITE_SIZES.checked_sub(text).map(|offset| EXE_TEXT_START + offset as usize).ok_or_else(|| not_exe("its text starts after the table"))?;
         let bytes = exe.get(offset..offset + 2 * SHAPES).ok_or_else(|| not_exe("its text ends before the table"))?;
         let mut rows = [[0; 2]; SHAPES];
         for (row, pair) in rows.iter_mut().zip(bytes.as_chunks::<2>().0) {
@@ -157,11 +151,7 @@ impl Placement {
 
     /// Where `Actor_SelectScriptBank` queues the sheet: VRAM word column and row.
     pub fn sheet_origin(&self) -> (usize, usize) {
-        let (page, row) = if self.page > PAGES_PER_ROW {
-            (self.page - PAGES_PER_ROW, u16::from(self.row) + LOWER_HALF_ROW)
-        } else {
-            (self.page, u16::from(self.row))
-        };
+        let (page, row) = if self.page > PAGES_PER_ROW { (self.page - PAGES_PER_ROW, u16::from(self.row) + LOWER_HALF_ROW) } else { (self.page, u16::from(self.row)) };
         (usize::from(page) << PAGE_WORDS_SHIFT, usize::from(row))
     }
 
@@ -216,9 +206,7 @@ impl Reader {
     pub fn of(path: &str) -> Self {
         let name = path.rsplit('/').next().unwrap_or(path);
         let stem = name.split_once('.').map_or(name, |(stem, _)| stem);
-        let numbered = |prefix: &str| {
-            stem.strip_prefix(prefix).is_some_and(|rest| rest.starts_with(|first: char| first.is_ascii_digit()))
-        };
+        let numbered = |prefix: &str| stem.strip_prefix(prefix).is_some_and(|rest| rest.starts_with(|first: char| first.is_ascii_digit()));
         if numbered(PARTY_FIELD) {
             Reader::Field
         } else if numbered(PARTY_BATTLE_DOWN) || numbered(PARTY_BATTLE_UP) {
@@ -289,14 +277,7 @@ impl Stage {
 
         let sheet_writer = Writer::Named(format!("sprite frame sheet {sheet}"));
         let (x, y) = placement.sheet_origin();
-        vram.load_image(
-            x,
-            y,
-            usize::from(image.width),
-            usize::from(image.height),
-            &image.words(),
-            sheet_writer.clone(),
-        );
+        vram.load_image(x, y, usize::from(image.width), usize::from(image.height), &image.words(), sheet_writer.clone());
         Self { vram, placement, staged: Some((sheet_writer, palette_writer)) }
     }
 
@@ -322,9 +303,7 @@ impl Stage {
         let clut = self.placement.clut();
         let (clut_x, clut_y) = (usize::from(clut.x) + usize::from(index), usize::from(clut.y));
         let (in_sheet, in_palette) = match &self.staged {
-            Some((sheet, palette)) => {
-                (self.vram.writer(column, row) == Some(sheet), self.vram.writer(clut_x, clut_y) == Some(palette))
-            }
+            Some((sheet, palette)) => (self.vram.writer(column, row) == Some(sheet), self.vram.writer(clut_x, clut_y) == Some(palette)),
             None => (self.vram.kind(column, row) == Some(Kind::Upload), self.vram.writer(clut_x, clut_y).is_some()),
         };
         Texel { index, word: self.vram.word(clut_x, clut_y), in_sheet, in_palette }
@@ -351,12 +330,7 @@ impl Bounds {
 
     /// The smallest rectangle around both.
     pub fn union(self, other: Self) -> Self {
-        Self {
-            left: self.left.min(other.left),
-            top: self.top.min(other.top),
-            right: self.right.max(other.right),
-            bottom: self.bottom.max(other.bottom),
-        }
+        Self { left: self.left.min(other.left), top: self.top.min(other.top), right: self.right.max(other.right), bottom: self.bottom.max(other.bottom) }
     }
 }
 
@@ -560,11 +534,7 @@ mod tests {
         let mut vram = Vram::new();
         // Page 7 is VRAM column 448; texel u 5 is the second nibble of word 1.
         let sheet: Vec<u8> = vec![0x21; 2048];
-        vram.load(
-            "BIN/WORLD00/AREA003.EMI",
-            &[rebof3_emi::Entry { size: 2048, offset: 0, ram_ptr: (14 << 24) | (1 << 8), first4: 0, file_type: 3 }],
-            &[&sheet],
-        );
+        vram.load("BIN/WORLD00/AREA003.EMI", &[rebof3_emi::Entry { size: 2048, offset: 0, ram_ptr: (14 << 24) | (1 << 8), first4: 0, file_type: 3 }], &[&sheet]);
         let stage = Stage::resident(vram, Placement::scene(7, 0, 0, KIND_CELL, 0));
         let texel = stage.texel(5, 3);
         assert_eq!(texel.index, 2);

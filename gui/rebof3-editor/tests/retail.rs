@@ -74,10 +74,7 @@ fn every_entry_round_trips_through_its_editor() {
 
             if loaded.formats[index] == Format::VramUpload {
                 textures.0 += 1;
-                let exact = texture_words(load_arg, payload)
-                    .ok()
-                    .and_then(|words| vram::payload_from_grid(words.width, words.height, &words.words).ok())
-                    .is_some_and(|bytes| bytes == payload);
+                let exact = texture_words(load_arg, payload).ok().and_then(|words| vram::payload_from_grid(words.width, words.height, &words.words).ok()).is_some_and(|bytes| bytes == payload);
                 if !exact {
                     textures.1.push(format!("{}#{index}", path.0));
                 }
@@ -93,8 +90,7 @@ fn every_entry_round_trips_through_its_editor() {
             let found = discover::table_records(payload).unwrap_or_else(|| discover::strings(payload, Some(load_arg)));
             for string in found {
                 strings.0 += 1;
-                let encoding =
-                    if matches!(string.kind, Kind::Field { .. }) { Encoding::Name } else { Encoding::Message };
+                let encoding = if matches!(string.kind, Kind::Field { .. }) { Encoding::Name } else { Encoding::Message };
                 let raw = &payload[string.start..string.end];
                 let text = codec::decode(encoding, raw);
                 if codec::encode(encoding, &text).ok().as_deref() != Some(raw) {
@@ -105,12 +101,7 @@ fn every_entry_round_trips_through_its_editor() {
     }
 
     eprintln!("textures: {} of {} do not round-trip", textures.1.len(), textures.0);
-    eprintln!(
-        "strings: {} of {} do not round-trip; first: {:?}",
-        strings.1.len(),
-        strings.0,
-        strings.1.iter().take(8).collect::<Vec<_>>()
-    );
+    eprintln!("strings: {} of {} do not round-trip; first: {:?}", strings.1.len(), strings.0, strings.1.iter().take(8).collect::<Vec<_>>());
     eprintln!("maps: {} of {} do not round-trip", maps.1.len(), maps.0);
     assert!(maps.1.is_empty(), "maps: {:?}", maps.1.iter().take(8).collect::<Vec<_>>());
     assert!(textures.1.is_empty(), "textures: {:?}", textures.1.iter().take(8).collect::<Vec<_>>());
@@ -140,8 +131,7 @@ fn every_sheet_fits_its_entries_and_rewrites_their_bytes() {
                     let record = &mut copy[sheet.range(row)];
                     for column in &sheet.columns {
                         if let Field::Name(_) = column.field {
-                            let bytes = schema::name_bytes(&schema::name_text(record, column), column)
-                                .expect("a stored name encodes again");
+                            let bytes = schema::name_bytes(&schema::name_text(record, column), column).expect("a stored name encodes again");
                             record[column.offset..column.offset + bytes.len()].copy_from_slice(&bytes);
                         } else {
                             let value = schema::read(record, column);
@@ -175,8 +165,7 @@ fn sequences_play_from_the_project_archive() {
         let Some(sequence) = package.sequences.iter().find(|sequence| sequence.has_notes()) else { continue };
 
         let archive = project.current_archive(&loaded).expect("archive bytes");
-        let pcm = rebof3_assets::sound::sequence_pcm(&path.0, &archive, u32::from(sequence.seq_id), 2.0)
-            .unwrap_or_else(|error| panic!("{}: {error}", path.0));
+        let pcm = rebof3_assets::sound::sequence_pcm(&path.0, &archive, u32::from(sequence.seq_id), 2.0).unwrap_or_else(|error| panic!("{}: {error}", path.0));
         played += 1;
         if pcm.samples.iter().all(|&sample| sample == 0) {
             silent.push(path.0.clone());
@@ -221,8 +210,7 @@ fn samples_and_tones_play_through_the_spu() {
             let note = tone.center_note.clamp(tone.min_note, tone.max_note);
             match note_pcm(header_bytes, body_bytes, &Note { keys, note, hold: 0.25 }) {
                 Ok(pcm) if pcm.channels == 2 && pcm.sample_rate == psx_formats::VAB_SAMPLE_RATE => tones += 1,
-                Ok(pcm) => problems
-                    .push(format!("bank {header} tone {keys:?}: {} Hz, {} channels", pcm.sample_rate, pcm.channels)),
+                Ok(pcm) => problems.push(format!("bank {header} tone {keys:?}: {} Hz, {} channels", pcm.sample_rate, pcm.channels)),
                 Err(error) => problems.push(format!("bank {header} tone {keys:?}: {error}")),
             }
         }

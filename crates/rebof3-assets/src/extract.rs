@@ -207,8 +207,7 @@ impl Read for DiscRange<'_> {
         if want == 0 {
             return Ok(0);
         }
-        let read =
-            self.image.read_entry_range(self.entry, self.position, &mut out[..want]).map_err(std::io::Error::other)?;
+        let read = self.image.read_entry_range(self.entry, self.position, &mut out[..want]).map_err(std::io::Error::other)?;
         self.position += read as u64;
         Ok(read)
     }
@@ -263,10 +262,7 @@ fn file_kinds(source: &str) -> &'static [Kind] {
 
 /// Whether an XA stream opens with MDEC frames rather than audio only.
 fn is_movie(bytes: &[u8]) -> bool {
-    bytes
-        .chunks(psx_cd::XA_SECTOR_SIZE)
-        .take(STR_PROBE_SECTORS)
-        .any(|sector| sector.get(STR_MAGIC_OFFSET..STR_MAGIC_OFFSET + STR_MAGIC.len()) == Some(&STR_MAGIC))
+    bytes.chunks(psx_cd::XA_SECTOR_SIZE).take(STR_PROBE_SECTORS).any(|sector| sector.get(STR_MAGIC_OFFSET..STR_MAGIC_OFFSET + STR_MAGIC.len()) == Some(&STR_MAGIC))
 }
 
 fn process(job: &Job, options: &Options, report: &mut Report, resident: &[ResidentClutBlock]) -> Result<()> {
@@ -311,23 +307,12 @@ fn file_rows(job: &Job, kind: Kind, note: &str, options: &Options, report: &mut 
         evidence: String::new(),
         note: note.to_string(),
     };
-    let output = Output {
-        role: "raw",
-        path: format!("{}/{}", kind.name(), job.source),
-        data: Cow::Borrowed(&job.bytes),
-        evidence: String::new(),
-    };
+    let output = Output { role: "raw", path: format!("{}/{}", kind.name(), job.source), data: Cow::Borrowed(&job.bytes), evidence: String::new() };
     write_output(&base, output, options, report)
 }
 
 /// Every selected slot of one container.
-fn emi_rows(
-    job: &Job,
-    archive: &Archive,
-    options: &Options,
-    report: &mut Report,
-    resident: &[ResidentClutBlock],
-) -> Result<()> {
+fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report, resident: &[ResidentClutBlock]) -> Result<()> {
     let stem = job.source.strip_suffix(&format!(".{EMI_EXTENSION}")).unwrap_or(&job.source);
     let mut payloads = Vec::with_capacity(archive.entries().len());
     for slot in 0..archive.entries().len() {
@@ -369,38 +354,17 @@ fn emi_rows(
         }
         let raw_extension = classify::extension(format);
         let name = |tag: &str, extension: &str| format!("{}/{stem}/{slot}{tag}.{extension}", kind.name());
-        let mut outputs = vec![Output {
-            role: "raw",
-            path: name("", raw_extension),
-            data: Cow::Borrowed(payload),
-            evidence: String::new(),
-        }];
+        let mut outputs = vec![Output { role: "raw", path: name("", raw_extension), data: Cow::Borrowed(payload), evidence: String::new() }];
         let mut note = String::new();
         if options.write {
             match derive(format, entry.ram_ptr, payload) {
-                Ok(derived) => outputs.extend(derived.into_iter().map(|file| Output {
-                    role: file.role,
-                    path: name("", file.extension),
-                    data: Cow::Owned(file.data),
-                    evidence: String::new(),
-                })),
+                Ok(derived) => outputs.extend(derived.into_iter().map(|file| Output { role: file.role, path: name("", file.extension), data: Cow::Owned(file.data), evidence: String::new() })),
                 Err(error) => note = format!("derived output skipped: {error}"),
             }
             if let Some(open) = format.describe().open {
-                let site = Site {
-                    stem,
-                    slot,
-                    entries: archive.entries(),
-                    payloads: &payloads,
-                    rows: rows.get(&slot).map_or(&[], Vec::as_slice),
-                };
+                let site = Site { stem, slot, entries: archive.entries(), payloads: &payloads, rows: rows.get(&slot).map_or(&[], Vec::as_slice) };
                 let opened = open(&site);
-                outputs.extend(opened.files.into_iter().map(|file| Output {
-                    role: file.role,
-                    path: name(&file.tag, file.extension),
-                    data: Cow::Owned(file.data),
-                    evidence: file.evidence,
-                }));
+                outputs.extend(opened.files.into_iter().map(|file| Output { role: file.role, path: name(&file.tag, file.extension), data: Cow::Owned(file.data), evidence: file.evidence }));
                 if let Some(skipped) = opened.skipped {
                     note = skipped;
                 }
@@ -419,13 +383,7 @@ fn emi_rows(
 
 /// Writes the fixed game tables of entry 0 of `ETC/GAME.EMI` as one JSON file per table. The entry
 /// itself stays a code image; its tables are outputs of it, not entries.
-fn game_table_rows(
-    job: &Job,
-    entry: &rebof3_emi::Entry,
-    payload: &[u8],
-    options: &Options,
-    report: &mut Report,
-) -> Result<()> {
+fn game_table_rows(job: &Job, entry: &rebof3_emi::Entry, payload: &[u8], options: &Options, report: &mut Report) -> Result<()> {
     let files = match rebof3_formats::game_tables::open::files(payload) {
         Ok(files) => files,
         Err(error) => {
@@ -461,19 +419,9 @@ fn game_table_rows(
         };
         // The stored bytes are the table's span of the disc file: `offset` and `size` locate them in the archive.
         let original = Row { offset: table.archive_offset as u64, size: bytes.len() as u64, ..base.clone() };
-        let output = Output {
-            role: "raw",
-            path: format!("{}/{stem}/{name}.bin", Kind::DataTable.name()),
-            data: Cow::Borrowed(bytes),
-            evidence: String::new(),
-        };
+        let output = Output { role: "raw", path: format!("{}/{stem}/{name}.bin", Kind::DataTable.name()), data: Cow::Borrowed(bytes), evidence: String::new() };
         write_output(&original, output, options, report)?;
-        let output = Output {
-            role: "json",
-            path: format!("{}/{stem}/{name}.json", Kind::DataTable.name()),
-            data: Cow::Owned(data),
-            evidence: TABLE_EVIDENCE.to_string(),
-        };
+        let output = Output { role: "json", path: format!("{}/{stem}/{name}.json", Kind::DataTable.name()), data: Cow::Owned(data), evidence: TABLE_EVIDENCE.to_string() };
         write_output(&base, output, options, report)?;
     }
     Ok(())
@@ -555,31 +503,16 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
                 evidence: String::new(),
                 note: String::new(),
             };
-            let output = Output {
-                role: clip.extension,
-                path: clip.output.clone(),
-                data: Cow::Owned(clip.bytes),
-                evidence: clip.evidence.clone(),
-            };
+            let output = Output { role: clip.extension, path: clip.output.clone(), data: Cow::Owned(clip.bytes), evidence: clip.evidence.clone() };
             write_output(&base, output, options, report)?;
             if let Some(midi) = clip.midi {
                 let path = std::path::Path::new(&clip.output).with_extension("mid");
-                let output = Output {
-                    role: "midi",
-                    path: path.to_string_lossy().into_owned(),
-                    data: Cow::Owned(midi),
-                    evidence: clip.evidence,
-                };
+                let output = Output { role: "midi", path: path.to_string_lossy().into_owned(), data: Cow::Owned(midi), evidence: clip.evidence };
                 write_output(&base, output, options, report)?;
             }
             // A sample's original bytes: its waveform data, as the VAB body stores it.
             if let Some(original) = clip.original {
-                let output = Output {
-                    role: "vag",
-                    path: original.output,
-                    data: Cow::Owned(original.bytes),
-                    evidence: String::new(),
-                };
+                let output = Output { role: "vag", path: original.output, data: Cow::Owned(original.bytes), evidence: String::new() };
                 write_output(&base, output, options, report)?;
             }
             Ok(())
@@ -596,8 +529,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
     let mode = options.selection.mode();
     let audio = options.selection.audio();
     let audio_extension = audio.extension();
-    let forms = [("raw", "pcm"), (audio_extension, audio_extension)]
-        .map(|(role, extension)| (role, extension, mode.writes(role, true)));
+    let forms = [("raw", "pcm"), (audio_extension, audio_extension)].map(|(role, extension)| (role, extension, mode.writes(role, true)));
     let mut written = Vec::new();
     let mut temporary = None;
     if options.write {
@@ -618,8 +550,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
                     let info = psx_formats::wav::parse(&wav)?;
                     let start = info.data_offset as usize;
                     let end = start + info.data_bytes as usize;
-                    let pcm: Vec<i16> =
-                        wav[start..end].as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes(*pair)).collect();
+                    let pcm: Vec<i16> = wav[start..end].as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes(*pair)).collect();
                     let title = format!("Track {:02}", track.number);
                     let tags = bof3player::export::Tags {
                         title: &title,
@@ -639,8 +570,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
     }
     for (position, track) in sheet.tracks.iter().enumerate().filter(|(_, track)| track.mode == cue::TrackMode::Audio) {
         let stem = format!("track{:02}", track.number);
-        let size =
-            cue::audio_track_range(sheet, position).map_or(0, |(start, end)| (end - start) * cue::AUDIO_SECTOR_SIZE);
+        let size = cue::audio_track_range(sheet, position).map_or(0, |(start, end)| (end - start) * cue::AUDIO_SECTOR_SIZE);
         for (role, extension, wanted) in forms {
             if !wanted {
                 continue;

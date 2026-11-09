@@ -91,12 +91,8 @@ pub fn mesh_from_payload(payload: &[u8]) -> Result<Mesh> {
 /// The terrain of a decoded map bundle.
 pub fn mesh_of_bundle(bundle: &MapBundle) -> Mesh {
     let width = usize::from(bundle.width).max(1);
-    let mut mesh = Mesh {
-        columns: usize::from(bundle.width),
-        rows: usize::from(bundle.height),
-        heights: bundle.heights.as_ref().map(|table| table.iter().map(|&byte| byte as i8).collect()),
-        ..Mesh::default()
-    };
+    let mut mesh =
+        Mesh { columns: usize::from(bundle.width), rows: usize::from(bundle.height), heights: bundle.heights.as_ref().map(|table| table.iter().map(|&byte| byte as i8).collect()), ..Mesh::default() };
     for cell in 0..bundle.cells.len() {
         let (column, row) = ((cell % width) as i32, (cell / width) as i32);
         let heights = bundle.cells[cell].heights.map(|height| i32::from(height) * HEIGHT_SCALE);
@@ -113,8 +109,7 @@ pub fn mesh_of_bundle(bundle: &MapBundle) -> Mesh {
 /// The OBJ and MTL text of a mesh. `mtl_name` is the MTL file the OBJ names.
 pub fn of_mesh(mesh: &Mesh, mtl_name: &str) -> Terrain {
     let mut obj = String::new();
-    writeln!(obj, "# One quad per map cell: x = column, z = row, y = corner byte x {HEIGHT_SCALE}.")
-        .expect("a String never fails");
+    writeln!(obj, "# One quad per map cell: x = column, z = row, y = corner byte x {HEIGHT_SCALE}.").expect("a String never fails");
     writeln!(obj, "mtllib {mtl_name}").expect("a String never fails");
     let cells = mesh.selectors.len().min(mesh.positions.len() / 4).min(mesh.uvs.len() / 4);
     let mut current = None;
@@ -132,11 +127,9 @@ pub fn of_mesh(mesh: &Mesh, mtl_name: &str) -> Terrain {
             writeln!(obj, "vt {u} {v}").expect("a String never fails");
         }
         let face = PERIMETER.map(|corner| 4 * cell + corner + 1);
-        writeln!(obj, "f {0}/{0} {1}/{1} {2}/{2} {3}/{3}", face[0], face[1], face[2], face[3])
-            .expect("a String never fails");
+        writeln!(obj, "f {0}/{0} {1}/{1} {2}/{2} {3}/{3}", face[0], face[1], face[2], face[3]).expect("a String never fails");
     }
-    let mut mtl =
-        String::from("# Materials carry no texture: a tile's page and palette are not named by the payload.\n");
+    let mut mtl = String::from("# Materials carry no texture: a tile's page and palette are not named by the payload.\n");
     for selector in 0..SELECTORS {
         writeln!(mtl, "newmtl page{selector}\nKd 1.0 1.0 1.0\n").expect("a String never fails");
     }
@@ -168,8 +161,7 @@ pub fn glb_of_mesh(mesh: &Mesh, name: &str) -> Option<Vec<u8>> {
 pub fn glb_of_bundle(bundle: &MapBundle, name: &str, nodes: &[gltf::Node]) -> Option<Vec<u8>> {
     let colours: Vec<[f32; 4]> = (0..bundle.cells.len())
         .flat_map(|cell| {
-            let grey = descriptor(bundle, cell)
-                .map_or(1.0, |word| f32::from(((word >> GREY_SHIFT) & GREY_MASK) as u8) / 255.0);
+            let grey = descriptor(bundle, cell).map_or(1.0, |word| f32::from(((word >> GREY_SHIFT) & GREY_MASK) as u8) / 255.0);
             [[grey, grey, grey, 1.0]; 4]
         })
         .collect();
@@ -194,21 +186,12 @@ pub fn cells_node(bundle: &MapBundle) -> gltf::Node {
 
 fn glb_with(mesh: &Mesh, name: &str, colours: Option<&[[f32; 4]]>, nodes: &[gltf::Node]) -> Option<Vec<u8>> {
     let positions: Vec<[f32; 3]> = mesh.positions.iter().map(|[x, y, z]| [*x as f32, *y as f32, *z as f32]).collect();
-    let uvs: Vec<[f32; 2]> =
-        mesh.uvs.iter().map(|[u, v]| [f32::from(*u) / COORDINATE_SPAN, f32::from(*v) / COORDINATE_SPAN]).collect();
+    let uvs: Vec<[f32; 2]> = mesh.uvs.iter().map(|[u, v]| [f32::from(*u) / COORDINATE_SPAN, f32::from(*v) / COORDINATE_SPAN]).collect();
     let cells = mesh.selectors.len().min(positions.len() / 4).min(uvs.len() / 4);
-    let mut primitives: Vec<Primitive> =
-        (0..SELECTORS).map(|material| Primitive { material, indices: Vec::new() }).collect();
+    let mut primitives: Vec<Primitive> = (0..SELECTORS).map(|material| Primitive { material, indices: Vec::new() }).collect();
     for cell in 0..cells {
         let base = (4 * cell) as u32;
-        primitives[usize::from(mesh.selectors[cell])].indices.extend([
-            base,
-            base + 2,
-            base + 3,
-            base,
-            base + 3,
-            base + 1,
-        ]);
+        primitives[usize::from(mesh.selectors[cell])].indices.extend([base, base + 2, base + 3, base, base + 3, base + 1]);
     }
     primitives.retain(|primitive| !primitive.indices.is_empty());
     let materials: Vec<String> = (0..SELECTORS).map(|selector| format!("page{selector}")).collect();
@@ -239,9 +222,7 @@ pub(super) fn tile_of(bundle: &MapBundle, descriptor: u32) -> (usize, [[u8; 2]; 
         let v = ((descriptor >> 4) as u8 & 0xf) * block;
         rectangle_corners(u, v, block - 1, block - 1)
     } else if descriptor & QUAD_BIT == 0 {
-        bundle.rects[selector]
-            .get((descriptor & 0xff) as usize)
-            .map_or([[0; 2]; 4], |rect: &TileRect| rectangle_corners(rect.u, rect.v, rect.du, rect.dv))
+        bundle.rects[selector].get((descriptor & 0xff) as usize).map_or([[0; 2]; 4], |rect: &TileRect| rectangle_corners(rect.u, rect.v, rect.du, rect.dv))
     } else {
         bundle.quads[selector].get((descriptor & 0x7ff) as usize).map_or([[0; 2]; 4], |quad| quad.uvs)
     };
@@ -323,13 +304,7 @@ impl TopDown {
 pub fn top_down(bundle: &MapBundle, vram: &Vram) -> TopDown {
     let (columns, rows) = (usize::from(bundle.width), usize::from(bundle.height));
     let width = columns * CELL_PIXELS;
-    let mut view = TopDown {
-        width,
-        height: rows * CELL_PIXELS,
-        words: vec![None; width * rows * CELL_PIXELS],
-        textured: 0,
-        unwritten: 0,
-    };
+    let mut view = TopDown { width, height: rows * CELL_PIXELS, words: vec![None; width * rows * CELL_PIXELS], textured: 0, unwritten: 0 };
     for cell in 0..(columns * rows).min(bundle.grid.len()) {
         let Some(word) = descriptor(bundle, cell) else { continue };
         let Some((page_x, page_y, clut, depth)) = terrain_descriptor(word) else { continue };
@@ -358,8 +333,7 @@ fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
     let at = |corner: usize, axis: usize| f32::from(corners[corner][axis]);
     let (origin, along_s, along_t, s, t) = if s + t <= 1.0 { (0, 1, 2, s, t) } else { (3, 2, 1, 1.0 - s, 1.0 - t) };
     [0, 1].map(|axis| {
-        let value =
-            at(origin, axis) + s * (at(along_s, axis) - at(origin, axis)) + t * (at(along_t, axis) - at(origin, axis));
+        let value = at(origin, axis) + s * (at(along_s, axis) - at(origin, axis)) + t * (at(along_t, axis) - at(origin, axis));
         value.round().clamp(0.0, 255.0) as u8
     })
 }
@@ -372,11 +346,7 @@ fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
 /// in `x` or `z` is an error.
 pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let mut bundle = MapBundle::decode(payload)?;
-    let positions = if mesh.starts_with(b"glTF") {
-        gltf::read_positions(mesh).map_err(Error::Import)?
-    } else {
-        obj_positions(mesh)?
-    };
+    let positions = if mesh.starts_with(b"glTF") { gltf::read_positions(mesh).map_err(Error::Import)? } else { obj_positions(mesh)? };
     let corners = 4 * bundle.cells.len();
     if positions.len() != corners {
         return Err(Error::Import(format!("the mesh has {} corners; the bundle needs {corners}", positions.len())));
@@ -389,8 +359,7 @@ pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
             if x != column + *step_x as f32 || z != row + *step_z as f32 {
                 return Err(Error::Import(format!("corner {corner} of cell {cell} is not at its cell")));
             }
-            record.heights[corner] = height_byte(y)
-                .ok_or_else(|| Error::Import(format!("corner {corner} of cell {cell} is at {y}, not a height step")))?;
+            record.heights[corner] = height_byte(y).ok_or_else(|| Error::Import(format!("corner {corner} of cell {cell} is at {y}, not a height step")))?;
         }
     }
     Ok(bundle.encode())
@@ -449,15 +418,7 @@ mod top_down_tests {
     }
 
     fn bundle(descriptor: u32) -> MapBundle {
-        MapBundle {
-            width: 2,
-            height: 1,
-            cells: vec![Cell { heights: [0; 4] }; 2],
-            codes: vec![0; 4],
-            grid: vec![1, 0],
-            records: vec![0, descriptor],
-            ..MapBundle::default()
-        }
+        MapBundle { width: 2, height: 1, cells: vec![Cell { heights: [0; 4] }; 2], codes: vec![0; 4], grid: vec![1, 0], records: vec![0, descriptor], ..MapBundle::default() }
     }
 
     #[test]

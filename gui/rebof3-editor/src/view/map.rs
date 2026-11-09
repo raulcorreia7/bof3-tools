@@ -13,10 +13,7 @@ use std::cell::Cell as Shared;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use gpui::{
-    AnyElement, Bounds, Context, Div, Image, ImageFormat, MouseButton, MouseDownEvent, MouseMoveEvent, ObjectFit,
-    Pixels, Point, canvas, div, img, prelude::*, px,
-};
+use gpui::{AnyElement, Bounds, Context, Div, Image, ImageFormat, MouseButton, MouseDownEvent, MouseMoveEvent, ObjectFit, Pixels, Point, canvas, div, img, prelude::*, px};
 use rebof3_emi::replay::scenes;
 use rebof3_formats::map::terrain::{self, mesh_of_bundle};
 use rebof3_formats::map::{CELL_BYTES, MapBundle};
@@ -96,10 +93,7 @@ pub fn prepare(editor: &mut Editor) {
         return;
     };
     let view = terrain::top_down(&bundle, &replayed.vram);
-    let summary = format!(
-        "Textured from the VRAM of {}: {} cells drawn, {} whose page or CLUT row the scene does not hold.",
-        replayed.scene.name, view.textured, view.unwritten
-    );
+    let summary = format!("Textured from the VRAM of {}: {} cells drawn, {} whose page or CLUT row the scene does not hold.", replayed.scene.name, view.textured, view.unwritten);
     let image = Arc::new(Image::from_bytes(ImageFormat::Png, view.png()));
     editor.views.map.textured = Some(Rc::new(Textured { key, image, summary }));
 }
@@ -107,11 +101,7 @@ pub fn prepare(editor: &mut Editor) {
 /// The mean corner height of each cell.
 fn mean_heights(bundle: &MapBundle) -> Vec<i32> {
     let corners = CELL_BYTES as i32;
-    bundle
-        .cells
-        .iter()
-        .map(|cell| cell.heights.iter().map(|&height| i32::from(height)).sum::<i32>() / corners)
-        .collect()
+    bundle.cells.iter().map(|cell| cell.heights.iter().map(|&height| i32::from(height)).sum::<i32>() / corners).collect()
 }
 
 /// One RGBA pixel per cell, row-major: the cell's page hue, darker for a lower cell. A cell whose grid
@@ -138,8 +128,7 @@ pub fn cell_colors(bundle: &MapBundle) -> Vec<[u8; 4]> {
 
 /// A one-line summary of the bundle's sections.
 pub fn summary(bundle: &MapBundle) -> String {
-    let tiles: usize =
-        bundle.rects.iter().map(Vec::len).sum::<usize>() + bundle.quads.iter().map(Vec::len).sum::<usize>();
+    let tiles: usize = bundle.rects.iter().map(Vec::len).sum::<usize>() + bundle.quads.iter().map(Vec::len).sum::<usize>();
     format!(
         "{} × {} cells · {} tile descriptors · {} tile records · lists {} + {} · {} objects · {} record cells · \
          scroll seat {:#06X} · height table {}",
@@ -170,19 +159,12 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let measure = Rc::clone(&state.image);
     let image = match textured.clone() {
         // One texel per screen pixel, drawn as one image: a quad per texel would be too many.
-        Some(textured) => div()
-            .relative()
-            .child(img(Arc::clone(&textured.image)).size_full().object_fit(ObjectFit::Fill))
-            .child(canvas(move |area, _, _| measure.set(area), |_, (), _, _| {}).absolute().size_full()),
+        Some(textured) => {
+            div().relative().child(img(Arc::clone(&textured.image)).size_full().object_fit(ObjectFit::Fill)).child(canvas(move |area, _, _| measure.set(area), |_, (), _, _| {}).absolute().size_full())
+        }
         None => {
             let pixels = cell_colors(&bundle);
-            div().child(
-                canvas(
-                    move |area, _, _| measure.set(area),
-                    move |area, (), window, _| paint_pixels(window, area, &pixels, width, CELL_PIXELS),
-                )
-                .size_full(),
-            )
+            div().child(canvas(move |area, _, _| measure.set(area), move |area, (), window, _| paint_pixels(window, area, &pixels, width, CELL_PIXELS)).size_full())
         }
     }
     .w(px(width as f32 * cell))
@@ -235,8 +217,7 @@ fn textured(editor: &Editor, entry: &Entry<'_>) -> Option<Rc<Textured>> {
     let state = &editor.views.map;
     let textured = state.textured.as_ref().filter(|_| !state.flat)?;
     let (archive, index, revision) = &textured.key;
-    (*archive == entry.archive.path.0 && *index == entry.index && *revision == entry.project.revision())
-        .then(|| Rc::clone(textured))
+    (*archive == entry.archive.path.0 && *index == entry.index && *revision == entry.project.revision()).then(|| Rc::clone(textured))
 }
 
 /// Screen pixels per cell in the mode drawn.
@@ -265,11 +246,10 @@ fn modes(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div {
         Some(textured) => {
             let name = format!("{}-{}.png", entry.archive.path.0.replace('/', "_"), entry.index);
             let image = Arc::clone(&textured.image);
-            row = row.child(separator(true)).child(muted(textured.summary.clone())).child(
-                button("map-export", "Export PNG", true).on_click(
-                    cx.listener(move |editor, _, _, cx| editor.save_file(name.clone(), Ok(image.bytes.clone()), cx)),
-                ),
-            );
+            row = row
+                .child(separator(true))
+                .child(muted(textured.summary.clone()))
+                .child(button("map-export", "Export PNG", true).on_click(cx.listener(move |editor, _, _, cx| editor.save_file(name.clone(), Ok(image.bytes.clone()), cx))));
         }
         None if !available => {
             row = row.child(muted("No scene loads this archive, so its tiles cannot be read from VRAM."));
@@ -286,12 +266,7 @@ fn describe(bundle: &MapBundle, cell: usize) -> String {
     let descriptor = bundle.records.get(usize::from(grid)).filter(|_| grid != 0);
     let heights = bundle.cells.get(cell).map(|cell| cell.heights).unwrap_or_default();
     let code = bundle.codes.get(cell).copied().unwrap_or(0);
-    format!(
-        "x {}  y {}  heights {heights:?}  code {code:#04X}  grid {grid}  tile {}",
-        cell % width,
-        cell / width,
-        descriptor.map_or_else(|| "none".into(), |word| format!("{word:#010X}")),
-    )
+    format!("x {}  y {}  heights {heights:?}  code {code:#04X}  grid {grid}  tile {}", cell % width, cell / width, descriptor.map_or_else(|| "none".into(), |word| format!("{word:#010X}")),)
 }
 
 /// The picked cell's corner heights, as fields.
@@ -306,8 +281,7 @@ fn panel(editor: &Editor, bundle: &MapBundle, picked: Option<usize>, cx: &mut Co
     for (corner, name) in CORNER_NAMES.into_iter().enumerate() {
         let text = bundle.cells[cell].heights[corner].to_string();
         let height = input(editor, ("corner", corner), Field::MapCorner(corner), &text, "", Some(CORNER_WIDTH), cx);
-        panel = panel
-            .child(div().flex().items_center().gap(px(GAP)).child(div().w(px(CORNER_WIDTH)).child(name)).child(height));
+        panel = panel.child(div().flex().items_center().gap(px(GAP)).child(div().w(px(CORNER_WIDTH)).child(name)).child(height));
     }
     panel.child(muted("A corner height is a signed byte, -128 to 127; the mesh scales it by 16."))
 }

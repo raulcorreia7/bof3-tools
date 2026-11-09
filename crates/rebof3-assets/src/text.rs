@@ -55,15 +55,7 @@ pub struct Options {
 impl Options {
     /// Both forms, from `disc` into `out`, with no disc image for the LBA.
     fn both(disc: &Path, out: &Path, write: bool) -> Self {
-        Self {
-            disc: disc.to_path_buf(),
-            out: out.to_path_buf(),
-            image: None,
-            raw: true,
-            modern: true,
-            write,
-            list: !write,
-        }
+        Self { disc: disc.to_path_buf(), out: out.to_path_buf(), image: None, raw: true, modern: true, write, list: !write }
     }
 }
 
@@ -102,10 +94,7 @@ pub fn extract(disc: &Path, out: &Path, write: bool) -> Result<Report> {
 /// Writes what `options` selects.
 pub fn extract_with(options: &Options) -> Result<Report> {
     if !options.disc.is_dir() {
-        return Err(Error::Text(format!(
-            "no extracted disc at {}; pass --text-disc DIR with the tree `bof3 disc extract` wrote",
-            options.disc.display()
-        )));
+        return Err(Error::Text(format!("no extracted disc at {}; pass --text-disc DIR with the tree `bof3 disc extract` wrote", options.disc.display())));
     }
     let mut report = Report::default();
     let mut archives = Vec::new();
@@ -128,9 +117,7 @@ pub fn extract_with(options: &Options) -> Result<Report> {
     if options.modern && options.write {
         write_index(options, &mut index, &mut report)?;
     }
-    report.notes.push(format!(
-        "text: {files} payloads, {found} strings, {dropped} dropped from the scan, {skipped} graphics/audio entries"
-    ));
+    report.notes.push(format!("text: {files} payloads, {found} strings, {dropped} dropped from the scan, {skipped} graphics/audio entries"));
     report.sort();
     Ok(report)
 }
@@ -176,22 +163,11 @@ fn lba_map(image: Option<&Path>) -> BTreeMap<String, u32> {
     let Some(image) = image else { return BTreeMap::new() };
     let Ok(mut image) = Image::open(image) else { return BTreeMap::new() };
     let Ok(entries) = image.entries() else { return BTreeMap::new() };
-    entries
-        .into_iter()
-        .filter(|entry| !entry.is_directory)
-        .map(|entry| (entry.path.to_string_lossy().replace('\\', "/"), entry.lba))
-        .collect()
+    entries.into_iter().filter(|entry| !entry.is_directory).map(|entry| (entry.path.to_string_lossy().replace('\\', "/"), entry.lba)).collect()
 }
 
 /// Writes one archive's text files.
-fn archive_rows(
-    path: &Path,
-    source: &str,
-    options: &Options,
-    lba: Option<u32>,
-    index: &mut Vec<IndexRow>,
-    report: &mut Report,
-) -> Result<Counts> {
+fn archive_rows(path: &Path, source: &str, options: &Options, lba: Option<u32>, index: &mut Vec<IndexRow>, report: &mut Report) -> Result<Counts> {
     let container = fs::read(path)?;
     let archive = Archive::parse(&container)?;
     let mut counts = Counts::default();
@@ -202,13 +178,7 @@ fn archive_rows(
         }
         let payload = archive.payload(&container, slot)?;
         let format = classify(entry, payload);
-        let source = PayloadSource {
-            source: source.to_string(),
-            entry: slot,
-            entry_offset: entry.offset,
-            lba,
-            load: strings::load_address(entry),
-        };
+        let source = PayloadSource { source: source.to_string(), entry: slot, entry_offset: entry.offset, lba, load: strings::load_address(entry) };
         let text = match text_file(&source, slot, entry, payload, format) {
             Ok(Some(text)) => text,
             Ok(None) => {
@@ -245,13 +215,7 @@ fn archive_rows(
 }
 
 /// One payload's stored bytes, JSON rows and plain-text view, or `None` when it holds no text.
-fn text_file(
-    source: &PayloadSource,
-    slot: usize,
-    entry: &Entry,
-    payload: &[u8],
-    format: Format,
-) -> Result<Option<TextFile>> {
+fn text_file(source: &PayloadSource, slot: usize, entry: &Entry, payload: &[u8], format: Format) -> Result<Option<TextFile>> {
     let known = known::strings(source, slot, format, payload);
     let exclude: Vec<(usize, usize)> = known.iter().map(known::Known::range).collect();
     if format == Format::AreaMessageTable {
@@ -262,10 +226,7 @@ fn text_file(
         if strings == 0 {
             return Ok(None);
         }
-        let lines: Vec<Line> = rows
-            .iter()
-            .map(|row| Line { offset: row.origin.offset, id: row.id.clone(), text: row.text.clone() })
-            .collect();
+        let lines: Vec<Line> = rows.iter().map(|row| Line { offset: row.origin.offset, id: row.id.clone(), text: row.text.clone() }).collect();
         let index = rows.iter().map(|row| index_row(source, &row.origin, &row.kind, &row.id, &row.text)).collect();
         return Ok(Some(TextFile { payload: payload.to_vec(), plain: plain_text(&lines), json, index, strings }));
     }
@@ -277,29 +238,13 @@ fn text_file(
     let mut items = Vec::with_capacity(known.len() + scan.len());
     for placed in &known {
         let raw = &payload[placed.offset..placed.offset + placed.length];
-        items.push(strings::Item::known(
-            source.origin(placed.offset),
-            raw,
-            placed.stride,
-            placed.text.clone(),
-            placed.table,
-            placed.index,
-        )?);
+        items.push(strings::Item::known(source.origin(placed.offset), raw, placed.stride, placed.text.clone(), placed.table, placed.index)?);
     }
     items.extend(scan);
     items.sort_by_key(|item| item.origin.offset);
-    let lines: Vec<Line> = items
-        .iter()
-        .map(|item| Line { offset: item.origin.offset, id: item.id.clone(), text: item.text.clone() })
-        .collect();
+    let lines: Vec<Line> = items.iter().map(|item| Line { offset: item.origin.offset, id: item.id.clone(), text: item.text.clone() }).collect();
     let index = items.iter().map(|item| index_row(source, &item.origin, &item.kind, &item.id, &item.text)).collect();
-    Ok(Some(TextFile {
-        payload: payload.to_vec(),
-        json: strings::document(payload.len(), &items),
-        plain: plain_text(&lines),
-        index,
-        strings: items.len(),
-    }))
+    Ok(Some(TextFile { payload: payload.to_vec(), json: strings::document(payload.len(), &items), plain: plain_text(&lines), index, strings: items.len() }))
 }
 
 /// Whether a payload's scanned strings are text, rather than bytes that happen to decode as some.
@@ -329,10 +274,7 @@ fn label_like(text: &str) -> bool {
 fn words_like(text: &str) -> bool {
     let plain = untagged(text);
     let letters = plain.chars().filter(|character| character.is_alphabetic()).count();
-    let words = plain
-        .split(|character: char| !character.is_alphanumeric())
-        .filter(|word| word.chars().any(char::is_alphabetic))
-        .count();
+    let words = plain.split(|character: char| !character.is_alphanumeric()).filter(|word| word.chars().any(char::is_alphabetic)).count();
     words >= 2 && letters >= 5 && controls(text) * 2 <= letters
 }
 
@@ -422,15 +364,7 @@ fn write_bytes(options: &Options, output: &str, bytes: &[u8]) -> Result<()> {
 }
 
 /// The `assets.jsonl` row of one written file.
-fn row(
-    source: &PayloadSource,
-    entry: &Entry,
-    payload: &[u8],
-    output: String,
-    written: &[u8],
-    write: bool,
-    role: &'static str,
-) -> Row {
+fn row(source: &PayloadSource, entry: &Entry, payload: &[u8], output: String, written: &[u8], write: bool, role: &'static str) -> Row {
     let format = classify(entry, payload);
     Row {
         source: source.source.clone(),

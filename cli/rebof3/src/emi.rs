@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 use psx_formats::clut;
 use psx_formats::vram::{Descriptor, Plane, UPLOAD_TYPE, decode};
-use rebof3_emi::{
-    Archive, PackEntry, PackFolderOptions, ensure_parent, entry_name, guess_type, manifest_entries, pack, pack_folder,
-};
+use rebof3_emi::{Archive, PackEntry, PackFolderOptions, ensure_parent, entry_name, guess_type, manifest_entries, pack, pack_folder};
 use rebof3_formats::coverage;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -56,17 +54,13 @@ fn run(args: Vec<OsString>) -> Result<i32, String> {
         "sep" => run_sep(&args),
         "coverage" => run_coverage(&args),
         option if option.starts_with('-') => run_extract(&args_prefixed(&args, option)),
-        path if Path::new(path).exists() || path.to_ascii_lowercase().ends_with(".emi") => {
-            run_extract(&args_prefixed(&args, path))
-        }
+        path if Path::new(path).exists() || path.to_ascii_lowercase().ends_with(".emi") => run_extract(&args_prefixed(&args, path)),
         unknown => Err(format!(
             "unknown command {unknown:?}; run `bof3 emi --help` for the commands, or name an .EMI \
              archive to extract it"
         )),
     };
-    result.map_err(|message| {
-        if message.contains("--help") { message } else { format!("{message}; run `bof3 emi {command} --help`") }
-    })
+    result.map_err(|message| if message.contains("--help") { message } else { format!("{message}; run `bof3 emi {command} --help`") })
 }
 
 /// The full argument list with `first` in front of the already-split `rest`.
@@ -146,18 +140,10 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
     if entry_index.is_some() && (options.manifest.is_some() || options.print_manifest) {
         return Err("manifest output needs every entry: drop -J or the index.".into());
     }
-    let archive = Archive::open(&source).map_err(|error| {
-        format!(
-            "cannot read {}: {error}; check the path, or run `bof3 emi list {}` first",
-            source.display(),
-            source.display()
-        )
-    })?;
+    let archive = Archive::open(&source).map_err(|error| format!("cannot read {}: {error}; check the path, or run `bof3 emi list {}` first", source.display(), source.display()))?;
     let default_output = source.with_extension("");
     if let Some(entry_index) = entry_index {
-        let entry = archive.entries().get(entry_index).ok_or_else(|| {
-            format!("entry index {entry_index} is out of range (archive has {} entries)", archive.entries().len())
-        })?;
+        let entry = archive.entries().get(entry_index).ok_or_else(|| format!("entry index {entry_index} is out of range (archive has {} entries)", archive.entries().len()))?;
         let output = match options.output {
             Some(path) if path.is_dir() => path.join(entry_name(entry_index, entry.file_type, options.typed)),
             Some(path) => path,
@@ -241,11 +227,7 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
                 index = start;
                 while index < args.len() && !is_option(&args[index]) {
                     let path = PathBuf::from(&args[index]);
-                    options.inputs.push(PackEntry {
-                        file_type: guess_type(&path).or(options.default_type).unwrap_or(255),
-                        path,
-                        ram_ptr: 0,
-                    });
+                    options.inputs.push(PackEntry { file_type: guess_type(&path).or(options.default_type).unwrap_or(255), path, ram_ptr: 0 });
                     index += 1;
                 }
                 if index == start {
@@ -284,9 +266,7 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
             let manifest = requested.unwrap_or_else(|| folder.join("emi.json"));
             // The manifest loads and validates once; these entries serve the
             // pack, the dry run and the cleanup, which never rereads it.
-            let (entries, archive_version) = manifest_entries(&folder, &manifest).map_err(|error| {
-                format!("cannot read the manifest {}: {error}; pass -J FILE or drop -J", manifest.display())
-            })?;
+            let (entries, archive_version) = manifest_entries(&folder, &manifest).map_err(|error| format!("cannot read the manifest {}: {error}; pass -J FILE or drop -J", manifest.display()))?;
             if !options.dry_run {
                 pack(&output, &entries, archive_version).map_err(|error| error.to_string())?;
             }
@@ -296,11 +276,7 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
             if !exclude.iter().any(|pattern| pattern == "emi.json") {
                 exclude.push("emi.json".into());
             }
-            let folder_options = PackFolderOptions {
-                default_type: options.default_type,
-                include_patterns: options.include,
-                exclude_patterns: exclude,
-            };
+            let folder_options = PackFolderOptions { default_type: options.default_type, include_patterns: options.include, exclude_patterns: exclude };
             let paths = enumerate_paths(&folder, &folder_options)?;
             if !options.dry_run {
                 pack_folder(&output, &folder, &folder_options).map_err(|error| error.to_string())?;
@@ -337,8 +313,7 @@ fn enumerate_paths(folder: &Path, options: &PackFolderOptions) -> Result<Vec<Pat
             continue;
         }
         let name = entry.file_name().to_string_lossy().into_owned();
-        let included = options.include_patterns.is_empty()
-            || options.include_patterns.iter().any(|pattern| rebof3_emi::glob_match(pattern, &name));
+        let included = options.include_patterns.is_empty() || options.include_patterns.iter().any(|pattern| rebof3_emi::glob_match(pattern, &name));
         let excluded = options.exclude_patterns.iter().any(|pattern| rebof3_emi::glob_match(pattern, &name));
         if included && !excluded {
             // Entries are recorded resolved, so the cleanup step can compare a
@@ -405,11 +380,7 @@ fn require_arg<'a>(args: &'a [OsString], index: usize, option: &str) -> Result<&
 }
 
 fn parse_num<T: FromStr>(value: &OsStr, label: &str) -> Result<T, String> {
-    value
-        .to_str()
-        .ok_or_else(|| format!("{label} must be valid UTF-8"))?
-        .parse()
-        .map_err(|_| format!("invalid {label}"))
+    value.to_str().ok_or_else(|| format!("{label} must be valid UTF-8"))?.parse().map_err(|_| format!("invalid {label}"))
 }
 
 const USAGE: &str = "\
@@ -585,9 +556,7 @@ fn run_list(args: &[OsString]) -> Result<i32, String> {
                 index += 1;
                 let path = require_arg(args, index, value)?;
                 if source.replace(PathBuf::from(path)).is_some() {
-                    return Err(
-                        "list takes one archive: drop the extra -i or positional; run `bof3 emi list --help`.".into()
-                    );
+                    return Err("list takes one archive: drop the extra -i or positional; run `bof3 emi list --help`.".into());
                 }
             }
             "--json" => json = true,
@@ -602,13 +571,8 @@ fn run_list(args: &[OsString]) -> Result<i32, String> {
         }
         index += 1;
     }
-    let source = source.ok_or_else(|| {
-        "list needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi list --help`."
-            .to_string()
-    })?;
-    let archive = Archive::open(&source).map_err(|error| {
-        format!("cannot read {}: {error}; check the path, or run `bof3 emi list --help`", source.display())
-    })?;
+    let source = source.ok_or_else(|| "list needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi list --help`.".to_string())?;
+    let archive = Archive::open(&source).map_err(|error| format!("cannot read {}: {error}; check the path, or run `bof3 emi list --help`", source.display()))?;
     if json {
         let entries: Vec<serde_json::Value> = archive
             .entries()
@@ -629,15 +593,7 @@ fn run_list(args: &[OsString]) -> Result<i32, String> {
     } else {
         println!("{:<5} {:<10} {:<12} {:<10} {:<6} FIRST4", "IDX", "OFFSET", "RAM_PTR", "SIZE", "TYPE");
         for (index, entry) in archive.entries().iter().enumerate() {
-            println!(
-                "{:<5} {:<10} {:<#12x} {:<#10x} {:<6} {:#x}",
-                index,
-                format!("{:#x}", entry.offset),
-                entry.ram_ptr,
-                entry.size,
-                entry.file_type,
-                entry.first4,
-            );
+            println!("{:<5} {:<10} {:<#12x} {:<#10x} {:<6} {:#x}", index, format!("{:#x}", entry.offset), entry.ram_ptr, entry.size, entry.file_type, entry.first4,);
         }
     }
     Ok(EXIT_OK)
@@ -649,22 +605,14 @@ struct VramOptions {
     source: Option<PathBuf>,
 }
 
-const VRAM_USAGE: &str =
-    "bof3 emi vram needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi vram --help`.";
+const VRAM_USAGE: &str = "bof3 emi vram needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi vram --help`.";
 
 /// Decodes an archive's type-3 uploads into one page set, optionally as PNG.
 fn run_vram(args: &[OsString]) -> Result<i32, String> {
     let options = vram_options(args)?;
     let source = options.source.ok_or(VRAM_USAGE)?;
-    let archive = Archive::open(&source).map_err(|error| {
-        format!(
-            "cannot read {}: {error}; check the path, or run `bof3 emi list {}`",
-            source.display(),
-            source.display()
-        )
-    })?;
-    let retail = fs::read(&source)
-        .map_err(|error| format!("cannot read {}: {error}; check the path and its permissions", source.display()))?;
+    let archive = Archive::open(&source).map_err(|error| format!("cannot read {}: {error}; check the path, or run `bof3 emi list {}`", source.display(), source.display()))?;
+    let retail = fs::read(&source).map_err(|error| format!("cannot read {}: {error}; check the path and its permissions", source.display()))?;
     let mut page_set = Plane::new();
     print_uploads(&archive, &retail, &mut page_set, &source)?;
     if let Some(output) = options.output {
@@ -687,9 +635,7 @@ fn vram_options(args: &[OsString]) -> Result<VramOptions, String> {
                 index += 1;
                 let path = PathBuf::from(require_arg(args, index, value.unwrap())?);
                 if options.source.replace(path).is_some() {
-                    return Err(
-                        "vram takes one archive: drop the extra -i or positional; run `bof3 emi vram --help`.".into()
-                    );
+                    return Err("vram takes one archive: drop the extra -i or positional; run `bof3 emi vram --help`.".into());
                 }
             }
             Some("-o" | "--output") => {
@@ -729,14 +675,7 @@ fn print_uploads(archive: &Archive, retail: &[u8], page_set: &mut Plane, source:
         let skipped = page_set.blit(&decoded);
         rectangles += decoded.len();
         dropped += skipped;
-        println!(
-            "{:<5} {:<22} {:<12} {:>8} {:>8}",
-            index,
-            format!("col={} row={} per_row={}", descriptor.column, descriptor.row, descriptor.chunks_per_row),
-            decoded.len(),
-            entry.size,
-            skipped,
-        );
+        println!("{:<5} {:<22} {:<12} {:>8} {:>8}", index, format!("col={} row={} per_row={}", descriptor.column, descriptor.row, descriptor.chunks_per_row), decoded.len(), entry.size, skipped,);
     }
     if uploads == 0 {
         return Err(format!("{}: no type-3 entry", source.display()));
@@ -780,23 +719,15 @@ fn run_clut(args: &[OsString]) -> Result<i32, String> {
         }
         (None, 2) => parse_num(positionals[1], "clut entry index")?,
         (None, _) => {
-            return Err(
-                "clut needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi clut --help`."
-                    .into(),
-            );
+            return Err("clut needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi clut --help`.".into());
         }
     };
     let source = match input {
         Some(input) => input,
         None => PathBuf::from(positionals[0]),
     };
-    let palette = rebof3_emi::entry::palette(&source, entry_index).map_err(|error| {
-        format!(
-            "cannot read {}#{entry_index}: {error}; run `bof3 emi list {}` to see the entry table",
-            source.display(),
-            source.display()
-        )
-    })?;
+    let palette = rebof3_emi::entry::palette(&source, entry_index)
+        .map_err(|error| format!("cannot read {}#{entry_index}: {error}; run `bof3 emi list {}` to see the entry table", source.display(), source.display()))?;
     if let Some(path) = json {
         ensure_parent(&path).map_err(|error| error.to_string())?;
         fs::write(&path, palette.json()).map_err(|error| error.to_string())?;
@@ -829,15 +760,11 @@ fn audio_args<'a>(args: &'a [OsString], command: &str) -> Result<(bool, Vec<&'a 
             Some("--dump") => dump = true,
             Some("-i" | "--input") => {
                 index += 1;
-                let value = args
-                    .get(index)
-                    .ok_or_else(|| format!("-i/--input needs an archive; run `bof3 emi {command} --help`."))?;
+                let value = args.get(index).ok_or_else(|| format!("-i/--input needs an archive; run `bof3 emi {command} --help`."))?;
                 if positionals.is_empty() {
                     positionals.push(value);
                 } else {
-                    return Err(format!(
-                        "{command} takes one archive: drop the extra -i or positional; run `bof3 emi {command} --help`."
-                    ));
+                    return Err(format!("{command} takes one archive: drop the extra -i or positional; run `bof3 emi {command} --help`."));
                 }
             }
             Some(value) if value.starts_with('-') => {
@@ -848,9 +775,7 @@ fn audio_args<'a>(args: &'a [OsString], command: &str) -> Result<(bool, Vec<&'a 
         index += 1;
     }
     if positionals.len() != 2 {
-        return Err(format!(
-            "{command} needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi {command} --help`."
-        ));
+        return Err(format!("{command} needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi {command} --help`."));
     }
     Ok((dump, positionals))
 }
@@ -891,15 +816,7 @@ fn run_sep(args: &[OsString]) -> Result<i32, String> {
     } else {
         println!("{}#{index}: sequences={}", source.display(), package.sequences.len());
         for (sequence, item) in package.sequences.iter().enumerate() {
-            println!(
-                "seq {sequence} id={} resolution={} tempo_us={} time={}/{} events={}",
-                item.seq_id,
-                item.resolution,
-                item.tempo_us,
-                item.time_num,
-                item.time_den,
-                item.events.len(),
-            );
+            println!("seq {sequence} id={} resolution={} tempo_us={} time={}/{} events={}", item.seq_id, item.resolution, item.tempo_us, item.time_num, item.time_den, item.events.len(),);
         }
     }
     Ok(report_problems(package.problems().into_iter().map(|problem| problem.to_string())))
@@ -950,18 +867,13 @@ fn run_coverage(args: &[OsString]) -> Result<i32, String> {
                 return Err(format!("unknown option {value}; run `bof3 emi coverage --help`"));
             }
             _ => {
-                return Err(
-                    "coverage takes no positional: pass the archive folder with -i DIR; run `bof3 emi coverage --help`."
-                        .into(),
-                );
+                return Err("coverage takes no positional: pass the archive folder with -i DIR; run `bof3 emi coverage --help`.".into());
             }
         }
         index += 1;
     }
 
-    let report = coverage::check(&corpus).map_err(|error| {
-        format!("cannot read the archives under {}: {error}; pass the folder with -i DIR", corpus.display())
-    })?;
+    let report = coverage::check(&corpus).map_err(|error| format!("cannot read the archives under {}: {error}; pass the folder with -i DIR", corpus.display()))?;
     if json {
         print!("{}", report.jsonl());
     } else {
@@ -969,9 +881,7 @@ fn run_coverage(args: &[OsString]) -> Result<i32, String> {
     }
     if let Some(path) = jsonl {
         ensure_parent(&path).map_err(|error| error.to_string())?;
-        fs::write(&path, report.jsonl()).map_err(|error| {
-            format!("cannot write {}: {error}; check the folder exists and is writable", path.display())
-        })?;
+        fs::write(&path, report.jsonl()).map_err(|error| format!("cannot write {}: {error}; check the folder exists and is writable", path.display()))?;
         eprintln!("wrote {}", path.display());
     }
     Ok(report_problems(report.all_failures().into_iter()))

@@ -59,7 +59,4 @@ pub use error::{Error, Result};
 #[cfg(feature = "std")]
 pub use manifest::manifest_entries;
 #[cfg(feature = "std")]
-pub use pack::{
-    PackEntry, PackFolderOptions, Payload, glob_match, guess_type, pack, pack_folder, pack_manifest,
-    pack_manifest_from, pack_payloads,
-};
+pub use pack::{PackEntry, PackFolderOptions, Payload, glob_match, guess_type, pack, pack_folder, pack_manifest, pack_manifest_from, pack_payloads};

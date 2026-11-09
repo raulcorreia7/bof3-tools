@@ -201,12 +201,7 @@ pub struct Progress {
 ///
 /// [`Error::Disc`] when the image does not boot, [`Error::Halt`] when the game stops the machine,
 /// [`Error::Cancelled`] when `progress` says stop.
-pub fn run(
-    image: &Path,
-    route: &Route,
-    disc_sha: &str,
-    mut progress: impl FnMut(Progress) -> bool,
-) -> Result<Observation, Error> {
+pub fn run(image: &Path, route: &Route, disc_sha: &str, mut progress: impl FnMut(Progress) -> bool) -> Result<Observation, Error> {
     let started = Instant::now();
     let mut machine = Machine::boot_image(image).map_err(|error| Error::Disc(error.to_string()))?;
     let disc = psx_cd::Image::open(image).map_err(|error| Error::Disc(error.to_string()))?;
@@ -214,9 +209,7 @@ pub fn run(
     while machine.frame() < route.frames {
         let next = machine.frame() + 1;
         machine.kernel_mut().buttons = route.buttons(machine.frame());
-        machine
-            .run_until(|machine| machine.frame() >= next, FRAME_BUDGET)
-            .map_err(|halt| Error::Halt { frame: machine.frame(), reason: halt.to_string() })?;
+        machine.run_until(|machine| machine.frame() >= next, FRAME_BUDGET).map_err(|halt| Error::Halt { frame: machine.frame(), reason: halt.to_string() })?;
         recorder.sources.follow(&machine.bus().cdrom.commands);
         let log = machine.bus_mut().gpu.take_log();
         recorder.log(&log);
@@ -282,11 +275,7 @@ const IMAGE_FOLDERS: [&str; 2] = ["inputs/external", "disk"];
 pub fn find_image(disc: &Path) -> Result<PathBuf, String> {
     if let Some(image) = std::env::var_os(IMAGE_VARIABLE).filter(|value| !value.is_empty()) {
         let image = PathBuf::from(image);
-        return if image.is_file() {
-            Ok(image)
-        } else {
-            Err(format!("{IMAGE_VARIABLE}={} is not a file", image.display()))
-        };
+        return if image.is_file() { Ok(image) } else { Err(format!("{IMAGE_VARIABLE}={} is not a file", image.display())) };
     }
     for folder in disc.ancestors() {
         for below in IMAGE_FOLDERS {
@@ -295,11 +284,7 @@ pub fn find_image(disc: &Path) -> Result<PathBuf, String> {
             }
         }
     }
-    Err(format!(
-        "no disc image: set {IMAGE_VARIABLE} to the .cue sheet, or put it in {} above {}",
-        IMAGE_FOLDERS.join(" or "),
-        disc.display()
-    ))
+    Err(format!("no disc image: set {IMAGE_VARIABLE} to the .cue sheet, or put it in {} above {}", IMAGE_FOLDERS.join(" or "), disc.display()))
 }
 
 /// The SHA-256 of a disc image's data track: the file a `.cue` sheet names for its first data
@@ -329,10 +314,5 @@ fn data_track(image: &Path) -> Result<PathBuf, Error> {
         return Ok(image.to_path_buf());
     }
     let sheet = psx_cd::cue::read(image).map_err(|error| Error::Disc(format!("{}: {error}", image.display())))?;
-    sheet
-        .tracks
-        .iter()
-        .find(|track| track.mode != psx_cd::cue::TrackMode::Audio)
-        .map(|track| track.file.clone())
-        .ok_or_else(|| Error::Disc(format!("{} names no data track", image.display())))
+    sheet.tracks.iter().find(|track| track.mode != psx_cd::cue::TrackMode::Audio).map(|track| track.file.clone()).ok_or_else(|| Error::Disc(format!("{} names no data track", image.display())))
 }

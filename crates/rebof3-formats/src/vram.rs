@@ -28,8 +28,7 @@ pub static UPLOAD: Description = Description {
 
 /// Decodes the upload and encodes it again; `Err` names the first difference.
 fn round_trip(entry: &Entry, payload: &[u8]) -> Result<(), String> {
-    let rectangles =
-        vram::decode(payload, Descriptor::from_load_argument(entry.ram_ptr)).map_err(|error| error.to_string())?;
+    let rectangles = vram::decode(payload, Descriptor::from_load_argument(entry.ram_ptr)).map_err(|error| error.to_string())?;
     difference(&vram::encode(&rectangles), payload)
 }
 
@@ -40,34 +39,16 @@ fn open(site: &Site<'_>) -> Extras {
         // No rule joins the texture to a palette row, so the TIM carries no CLUT: guessing one would
         // put a placement in the header that the game never states.
         match texture_tim_direct(site.entry().ram_ptr, site.payload()) {
-            Ok(data) => extras.files.push(Extra {
-                role: "tim",
-                tag: String::new(),
-                extension: "tim",
-                evidence: "the upload's VRAM words as a 15-bit TIM; no palette row is joined".to_string(),
-                data,
-            }),
+            Ok(data) => extras.files.push(Extra { role: "tim", tag: String::new(), extension: "tim", evidence: "the upload's VRAM words as a 15-bit TIM; no palette row is joined".to_string(), data }),
             Err(error) => extras.skipped = Some(format!("tim skipped: {error}")),
         }
     }
     match indexed_rows(site.entry().ram_ptr, site.payload(), site.rows) {
         Ok(files) => {
             for file in files {
-                extras.files.push(Extra {
-                    role: "png",
-                    tag: file.tag.clone(),
-                    extension: "png",
-                    evidence: file.evidence.clone(),
-                    data: file.data,
-                });
+                extras.files.push(Extra { role: "png", tag: file.tag.clone(), extension: "png", evidence: file.evidence.clone(), data: file.data });
                 if let Some(tim) = file.tim {
-                    extras.files.push(Extra {
-                        role: "tim",
-                        tag: file.tag,
-                        extension: "tim",
-                        evidence: file.evidence,
-                        data: tim,
-                    });
+                    extras.files.push(Extra { role: "tim", tag: file.tag, extension: "tim", evidence: file.evidence, data: tim });
                 }
             }
         }
@@ -159,13 +140,7 @@ pub fn texture_words(load_arg: u32, payload: &[u8]) -> Result<TextureWords> {
     let descriptor = vram::Descriptor::from_load_argument(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let side = vram::RECTANGLE_SIDE as u32;
-    Ok(TextureWords {
-        x: u32::from(descriptor.column) * side,
-        y: u32::from(descriptor.row) * side,
-        width: grid.width,
-        height: grid.height,
-        words: grid.words,
-    })
+    Ok(TextureWords { x: u32::from(descriptor.column) * side, y: u32::from(descriptor.row) * side, width: grid.width, height: grid.height, words: grid.words })
 }
 
 /// The standard PS1 TIM file of a texture read in one palette row: the
@@ -180,14 +155,7 @@ pub fn texture_tim(load_arg: u32, payload: &[u8], row: &RowUse) -> Result<Vec<u8
 /// The standard PS1 TIM file of a texture drawn with one CLUT row: `bits` is
 /// 4 or 8, `words` is the row's color words, and `clut_x` and `clut_y` are the
 /// row's place in the frame buffer.
-pub fn texture_tim_of(
-    load_arg: u32,
-    payload: &[u8],
-    bits: u32,
-    words: &[u16],
-    clut_x: u16,
-    clut_y: u16,
-) -> Result<Vec<u8>> {
+pub fn texture_tim_of(load_arg: u32, payload: &[u8], bits: u32, words: &[u16], clut_x: u16, clut_y: u16) -> Result<Vec<u8>> {
     let descriptor = vram::Descriptor::from_load_argument(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let mode = match bits {
@@ -198,13 +166,7 @@ pub fn texture_tim_of(
     let side = u16::try_from(vram::RECTANGLE_SIDE).unwrap_or(u16::MAX);
     let tim = tim::File {
         mode,
-        clut: Some(tim::Block {
-            x: clut_x,
-            y: clut_y,
-            width: u16::try_from(words.len()).unwrap_or(u16::MAX),
-            height: 1,
-            words: words.to_vec(),
-        }),
+        clut: Some(tim::Block { x: clut_x, y: clut_y, width: u16::try_from(words.len()).unwrap_or(u16::MAX), height: 1, words: words.to_vec() }),
         image: tim::Block {
             x: u16::from(descriptor.column).saturating_mul(side),
             y: u16::from(descriptor.row).saturating_mul(side),
@@ -228,13 +190,7 @@ pub fn texture_tim_direct(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
     let tim = tim::File {
         mode: tim::Mode::Fifteen,
         clut: None,
-        image: tim::Block {
-            x: place.x(),
-            y: place.y(),
-            width: u16::try_from(grid.width).unwrap_or(u16::MAX),
-            height: u16::try_from(grid.height).unwrap_or(u16::MAX),
-            words: grid.words,
-        },
+        image: tim::Block { x: place.x(), y: place.y(), width: u16::try_from(grid.width).unwrap_or(u16::MAX), height: u16::try_from(grid.height).unwrap_or(u16::MAX), words: grid.words },
     };
     Ok(tim.write())
 }
@@ -277,10 +233,7 @@ impl Placement {
 
     /// `base` with this placement in the bits it owns; every other bit of `base` stays.
     pub fn load_argument(self, base: u32) -> u32 {
-        base & !PLACEMENT_BITS
-            | u32::from(self.column) << 24
-            | u32::from(self.row) << 16
-            | u32::from(self.chunks_per_row) << 8
+        base & !PLACEMENT_BITS | u32::from(self.column) << 24 | u32::from(self.row) << 16 | u32::from(self.chunks_per_row) << 8
     }
 
     /// The same upload with its top-left rectangle at VRAM `column` and `row` (32-word and 32-row units),
@@ -288,8 +241,7 @@ impl Placement {
     pub fn moved(self, column: u8, row: u8, rectangles: usize) -> Option<Self> {
         let per_row = usize::from(self.chunks_per_row).max(1);
         let rows = rectangles.div_ceil(per_row);
-        let fits = usize::from(column) + per_row <= vram::VRAM_WIDTH / vram::RECTANGLE_SIDE
-            && usize::from(row) + rows <= vram::VRAM_HEIGHT / vram::RECTANGLE_SIDE;
+        let fits = usize::from(column) + per_row <= vram::VRAM_WIDTH / vram::RECTANGLE_SIDE && usize::from(row) + rows <= vram::VRAM_HEIGHT / vram::RECTANGLE_SIDE;
         fits.then_some(Self { column, row, ..self })
     }
 }
@@ -346,14 +298,9 @@ pub fn import_tim(bytes: &[u8]) -> Result<TimTexture> {
     // The loader skips the rectangles of a retail upload that leave the frame buffer, so the TIM keeps
     // them: only what the load argument cannot name is refused.
     if x / side > 0x3f || y / side > 0x1f {
-        return Err(Error::Import(format!(
-            "the TIM image at ({x}, {y}) is past the place a load argument can name (column 63, row 31)"
-        )));
+        return Err(Error::Import(format!("the TIM image at ({x}, {y}) is past the place a load argument can name (column 63, row 31)")));
     }
-    let chunks_per_row = u8::try_from(width / side)
-        .ok()
-        .filter(|per_row| *per_row <= 0x3f)
-        .ok_or_else(|| Error::Import(format!("{width} words per row is more than a load argument can name")))?;
+    let chunks_per_row = u8::try_from(width / side).ok().filter(|per_row| *per_row <= 0x3f).ok_or_else(|| Error::Import(format!("{width} words per row is more than a load argument can name")))?;
     let placement = Placement { column: (x / side) as u8, row: (y / side) as u8, chunks_per_row };
     let payload = vram::payload_from_grid(width, height, &image.words)?;
     let depth = match file.mode {
@@ -361,13 +308,7 @@ pub fn import_tim(bytes: &[u8]) -> Result<TimTexture> {
         tim::Mode::Eight => Some(Depth::Eight),
         tim::Mode::Fifteen => None,
     };
-    let clut = file.clut.map(|block| TimClut {
-        x: block.x,
-        y: block.y,
-        width: block.width,
-        height: block.height,
-        words: block.words,
-    });
+    let clut = file.clut.map(|block| TimClut { x: block.x, y: block.y, width: block.width, height: block.height, words: block.words });
     Ok(TimTexture { payload, depth, placement, height: image.height, clut })
 }
 
@@ -409,11 +350,7 @@ pub fn texture_row_png(load_arg: u32, payload: &[u8], bits: u32, palette: &[u16]
         other => return Err(Error::Import(format!("a texture is 4- or 8-bit indexed, not {other}-bit"))),
     };
     if palette.len() != depth.colors() {
-        return Err(Error::Import(format!(
-            "a {bits}-bit row holds {} color words, not {}",
-            depth.colors(),
-            palette.len()
-        )));
+        return Err(Error::Import(format!("a {bits}-bit row holds {} color words, not {}", depth.colors(), palette.len())));
     }
     let grid = vram::word_grid(payload, vram::Descriptor::from_load_argument(load_arg))?;
     let indices = texel_indices(&grid.words, depth);
@@ -428,22 +365,8 @@ pub fn indexed_rows(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> Result<Ve
         .into_iter()
         .map(|image| {
             let tag = format!(".clut-{}-{}", image.clut.x, image.clut.y);
-            let tim = rows
-                .iter()
-                .find(|row| row.clut == image.clut && row.depth == image.depth)
-                .and_then(|row| texture_tim(load_arg, payload, row).ok());
-            RowFile {
-                tag,
-                data: png::indexed_png(
-                    image.width as u32,
-                    image.height as u32,
-                    image.depth.bits() as u8,
-                    &image.colors,
-                    &image.indices,
-                ),
-                evidence: image.evidence,
-                tim,
-            }
+            let tim = rows.iter().find(|row| row.clut == image.clut && row.depth == image.depth).and_then(|row| texture_tim(load_arg, payload, row).ok());
+            RowFile { tag, data: png::indexed_png(image.width as u32, image.height as u32, image.depth.bits() as u8, &image.colors, &image.indices), evidence: image.evidence, tim }
         })
         .collect())
 }
@@ -476,8 +399,7 @@ pub enum TextureImport {
 pub fn import(bytes: &[u8]) -> Result<TextureImport> {
     Ok(match png::read(bytes)? {
         png::Picture::Rgba(picture) => {
-            let words: Vec<u16> =
-                picture.pixels.as_chunks::<4>().0.iter().map(|&pixel| clut::view_to_word(pixel)).collect();
+            let words: Vec<u16> = picture.pixels.as_chunks::<4>().0.iter().map(|&pixel| clut::view_to_word(pixel)).collect();
             let payload = vram::payload_from_grid(picture.width as usize, picture.height as usize, &words)?;
             TextureImport::Words(payload)
         }

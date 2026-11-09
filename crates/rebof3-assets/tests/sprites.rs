@@ -15,12 +15,5 @@ fn every_retail_character_sprites_palette_table_round_trips() {
     assert_eq!(palettes.both_entries, palettes.entries, "every palette table exports and imports to its own bytes");
     assert_eq!(palettes.both_bytes, 44_948, "the bytes of the palette tables");
     let out = support::out_dir("every_retail_character_sprites_palette_table_round_trips");
-    support::write(
-        &out,
-        "palette-coverage.json",
-        format!(
-            "{{\"entries\":{},\"both_entries\":{},\"both_bytes\":{}}}",
-            palettes.entries, palettes.both_entries, palettes.both_bytes
-        ),
-    );
+    support::write(&out, "palette-coverage.json", format!("{{\"entries\":{},\"both_entries\":{},\"both_bytes\":{}}}", palettes.entries, palettes.both_entries, palettes.both_bytes));
 }

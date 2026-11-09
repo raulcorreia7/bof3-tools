@@ -15,12 +15,7 @@ use psx_formats::vab::{BODY_TYPE, Bank};
 /// type-7 entry that shares its load argument.
 pub fn vab_body_index(entries: &[Entry], index: usize) -> Result<usize> {
     let entry = entries.get(index).ok_or(Error::EntryOutOfRange { index, count: entries.len() })?;
-    let bodies: Vec<usize> = entries
-        .iter()
-        .enumerate()
-        .filter(|(_other, body)| body.file_type == BODY_TYPE && body.ram_ptr == entry.ram_ptr)
-        .map(|(index, _body)| index)
-        .collect();
+    let bodies: Vec<usize> = entries.iter().enumerate().filter(|(_other, body)| body.file_type == BODY_TYPE && body.ram_ptr == entry.ram_ptr).map(|(index, _body)| index).collect();
     match bodies.as_slice() {
         [body] => Ok(*body),
         _ => Err(Error::InvalidArchive("a VAB header needs one body entry with its load argument")),
