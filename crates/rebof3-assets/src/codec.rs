@@ -7,7 +7,7 @@
 //! op's needs, read the files, call [`Op::run`], write the bytes.
 
 use crate::error::Result;
-use crate::{decode, import, sprites, tables, text};
+use crate::{import, sprites, tables, text};
 
 /// Which way a conversion goes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,9 +132,11 @@ pub static CODECS: &[Codec] = &[
     Codec {
         kind: "palette",
         export: Some(Op::new("export palette needs a palette bank file", "json", |job| {
-            decode::palette_json(job.input)
+            Ok(rebof3_formats::clut::export(job.input)?)
         })),
-        import: Some(Op::new("import palette needs a palette JSON file", "bin", |job| import::palette(job.input))),
+        import: Some(Op::new("import palette needs a palette JSON file", "bin", |job| {
+            Ok(rebof3_formats::clut::import(job.input)?)
+        })),
     },
     Codec {
         kind: "vag",

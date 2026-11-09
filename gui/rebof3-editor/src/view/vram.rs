@@ -16,9 +16,9 @@ use gpui::{
 use psx_formats::gfx::png;
 use psx_formats::gfx::texture::Clut;
 use psx_formats::gfx::vram::{VRAM_HEIGHT, VRAM_WIDTH};
-use rebof3_assets::decode::color_rgba;
 use rebof3_emi::replay::scenes::{self, Kind as SceneKind, Scene};
 use rebof3_emi::replay::{Kind, Region, Vram};
+use rebof3_formats::clut::color_rgba;
 
 use super::Entry;
 use super::scene::{self, Replayed};

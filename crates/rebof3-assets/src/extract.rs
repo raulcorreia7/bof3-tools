@@ -20,12 +20,14 @@ use rebof3_emi::Archive;
 use rebof3_emi::texture::{Bank, ResidentBank};
 use rebof3_formats::{self as classify, Format, classify};
 
-use crate::decode::{derive, indexed_rows, joined_rows_in};
+use crate::decode::derive;
 use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Selection};
 use crate::report::{DERIVED_TABLE, RENDERED_ITEM, Report, Row};
 use crate::sound;
+use rebof3_formats::joins::joined_rows_in;
 use rebof3_formats::map::{layout, terrain};
+use rebof3_formats::vram::indexed_rows;
 
 /// Name of the table written next to the asset tree.
 pub const TABLE_FILE: &str = "assets.jsonl";

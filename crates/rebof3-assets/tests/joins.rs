@@ -13,9 +13,10 @@ use std::fs;
 use std::path::Path;
 
 use psx_formats::gfx::texture::{Clut, Depth};
-use rebof3_assets::decode::{indexed_rows, joined_rows, texture_view_png};
 use rebof3_emi::Archive;
 use rebof3_emi::texture::ResidentBank;
+use rebof3_formats::joins::joined_rows;
+use rebof3_formats::vram::{indexed_rows, texture_view_png};
 
 /// The proven palette joins: 202 textures and 882 rows.
 const TEXTURES: usize = 202;
@@ -33,7 +34,7 @@ fn write_artifacts(
     source: &str,
     archive: &Archive,
     payloads: &[Vec<u8>],
-    rows: &std::collections::HashMap<usize, Vec<rebof3_assets::decode::RowUse>>,
+    rows: &std::collections::HashMap<usize, Vec<rebof3_formats::vram::RowUse>>,
     summary: &mut Vec<serde_json::Value>,
 ) {
     // The output folder is flat, so the archive's folder joins its file name.

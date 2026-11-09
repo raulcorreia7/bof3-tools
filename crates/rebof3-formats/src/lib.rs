@@ -26,6 +26,7 @@ pub mod error;
 pub mod game_tables;
 pub mod gltf;
 pub mod identity;
+pub mod joins;
 pub mod map;
 pub mod message;
 pub mod registry;

@@ -12,15 +12,15 @@ use crate::disc::find_disc_image;
 use clap::Parser;
 use rebof3_assets::codec::{self, Direction, Index, Job};
 use rebof3_assets::coverage;
-use rebof3_assets::decode;
 use rebof3_assets::disc;
 use rebof3_assets::extract::{self, Options, SUMMARY_FILE, TABLE_FILE};
-use rebof3_assets::import::{self, TextureImport};
+use rebof3_assets::import;
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
 use rebof3_assets::text::{self, DEFAULT_DISC};
 use rebof3_assets::{Error, Result};
 use rebof3_formats::map::terrain;
 use rebof3_formats::vab::soundfont;
+use rebof3_formats::vram::TextureImport;
 
 /// Exit codes: 0 success, 1 some payloads failed to write, 2 an error.
 const EXIT_OK: i32 = 0;
@@ -862,7 +862,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
         load_arg.ok_or_else(|| Error::Usage("export texture needs --load-arg, the entry's load address".into()))?;
     let bytes = read_file(&payload_path)?;
     let (png, what) = match depth {
-        None => (decode::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
+        None => (rebof3_formats::vram::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
         Some(bits) => {
             let Some(bank) = args.palette else {
                 return Err(Error::Usage("--depth needs --palette, the bank that holds the row".into()));
@@ -876,7 +876,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
             let row = words
                 .get(offset..offset + count)
                 .ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
-            let png = decode::texture_row_png(load_arg, &bytes, bits, row)?;
+            let png = rebof3_formats::vram::texture_row_png(load_arg, &bytes, bits, row)?;
             (png, format!("{bits}-bit indexed row at word {offset}"))
         }
     };
@@ -904,7 +904,7 @@ fn import_texture(args: &[String]) -> Result<i32> {
     let input = single(args.files, "import texture needs a PNG file")?;
     let out = with_extension_of(args.output, &input, "img");
     create_parent(&out)?;
-    match import::texture(&read_file(&input)?)? {
+    match rebof3_formats::vram::import(&read_file(&input)?)? {
         TextureImport::Words(payload) => {
             fs::write(&out, payload)?;
             println!("wrote {} (16 bpp view)", out.display());

@@ -17,9 +17,9 @@ use std::thread;
 use psx_cd::Image;
 use psx_cd::checksum::sha256_hex;
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{Kind, Mode, Selection};
 use rebof3_assets::report::Report;
+use rebof3_formats::vram::TextureImport;
 
 /// The extracted tree and its catalog, extracted once for the whole file.
 struct Extracted {
@@ -167,7 +167,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(view) = beside(&path, &format!("{slot}.png")) else { continue };
         let png = fs::read(view).unwrap();
-        let same = match import::texture(&png) {
+        let same = match rebof3_formats::vram::import(&png) {
             Ok(TextureImport::Words(words)) => words == payload,
             Ok(TextureImport::Indexed(row)) => row.payload == payload,
             Err(_) => false,
@@ -184,7 +184,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(json) = beside(&path, &format!("{slot}.json")) else { continue };
         let document = fs::read(json).unwrap();
-        let same = import::palette(&document).map(|back| back == words).unwrap_or(false);
+        let same = rebof3_formats::clut::import(&document).map(|back| back == words).unwrap_or(false);
         record("palette", same);
     }
 

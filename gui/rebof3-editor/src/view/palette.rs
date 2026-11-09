@@ -7,7 +7,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{AnyElement, Bounds, Context, Div, Pixels, div, prelude::*, px};
-use rebof3_assets::decode::color_rgba;
+use rebof3_formats::clut::color_rgba;
 
 use super::Entry;
 use crate::app::Editor;

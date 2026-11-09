@@ -8,12 +8,12 @@ mod support;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rebof3_assets::decode;
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::import::{self, TextureImport};
+use rebof3_assets::import;
 use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
 use rebof3_formats::game_tables::{PAYLOAD_START, TABLES};
+use rebof3_formats::vram::TextureImport;
 
 /// Every file under `directory`, empty when the directory is missing.
 fn files_under(directory: &Path, found: &mut Vec<PathBuf>) {
@@ -69,7 +69,7 @@ fn retail_textures_round_trip_byte_exactly() {
             None => (stem, false),
         };
         let stored = fs::read(path.with_file_name(format!("{slot}.img"))).unwrap();
-        match (import::texture(&fs::read(path).unwrap()), is_row) {
+        match (rebof3_formats::vram::import(&fs::read(path).unwrap()), is_row) {
             (Ok(TextureImport::Words(payload)), false) => {
                 views += 1;
                 if payload != stored {
@@ -108,14 +108,14 @@ fn retail_textures_round_trip_byte_exactly() {
         palettes += 1;
         let json = fs::read(json_path).unwrap();
         let stored = fs::read(json_path.with_extension("clut")).unwrap();
-        if import::palette(&json).ok().as_deref() != Some(stored.as_slice()) {
+        if rebof3_formats::clut::import(&json).ok().as_deref() != Some(stored.as_slice()) {
             failures.push(format!(
                 "{}: the JSON does not return its {} stored bytes",
                 json_path.display(),
                 stored.len()
             ));
         }
-        if decode::palette_json(&stored).ok().as_deref() != Some(json.as_slice()) {
+        if rebof3_formats::clut::export(&stored).ok().as_deref() != Some(json.as_slice()) {
             failures.push(format!("{}: the export does not reproduce the JSON", json_path.display()));
         }
     }
