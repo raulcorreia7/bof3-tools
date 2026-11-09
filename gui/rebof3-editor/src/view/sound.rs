@@ -9,12 +9,12 @@ use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use psx_formats::VAB_SAMPLE_RATE;
 use psx_formats::sep::{Package, Sequence};
 use psx_formats::vab::{Bank, Tone};
-use rebof3_assets::decode::soundfont;
 use rebof3_assets::sound::sequence_pcm;
 use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 use rebof3_emi::entry::vab_body_index;
 use rebof3_formats::Format;
 use rebof3_formats::sep::midi::export as sequence_midi;
+use rebof3_formats::vab::soundfont::export as soundfont;
 use rebof3_formats::vab::vag::pcm_wav;
 
 use super::{Entry, Field, input};

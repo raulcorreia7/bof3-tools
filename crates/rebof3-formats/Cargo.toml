@@ -14,6 +14,8 @@ publish.workspace = true
 [dependencies]
 rebof3-emi = { workspace = true, features = ["std"] }
 psx-formats = { workspace = true, features = ["std"] }
+# The SoundFont export times each envelope with the audio library's own SPU steps.
+bof3player = { workspace = true, features = ["std"] }
 serde.workspace = true
 serde_json.workspace = true
 

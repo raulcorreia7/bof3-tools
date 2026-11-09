@@ -1,4 +1,7 @@
-//! SoundFont 2 back to a VAB bank: the open bank read into the header and body the game loads.
+//! SoundFont 2 for a VAB bank: the export of a header and body to the open file, and the import of that
+//! file back to the header and body the game loads.
+//!
+//! [`export`] times each tone's volume envelope by the audio library's own envelope steps.
 //!
 //! Each preset of bank 0 becomes a program, each zone a tone, and each sample a VAG that the ADPCM encoder writes
 //! from the sample's frames. A zone keeps its keys, root, tuning, level, pan, loop and volume envelope. Three
@@ -21,7 +24,6 @@ use psx_formats::adpcm::{self, BLOCK_BYTES, BLOCK_SAMPLES, FLAG_END, FLAG_LOOP_S
 use psx_formats::sf2::{self, Envelope, Sample};
 use psx_formats::vab::{self, BankProgram, Program, TONES_PER_PROGRAM, Tone};
 
-use crate::decode::volume_envelope;
 use crate::error::{Error, Result};
 
 /// Programs a bank holds, and the volume and pan of a program record the import writes.
@@ -40,8 +42,23 @@ const NEVER: i16 = i16::MIN;
 /// Sustain nibble for full scale: a decay that starts there ends at once, so an attack is timed alone.
 const FULL_SUSTAIN: u16 = 0x0F;
 
+/// The SoundFont 2 file of one VAB bank, from its header and body. `title` names the file inside it. Each
+/// tone's volume envelope is timed by the audio library's own envelope steps, from the registers the voice
+/// plays.
+pub fn export(header: &[u8], body: &[u8], title: &str) -> Result<Vec<u8>> {
+    let vab = vab::Bank::parse(header, body)?;
+    Ok(sf2::write_with(&vab, body, title, &volume_envelope)?)
+}
+
+/// The SoundFont envelope of a tone's ADSR registers. `None` when a phase never ends, which leaves the
+/// SoundFont default on that zone.
+fn volume_envelope(adsr1: u16, adsr2: u16) -> Option<Envelope> {
+    let timing = bof3player::spu::envelope_timing(adsr1, adsr2)?;
+    Some(Envelope::new(timing.attack, timing.decay, timing.sustain_level, timing.release))
+}
+
 /// Reads a SoundFont 2 file back to the VAB bank it describes: the header and the body.
-pub fn bank(sf2_file: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+pub fn import(sf2_file: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     let font = sf2::read(sf2_file)?;
     let mut presets: Vec<_> = font.presets.iter().filter(|preset| preset.bank == 0).collect();
     presets.sort_by_key(|preset| preset.number);
@@ -216,4 +233,18 @@ fn pack(attack: usize, shift: usize, level: usize) -> u16 {
 /// The index of the value nearest `target`. A tie takes the first index, so the choice is the same every time.
 fn nearest(values: &[i16], target: i16) -> usize {
     (0..values.len()).min_by_key(|&index| (i32::from(values[index]) - i32::from(target)).abs()).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_slow_attack_is_timed_by_the_library_steps() {
+        // Attack shift 16, linear step 7: 4,681 steps of 32 samples reach full scale, about 3.40 s, which is
+        // 1200 log2(3.40) = 2117 timecents.
+        let envelope = volume_envelope(0x4000, 0).expect("the phases end");
+        assert_eq!(envelope.attack, 2117);
+        assert_eq!(envelope.sustain, 241, "the decay register's level 0 is 0x800, about 24 dB down");
+    }
 }

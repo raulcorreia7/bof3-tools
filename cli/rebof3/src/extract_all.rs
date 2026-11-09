@@ -16,7 +16,6 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use rebof3_assets::decode;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -377,7 +376,7 @@ fn run_export(job: &ExportJob) -> Result<(), String> {
         Export::Soundfont(body) => {
             let body = fs::read(body).map_err(|error| error.to_string())?;
             let title = job.target.file_stem().unwrap_or_default().to_string_lossy();
-            decode::soundfont(&bytes, &body, &title).map_err(|e| e.to_string())?
+            rebof3_formats::vab::soundfont::export(&bytes, &body, &title).map_err(|e| e.to_string())?
         }
         Export::Sequence(index) => rebof3_formats::sep::midi::export(&bytes, *index).map_err(|e| e.to_string())?,
     };

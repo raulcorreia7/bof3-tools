@@ -303,10 +303,10 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
 fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) -> (bool, bool) {
     let stored = fs::read(header_path).unwrap();
     let soundfont = fs::read(soundfont_path).unwrap();
-    let rebuilt = rebof3_assets::soundfont::bank(&soundfont);
+    let rebuilt = rebof3_formats::vab::soundfont::import(&soundfont);
     let header_equal = rebuilt.as_ref().is_ok_and(|(header, _)| *header == stored);
     let same = rebuilt
-        .and_then(|(header, body)| rebof3_assets::decode::soundfont(&header, &body, slot))
+        .and_then(|(header, body)| rebof3_formats::vab::soundfont::export(&header, &body, slot))
         .ok()
         .and_then(|again| {
             let names_cleared = |bytes: &[u8]| {

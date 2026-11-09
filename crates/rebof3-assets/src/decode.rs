@@ -102,21 +102,6 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_formats::
     }
 }
 
-/// The SoundFont 2 file of one VAB bank, from its header and body. `title` names the file inside it. Each
-/// tone's volume envelope is timed by the audio library's own envelope steps, from the registers the voice
-/// plays.
-pub fn soundfont(header: &[u8], body: &[u8], title: &str) -> crate::Result<Vec<u8>> {
-    let vab = psx_formats::vab::Bank::parse(header, body)?;
-    Ok(psx_formats::sf2::write_with(&vab, body, title, &volume_envelope)?)
-}
-
-/// The SoundFont envelope of a tone's ADSR registers. `None` when a phase never ends, which leaves the
-/// SoundFont default on that zone.
-pub(crate) fn volume_envelope(adsr1: u16, adsr2: u16) -> Option<psx_formats::sf2::Envelope> {
-    let timing = bof3player::spu::envelope_timing(adsr1, adsr2)?;
-    Some(psx_formats::sf2::Envelope::new(timing.attack, timing.decay, timing.sustain_level, timing.release))
-}
-
 /// The lossless RGBA view of a color word (`clut::word_to_view`): `0x0000` reads as transparent and
 /// the STP bit reads as half alpha, so [`crate::import`] returns the word exactly.
 pub fn color_rgba(word: u16) -> [u8; 4] {
@@ -367,18 +352,4 @@ pub fn indexed_rows(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> rebof3_fo
             }
         })
         .collect())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_slow_attack_is_timed_by_the_library_steps() {
-        // Attack shift 16, linear step 7: 4,681 steps of 32 samples reach full scale, about 3.40 s, which is
-        // 1200 log2(3.40) = 2117 timecents.
-        let envelope = volume_envelope(0x4000, 0).expect("the phases end");
-        assert_eq!(envelope.attack, 2117);
-        assert_eq!(envelope.sustain, 241, "the decay register's level 0 is 0x800, about 24 dB down");
-    }
 }

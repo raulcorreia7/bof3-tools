@@ -20,7 +20,7 @@ use rebof3_emi::Archive;
 use rebof3_emi::texture::{Bank, ResidentBank};
 use rebof3_formats::{self as classify, Format, classify};
 
-use crate::decode::{derive, indexed_rows, joined_rows_in, soundfont};
+use crate::decode::{derive, indexed_rows, joined_rows_in};
 use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Selection};
 use crate::report::{DERIVED_TABLE, RENDERED_ITEM, Report, Row};
@@ -473,7 +473,7 @@ fn emi_rows(
                             data: Cow::Owned(whole),
                             evidence: VAB_EVIDENCE.to_string(),
                         });
-                        match soundfont(payload, body, &format!("{stem}/{slot}")) {
+                        match rebof3_formats::vab::soundfont::export(payload, body, &format!("{stem}/{slot}")) {
                             Ok(data) => outputs.push(Output {
                                 role: "sf2",
                                 path: name("", "sf2"),

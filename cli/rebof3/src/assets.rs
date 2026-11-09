@@ -17,10 +17,10 @@ use rebof3_assets::disc;
 use rebof3_assets::extract::{self, Options, SUMMARY_FILE, TABLE_FILE};
 use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
-use rebof3_assets::soundfont;
 use rebof3_assets::text::{self, DEFAULT_DISC};
 use rebof3_assets::{Error, Result};
 use rebof3_formats::map::terrain;
+use rebof3_formats::vab::soundfont;
 
 /// Exit codes: 0 success, 1 some payloads failed to write, 2 an error.
 const EXIT_OK: i32 = 0;
@@ -1036,7 +1036,7 @@ struct OneFile {
 fn import_soundfont(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let input = single(args.files, "import soundfont needs a SoundFont 2 file")?;
-    let (header, body) = soundfont::bank(&read_file(&input)?)?;
+    let (header, body) = soundfont::import(&read_file(&input)?)?;
     let prefix = args.output.unwrap_or_else(|| input.with_extension(""));
     write_output(&PathBuf::from(format!("{}.vh", prefix.display())), &header)?;
     write_output(&PathBuf::from(format!("{}.vb", prefix.display())), &body)?;
@@ -1053,7 +1053,7 @@ fn soundfont_command(args: &[String]) -> Result<i32> {
     let out = with_extension_of(args.output, header, "sf2");
     create_parent(&out)?;
     let title = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
-    let data = decode::soundfont(&read_file(header)?, &read_file(body)?, &title)?;
+    let data = soundfont::export(&read_file(header)?, &read_file(body)?, &title)?;
     fs::write(&out, data)?;
     println!("wrote {}", out.display());
     Ok(EXIT_OK)

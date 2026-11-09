@@ -18,7 +18,6 @@ pub mod import;
 pub mod kind;
 pub mod report;
 pub mod sound;
-pub mod soundfont;
 pub mod sprites;
 pub mod tables;
 pub mod text;

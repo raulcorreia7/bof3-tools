@@ -6,6 +6,7 @@ use rebof3_emi::Entry;
 
 use crate::registry::{Description, Format, RoundTrip, Selector, State};
 
+pub mod soundfont;
 pub mod vag;
 
 /// The header as a format-registry row.

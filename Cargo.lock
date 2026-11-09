@@ -4888,6 +4888,7 @@ dependencies = [
 name = "rebof3-formats"
 version = "0.2.0"
 dependencies = [
+ "bof3player",
  "psx-formats",
  "rebof3-emi",
  "serde",
