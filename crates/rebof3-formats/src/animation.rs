@@ -1,8 +1,10 @@
 //! An animation: the step stream an actor plays and the frames it shows.
 //!
-//! `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) points work `+0x50` at
-//! `table + table[n]` of the section's animation table, and `Actor_SeekScript`
-//! (`exe/slus_004_22@0x8014D910`) reads it:
+//! Two formats hold animations, so this module is shared. Work `+0x50` points at one from either
+//! source: `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) takes `table + table[n]` of a
+//! sprite bank section's animation table, and `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) takes
+//! a record of the script bank `g_ScriptBank` names. `Actor_SeekScript`
+//! (`exe/slus_004_22@0x8014D910`) then reads it:
 //!
 //! | Offset | Size | Field | Meaning |
 //! | -----: | ---: | ----- | ------- |
@@ -139,7 +141,7 @@ impl Animation {
 
         let animation = Self { steps, frames };
         if animation.encode() != bytes[..end] {
-            return Err(Error::SpriteBank(
+            return Err(Error::AnimationStream(
                 "an animation's frames are not laid out in table order after its offsets".into(),
             ));
         }
@@ -319,7 +321,7 @@ impl Player {
 }
 
 fn short(at: usize) -> Error {
-    Error::SpriteBank(format!("an animation ends before byte {at:#X}"))
+    Error::AnimationStream(format!("an animation ends before byte {at:#X}"))
 }
 
 #[cfg(test)]

@@ -453,7 +453,7 @@ mod tests {
         let sizes = sizes();
 
         let plain = Cell { size: 0, x: 0, y: 0, u: 0, v: 0 };
-        let flipped = Cell { size: super::super::animation::FLIP, x: 8, y: 0, u: 0, v: 0 };
+        let flipped = Cell { size: crate::animation::FLIP, x: 8, y: 0, u: 0, v: 0 };
         let frame = Frame { cells: vec![plain, flipped] };
         let bounds = frame_bounds(&frame, &sizes, false).expect("cells");
         assert_eq!(bounds, Bounds { left: 0, top: 0, right: 16, bottom: 8 });

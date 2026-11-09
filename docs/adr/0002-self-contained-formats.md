@@ -154,7 +154,8 @@ Every format moved into `rebof3-formats`, one commit per move:
 
 `joins` (a texture's palette rows over a whole archive) and `text` read several formats, so they
 are not formats. No format module imports them except `message`, which uses `text`; the
-independence test lists `text` as shared. SoundFont fits in `vab` because `bof3player` depends only
+independence test lists `text` as shared. `animation`, the actor animation stream that
+`Actor_SeekScript` reads, is shared the same way: the sprite banks and the script banks both hold it. SoundFont fits in `vab` because `bof3player` depends only
 on `psx-formats` and its own `emi` crate, so there is no cycle; the crate takes it for the SPU
 envelope steps.
 

@@ -28,12 +28,11 @@
 //! sheet is packed again, and the parts after it move; the section keeps its length, so an edit that
 //! needs more than the section's trailing zero bytes is refused.
 
-mod animation;
 mod draw;
 mod image;
 mod sheet;
 
-pub use animation::{Animation, CELL_BYTES, Cell, FLIP, Frame, JUMP, Playback, Player, SHAPE_MASK, Step};
+pub use crate::animation::{Animation, CELL_BYTES, Cell, FLIP, Frame, JUMP, Playback, Player, SHAPE_MASK, Step};
 pub use draw::{
     Bounds, Composite, FIELD_PAGE, FIELD_PALETTE, FIELD_PALETTE_STAGE, FIELD_SLOT_ROWS, Pixel, Placement, Reader,
     SHAPES, SPRITE_SIZES, SpriteSizes, Stage, TRANSPARENT, Texel, animation_bounds, cell_rect, compose, frame_bounds,
