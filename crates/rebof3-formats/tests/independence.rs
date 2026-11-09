@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 
 /// The modules of `src/` that hold one format each.
-const FORMATS: [&str; 14] = [
+const FORMATS: [&str; 16] = [
     "cells",
     "clut",
     "cue",
@@ -13,6 +13,7 @@ const FORMATS: [&str; 14] = [
     "game_tables",
     "map",
     "message",
+    "residue",
     "resources",
     "scene",
     "script",
@@ -20,6 +21,7 @@ const FORMATS: [&str; 14] = [
     "sprite_bank",
     "vab",
     "vram",
+    "window",
 ];
 
 /// The modules a format may import: the registry row types, the identity check, the error type and
