@@ -6,17 +6,15 @@ every switch with its default, and runnable examples. A command with verbs (`dis
 `emi pack`, `assets import texture`) has its own focused `--help`. Errors name what failed and the
 next safe action.
 
-```sh
-make build
-target/release/bof3 --help
-target/release/bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
-target/release/bof3 emi list "BIN/BGM/BGM000.EMI"
-target/release/bof3 assets extract-all -o build/extract
-```
+Build the binary first ([README](../README.md#build)); the examples run from the repository root with
+`bin/bof3` and write below `build/`.
 
-`make build` writes `target/release/bof3`. The build needs the Rust toolchain in
-`rust-toolchain.toml`. Audio extraction uses the [bof3-player](https://github.com/raulcorreia7/bof3-player) libraries;
-on Linux they need the ALSA headers. The examples run from the repository root and write below `build/`.
+```sh
+bin/bof3 --help
+bin/bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+bin/bof3 emi list build/disc/BIN/BGM/BGM000.EMI
+bin/bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
+```
 
 | Command       | Does                                                           | Reference         |
 | ------------- | -------------------------------------------------------------- | ----------------- |
@@ -25,16 +23,16 @@ on Linux they need the ALSA headers. The examples run from the repository root a
 | `bof3 assets` | Extract the disc's assets or convert one asset                 | [Assets](#assets) |
 
 Switch names match across commands: `-i/--input`, `-o/--output`, `--list`, `--json`, `-q/--quiet`.
-`-i` for a disc image defaults to the image in `inputs/external`, then `./disk`.
+Without `-i`, a command that reads a disc image looks for one in `inputs/external`, then in `./disk`.
 
 ## disc
 
 `disc` extracts, checksums, verifies and describes disc images.
 
 ```sh
-target/release/bof3 disc extract -i inputs/external/disc.cue -o build/disc
-target/release/bof3 disc checksum -i build/disc -o build/checksums.json
-target/release/bof3 disc verify -i build/disc -o build/checksums.json
+bin/bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+bin/bof3 disc checksum -i dumps -o build/checksums.json
+bin/bof3 disc verify -i dumps -o build/checksums.json
 ```
 
 | Verb       | Switches                                                                                                            |
@@ -42,8 +40,8 @@ target/release/bof3 disc verify -i build/disc -o build/checksums.json
 | `extract`  | `-i IMAGE`, `-o DIR` (default `build/extracted`), `-p FILE.xml` (default `DIR/IMAGE.xml`), `-q`                     |
 | `rebuild`  | `-i DIR` and `-o IMAGE.iso`, both required; writes a synthetic ISO of the folder's top-level files, not a game disc |
 | `lba-json` | `-i IMAGE`, `-o FILE.json`, `-x DIR`, `-p FILE.xml` (all required), `-r DIR` (default `processed/emi_raw`)          |
-| `checksum` | `-i DIR`, `-o FILE.json`, both required                                                                             |
-| `verify`   | `-i DIR`, `-o FILE.json`, both required                                                                             |
+| `checksum` | `-i DIR`, `-o FILE.json`, both required; hashes the `.bin`, `.cue`, `.img` and `.iso` files below `DIR`             |
+| `verify`   | `-i DIR`, `-o FILE.json`, both required; compares those files with the checksums file                               |
 
 Every verb takes `-q/--quiet`. `verify` exits 0 when every file matches, 1 on a mismatch and 2 on an
 error.
@@ -55,10 +53,10 @@ palette, bank and sequence entries. The container layout is in the
 [EMI format](https://raulcorreia7.github.io/bof3-wiki/formats/emi.html).
 
 ```sh
-target/release/bof3 emi list "BIN/BGM/BGM000.EMI"
-target/release/bof3 emi extract "BIN/BGM/BGM000.EMI" -o build/bgm000
-target/release/bof3 emi pack -o build/test.EMI build/src
-target/release/bof3 emi vram -i "BIN/BGM/BGM000.EMI" -o build/page.png
+bin/bof3 emi list build/disc/BIN/BGM/BGM000.EMI
+bin/bof3 emi extract build/disc/BIN/BGM/BGM000.EMI -o build/bgm000
+bin/bof3 emi pack -o build/test.EMI build/src
+bin/bof3 emi vram -i build/disc/BIN/BATTLE/BATL_DRA.EMI -o build/page.png
 ```
 
 `bof3 emi ARCHIVE.EMI` extracts the archive. Every verb takes the archive as `-i/--input` or as the
@@ -106,10 +104,10 @@ Without `-J`, `pack` guesses the type from the extension and loses the load addr
 format. The kinds and the output layout are in [assets](assets.md).
 
 ```sh
-target/release/bof3 assets extract --only texture,palette -o build/art
-target/release/bof3 assets extract --only audio-sequence --audio-format ogg --mode modern -o build/music
-target/release/bof3 assets extract-all -o build/extract
-target/release/bof3 assets coverage -i "Breath of Fire III (USA).cue"
+bin/bof3 assets extract --only texture,palette -i "Breath of Fire III (USA).cue" -o build/art
+bin/bof3 assets extract --only audio-sequence --audio-format ogg --mode modern -i "Breath of Fire III (USA).cue" -o build/music
+bin/bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
+bin/bof3 assets coverage -i "Breath of Fire III (USA).cue"
 ```
 
 `assets extract` writes to `build/game-assets` by default.
@@ -147,8 +145,8 @@ Each verb has focused help with its own switches and defaults, for example
 `--entry INDEX=FILE` and `--file PATH=FILE`.
 
 ```sh
-target/release/bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
-target/release/bof3 assets import texture 7.png -o payload.img
+bin/bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
+bin/bof3 assets import texture 7.png -o payload.img
 ```
 
 `terrain` writes `.glb` for a `.glb` output path and OBJ plus MTL otherwise. `soundfont` takes the header

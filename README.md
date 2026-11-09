@@ -10,34 +10,58 @@ disc images, lists, unpacks and packs EMI archives, and converts the disc's asse
 the disc and asset commands. This is a fan project, not affiliated with or endorsed by Capcom.
 *Breath of Fire* is Capcom's trademark.
 
-## Install
+## Requirements
 
-From a release: download the archive for your platform from
-[Releases](https://github.com/raulcorreia7/bof3-tools/releases), unpack it and run `bof3`. Each
-archive has a matching `.sha256` file; check it with `sha256sum -c` (Linux) or `shasum -a 256 -c`
-(macOS).
+| Need | Version | Get it |
+| ---- | ------- | ------ |
+| Rust (`rustup`, `cargo`) | 1.99 or later | [rustup.rs](https://rustup.rs); `rust-toolchain.toml` selects stable, and `rustup update stable` updates it |
+| Git, GNU make, a C compiler, `pkg-config` | any recent | the distribution's packages |
+| `cargo-deny` | any | `cargo install cargo-deny --locked` (the check gate only) |
+| System libraries | Linux only | below |
+| The disc | US release, serial SLUS-00422 | your own dump: a Redump-verified CUE sheet and its two BIN tracks, in one folder |
 
-From source: you need Git and Rust 1.99 or later (`rust-toolchain.toml` selects stable Rust and
-`rustup` installs it on the first build). On Linux, building the editor needs the ALSA, fontconfig,
-Wayland, xkbcommon, XCB and Vulkan headers (`libasound2-dev libfontconfig1-dev libwayland-dev
-libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev
-libxcb-xfixes0-dev libvulkan-dev` on Debian and Ubuntu); the `bof3` command does not. The editor
-draws with [gpui](https://crates.io/crates/gpui) and needs a Vulkan driver on Linux.
-Run `rustup update stable` to update an installed toolchain.
+System libraries for the editor (`make build` builds it, so install them; `cargo build -p rebof3`
+builds the `bof3` command with only the C compiler):
+
+| Distribution | Packages |
+| ------------ | -------- |
+| Debian, Ubuntu | `build-essential pkg-config libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libvulkan-dev` |
+| Arch | `base-devel alsa-lib fontconfig wayland libxkbcommon libxkbcommon-x11 libxcb vulkan-icd-loader` |
+
+The editor draws with [gpui](https://crates.io/crates/gpui) and needs a Vulkan driver at run time.
+Release archives for Linux, macOS and Windows are on
+[Releases](https://github.com/raulcorreia7/bof3-tools/releases); each has a `.sha256` file to check with
+`sha256sum -c` (Linux) or `shasum -a 256 -c` (macOS).
+
+No game data is in this repository. Keep the disc dump outside Git.
+
+## Set up
 
 ```sh
 git clone https://github.com/raulcorreia7/bof3-tools.git
 cd bof3-tools
-make build   # builds target/release and links bof3 and bof3-edit into bin/
 ```
 
-## Usage
+## Build
 
 ```sh
-bof3 --help
-bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
-bof3 emi list build/disc/BIN/BGM/BGM000.EMI
-bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
+make build
+```
+
+`make build` builds the release workspace and links `bof3` and `bof3-edit` into `bin/`. For the
+command alone: `cargo build --release --locked -p rebof3`, which writes `target/release/bof3`.
+
+## Run
+
+Run from the repository root. `Breath of Fire III (USA).cue` stands for your CUE sheet; its BIN tracks
+sit next to it.
+
+```sh
+bin/bof3 --help
+bin/bof3 disc extract -i "Breath of Fire III (USA).cue" -o build/disc
+bin/bof3 emi list build/disc/BIN/BGM/BGM000.EMI
+bin/bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
+bin/bof3-edit build/disc my-mod
 ```
 
 `emi pack` builds an EMI archive from any files, so you can try the tool without a disc:
@@ -45,9 +69,11 @@ bof3 assets extract-all -i "Breath of Fire III (USA).cue" -o build/extract
 ```sh
 printf hello > a.bin
 printf world > b.bin
-bof3 emi pack -o test.EMI -i a.bin b.bin
-bof3 emi list test.EMI
+bin/bof3 emi pack -o test.EMI -i a.bin b.bin
+bin/bof3 emi list test.EMI
 ```
+
+## Commands
 
 | Command       | Does                                                           |
 | ------------- | -------------------------------------------------------------- |
@@ -57,50 +83,9 @@ bof3 emi list test.EMI
 
 ## Asset editor
 
-`bof3-edit` is a desktop editor for the disc's EMI archives. It runs on Linux (X11 and Wayland), macOS and
-Windows.
-
-```sh
-bin/bof3-edit build/disc my-mod   # after make build; or: cargo run --release -p rebof3-editor -- build/disc my-mod
-```
-
-The first argument is an extracted disc (the folder that holds `BIN/`), the second a project folder. The
-editor only reads the disc. Edits are saved to `my-mod/edits/`, and **Project → Export** rebuilds each
-edited archive into `my-mod/disc/`, then reads it back to confirm that it holds exactly the edited
-payloads.
-
-The left panel has two trees, switched at its top (**Game** and **Disc**) and remembered in the project
-folder. **Game** is the catalog: characters, enemies and bosses, areas and maps, battle, interface,
-audio, text, data tables, movies and other, each with its entry count, in the game's own order (area
-number, enemy archive, boss, spell effect). Every entry of every archive is in it once, and a name no rule
-places is under Unsorted with the reason. **Disc** is the file tree. The filter works in both, and
-each line opens the views below. [docs/editor.md](docs/editor.md#game-catalog) says how the catalog files
-an entry.
-
-| View    | Entries                       | What you can do                                                    |
-| ------- | ----------------------------- | ------------------------------------------------------------------ |
-| Info    | every entry                   | type, load address, size, format and what is known about it        |
-| Hex     | every entry                   | edit bytes; read and write the value at the cursor as any int width |
-| Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a palette row a draw rule joins in the scene that loads it, or pick one; a ranked depth and row suggestion when no rule joins; paint |
-| VRAM    | VRAM uploads, CLUT blocks   | the whole 1024×512 VRAM of a field, world-map, menu, battle or effect scene, replayed from its archives; each region outlined with the entry that wrote it; decode any region at any depth with any CLUT row; export PNG |
-| Palette | CLUT blocks                 | edit any color's 5-bit channels and semi-transparency bit          |
-| Tables  | `ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, area encounter blocks, actor definitions, cue tables, VAB headers | spreadsheets of items, equipment, shops, abilities, level growth, party members, encounters, enemies and their AI blocks, actor definitions, sound cues, and a sound bank's programs and tones; drops, equipment, skills and encounter slots show the name they point at |
-| Text    | message tables, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
-| Sound   | VAB banks, sequence packages  | play samples, tones at a chosen note and sequences through the audio library's SPU, in stereo (with the archive's own bank and your edits); export a raw sample as WAVE, SoundFont and MIDI; replace a sample from WAVE; edit a sequence's resolution, tempo and time signature; import a sequence from MIDI |
-| Map     | area map bundles              | the map from above, textured from its area's replayed VRAM or coloured by texture page and height; export the textured map as PNG; edit a cell's corner heights |
-| 3D      | area map bundles              | the area as the field renderer draws it, through a free or the game's camera, drawn with OpenGL ES or in software; layers for exits, cell codes, the battle grid, encounter zones and actors; paint codes and battle values, raise cells, edit tile descriptors, move and turn actors, edit encounter rows; export and import glTF |
-| Character sprites | character sprites, raw or LZ77 | play each section's animations at the game's tick (loop, once, reverse; step by tick or step) with the frame stitched through VRAM and its cells outlined; the frame sheet; edit any palette colour; export and import a PNG sprite sheet with Aseprite JSON |
-| Formation | area encounter blocks | each encounter's enemies placed as the field places them for battle, drawn through the area's VRAM and animated, for each scroll direction |
-| Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
-| Script  | area, battle and magic-effect script tables | each record's animation stream one op per line: `show` a frame for its ticks, `jump` to a labelled step; edit any operand or cell; add or remove a step at the end of a stream; export and import the bank as text |
-| Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |
-
-[docs/editor.md](docs/editor.md) lists what the editor offers for every entry format.
-
-Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); one undo takes back a whole drag or typed field. `Ctrl+S`
-saves, `Ctrl+E` exports, and closing with unsaved edits asks to save or discard them. The editor
-uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font
-family to use another one.
+`bof3-edit` is a desktop editor for the disc's EMI archives (Linux with X11 or Wayland, macOS, Windows).
+It reads an extracted disc and saves edits to a project folder. The views, keys and project layout are in
+[docs/editor.md](docs/editor.md).
 
 ## Supported formats
 
@@ -116,18 +101,26 @@ family to use another one.
 `bof3 assets kinds` lists every asset kind and how it is handled. The formats are described in the
 [wiki](https://raulcorreia7.github.io/bof3-wiki/).
 
-## Documentation
+## Check
+
+```sh
+make check
+```
+
+`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. Tests that need the
+retail disc skip without it; `make check-retail` runs them with `BOF3_DISC_DIR` (the extracted disc) and
+`BOF3_DISC_IMAGE` (the CUE sheet) set, and a skip fails ([CONTRIBUTING.md](CONTRIBUTING.md#test-data)).
+
+## Next
 
 - [Command line](docs/cli.md): every command, switch and example.
 - [Asset output](docs/assets.md): the folder layout and file kinds.
+- [Asset editor](docs/editor.md): the views, the game catalog and the format coverage.
 - [Crates](docs/crates.md): the libraries behind the command.
+- [CONTRIBUTING.md](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md) and the
+  [security policy](SECURITY.md).
 - Related projects: [bof3-player](https://github.com/raulcorreia7/bof3-player) plays the extracted
   audio, and the [bof3 workspace](https://github.com/raulcorreia7/bof3) links all projects.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md) and the
-[security policy](SECURITY.md). Run `make check` before a pull request.
 
 ## License
 

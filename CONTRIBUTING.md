@@ -6,23 +6,27 @@ Issues and pull requests are welcome. All contributions follow the
 
 ## Set up
 
-You need Git and Rust 1.99 or later. `rust-toolchain.toml` selects stable Rust, and `rustup`
-installs it on the first build. Audio extraction needs the ALSA headers on Linux. The
-[README](README.md) shows how to build and run `bof3`.
+Install the tools in the [README requirements](README.md#requirements): Rust 1.99 or later, GNU make,
+`cargo-deny` and the Linux libraries. Then:
 
 ```sh
 git clone https://github.com/raulcorreia7/bof3-tools.git
 cd bof3-tools
-make check
+git switch -c fix/short-name
 ```
 
 ## Checks
 
-`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. Install `cargo-deny`
-once with `cargo install cargo-deny --locked`. CI runs the same checks on Linux and Windows and
-builds with the minimum supported Rust version (`rust-version` in `Cargo.toml`) and builds the CLI.
-The release workflow also builds for macOS. A pull request that changes only docs runs the format
-checks only.
+Run before every push:
+
+```sh
+make check
+```
+
+`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. CI runs the same checks
+on Linux and Windows, checks the minimum supported Rust version (`rust-version` in `Cargo.toml`) and
+builds the CLI. The release workflow also builds for macOS. A pull request that changes only docs runs
+the format check only.
 
 ## Test data
 
@@ -42,13 +46,17 @@ variable is set but wrong (no `BIN/` folder, missing cue sheet). A skip looks gr
 must prove the retail results runs `make check-retail`: it sets `BOF3_REQUIRE_RETAIL=1`, which turns
 every skip into a failure, and runs the workspace tests.
 
-Do not commit game data, disc images, extracted assets or game text.
+Do not commit game data, disc images, extracted assets, game text or build output (`build/`, `target/`, `bin/`).
 
 ## Submit a change
 
-Create a branch and keep each change focused. Use commit subjects such as
-`fix(emi): reject a short header` or `docs(cli): add a pack example`. Describe the behavior and the
-checks in the pull request.
+1. Branch from `main` and keep each change focused.
+2. Commit as `type(scope): subject`, imperative and lowercase, for example
+   `fix(emi): reject a short header` or `docs(cli): add a pack example`.
+3. Run `make check`, then push and open a pull request that describes the behavior and the checks.
+
+Docs, comments and commit messages follow the workspace
+[writing standard](https://github.com/raulcorreia7/bof3/blob/main/docs/standard.md#writing).
 
 ## License
 
