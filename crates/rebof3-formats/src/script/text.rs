@@ -1,4 +1,4 @@
-//! A script bank as text: one op per line, labels for the steps jumps reach.
+//! A script table as text: one op per line, labels for the steps jumps reach.
 //!
 //! ```text
 //! bof3-script 1
@@ -54,13 +54,13 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Text from [`export`] back to a payload. The payload may not outgrow `base`, the stored one: what
-/// follows the bank in memory is not known to be free.
+/// follows the table in memory is not known to be free.
 pub fn import(text: &[u8], base: &[u8]) -> Result<Vec<u8>> {
     let text = core::str::from_utf8(text).map_err(|_| Error::Import("the script text is not UTF-8".into()))?;
     let bytes = parse(text)?.encode()?;
     if bytes.len() > base.len() {
         return Err(Error::Import(format!(
-            "the bank grows to {} bytes from {}: what follows it in memory is not known to be free",
+            "the table grows to {} bytes from {}: what follows it in memory is not known to be free",
             bytes.len(),
             base.len()
         )));
@@ -73,7 +73,7 @@ pub fn write(program: &Program) -> String {
     let mut out = String::new();
     let _ = writeln!(
         out,
-        "; A script bank: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)"
+        "; A script table: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)"
     );
     let _ = writeln!(out, "; points an actor at a record and Actor_SeekScript (exe/slus_004_22@0x8014D910) plays it.");
     let _ = writeln!(out, "; show: stage a frame for its ticks (Actor_StageAnimStep; a tick is 33.4 ms, 0 lasts 256).");
@@ -421,8 +421,8 @@ mod tests {
     use super::*;
     use crate::animation::Step;
 
-    /// A bank: one section of a stream with a loop and a pad, a shared table entry and a raw record.
-    fn bank() -> Vec<u8> {
+    /// A table: one section of a stream with a loop and a pad, a shared table entry and a raw record.
+    fn table() -> Vec<u8> {
         let animation = Animation {
             steps: vec![Step { delay: 4, frame: 0 }, Step { delay: 0, frame: 1 }, Step { delay: 0x81, frame: 1 }],
             frames: vec![
@@ -438,14 +438,14 @@ mod tests {
 
     #[test]
     fn an_unchanged_export_imports_to_the_stored_bytes() {
-        let payload = bank();
+        let payload = table();
         let text = export(&payload).expect("exports");
         assert_eq!(import(&text, &payload).expect("imports"), payload);
     }
 
     #[test]
     fn the_text_names_ops_labels_and_cells() {
-        let text = String::from_utf8(export(&bank()).expect("exports")).expect("UTF-8");
+        let text = String::from_utf8(export(&table()).expect("exports")).expect("UTF-8");
         assert!(text.contains("s1:\n    show frame 1 ticks 0"), "{text}");
         assert!(text.contains("jump s1 code 0x81"), "{text}");
         assert!(text.contains("cell shape 5 flip x -8 y -16 u 0 v 0"), "{text}");
@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn an_added_step_moves_the_jump_through_its_label() {
-        let payload = bank();
+        let payload = table();
         let text = String::from_utf8(export(&payload).expect("exports")).expect("UTF-8");
         let grown = text
             .replacen("    show frame 0 ticks 4", "    show frame 0 ticks 4\n    show frame 0 ticks 2", 1)
@@ -471,8 +471,8 @@ mod tests {
     }
 
     #[test]
-    fn a_bank_that_outgrows_its_payload_is_refused() {
-        let payload = bank();
+    fn a_table_that_outgrows_its_payload_is_refused() {
+        let payload = table();
         let text = String::from_utf8(export(&payload).expect("exports")).expect("UTF-8");
         let grown = text.replacen("pad 00 00", "pad 00 00 00 00", 1);
         assert!(import(grown.as_bytes(), &payload).is_err());

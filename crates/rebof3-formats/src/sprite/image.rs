@@ -118,7 +118,7 @@ impl Image {
     pub fn new(width: u16, height: u16, encoding: Encoding, texels: Vec<u8>) -> Result<Self> {
         let image = Self { width, height, encoding, kind: encoding.kind(), texels: Vec::new(), stored: None };
         if texels.len() != image.texel_count() {
-            return Err(Error::SpriteBank(format!(
+            return Err(Error::CharacterSprites(format!(
                 "a {}x{} sheet holds {} texels, not {}",
                 image.texel_width(),
                 height,
@@ -157,7 +157,11 @@ impl Image {
     /// Replaces the texels. A change drops the stored record, so [`Image::encode`] packs the sheet again.
     pub fn set_texels(&mut self, texels: Vec<u8>) -> Result<()> {
         if texels.len() != self.texel_count() {
-            return Err(Error::SpriteBank(format!("a sheet of {} texels takes {}", self.texel_count(), texels.len())));
+            return Err(Error::CharacterSprites(format!(
+                "a sheet of {} texels takes {}",
+                self.texel_count(),
+                texels.len()
+            )));
         }
         if texels != self.texels {
             self.texels = texels;
@@ -253,7 +257,7 @@ fn word(bytes: &[u8], at: usize) -> Result<u32> {
 }
 
 fn short(needed: usize, have: usize) -> Error {
-    Error::SpriteBank(format!("a frame sheet needs {needed} bytes; its record has {have}"))
+    Error::CharacterSprites(format!("a frame sheet needs {needed} bytes; its record has {have}"))
 }
 
 #[cfg(test)]

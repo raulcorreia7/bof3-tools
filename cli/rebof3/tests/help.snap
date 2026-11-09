@@ -468,24 +468,24 @@ Usage: bof3 assets export <KIND> ...
 
 Kinds:
   texture         PNG view, or an indexed PNG in one palette row
-  tim             a texture as a TIM file, with its CLUT when you give one
-  palette         a CLUT bank as JSON
-  terrain         a map bundle as glTF or OBJ
-  vag             one sample of a VAB bank as WAVE
-  vab             a bank's header and body as one VAB file
-  sequence        one sequence of a package as MIDI
-  seq             one sequence of a package as a SEQ file
-  sep             a sequence package as a SEP file
-  message         a message bank as JSON
-  message-po      a message bank as a PO catalogue for translators
-  script          a script bank's animation streams as text, one op per line
-  strings         the strings of another payload as JSON
-  characters      the eight playable characters as JSON
-  character-bank  a sprite bank's palette tables as JSON
-  sprite-sheet    a sprite bank section as a PNG sheet and Aseprite JSON
+  tim                a texture as a TIM file, with its CLUT when you give one
+  palette            a CLUT block as JSON
+  terrain            a map bundle as glTF or OBJ
+  vag                one sample of a VAB bank as WAVE
+  vab                a bank's header and body as one VAB file
+  sequence           one sequence of a package as MIDI
+  seq                one sequence of a package as a SEQ file
+  sep                a sequence package as a SEP file
+  message            a message table as JSON
+  message-po         a message table as a PO catalogue for translators
+  script             a script table's animation streams as text, one op per line
+  strings            the strings of another payload as JSON
+  characters         the eight playable characters as JSON
+  character-sprites  the character sprites' palette tables as JSON
+  sprite-sheet       a character sprites section as a PNG sheet and Aseprite JSON
 
 Every kind has focused help: bof3 assets export <KIND> --help.
-Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette BANK,
+Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette CLUT_BLOCK,
 --palette-offset WORDS, --index N.
 
 Example:
@@ -498,28 +498,28 @@ bof3 assets import: read one asset's open form back into its stored bytes.
 Usage: bof3 assets import <KIND> ...
 
 Kinds:
-  texture         a PNG view or indexed PNG back into a payload
-  tim             a TIM file back into a payload and its palette
-  palette         palette JSON back into color words
-  terrain         a glTF or OBJ mesh back into a map bundle
-  vag             a WAVE file back into a sample
-  vab             a VAB file back into its header and body
-  seq             SEQ files back into a sequence package
-  sep             a SEP file back into a sequence package
-  table           one game table back into ETC/GAME.EMI entry 0
-  encounters      encounter JSON back into its block
-  layout          map layout JSON back into a bundle
-  emi             a container with named entries replaced
-  sequence        MIDI files back into a sequence package
-  disc            a patched copy of the whole disc
-  soundfont       a SoundFont 2 file back into a VAB bank
-  message         message JSON back into a bank
-  message-po      a translated PO catalogue back into a bank (needs --payload)
-  script          script text back into its bank
-  strings         strings JSON back into its payload
-  characters      character JSON back into ETC/START.EMI entry 8
-  character-bank  palette JSON back into a sprite bank
-  sprite-sheet    a PNG sheet and Aseprite JSON back into a sprite bank
+  texture            a PNG view or indexed PNG back into a payload
+  tim                a TIM file back into a payload and its palette
+  palette            palette JSON back into color words
+  terrain            a glTF or OBJ mesh back into a map bundle
+  vag                a WAVE file back into a sample
+  vab                a VAB file back into its header and body
+  seq                SEQ files back into a sequence package
+  sep                a SEP file back into a sequence package
+  table              one game table back into ETC/GAME.EMI entry 0
+  encounters         encounter JSON back into its block
+  layout             map layout JSON back into a bundle
+  emi                a container with named entries replaced
+  sequence           MIDI files back into a sequence package
+  disc               a patched copy of the whole disc
+  soundfont          a SoundFont 2 file back into a VAB bank
+  message            message JSON back into a message table
+  message-po         a translated PO catalogue back into a message table (needs --payload)
+  script             script text back into its script table
+  strings            strings JSON back into its payload
+  characters         character JSON back into ETC/START.EMI entry 8
+  character-sprites  palette JSON back into character sprites
+  sprite-sheet       a PNG sheet and Aseprite JSON back into character sprites
 
 Every kind has focused help: bof3 assets import <KIND> --help.
 Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
@@ -533,28 +533,28 @@ $ bof3 assets export texture --help
 bof3 assets export texture: write a texture's stored payload as a PNG.
 
 Usage: bof3 assets export texture PAYLOAD --load-arg HEX [-o OUT]
-       bof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette BANK
+       bof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette CLUT_BLOCK
                                            [--palette-offset WORDS] [-o OUT]
 
-  PAYLOAD                  stored texture payload
-      --load-arg HEX       the entry's load address (required)
-      --depth 4|8          draw an indexed PNG at this depth (default: off, 16 bpp view)
-      --palette BANK       color-word file for --depth (required with it)
-      --palette-offset N   first word of the palette row (default: 0)
-  -o, --output OUT         PNG to write (default: PAYLOAD.png)
+  PAYLOAD                   stored texture payload
+      --load-arg HEX        the entry's load address (required)
+      --depth 4|8           draw an indexed PNG at this depth (default: off, 16 bpp view)
+      --palette CLUT_BLOCK  color-word file for --depth (required with it)
+      --palette-offset N    first word of the palette row (default: 0)
+  -o, --output OUT          PNG to write (default: PAYLOAD.png)
 
 Examples:
   bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
-  bof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette bank.clut -o 7.png
+  bof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette block.clut -o 7.png
 
 $ bof3 assets export palette --help
 [exit 0]
-bof3 assets export palette: write a CLUT bank as JSON.
+bof3 assets export palette: write a CLUT block as JSON.
 
-Usage: bof3 assets export palette BANK [-o OUT]
+Usage: bof3 assets export palette CLUT_BLOCK [-o OUT]
 
-  BANK                raw color words
-  -o, --output OUT    JSON to write (default: BANK.json)
+  CLUT_BLOCK          raw color words
+  -o, --output OUT    JSON to write (default: CLUT_BLOCK.json)
 
 Example:
   bof3 assets export palette palette.clut -o palette.json
@@ -601,15 +601,15 @@ Example:
 
 $ bof3 assets export message --help
 [exit 0]
-bof3 assets export message: write a message bank as JSON.
+bof3 assets export message: write a message table as JSON.
 
 Usage: bof3 assets export message PAYLOAD [-o OUT]
 
-  PAYLOAD             message-bank payload
+  PAYLOAD             message-table payload
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  bof3 assets export message bank.bin -o bank.json
+  bof3 assets export message table.bin -o table.json
 
 $ bof3 assets export strings --help
 [exit 0]
@@ -637,25 +637,25 @@ Usage: bof3 assets export characters PAYLOAD [-o OUT]
 Example:
   bof3 assets export characters START8.bin -o characters.json
 
-$ bof3 assets export character-bank --help
+$ bof3 assets export character-sprites --help
 [exit 0]
-bof3 assets export character-bank: write a sprite bank's palettes as JSON.
+bof3 assets export character-sprites: write the character sprites' palettes as JSON.
 
-Usage: bof3 assets export character-bank PAYLOAD [-o OUT]
+Usage: bof3 assets export character-sprites PAYLOAD [-o OUT]
 
-  PAYLOAD             decoded sprite bank, container or one section
+  PAYLOAD             decoded character sprites, container or one section
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  bof3 assets export character-bank bank.bin -o palettes.json
+  bof3 assets export character-sprites sprites.bin -o palettes.json
 
 $ bof3 assets export sprite-sheet --help
 [exit 0]
-bof3 assets export sprite-sheet: write a sprite bank section as a PNG sheet and Aseprite JSON.
+bof3 assets export sprite-sheet: write a character sprites section as a PNG sheet and Aseprite JSON.
 
 Usage: bof3 assets export sprite-sheet PAYLOAD --exe SLUS_004.22 [--section N] [--palette N] [-o OUT]
 
-  PAYLOAD             stored sprite bank payload, raw or LZ77
+  PAYLOAD             stored character sprites payload, raw or LZ77
       --exe PATH      the executable, which holds the cell sizes (required)
       --section N     the container section (default: 0)
       --palette N     the section palette to draw with (default: 0, the one the field stages)
@@ -676,7 +676,7 @@ Usage: bof3 assets import texture PNG [-o OUT] [--palette OUT]
 
 Examples:
   bof3 assets import texture 7.png -o payload.img
-  bof3 assets import texture 7.png --palette bank.clut -o payload.img
+  bof3 assets import texture 7.png --palette block.clut -o payload.img
 
 $ bof3 assets import palette --help
 [exit 0]
@@ -814,15 +814,15 @@ Example:
 
 $ bof3 assets import message --help
 [exit 0]
-bof3 assets import message: read message JSON back into a bank.
+bof3 assets import message: read message JSON back into a message table.
 
 Usage: bof3 assets import message JSON [-o OUT]
 
   JSON                message JSON from export message
-  -o, --output OUT    bank to write (default: JSON.bin)
+  -o, --output OUT    table to write (default: JSON.bin)
 
 Example:
-  bof3 assets import message bank.json -o bank.bin
+  bof3 assets import message table.json -o table.bin
 
 $ bof3 assets import strings --help
 [exit 0]
@@ -850,22 +850,22 @@ Usage: bof3 assets import characters JSON --payload PAYLOAD [-o OUT]
 Example:
   bof3 assets import characters characters.json --payload START8.bin -o START8.new.bin
 
-$ bof3 assets import character-bank --help
+$ bof3 assets import character-sprites --help
 [exit 0]
-bof3 assets import character-bank: read palette JSON back into a sprite bank.
+bof3 assets import character-sprites: read palette JSON back into character sprites.
 
-Usage: bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]
+Usage: bof3 assets import character-sprites JSON --payload PAYLOAD [-o OUT]
 
-  JSON                palette JSON from export character-bank
-      --payload PATH  the decoded bank (required)
-  -o, --output OUT    bank to write (default: JSON.bin)
+  JSON                palette JSON from export character-sprites
+      --payload PATH  the decoded character sprites (required)
+  -o, --output OUT    payload to write (default: JSON.bin)
 
 Example:
-  bof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
+  bof3 assets import character-sprites palettes.json --payload sprites.bin -o sprites.new.bin
 
 $ bof3 assets import sprite-sheet --help
 [exit 0]
-bof3 assets import sprite-sheet: read a PNG sheet and Aseprite JSON back into a sprite bank.
+bof3 assets import sprite-sheet: read a PNG sheet and Aseprite JSON back into character sprites.
 
 Usage: bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe SLUS_004.22 [-o OUT]
 
@@ -879,30 +879,30 @@ Example:
 
 $ bof3 assets kinds
 [exit 0]
-executable       raw       program images: SLUS_004.22 and LOGO.EXE
-system           raw       SYSTEM.CNF and the license sectors
-video            raw       MDEC video with XA audio (2336-byte sectors)
-xa-audio         raw       multiplexed XA ADPCM banks (2336-byte sectors)
-cdda             decoded   CD-DA tracks: the stored 16-bit stereo PCM and a 44.1 kHz WAV
-texture          decoded   type-3 VRAM uploads: raw words and a 16bpp PNG view
-palette          decoded   CLUT banks: raw words, JSON and a swatch PNG
-audio-bank       decoded   VAB header (.vh) and body (.vb) halves, and a SoundFont 2 (.sf2) per bank
-audio-sequence   raw       SEP sequence packages (.seq)
-audio-cues       decoded   type-8 cue tables: raw records and JSON
-character-bank   decoded   sprite banks: stored form and, for type 1, the LZ77-decoded blob
-area-message     raw       area message banks (0x80010000)
-area-cells       raw       packed 4-bit cell grids (0x80032000)
-area-script      decoded   area script banks (0x800D3800): stored bytes, JSON and the ops as text
-battle-script    decoded   battle script banks (0x800F0800): stored bytes, JSON and the ops as text
-area-actor-defs  decoded   actor definitions: raw records and JSON
-area-encounters  decoded   encounters and enemy records (0x800E4000): stored bytes and JSON
-area-map         decoded   map bundles (0x80104000): stored bytes and the terrain as OBJ, MTL and glTF binary
-area-module      raw       auxiliary module windows (0x80117000)
-resource-table   raw       shared resource tables (0x8001A000)
-bmagic-table     decoded   magic-effect script banks (0x800C3800): stored bytes, JSON and the ops as text
-code             raw       code images loaded from EMI entries
-reserve          none      all-zero payloads that reserve a RAM slot
-unknown          raw       entries and files no rule classifies
-data-table       decoded   fixed game tables from ETC/GAME.EMI entry 0: stored bytes and JSON for items, equipment, shops, abilities, level growth
-text             decoded   game strings and message banks as JSON, from the extracted disc
+executable        raw       program images: SLUS_004.22 and LOGO.EXE
+system            raw       SYSTEM.CNF and the license sectors
+video             raw       MDEC video with XA audio (2336-byte sectors)
+xa-audio          raw       multiplexed XA ADPCM banks (2336-byte sectors)
+cdda              decoded   CD-DA tracks: the stored 16-bit stereo PCM and a 44.1 kHz WAV
+texture           decoded   type-3 VRAM uploads: raw words and a 16bpp PNG view
+palette           decoded   CLUT blocks: raw words, JSON and a swatch PNG
+audio-bank        decoded   VAB header (.vh) and body (.vb) halves, and a SoundFont 2 (.sf2) per bank
+audio-sequence    raw       SEP sequence packages (.seq)
+audio-cues        decoded   type-8 cue tables: raw records and JSON
+character-sprites decoded   character sprites: stored form and, for type 1, the LZ77-decoded blob
+area-message      raw       area message tables (0x80010000)
+area-cells        raw       packed 4-bit cell grids (0x80032000)
+area-script       decoded   area script tables (0x800D3800): stored bytes, JSON and the ops as text
+battle-script     decoded   battle script tables (0x800F0800): stored bytes, JSON and the ops as text
+area-actor-defs   decoded   actor definitions: raw records and JSON
+area-encounters   decoded   encounters and enemy records (0x800E4000): stored bytes and JSON
+area-map          decoded   map bundles (0x80104000): stored bytes and the terrain as OBJ, MTL and glTF binary
+area-module       raw       auxiliary module windows (0x80117000)
+resource-table    raw       shared resource tables (0x8001A000)
+bmagic-script     decoded   magic-effect script tables (0x800C3800): stored bytes, JSON and the ops as text
+code              raw       code images loaded from EMI entries
+reserve           none      all-zero payloads that reserve a RAM slot
+unknown           raw       entries and files no rule classifies
+data-table        decoded   fixed game tables from ETC/GAME.EMI entry 0: stored bytes and JSON for items, equipment, shops, abilities, level growth
+text              decoded   game strings and message tables as JSON, from the extracted disc
 

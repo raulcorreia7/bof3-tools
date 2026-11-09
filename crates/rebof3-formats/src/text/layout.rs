@@ -156,7 +156,7 @@ pub enum Redirect {
     Character(u8),
     /// `{VAR:n}`: the 32-byte string number `n` that `Message_SetVariable` fills.
     Variable(u8),
-    /// `{LINK:n}`: a string of the bank's own sub-table.
+    /// `{LINK:n}`: a string of the table's own sub-table.
     Link(u8),
 }
 
@@ -302,11 +302,11 @@ pub struct Layout {
     pub unproven: Vec<Unproven>,
 }
 
-/// What a layout reads besides the message: the bank, for `{LINK}`, and the text a runtime code stands for.
+/// What a layout reads besides the message: the table, for `{LINK}`, and the text a runtime code stands for.
 #[derive(Clone, Copy, Default)]
 pub struct Context<'a> {
-    /// The bank the message belongs to.
-    pub bank: Option<&'a [u8]>,
+    /// The table the message belongs to.
+    pub table: Option<&'a [u8]>,
     /// The bytes a redirect reads, when the caller knows them (a default party name, say).
     pub runtime: Option<&'a dyn Fn(Redirect) -> Option<Vec<u8>>>,
 }
@@ -328,7 +328,7 @@ fn is_blank(page: &Page) -> bool {
     page.glyphs.is_empty() && page.runtime.is_empty() && page.events.is_empty() && matches!(page.end, PageEnd::End)
 }
 
-/// A position in one of the byte streams the machine reads: the message, the bank, or a redirected string.
+/// A position in one of the byte streams the machine reads: the message, the table, or a redirected string.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Cursor {
     stream: usize,
@@ -554,9 +554,9 @@ impl<'a> Machine<'a> {
 
     fn resolve(&self, what: Redirect) -> Option<Vec<u8>> {
         if let Redirect::Link(operand) = what
-            && let Some(bank) = self.context.bank
+            && let Some(table) = self.context.table
         {
-            return link_bytes(bank, operand);
+            return link_bytes(table, operand);
         }
         self.context.runtime.and_then(|resolve| resolve(what))
     }
@@ -597,15 +597,15 @@ impl<'a> Machine<'a> {
     }
 }
 
-/// The bytes `{LINK:n}` reads from `bank`: `D_80010004` holds the offset of a table of `u16` offsets, entry `n`
+/// The bytes `{LINK:n}` reads from `table`: `D_80010004` holds the offset of a table of `u16` offsets, entry `n`
 /// of which, added to the table's address, is one byte before the string (`UI_DrawMessageScript`, case
-/// `STRING_LINK`; the shared tail's `p++` lands on the string). `None` when any of it lies outside the bank.
-fn link_bytes(bank: &[u8], operand: u8) -> Option<Vec<u8>> {
-    let table = u32::from_le_bytes(bank.get(4..8)?.try_into().ok()?) as usize;
-    let entry = table.checked_add(usize::from(operand) * 2)?;
-    let offset = usize::from(u16::from_le_bytes(bank.get(entry..entry + 2)?.try_into().ok()?));
-    let start = table.checked_add(offset)?.checked_add(1)?;
-    bank.get(start..).filter(|rest| !rest.is_empty()).map(<[u8]>::to_vec)
+/// `STRING_LINK`; the shared tail's `p++` lands on the string). `None` when any of it lies outside the table.
+fn link_bytes(table: &[u8], operand: u8) -> Option<Vec<u8>> {
+    let directory = u32::from_le_bytes(table.get(4..8)?.try_into().ok()?) as usize;
+    let entry = directory.checked_add(usize::from(operand) * 2)?;
+    let offset = usize::from(u16::from_le_bytes(table.get(entry..entry + 2)?.try_into().ok()?));
+    let start = directory.checked_add(offset)?.checked_add(1)?;
+    table.get(start..).filter(|rest| !rest.is_empty()).map(<[u8]>::to_vec)
 }
 
 #[cfg(test)]
@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn a_known_name_is_drawn_through_the_redirect_budget() {
         let name = |what: Redirect| (what == Redirect::Character(2)).then(|| vec![b'R', b'y', b'u', code::END]);
-        let context = Context { bank: None, runtime: Some(&name) };
+        let context = Context { table: None, runtime: Some(&name) };
         let layout = layout(&[code::INSERT, 2, b'!', code::END], context);
         let xs: Vec<i32> = layout.pages[0].glyphs.iter().map(|glyph| glyph.x).collect();
         assert_eq!(xs, [10, 18, 26, 34]);
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn a_redirect_stops_at_its_budget() {
         let long = |_: Redirect| Some(b"ABCDEFGH".to_vec());
-        let context = Context { bank: None, runtime: Some(&long) };
+        let context = Context { table: None, runtime: Some(&long) };
         let layout = layout(&[code::INSERT, 0, b'!', code::END], context);
         // Five bytes of the name, then the glyph after the code.
         assert_eq!(layout.pages[0].glyphs.len(), NAME_FIELD_BYTES + 1);
@@ -718,8 +718,8 @@ mod tests {
     }
 
     #[test]
-    fn a_link_outside_the_bank_is_a_placeholder() {
-        let layout = layout(&[code::LINK, 7, code::END], Context { bank: Some(&[0u8; 8]), runtime: None });
+    fn a_link_outside_the_table_is_a_placeholder() {
+        let layout = layout(&[code::LINK, 7, code::END], Context { table: Some(&[0u8; 8]), runtime: None });
         assert_eq!(layout.pages[0].runtime.len(), 1);
     }
 }

@@ -1,4 +1,4 @@
-//! The character sprite bank, stored as a type-1 LZ77 blob or as a raw type-0 container
+//! The character sprites, stored as a type-1 LZ77 blob or as a raw type-0 container
 //! (`wiki: formats/character#container`).
 
 use rebof3_emi::{TYPE_LZ77, lz77};
@@ -6,14 +6,14 @@ use rebof3_emi::{TYPE_LZ77, lz77};
 use crate::error::Result;
 use crate::registry::{Derived, Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
-/// Load arguments of the raw bank: the whole container and the five section positions
+/// Load arguments of the raw sprites: the whole container and the five section positions
 /// (`wiki: formats/character#load-arguments`).
 const RAW_ADDRESSES: [u32; 6] = [0x8003_b800, 0x8003_b80c, 0x8005_680c, 0x8005_f80c, 0x8007_180c, 0x8007_a80c];
 
-/// The LZ77-packed bank as a format-registry row.
-pub static LZ77_BLOB: Description = Description {
-    format: Format::Lz77Blob,
-    name: "character sprite blob, LZ77 (type 1)",
+/// The LZ77-packed sprites as a format-registry row.
+pub static LZ77: Description = Description {
+    format: Format::CharacterSpritesLz77,
+    name: "character sprites, LZ77 (type 1)",
     state: State::Specified,
     spec_state: "partial",
     codec_state: "decode-only (in the game's own decoder)",
@@ -23,13 +23,13 @@ pub static LZ77_BLOB: Description = Description {
     round_trip: RoundTrip::None,
     derive: Some(derive),
     open: None,
-    kind: "character-bank",
+    kind: "character-sprites",
 };
 
-/// The raw bank as a format-registry row.
-pub static RAW_BLOB: Description = Description {
-    format: Format::CharacterBlob,
-    name: "character sprite blob, raw (type 0)",
+/// The raw sprites as a format-registry row.
+pub static RAW: Description = Description {
+    format: Format::CharacterSprites,
+    name: "character sprites, raw (type 0)",
     state: State::Specified,
     spec_state: "partial",
     codec_state: "none",
@@ -39,7 +39,7 @@ pub static RAW_BLOB: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "character-bank",
+    kind: "character-sprites",
 };
 
 /// The LZ77-decoded blob, as the game's own decoder produces it.

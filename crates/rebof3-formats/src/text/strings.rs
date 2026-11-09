@@ -1,4 +1,4 @@
-//! The strings of a payload that is not a message bank, as JSON: each string with its offset, its length and its text.
+//! The strings of a payload that is not a message table, as JSON: each string with its offset, its length and its text.
 //!
 //! The strings are the ones [`rebof3_formats::text::discover`] finds. The JSON lists only the strings. Import
 //! takes the same payload back, so every byte between two strings stays as it was. An unedited export imports to its
@@ -66,7 +66,7 @@ pub struct Item {
     /// The record's index inside its table.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index: Option<usize>,
-    /// How the string was found: `bank header`, `known table` or `scan`.
+    /// How the string was found: `table header`, `known table` or `scan`.
     #[serde(default)]
     pub found: String,
 }
@@ -93,7 +93,7 @@ impl Item {
 }
 
 /// The strings of `payload` as JSON. `load_address` is the address the payload loads at, when it has one; the scan
-/// uses it to recognise a pointer table. A message bank is refused: its records are exported with [`super::bank`].
+/// uses it to recognise a pointer table. A message table is refused: its records are exported with [`super::table`].
 pub fn export(payload: &[u8], load_address: Option<u32>) -> Result<Vec<u8>> {
     export_counted(payload, load_address, None, &[]).map(|(json, _)| json)
 }
@@ -105,8 +105,8 @@ pub fn rows(
     source: Option<&PayloadSource>,
     exclude: &[(usize, usize)],
 ) -> Result<Vec<Item>> {
-    if discover::bank_records(payload).is_some() {
-        return Err(Error::Import("this payload is a message bank; export it with the message bank format".into()));
+    if discover::table_records(payload).is_some() {
+        return Err(Error::Import("this payload is a message table; export it with the message table format".into()));
     }
     let strings = disjoint(discover::strings(payload, load_address));
     let mut fields = BTreeMap::new();

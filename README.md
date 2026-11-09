@@ -72,7 +72,7 @@ payloads.
 The left panel has two trees, switched at its top (**Game** and **Disc**) and remembered in the project
 folder. **Game** is the catalog: characters, enemies and bosses, areas and maps, battle, interface,
 audio, text, data tables, movies and other, each with its entry count, in the game's own order (area
-number, enemy bank, boss, spell effect). Every entry of every archive is in it once, and a name no rule
+number, enemy archive, boss, spell effect). Every entry of every archive is in it once, and a name no rule
 places is under Unsorted with the reason. **Disc** is the file tree. The filter works in both, and
 each line opens the views below. [docs/editor.md](docs/editor.md#game-catalog) says how the catalog files
 an entry.
@@ -82,17 +82,17 @@ an entry.
 | Info    | every entry                   | type, load address, size, format and what is known about it        |
 | Hex     | every entry                   | edit bytes; read and write the value at the cursor as any int width |
 | Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a palette row a draw rule joins in the scene that loads it, or pick one; a ranked depth and row suggestion when no rule joins; paint |
-| VRAM    | VRAM uploads, palette banks   | the whole 1024×512 VRAM of a field, world-map, menu, battle or effect scene, replayed from its archives; each region outlined with the entry that wrote it; decode any region at any depth with any CLUT row; export PNG |
-| Palette | palette banks                 | edit any color's 5-bit channels and semi-transparency bit          |
+| VRAM    | VRAM uploads, CLUT blocks   | the whole 1024×512 VRAM of a field, world-map, menu, battle or effect scene, replayed from its archives; each region outlined with the entry that wrote it; decode any region at any depth with any CLUT row; export PNG |
+| Palette | CLUT blocks                 | edit any color's 5-bit channels and semi-transparency bit          |
 | Tables  | `ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, area encounter blocks, actor definitions, cue tables, VAB headers | spreadsheets of items, equipment, shops, abilities, level growth, party members, encounters, enemies and their AI blocks, actor definitions, sound cues, and a sound bank's programs and tones; drops, equipment, skills and encounter slots show the name they point at |
-| Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
+| Text    | message tables, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
 | Sound   | VAB banks, sequence packages  | play samples, tones at a chosen note and sequences through the audio library's SPU, in stereo (with the archive's own bank and your edits); export a raw sample as WAVE, SoundFont and MIDI; replace a sample from WAVE; edit a sequence's resolution, tempo and time signature; import a sequence from MIDI |
-| Map     | area map bundles              | the map from above, textured from its area's replayed VRAM or coloured by tile bank and height; export the textured map as PNG; edit a cell's corner heights |
+| Map     | area map bundles              | the map from above, textured from its area's replayed VRAM or coloured by texture page and height; export the textured map as PNG; edit a cell's corner heights |
 | 3D      | area map bundles              | the area as the field renderer draws it, through a free or the game's camera, drawn with OpenGL ES or in software; layers for exits, cell codes, the battle grid, encounter zones and actors; paint codes and battle values, raise cells, edit tile descriptors, move and turn actors, edit encounter rows; export and import glTF |
-| Sprite bank | character sprite banks, raw or LZ77 | play each section's animations at the game's tick (loop, once, reverse; step by tick or step) with the frame stitched through VRAM and its cells outlined; the frame sheet; edit any palette colour; export and import a PNG sprite sheet with Aseprite JSON |
+| Character sprites | character sprites, raw or LZ77 | play each section's animations at the game's tick (loop, once, reverse; step by tick or step) with the frame stitched through VRAM and its cells outlined; the frame sheet; edit any palette colour; export and import a PNG sprite sheet with Aseprite JSON |
 | Formation | area encounter blocks | each encounter's enemies placed as the field places them for battle, drawn through the area's VRAM and animated, for each scroll direction |
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
-| Script  | area, battle and magic-effect script banks | each record's animation stream one op per line: `show` a frame for its ticks, `jump` to a labelled step; edit any operand or cell; add or remove a step at the end of a stream; export and import the bank as text |
+| Script  | area, battle and magic-effect script tables | each record's animation stream one op per line: `show` a frame for its ticks, `jump` to a labelled step; edit any operand or cell; add or remove a step at the end of a stream; export and import the bank as text |
 | Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |
 
 [docs/editor.md](docs/editor.md) lists what the editor offers for every entry format.

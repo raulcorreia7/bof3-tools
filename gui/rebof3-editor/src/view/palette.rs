@@ -1,4 +1,4 @@
-//! A palette bank as a grid of 16-color rows, with a 15-bit color picker.
+//! A CLUT block as a grid of 16-color rows, with a 15-bit color picker.
 //!
 //! A color word is `stp << 15 | blue << 10 | green << 5 | red`, five bits per channel. Word `0x0000`
 //! draws transparent; the STP bit marks a semi-transparent texel.
@@ -81,13 +81,13 @@ pub struct State {
     sliders: Sliders,
 }
 
-/// The bank's colors.
+/// The block's colors.
 pub fn words(bytes: &[u8]) -> Vec<u16> {
     bytes.as_chunks::<COLOR_BYTES>().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect()
 }
 
 /// Writes color `index` of `bytes` as `word`. Every other byte keeps its value, a trailing odd byte
-/// included. Returns false when the bank has no such color.
+/// included. Returns false when the block has no such color.
 fn put_color(bytes: &mut [u8], index: usize, word: u16) -> bool {
     let start = index * COLOR_BYTES;
     let Some(slot) = bytes.get_mut(start..start + COLOR_BYTES) else { return false };
@@ -98,7 +98,7 @@ fn put_color(bytes: &mut [u8], index: usize, word: u16) -> bool {
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     let words = words(entry.payload());
     if words.is_empty() {
-        return muted("The bank holds no colors.").into_any_element();
+        return muted("The block holds no colors.").into_any_element();
     }
     let original = entry.original();
     let selected = editor.views.palette.selected.min(words.len() - 1);
@@ -179,7 +179,7 @@ pub fn picker(word: u16, index: usize, sliders: &Sliders, set: SetColor, cx: &mu
         .child(controls)
 }
 
-/// Rewrites color `index` of the shown bank.
+/// Rewrites color `index` of the shown block.
 fn set_color(editor: &mut Editor, index: usize, change: &dyn Fn(u16) -> u16) {
     let Some(entry) = editor.current() else { return };
     let mut bytes = entry.payload().to_vec();
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(words(&bytes), [0x2211, 0xBEEF]);
     }
 
-    /// Every color of every retail palette bank takes an STP flip in its own two bytes and flips back to
+    /// Every color of every retail CLUT block takes an STP flip in its own two bytes and flips back to
     /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_color_edit_rewrites_only_its_word() {
@@ -219,11 +219,11 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("bof3-edit-palette-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 
-        let (mut banks, mut failures) = (0, Vec::new());
+        let (mut blocks, mut failures) = (0, Vec::new());
         for path in project.archives.clone() {
             let archive = project.load(&path).expect("archive loads");
-            for index in (0..archive.entries().len()).filter(|&index| archive.formats[index] == Format::ClutBank) {
-                banks += 1;
+            for index in (0..archive.entries().len()).filter(|&index| archive.formats[index] == Format::ClutBlock) {
+                blocks += 1;
                 let payload = archive.original(index);
                 let mut bytes = payload.to_vec();
                 for (color, word) in words(payload).into_iter().enumerate() {
@@ -235,13 +235,13 @@ mod tests {
                     }
                 }
                 if bytes != payload {
-                    failures.push(format!("{}#{index}: the flips do not restore the bank", path.0));
+                    failures.push(format!("{}#{index}: the flips do not restore the block", path.0));
                 }
             }
         }
 
         let _ = std::fs::remove_dir_all(&folder);
-        eprintln!("palette: {} problems over {banks} banks", failures.len());
-        assert!(banks > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
+        eprintln!("palette: {} problems over {blocks} blocks", failures.len());
+        assert!(blocks > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 }

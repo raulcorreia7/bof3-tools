@@ -137,12 +137,12 @@ payload that holds text writes `text/<disc path without .EMI>/<slot>.bin`, `<slo
 
 | Operation | Verbs                                                                                                                                                                                     |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Export    | `terrain` (glTF or OBJ), `soundfont`, `tables`, `encounters`, and `export` for `texture`, `palette`, `terrain`, `vag`, `sequence`, `message`, `message-po`, `script`, `strings`, `characters` or `character-bank` |
-| Import    | `import` for `texture`, `palette`, `terrain`, `vag`, `table`, `encounters`, `layout`, `emi`, `sequence`, `disc`, `soundfont`, `message`, `message-po`, `script`, `strings`, `characters` or `character-bank`      |
+| Export    | `terrain` (glTF or OBJ), `soundfont`, `tables`, `encounters`, and `export` for `texture`, `palette`, `terrain`, `vag`, `sequence`, `message`, `message-po`, `script`, `strings`, `characters` or `character-sprites` |
+| Import    | `import` for `texture`, `palette`, `terrain`, `vag`, `table`, `encounters`, `layout`, `emi`, `sequence`, `disc`, `soundfont`, `message`, `message-po`, `script`, `strings`, `characters` or `character-sprites`      |
 
 Each verb has focused help with its own switches and defaults, for example
 `bof3 assets export texture --help` and `bof3 assets import disc --help`. Common export switches are
-`-o/--output`, `--load-arg HEX`, `--depth 4|8`, `--palette BANK`, `--palette-offset WORDS` and
+`-o/--output`, `--load-arg HEX`, `--depth 4|8`, `--palette CLUT_BLOCK`, `--palette-offset WORDS` and
 `--index N`. Common import switches are `-o/--output`, `--payload PATH`, `--palette OUT`, `--base BLOCK`,
 `--entry INDEX=FILE` and `--file PATH=FILE`.
 

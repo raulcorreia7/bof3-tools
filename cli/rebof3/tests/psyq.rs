@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! The period file verbs (TIM, VAB, SEQ, SEP) over small synthetic inputs: each export reads back to
+//! The Psy-Q file verbs (TIM, VAB, SEQ, SEP) over small synthetic inputs: each export reads back to
 //! the bytes it came from.
 
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ fn bof3(dir: &Path, args: &[&str]) -> String {
 }
 
 fn folder(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("bof3-period-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("bof3-psyq-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -28,7 +28,7 @@ fn sheet() -> Vec<u8> {
     (0..2 * 1024u16).flat_map(|word| word.wrapping_mul(7).to_le_bytes()).collect()
 }
 
-fn bank_words() -> Vec<u8> {
+fn block_words() -> Vec<u8> {
     (0..32u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect()
 }
 
@@ -36,7 +36,7 @@ fn bank_words() -> Vec<u8> {
 fn a_tim_goes_back_to_the_texture_and_the_palette() {
     let dir = folder("tim");
     std::fs::write(dir.join("t.img"), sheet()).unwrap();
-    std::fs::write(dir.join("bank.clut"), bank_words()).unwrap();
+    std::fs::write(dir.join("block.clut"), block_words()).unwrap();
 
     bof3(
         &dir,
@@ -50,7 +50,7 @@ fn a_tim_goes_back_to_the_texture_and_the_palette() {
             "--depth",
             "4",
             "--palette",
-            "bank.clut",
+            "block.clut",
             "--palette-offset",
             "16",
             "--clut",
@@ -62,7 +62,7 @@ fn a_tim_goes_back_to_the_texture_and_the_palette() {
     assert!(said.contains("load argument 0x16080100"), "{said}");
     assert!(said.contains("CLUT at (160, 483)"), "{said}");
     assert_eq!(std::fs::read(dir.join("back.img")).unwrap(), sheet());
-    assert_eq!(std::fs::read(dir.join("row.bin")).unwrap(), bank_words()[32..64]);
+    assert_eq!(std::fs::read(dir.join("row.bin")).unwrap(), block_words()[32..64]);
 
     bof3(
         &dir,
@@ -75,16 +75,16 @@ fn a_tim_goes_back_to_the_texture_and_the_palette() {
             "again.img",
             "--palette",
             "spliced.clut",
-            "--bank",
-            "bank.clut",
+            "--clut-block",
+            "block.clut",
             "--palette-offset",
             "16",
         ],
     );
     assert_eq!(
         std::fs::read(dir.join("spliced.clut")).unwrap(),
-        bank_words(),
-        "an unchanged row leaves the bank as it was"
+        block_words(),
+        "an unchanged row leaves the CLUT block as it was"
     );
     let _ = std::fs::remove_dir_all(&dir);
 }

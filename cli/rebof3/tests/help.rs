@@ -30,7 +30,7 @@ const EXPORT: &[&str] = &[
     "message",
     "strings",
     "characters",
-    "character-bank",
+    "character-sprites",
     "sprite-sheet",
 ];
 const IMPORT: &[&str] = &[
@@ -48,7 +48,7 @@ const IMPORT: &[&str] = &[
     "message",
     "strings",
     "characters",
-    "character-bank",
+    "character-sprites",
     "sprite-sheet",
 ];
 

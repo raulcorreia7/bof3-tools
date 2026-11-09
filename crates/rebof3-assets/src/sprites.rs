@@ -1,7 +1,7 @@
-//! Sprite banks: their palettes as JSON, and each section as a PNG sprite sheet with Aseprite JSON.
+//! Character sprites: their palettes as JSON, and each section as a PNG sprite sheet with Aseprite JSON.
 //!
 //! The format lives in `rebof3_formats::sprite` (frame sheets, animations, records and the draw) and
-//! `rebof3_formats::character_bank` (the palette JSON). This module is what the `bof3` command and the
+//! `rebof3_formats::sprite_palettes` (the palette JSON). This module is what the `bof3` command and the
 //! editor share: it takes an entry payload as the disc stores it, raw or LZ77, and gives it back in the
 //! same form, so the two agree on every byte.
 //!
@@ -9,7 +9,7 @@
 //!
 //! | Family | C record (`decomp/include`) |
 //! | --- | --- |
-//! | sprite bank | `Actor` (`include/sys/actor.h`): `+0x4C` section, `+0x50` steps, `+0x54` frame table; `SpriteCell` (`src/engine/slus/slus.h`) |
+//! | character sprites | `Actor` (`include/sys/actor.h`): `+0x4C` section, `+0x50` steps, `+0x54` frame table; `SpriteCell` (`src/engine/slus/slus.h`) |
 //!
 //! The layout is in `wiki: formats/character`.
 
@@ -18,44 +18,44 @@ use rebof3_formats::sprite;
 
 use crate::Result;
 
-pub use rebof3_formats::character_bank::{Bank, parse};
 pub use rebof3_formats::sprite::{Sheet, SpriteSizes};
+pub use rebof3_formats::sprite_palettes::{CharacterSprites, parse};
 
-/// The JSON of the palettes of one sprite bank. `payload` is the decoded bank: a whole container, or one section.
-pub fn character_bank(payload: &[u8]) -> Result<Vec<u8>> {
-    Ok(rebof3_formats::character_bank::export(payload)?)
+/// The JSON of the palettes of one character sprites. `payload` is the decoded sprites: a whole container, or one section.
+pub fn character_sprites(payload: &[u8]) -> Result<Vec<u8>> {
+    Ok(rebof3_formats::sprite_palettes::export(payload)?)
 }
 
-/// How an entry stores its bank.
+/// How an entry stores its sprites.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Packing {
-    /// A type-0 entry: the bank's bytes.
+    /// A type-0 entry: the character sprites' bytes.
     Raw,
-    /// A type-1 entry: the bank packed with the loader's LZ77 codec.
+    /// A type-1 entry: the sprites packed with the loader's LZ77 codec.
     Lz77,
 }
 
-/// The bank bytes of a stored payload, and how it was stored. A payload that reads as a bank is raw;
+/// The sprites bytes of a stored payload, and how it was stored. A payload that reads as character sprites is raw;
 /// otherwise it must unpack to one.
 pub fn unpack(payload: &[u8]) -> Result<(Packing, Vec<u8>)> {
     if sprite::decode(payload).is_ok() {
         return Ok((Packing::Raw, payload.to_vec()));
     }
-    let bank = lz77::decode(payload)?;
-    sprite::decode(&bank)?;
-    Ok((Packing::Lz77, bank))
+    let sprites = lz77::decode(payload)?;
+    sprite::decode(&sprites)?;
+    Ok((Packing::Lz77, sprites))
 }
 
-/// The payload that stores `bank` the way `original` stored its bank: `original` itself while the bank
+/// The payload that stores `sprites` the way `original` stored its sprites: `original` itself while the sprites
 /// is unchanged, so an LZ77 entry keeps its stored stream.
-pub fn pack(original: &[u8], bank: &[u8]) -> Result<Vec<u8>> {
+pub fn pack(original: &[u8], sprites: &[u8]) -> Result<Vec<u8>> {
     let (packing, stored) = unpack(original)?;
-    if stored == bank {
+    if stored == sprites {
         return Ok(original.to_vec());
     }
     Ok(match packing {
-        Packing::Raw => bank.to_vec(),
-        Packing::Lz77 => lz77::encode(bank),
+        Packing::Raw => sprites.to_vec(),
+        Packing::Lz77 => lz77::encode(sprites),
     })
 }
 
@@ -72,15 +72,15 @@ pub fn sprite_sizes(executable: &[u8]) -> Result<SpriteSizes> {
 /// Section `section` of the stored `payload` as a sprite sheet drawn with palette `palette`. `image` is the
 /// PNG's file name, which the JSON names.
 pub fn sprite_sheet(payload: &[u8], section: usize, palette: usize, sizes: &SpriteSizes, image: &str) -> Result<Sheet> {
-    let bank = sprite::decode(&unpack(payload)?.1)?;
-    Ok(sprite::export(&bank, section, palette, sizes, image)?)
+    let sprites = sprite::decode(&unpack(payload)?.1)?;
+    Ok(sprite::export(&sprites, section, palette, sizes, image)?)
 }
 
 /// The stored payload with a sprite sheet read back into the section it names; see
 /// `rebof3_formats::sprite::import` for what changes.
 pub fn import_sprite_sheet(json: &[u8], png: &[u8], payload: &[u8], sizes: &SpriteSizes) -> Result<Vec<u8>> {
-    let bank = sprite::decode(&unpack(payload)?.1)?;
-    let imported = sprite::encode(&sprite::import(&bank, sizes, json, png)?)?;
+    let sprites = sprite::decode(&unpack(payload)?.1)?;
+    let imported = sprite::encode(&sprite::import(&sprites, sizes, json, png)?)?;
     pack(payload, &imported)
 }
 
@@ -130,10 +130,10 @@ mod tests {
         let raw = section();
         assert_eq!(unpack(&raw).expect("raw").0, Packing::Raw);
         let packed = lz77::encode(&raw);
-        let (packing, bank) = unpack(&packed).expect("LZ77");
-        assert_eq!((packing, &bank), (Packing::Lz77, &raw));
-        assert_eq!(pack(&packed, &bank).expect("packs"), packed, "an unchanged bank keeps its stream");
-        let mut edited = bank.clone();
+        let (packing, sprites) = unpack(&packed).expect("LZ77");
+        assert_eq!((packing, &sprites), (Packing::Lz77, &raw));
+        assert_eq!(pack(&packed, &sprites).expect("packs"), packed, "an unchanged sprites keeps its stream");
+        let mut edited = sprites.clone();
         edited[0x30] ^= 1;
         assert_eq!(lz77::decode(&pack(&packed, &edited).expect("packs")).expect("decodes"), edited);
     }
@@ -141,12 +141,12 @@ mod tests {
     #[test]
     fn an_unchanged_sheet_imports_to_the_stored_payload() {
         let packed = lz77::encode(&section());
-        let sheet = sprite_sheet(&packed, 0, 0, &sizes(), "bank.png").expect("exports");
+        let sheet = sprite_sheet(&packed, 0, 0, &sizes(), "sprites.png").expect("exports");
         assert_eq!(import_sprite_sheet(&sheet.json, &sheet.png, &packed, &sizes()).expect("imports"), packed);
     }
 
     #[test]
-    fn a_payload_that_is_no_bank_is_refused() {
+    fn a_payload_that_is_no_sprite_container_is_refused() {
         assert!(unpack(&[1, 2, 3, 4, 5, 6, 7, 8]).is_err());
     }
 }

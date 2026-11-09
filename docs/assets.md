@@ -6,7 +6,7 @@ the formats are in the [wiki](https://raulcorreia7.github.io/bof3-wiki/formats/a
 
 ## Output layout
 
-The original file is named by the real format: the game's VRAM upload is `img`, its CLUT bank `clut`,
+The original file is named by the real format: the game's VRAM upload is `img`, its CLUT block `clut`,
 its map bundle `map`, the two halves of a sound bank `vh` and `vb` (the whole bank is `vab`), a
 sample's waveform data `vag`, a sequence package `seq`, an LZ77 blob `lz77`, and a type-8 cue table
 `emi8`. Other entries carry the EMI type tag `emi0`. `assets.jsonl` records the source and the SHA-256
@@ -24,8 +24,8 @@ of every file.
 | `area-encounters` | `<slot>.emi0`                                                      | `<slot>.json`                                                             |
 | `area-script`     | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
 | `battle-script`   | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
-| `bmagic-table`    | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
-| `character-bank`  | `<slot>.lz77` or `<slot>.emi0`                                     | the decoded blob `<slot>.bin` of an LZ77 bank                             |
+| `bmagic-script`    | `<slot>.emi0`                                                      | `<slot>.json`, `<slot>.txt` (the ops)                                     |
+| `character-sprites`  | `<slot>.lz77` or `<slot>.emi0`                                     | the decoded blob `<slot>.bin` of an LZ77 character sprites                             |
 | `cdda`            | `cdda/track<NN>.pcm` (16-bit stereo, 44.1 kHz, no header)          | `track<NN>.wav`                                                           |
 | `data-table`      | `data-table/BIN/ETC/GAME/<name>.bin` (the table's span of entry 0) | `<name>.json`                                                             |
 | `xa-audio`        | the `.STR` file as stored                                          | `.wav`                                                                    |
@@ -53,8 +53,8 @@ its modern output too.
 | `audio-bank`                                                                                                                                       | `.vh`, `.vb`, `.vab`, `.vag` | `.sf2`, `.wav`                                     |
 | `audio-sequence`                                                                                                                                   | `.seq`                       | `.mid`                                             |
 | `audio-cues`, `area-actor-defs`, `area-encounters`                                                                                                 | `.emi8`, `.emi0`             | `.json`                                            |
-| `area-script`, `battle-script`, `bmagic-table`                                                                                                     | `.emi0`                      | `.json`, `.txt`                                    |
-| `character-bank`                                                                                                                                   | `.lz77` or `.emi0`           | `.bin` for an LZ77 bank; an unpacked bank has none |
+| `area-script`, `battle-script`, `bmagic-script`                                                                                                     | `.emi0`                      | `.json`, `.txt`                                    |
+| `character-sprites`                                                                                                                                   | `.lz77` or `.emi0`           | `.bin` for an LZ77 character sprites; an unpacked bank has none |
 | `area-map`                                                                                                                                         | `.map`                       | `.obj`, `.mtl`, `.glb`, `.layout.json`             |
 | `cdda`                                                                                                                                             | `.pcm`                       | `.wav`                                             |
 | `data-table`                                                                                                                                       | `.bin`                       | `.json`                                            |
@@ -68,7 +68,7 @@ its modern output too.
 `type`, `load_arg`, `format`, `kind`, `state`, `role`, `output`, `bytes`, `sha256`, `evidence` and
 `note`. `role` is `raw` for the stored bytes (`vab` and `vag` are also the disc's own bytes); a derived
 file names its format (`png`, `tim`, `json`, `obj`, `mtl`, `glb`, `sf2`, `wav` or `midi`; `script` for a script
-bank's ops as text). `kind` is the
+table's ops as text). `kind` is the
 asset kind and `format` is the entry's format. `evidence` names the loader evidence behind a derived
 file. A derived file of one entry carries the same `source` and `slot` as that entry.
 
@@ -79,7 +79,7 @@ For every payload that holds text, the `text` kind writes three files below
 
 | File          | Contents                                                         |
 | ------------- | ---------------------------------------------------------------- |
-| `<slot>.bin`  | the entry's stored bytes (the message bank or name table)        |
+| `<slot>.bin`  | the entry's stored bytes (the message table or name table)        |
 | `<slot>.json` | one row per string, with its source chain                        |
 | `<slot>.txt`  | one line per string: `offset<TAB>id<TAB>text`, the offset in hex |
 
@@ -93,7 +93,7 @@ encoding and the tables are in the [text page](https://raulcorreia7.github.io/bo
 Export and import are paired. Import takes the stored payload as `--payload` (or `--base`) and keeps
 every byte the open form does not name.
 
-- **Texture.** `export texture PAYLOAD --load-arg HEX` writes the view; `--depth 4|8 --palette BANK
+- **Texture.** `export texture PAYLOAD --load-arg HEX` writes the view; `--depth 4|8 --palette CLUT_BLOCK
   --palette-offset WORDS` writes an indexed row. `import texture PNG [-o OUT] [--palette OUT]` reads a PNG
   back to the stored payload; an indexed PNG also gives its color words, which `--palette` writes as
   raw little-endian words.
@@ -125,7 +125,7 @@ every byte the open form does not name.
   code in its `extras`. The import reads the mesh's corner heights alone. `import encounters JSON --base BLOCK`
   rebuilds an encounter block.
 - **Text and characters.** `export message`, `export strings`, `export characters` and
-  `export character-bank` pair with the `import` verbs of the same name. `character-bank` imports palette
+  `export character-sprites` pair with the `import` verbs of the same name. `character-sprites` imports palette
   tables only.
 - **Message markup and translation.** A message exports as text with its control codes as `{TAG}` or
   `{TAG:hh}` (`rebof3_emi::text::codec`; `hh` is the operand byte in hex): `{END}` ends the message,
@@ -135,20 +135,20 @@ every byte the open form does not name.
   is `{RAW:hh}`. Unchanged text encodes to the stored bytes. `export message-po PAYLOAD` writes a PO catalogue
   for translators: one entry per message, `msgctxt` `message[N]`, `msgid` the markup, an empty `msgstr`.
   `import message-po PO --payload PAYLOAD` puts each non-empty `msgstr` in place of its message and keeps the
-  rest, so an untouched catalogue rebuilds the bank byte for byte. A bank larger than `0xA000` bytes, the
+  rest, so an untouched catalogue rebuilds the message table byte for byte. A table larger than `0xA000` bytes, the
   space from its load address `0x80010000` to the resource table at `0x8001A000`, is refused.
-- **Script banks.** `export script PAYLOAD` writes an area, battle or magic-effect script bank as text,
+- **Script tables.** `export script PAYLOAD` writes an area, battle or magic-effect script table as text,
   one op per line; `import script TEXT --payload PAYLOAD` reads it back. A record is the animation
   stream `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`) plays: `show frame F ticks T` stages a
   frame for its ticks (`Actor_StageAnimStep`), and `jump LABEL` continues at a labelled step (`Actor_StepAnimLoop`,
   `Actor_StepAnimOnce`); every first byte selects one of the two. `frame` and `cell` lines give the frames,
   `pad` the bytes before the next record, and `raw` a record that does not read as a stream. The
-  text carries every byte, so an unchanged export imports to the stored bank. A jump names a label, so a
-  step added in the text moves the jumps after it; the import refuses a bank larger than `--payload`,
-  because what follows the bank in memory is not known to be free. Game code names stream positions
+  text carries every byte, so an unchanged export imports to the stored script table. A jump names a label, so a
+  step added in the text moves the jumps after it; the import refuses a table larger than `--payload`,
+  because what follows the table in memory is not known to be free. Game code names stream positions
   (`Actor_BeginScript`'s start position, `script_pc` tests), and the import cannot check those.
 - **Sprite sheets.** `export sprite-sheet PAYLOAD --exe SLUS_004.22 --section N --palette N -o OUT.png`
-  writes one section of a sprite bank as an 8-bit indexed PNG and `OUT.json` in Aseprite's array form:
+  writes one section of a character sprites as an 8-bit indexed PNG and `OUT.json` in Aseprite's array form:
   one row per animation a record plays, one cell per frame stitched through the VRAM model, one frame
   per step with the step's time in milliseconds (a tick is two NTSC fields, 33.4 ms), and one tag per
   animation. `meta.bof3` holds the section, palette, actor position, loop points and evidence. The cell
@@ -156,15 +156,15 @@ every byte the open form does not name.
   --exe SLUS_004.22` reads the PNG named in the JSON from the same folder and writes the payload back,
   raw or LZ77 as stored. A texel, colour or duration comes back only when it changed, so an unchanged
   sheet gives the stored payload byte for byte; two different changes to one shared texel, paint
-  outside every cell, and an edit that outgrows the section's padding are refused. The editor's Sprite
-  bank view writes and reads the same files.
+  outside every cell, and an edit that outgrows the section's padding are refused. The editor's Character sprites
+  view writes and reads the same files.
 - **Archives and discs.** `import emi CONTAINER --entry INDEX=FILE` keeps every entry's type and load
   address; a changed payload moves the entries after it. `import disc CUE --file PATH=FILE -o DIR` writes
   a patched copy of the disc; a replacement file cannot grow past its last sector.
 
 Cue tables, area cells, actor definitions, XA and STR streams and CDDA tracks have no import verb. An import verb that does not exist for a kind fails with a usage error.
 
-## Period files
+## Psy-Q files
 
 A 1997 PlayStation studio kept its textures as TIM files from TIMTOOL, its sound banks as VAB, VH and
 VB files from VABTOOL, and its sequences as SEQ files, or SEP files for several, from smf2seq. The
@@ -174,12 +174,12 @@ manual (`FileFormat47.pdf`: TIM in chapter 2, VAB in chapter 3, SEQ and SEP in c
 repository does not run those tools.
 
 - **TIM.** `export tim PAYLOAD --load-arg HEX` writes a type-3 texture as a TIM whose image block
-  sits at the VRAM place the load argument names. A texture a draw site joins takes `--depth 4|8 --clut X,Y --palette BANK
+  sits at the VRAM place the load argument names. A texture a draw site joins takes `--depth 4|8 --clut X,Y --palette CLUT_BLOCK
   --palette-offset WORDS`: the TIM then has a CLUT block at `X,Y` and the matching 4 or 8 bpp image.
   Without `--depth` the TIM is 16 bpp with no CLUT. `--clut` is required with `--depth` and is
-  never guessed. `import tim FILE [--load-arg HEX] [--palette OUT] [--bank BANK --palette-offset
+  never guessed. `import tim FILE [--load-arg HEX] [--palette OUT] [--clut-block CLUT_BLOCK --palette-offset
   WORDS]` reads the image back to the stored payload, its place to a load argument, and the CLUT to
-  the colour words; with `--bank` they are spliced into the bank. An image that is not on the
+  the colour words; with `--clut-block` (the old `--bank` still works) they are spliced into the CLUT block. An image that is not on the
   32-word, 32-row grid the loader uploads in is refused. An unchanged export imports to the stored
   bytes. The extractor writes a plain 16 bpp `.tim` for a type-3 texture no row joins.
 - **VAB.** `export vab HEADER BODY` writes one `.vab` file, the header followed by the body, as
@@ -198,8 +198,8 @@ An unchanged file of each kind comes back byte for byte.
 `assets coverage` reads every EMI entry on the disc and prints one line per kind: the entries and
 bytes of the kind, and the part that exports and imports to its own bytes. It measures four kinds:
 `area-message`, `area-encounters`, `data-table` (the game tables and the characters) and `text` (the
-strings and the message banks together). A fifth line counts the palette tables of the sprite
-banks against their decoded bytes. Every other kind prints `no round trip yet` and zero; the note
+strings and the message tables together). A fifth line counts the palette tables of the character
+sprites against their decoded bytes. Every other kind prints `no round trip yet` and zero; the note
 means the command does not measure the kind, not that the tool cannot write it back.
 
 The other kinds round trip through their own commands. Results over the retail disc:
@@ -217,8 +217,8 @@ The other kinds round trip through their own commands. Results over the retail d
 | sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |
 | sound bank with `--mode raw`                     | 1,020 of 1,020 banks                          | lossless |
 | VAG sample through WAVE                          | no sample comes back byte for byte            | lossy    |
-| sprite bank section through a sprite sheet       | 273 of 273 sections                           | lossless |
-| script bank through its text                     | 279 of 279 banks                              | lossless |
+| character sprites section through a sprite sheet       | 273 of 273 sections                           | lossless |
+| script table through its text                     | 279 of 279 tables                              | lossless |
 
 `assets import vag` drops the end-marker block and the loop flags. The retail cases need the disc and
 skip without it.

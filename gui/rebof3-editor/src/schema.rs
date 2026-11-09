@@ -8,7 +8,7 @@ use rebof3_formats::Format;
 use rebof3_formats::encounter::{
     self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES,
 };
-use rebof3_formats::game_tables::{self as tables, Table};
+use rebof3_formats::game_tables as tables;
 
 /// The archive that holds the fixed game tables in entry 0.
 pub const GAME: &str = "BIN/ETC/GAME.EMI";
@@ -130,7 +130,7 @@ const CATEGORY_ACCESSORY: u8 = 3;
 const CATEGORY_VITAL: u8 = 4;
 
 /// The tables each item category indexes, in category order.
-const CATEGORY_TABLES: [Table; 5] =
+const CATEGORY_TABLES: [tables::Table; 5] =
     [tables::ITEMS, tables::WEAPONS, tables::ARMOR, tables::ACCESSORIES, tables::VITAL_ITEMS];
 
 /// Where a sheet's records live.
@@ -158,7 +158,7 @@ pub enum Count {
 }
 
 /// A table of fixed-size records: where it lives, its first record's payload offset, and its columns.
-pub struct Sheet {
+pub struct Table {
     pub name: &'static str,
     pub place: Place,
     pub start: usize,
@@ -167,7 +167,7 @@ pub struct Sheet {
     pub columns: Vec<Column>,
 }
 
-impl Sheet {
+impl Table {
     /// The payload bytes of record `row`.
     pub fn range(&self, row: usize) -> std::ops::Range<usize> {
         let start = self.start + row * self.record;
@@ -202,8 +202,8 @@ impl Sheet {
     }
 }
 
-fn game(table: Table, columns: Vec<Column>) -> Sheet {
-    Sheet {
+fn game(table: tables::Table, columns: Vec<Column>) -> Table {
+    Table {
         name: table.name,
         place: Place::Entry { archive: GAME, entry: 0 },
         start: table.archive_offset - tables::PAYLOAD_START,
@@ -214,12 +214,12 @@ fn game(table: Table, columns: Vec<Column>) -> Sheet {
 }
 
 /// The sheets of entry `entry` of `archive`, whose format is `format`.
-pub fn sheets_for(archive: &str, entry: usize, format: Format) -> Vec<Sheet> {
+pub fn sheets_for(archive: &str, entry: usize, format: Format) -> Vec<Table> {
     sheets().into_iter().filter(|sheet| sheet.applies(archive, entry, format)).collect()
 }
 
 /// Every sheet the editor knows.
-pub fn sheets() -> Vec<Sheet> {
+pub fn sheets() -> Vec<Table> {
     use Field::*;
     let name = Name(tables::NAME_BYTES);
     vec![
@@ -348,7 +348,7 @@ const PARTY_STATS: usize = 0x1c;
 const PARTY_BASE: usize = 0x3c;
 
 /// `Character` (`include/game/character.h`): the party members' starting records.
-fn party_sheet() -> Sheet {
+fn party_sheet() -> Table {
     use Field::*;
     let mut columns = vec![
         col("name", 0x00, Name(rebof3_formats::characters::NAME_BYTES)),
@@ -373,7 +373,7 @@ fn party_sheet() -> Sheet {
     columns.extend(stat_columns(BASE_STAT_NAMES, PARTY_BASE));
     columns.push(col("master level", 0x84, U8));
 
-    Sheet {
+    Table {
         name: "party",
         place: Place::Entry { archive: START, entry: START_PARTY_ENTRY },
         start: PARTY_START,
@@ -397,11 +397,11 @@ const ENCOUNTER_SLOTS: [&str; ENCOUNTER_ENEMIES] =
     ["enemy 1", "enemy 2", "enemy 3", "enemy 4", "enemy 5", "enemy 6", "enemy 7", "enemy 8"];
 
 /// `Encounter`: eight enemy indexes and an appearance rate.
-fn encounter_sheet() -> Sheet {
+fn encounter_sheet() -> Table {
     let mut columns: Vec<Column> =
         ENCOUNTER_SLOTS.into_iter().enumerate().map(|(at, name)| col(name, at, Field::Enemy)).collect();
     columns.push(col("appearance rate", ENCOUNTER_ENEMIES, Field::U8));
-    Sheet {
+    Table {
         name: "encounters",
         place: Place::Format(Format::AreaEncounterTable),
         start: 0,
@@ -421,7 +421,7 @@ const INITIAL_SKILLS: [&str; 8] =
     ["skill 1", "skill 2", "skill 3", "skill 4", "skill 5", "skill 6", "skill 7", "skill 8"];
 
 /// `Enemy` (`include/game/enemy.h`): the eight enemy records after the encounters.
-fn enemy_sheet() -> Sheet {
+fn enemy_sheet() -> Table {
     use Field::*;
     let mut columns = vec![
         col("name", 0x00, Name(encounter::NAME_BYTES)),
@@ -456,7 +456,7 @@ fn enemy_sheet() -> Sheet {
     columns.push(col("reach", 0x82, U8));
     columns.push(col("height", 0x83, U8));
 
-    Sheet {
+    Table {
         name: "enemies",
         place: Place::Format(Format::AreaEncounterTable),
         start: ENEMY_BASE,
@@ -496,13 +496,13 @@ macro_rules! ai_block {
 }
 
 /// The four `EnemyAIBlock`s of each enemy record. A skill byte of 99 marks an unused block.
-fn enemy_ai_sheet() -> Sheet {
+fn enemy_ai_sheet() -> Table {
     let mut columns = vec![col("name", 0x00, Field::Name(encounter::NAME_BYTES))];
     columns.extend(ai_block!(1));
     columns.extend(ai_block!(2));
     columns.extend(ai_block!(3));
     columns.extend(ai_block!(4));
-    Sheet {
+    Table {
         name: "enemy AI",
         place: Place::Format(Format::AreaEncounterTable),
         start: ENEMY_BASE,
@@ -516,9 +516,9 @@ fn enemy_ai_sheet() -> Sheet {
 const SPRITE_TEXTURE_MODES: &[(u8, &str)] = &[(0, "0"), (1, "1"), (2, "2"), (3, "3"), (4, "4"), (9, "9"), (10, "10")];
 
 /// `AreaActorDefs` (`include/world/area.h`): a `u32` count, then eight-byte `AreaActorDef` records.
-fn actor_def_sheet() -> Sheet {
+fn actor_def_sheet() -> Table {
     use Field::*;
-    Sheet {
+    Table {
         name: "actor definitions",
         place: Place::Format(Format::AreaActorDefsTable),
         start: rebof3_formats::scene::COUNT_BYTES,
@@ -537,9 +537,9 @@ fn actor_def_sheet() -> Sheet {
 
 /// A type-8 cue record (`EMICue`, `include/audio/cue.h`): the SPU voice, VAB program and tone of one
 /// sound effect, packed in four bytes.
-fn cue_sheet() -> Sheet {
+fn cue_sheet() -> Table {
     use Field::*;
-    Sheet {
+    Table {
         name: "cues",
         place: Place::Format(Format::CueTable),
         start: 0,
@@ -571,9 +571,9 @@ const VAB_PROGRAM_COUNT: usize = 0x12;
 
 /// `VabHdr` (PsyQ `libsnd.h`): the bank's master volume, pan and attributes. The counts and sizes
 /// that lay out the header are left out, so an edit cannot move a table.
-fn vab_bank_sheet() -> Sheet {
+fn vab_bank_sheet() -> Table {
     use Field::*;
-    Sheet {
+    Table {
         name: "bank",
         place: Place::Format(Format::VabHeader),
         start: 0,
@@ -590,9 +590,9 @@ fn vab_bank_sheet() -> Sheet {
 }
 
 /// `ProgAtr` (PsyQ `libsnd.h`): one record per program slot; slot 0 is the bank's dummy program.
-fn vab_program_sheet() -> Sheet {
+fn vab_program_sheet() -> Table {
     use Field::*;
-    Sheet {
+    Table {
         name: "programs",
         place: Place::Format(Format::VabHeader),
         start: VAB_PROGRAM_TABLE,
@@ -610,9 +610,9 @@ fn vab_program_sheet() -> Sheet {
 }
 
 /// `VagAtr` (PsyQ `libsnd.h`, `include/audio/vab.h`): sixteen tone slots per program block.
-fn vab_tone_sheet() -> Sheet {
+fn vab_tone_sheet() -> Table {
     use Field::*;
-    Sheet {
+    Table {
         name: "tones",
         place: Place::Format(Format::VabHeader),
         start: VAB_TONE_TABLE,
@@ -654,7 +654,7 @@ impl Names {
     /// The names in `game`, the payload of `GAME.EMI` entry 0, and in `shown`, the shown entry's payload
     /// when it is an encounter block.
     pub fn new(game: Option<&[u8]>, shown: Option<&[u8]>) -> Self {
-        let names = |table: Table| -> Vec<String> {
+        let names = |table: tables::Table| -> Vec<String> {
             game.and_then(|payload| table.records(payload).ok())
                 .map(|records| records.iter().map(|record| tables::name_text(&record[..tables::NAME_BYTES])).collect())
                 .unwrap_or_default()
@@ -903,7 +903,7 @@ mod tests {
             .iter()
             .map(|table| table.archive_offset - tables::PAYLOAD_START + table.count * table.record);
         let mut payload = vec![0; end.max().unwrap()];
-        let mut put = |table: Table, index: usize, name: &str| {
+        let mut put = |table: tables::Table, index: usize, name: &str| {
             let at = table.archive_offset - tables::PAYLOAD_START + index * table.record;
             let bytes = tables::name_field(name, tables::NAME_BYTES).unwrap();
             payload[at..at + bytes.len()].copy_from_slice(&bytes);

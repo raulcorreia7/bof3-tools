@@ -1,9 +1,9 @@
-//! A message bank as the player sees it: each message drawn in the game's font and window, page by page,
-//! with the findings of `rebof3_formats::text::check` and an editor that rebuilds the bank.
+//! A message table as the player sees it: each message drawn in the game's font and window, page by page,
+//! with the findings of `rebof3_formats::text::check` and an editor that rebuilds the table.
 //!
 //! The font is read from `ETC/FIRST.EMI` (`rebof3_formats::text::font`). The preview is the window alone over a
-//! black backdrop, since the field behind it is the game's. A message edit is encoded, put in the bank and the bank
-//! rebuilt; it is refused when the text cannot be encoded or the bank would outgrow its space.
+//! black backdrop, since the field behind it is the game's. A message edit is encoded, put in the table and the table
+//! rebuilt; it is refused when the text cannot be encoded or the table would outgrow its space.
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use gpui::{AnyElement, Context, Image, ImageFormat, ObjectFit, div, img, prelude::*, px};
 use psx_formats::gfx::png::rgba_png;
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_formats::message::bank;
+use rebof3_formats::message::table;
 use rebof3_formats::text::check::{self, Problem};
 use rebof3_formats::text::font::Font;
 use rebof3_formats::text::layout::{self, Context as LayoutContext, Layout, PageEnd};
@@ -74,7 +74,7 @@ pub fn prepare(editor: &mut Editor) {
     }
     let Some(Ok(font)) = editor.views.compose.font.clone() else { return };
     let Some(entry) = editor.current() else { return };
-    let Ok(parsed) = bank::parse(entry.payload()) else { return };
+    let Ok(parsed) = table::parse(entry.payload()) else { return };
     let state = &editor.views.compose;
     let selected = state.selected.min(parsed.messages.len().saturating_sub(1));
     let key = (entry.archive.path.0.clone(), entry.index, entry.project.revision(), selected);
@@ -83,7 +83,7 @@ pub fn prepare(editor: &mut Editor) {
         return;
     }
     let Some(message) = parsed.messages.get(selected) else { return };
-    let laid = layout::layout(message, LayoutContext { bank: Some(entry.payload()), runtime: None });
+    let laid = layout::layout(message, LayoutContext { table: Some(entry.payload()), runtime: None });
     let problems = check::problems(&laid, &font);
     let shown_page = laid.pages.get(page.min(laid.pages.len() - 1));
     let (window, window_size) = shown_page
@@ -100,12 +100,12 @@ pub fn prepare(editor: &mut Editor) {
     editor.views.compose.shown = Some(Rc::new(shown));
 }
 
-/// The compose view of the bank in `entry`.
+/// The compose view of the table in `entry`.
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     let state = &editor.views.compose;
     let payload = entry.payload();
-    let Ok(parsed) = bank::parse(payload) else {
-        return muted("This payload is not a message bank.").into_any_element();
+    let Ok(parsed) = table::parse(payload) else {
+        return muted("This payload is not a message table.").into_any_element();
     };
     if let Some(Err(error)) = &state.font {
         return muted(format!("The font did not load: {error}")).into_any_element();
@@ -157,8 +157,8 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             .child(step("compose-prev", "Previous", page > 0, false, cx))
             .child(step("compose-next", "Next", page + 1 < pages, true, cx))
             .child(muted(format!(
-                "bank {used} of {} bytes{}",
-                bank::LIMIT,
+                "table {used} of {} bytes{}",
+                table::LIMIT,
                 shown.layout.placement.operand.map_or(String::new(), |operand| format!(", window {operand:02X}"))
             ))),
     );
@@ -185,11 +185,11 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     div().flex().gap(px(GAP)).child(list).child(preview).into_any_element()
 }
 
-/// Rewrites message `index` of the shown bank from `text`. Refuses text the codec cannot encode, an empty message
-/// and a bank that would outgrow its space.
+/// Rewrites message `index` of the shown table from `text`. Refuses text the codec cannot encode, an empty message
+/// and a table that would outgrow its space.
 pub fn message_changed(editor: &mut Editor, index: usize, text: &str) -> Option<String> {
     let entry = editor.current()?;
-    let mut parsed = match bank::parse(entry.payload()) {
+    let mut parsed = match table::parse(entry.payload()) {
         Ok(parsed) => parsed,
         Err(error) => return Some(error.to_string()),
     };
@@ -203,7 +203,7 @@ pub fn message_changed(editor: &mut Editor, index: usize, text: &str) -> Option<
         return None;
     }
     *slot = bytes;
-    match bank::build_within_limit(&parsed) {
+    match table::build_within_limit(&parsed) {
         Ok(rebuilt) => {
             editor.set_payload(rebuilt);
             editor.views.compose.shown = None;

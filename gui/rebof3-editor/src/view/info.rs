@@ -8,13 +8,13 @@ use rebof3_emi::cue::CueTable;
 use rebof3_emi::entry::vab_body_index;
 use rebof3_emi::lz77;
 use rebof3_formats::Format;
-use rebof3_formats::character_bank;
-use rebof3_formats::clut::palette_bank;
+use rebof3_formats::clut::clut_block;
 use rebof3_formats::encounter::EncounterBlock;
 use rebof3_formats::game_tables::name_text;
 use rebof3_formats::map::MapBundle;
 use rebof3_formats::scene::SceneTable;
-use rebof3_formats::script::ScriptBank;
+use rebof3_formats::script::ScriptTable;
+use rebof3_formats::sprite_palettes;
 use rebof3_formats::text::discover;
 use rebof3_formats::vram::texture_words;
 
@@ -103,19 +103,19 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
     let payload = entry.payload();
     let rows = match entry.format() {
         Format::VramUpload => texture(entry.load_arg(), payload),
-        Format::ClutBank => palette(entry.load_arg(), payload),
+        Format::ClutBlock => palette(entry.load_arg(), payload),
         Format::VabHeader | Format::VabBody => sound_bank(entry),
         Format::SepPackage => sequences(payload),
-        Format::Lz77Blob => lz77::decode(payload).map_err(|error| error.to_string()).and_then(|decoded| {
+        Format::CharacterSpritesLz77 => lz77::decode(payload).map_err(|error| error.to_string()).and_then(|decoded| {
             let mut rows = vec![("Decompressed", format!("{} bytes", decoded.len()))];
-            rows.extend(sprite_bank(&decoded)?);
+            rows.extend(character_sprites(&decoded)?);
             Ok(rows)
         }),
-        Format::CharacterBlob => sprite_bank(payload),
-        Format::AreaMessageBank => Ok(messages(payload, entry.load_arg())),
-        // The battle bank at `0x800F0800` and the magic-effect bank at `0x800C3800` have the area bank's
+        Format::CharacterSprites => character_sprites(payload),
+        Format::AreaMessageTable => Ok(messages(payload, entry.load_arg())),
+        // The battle table at `0x800F0800` and the magic-effect table at `0x800C3800` have the area script table's
         // format (`wiki: formats/area`).
-        Format::AreaScriptBank | Format::BattleScriptBank | Format::MagicTable => script_bank(payload),
+        Format::AreaScriptTable | Format::BattleScriptTable | Format::MagicScriptTable => script_table(payload),
         Format::AreaActorDefsTable => actor_defs(payload),
         Format::AreaEncounterTable => encounters(payload),
         Format::AreaMapBundle => MapBundle::decode(payload)
@@ -144,7 +144,7 @@ fn texture(load_arg: u32, payload: &[u8]) -> Result<Vec<Row>, String> {
 }
 
 fn palette(load_arg: u32, payload: &[u8]) -> Result<Vec<Row>, String> {
-    let bank = palette_bank(load_arg, payload).map_err(|error| error.to_string())?;
+    let bank = clut_block(load_arg, payload).map_err(|error| error.to_string())?;
     let mut rows =
         vec![("Colours", bank.words.len().to_string()), ("4-bit rows", (bank.words.len() / ROW_COLOURS).to_string())];
     if let Some(clut) = bank.vram {
@@ -183,8 +183,8 @@ fn sequences(payload: &[u8]) -> Result<Vec<Row>, String> {
     Ok(vec![("Sequences", package.sequences.len().to_string()), ("Sequence ids", ids.join(", "))])
 }
 
-fn sprite_bank(payload: &[u8]) -> Result<Vec<Row>, String> {
-    let bank = character_bank::parse(payload).map_err(|error| error.to_string())?;
+fn character_sprites(payload: &[u8]) -> Result<Vec<Row>, String> {
+    let bank = sprite_palettes::parse(payload).map_err(|error| error.to_string())?;
     let mut rows = vec![("Sections", bank.sections.len().to_string())];
     for section in &bank.sections {
         rows.push((
@@ -207,7 +207,7 @@ fn count(count: usize, thing: &str) -> String {
 
 /// The bank's messages, or the strings a scan finds when the bank has no offset table.
 fn messages(payload: &[u8], load_arg: u32) -> Vec<Row> {
-    match discover::bank_records(payload) {
+    match discover::table_records(payload) {
         Some(records) => vec![("Messages", records.len().to_string())],
         None => vec![
             ("Messages", "no offset table".into()),
@@ -216,12 +216,12 @@ fn messages(payload: &[u8], load_arg: u32) -> Vec<Row> {
     }
 }
 
-fn script_bank(payload: &[u8]) -> Result<Vec<Row>, String> {
-    let bank = ScriptBank::decode(payload).map_err(|error| error.to_string())?;
-    let records: usize = bank.sections().iter().map(|section| section.records.len()).sum();
+fn script_table(payload: &[u8]) -> Result<Vec<Row>, String> {
+    let table = ScriptTable::decode(payload).map_err(|error| error.to_string())?;
+    let records: usize = table.sections().iter().map(|section| section.records.len()).sum();
     Ok(vec![
-        ("Directory", format!("{} bytes", bank.dir_bytes)),
-        ("Sections", bank.sections().len().to_string()),
+        ("Directory", format!("{} bytes", table.dir_bytes)),
+        ("Sections", table.sections().len().to_string()),
         ("Scripts", records.to_string()),
     ])
 }
@@ -325,14 +325,14 @@ mod tests {
     }
 
     #[test]
-    fn a_sprite_bank_lists_its_sections() {
+    fn character_sprites_lists_its_sections() {
         // One bare section: the table offset at +4 points at a table of one palette.
         let mut section = vec![0; 8];
         section[4] = 8;
         section.extend(4u32.to_le_bytes());
-        section.extend([0; character_bank::PALETTE_BYTES]);
+        section.extend([0; sprite_palettes::PALETTE_BYTES]);
 
-        let rows = sprite_bank(&section).unwrap();
+        let rows = character_sprites(&section).unwrap();
         assert_eq!(rows[0], ("Sections", "1".into()));
         assert!(rows[1].1.ends_with("1 palette"), "{rows:?}");
     }
@@ -355,8 +355,8 @@ mod tests {
                 let Some((_, error)) = details(&entry).into_iter().find(|(label, _)| *label == "Decoder") else {
                     continue;
                 };
-                // Three raw sprite blobs hold no palette table at their section's +4 word.
-                if entry.format() == Format::CharacterBlob && error.contains("is not a sprite bank") {
+                // Three raw character sprites hold no palette table at their section's +4 word.
+                if entry.format() == Format::CharacterSprites && error.contains("is not a character sprites") {
                     continue;
                 }
                 failures.push(format!("{}#{index} {:?}: {error}", path.0, entry.format()));

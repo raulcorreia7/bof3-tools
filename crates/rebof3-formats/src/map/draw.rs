@@ -20,14 +20,14 @@
 //!
 //! | Bits | Field | Primitive |
 //! | ---- | ----- | --------- |
-//! | 0-11 | the tile (block, rectangle or quad) and the bank bit | the four texture corners |
+//! | 0-11 | the tile (block, rectangle or quad) and the quad bit | the four texture corners |
 //! | 12-13 | semi-transparency mode | tpage bits 5-6 (graph type 0) |
 //! | 14 | deferred to the depth-sorted list in draw modes 4 and 6 (`func_801530D0`) | none |
 //! | 15 | semi-transparency on | `SetSemiTrans` |
 //! | 16-18 | corner order: flip across x, flip across z, quarter turn | the texture corners |
 //! | 19-23 | grey level | `r`, `g` and `b` (`(word >> 16) & 0xF8`) |
 //! | 24-27 | CLUT index | CLUT word |
-//! | 28-29 | page bank | tpage x |
+//! | 28-29 | page selector | tpage x |
 //! | 30 | linked into the cell row's second ordering-table slot (`func_801530D0`) | none |
 //! | 31 | depth: clear is 8-bit, set is 4-bit | tpage bits 7-8, CLUT word |
 //!
@@ -185,7 +185,7 @@ pub struct Tile {
 
 impl Tile {
     /// The tile of descriptor `index` of the bundle, or `None` past the table. A `0` word is drawn
-    /// too, as `func_80155560` reads it: block 0 of page bank 0 through CLUT row 483 at grey level 0,
+    /// too, as `func_80155560` reads it: block 0 of page 0 through CLUT row 483 at grey level 0,
     /// which leaves every texel but the transparent one black.
     pub fn of(bundle: &MapBundle, index: usize) -> Option<Self> {
         let descriptor = *bundle.records.get(index)?;
@@ -214,7 +214,7 @@ impl Tile {
 /// A field of a descriptor word that [`Tile`] reads, by its bits (the table at the top of the module).
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum TileField {
-    /// Bits 0-11: the tile within its bank (the block, rectangle or quad index and the bank bit).
+    /// Bits 0-11: the tile within its table (the block, rectangle or quad index and the quad bit).
     Tile,
     /// Bits 12-13.
     BlendMode,
@@ -233,7 +233,7 @@ pub enum TileField {
     /// Bits 24-27.
     Clut,
     /// Bits 28-29.
-    PageBank,
+    Page,
     /// Bit 30.
     Front,
     /// Bit 31: set is 4-bit.
@@ -245,7 +245,7 @@ impl TileField {
         Self::Tile,
         Self::Shade,
         Self::Clut,
-        Self::PageBank,
+        Self::Page,
         Self::FourBit,
         Self::Semi,
         Self::BlendMode,
@@ -268,7 +268,7 @@ impl TileField {
             Self::Turn => (18, 1),
             Self::Shade => (19, 5),
             Self::Clut => (24, 4),
-            Self::PageBank => (28, 2),
+            Self::Page => (28, 2),
             Self::Front => (30, 1),
             Self::FourBit => (31, 1),
         }
@@ -285,7 +285,7 @@ impl TileField {
             Self::Turn => "quarter turn",
             Self::Shade => "grey (x8)",
             Self::Clut => "CLUT index",
-            Self::PageBank => "page bank",
+            Self::Page => "page selector",
             Self::Front => "front slot",
             Self::FourBit => "4-bit",
         }
@@ -471,7 +471,7 @@ mod tests {
         let word = 0x8180_9001;
         assert_eq!(TileField::Shade.get(word), 0x10);
         assert_eq!(TileField::Clut.set(word, 3), Some(0x8380_9001));
-        assert_eq!(TileField::PageBank.set(word, 4), None);
+        assert_eq!(TileField::Page.set(word, 4), None);
         let mut covered = 0u64;
         for field in TileField::ALL {
             let (shift, width) = field.bits();
