@@ -141,6 +141,25 @@ pub fn build(bank: &Bank) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+/// The most bytes a bank may hold: it loads at `0x8001_0000` and the resource table starts at `0x8001_A000`
+/// (`Message_GetText (exe/slus_004_22@0x801502D0)` reads the bank and the table from those addresses), so the
+/// bank has `0xA000` bytes before it runs into the table.
+pub const LIMIT: usize = 0xA000;
+
+/// [`build`], refusing a bank that no longer fits the space the game gives it, with the reason.
+pub fn build_within_limit(bank: &Bank) -> Result<Vec<u8>> {
+    let bytes = build(bank)?;
+    if bytes.len() > LIMIT {
+        return Err(Error::Import(format!(
+            "the bank would be {} bytes, {} past the {LIMIT} bytes between its load address 0x80010000 and the \
+             resource table at 0x8001A000",
+            bytes.len(),
+            bytes.len() - LIMIT
+        )));
+    }
+    Ok(bytes)
+}
+
 /// The bank as JSON: each message decoded with its control codes kept, and the slot map. Refuses a bank that
 /// [`build`] would not lay out to the same bytes.
 pub fn export(payload: &[u8]) -> Result<Vec<u8>> {

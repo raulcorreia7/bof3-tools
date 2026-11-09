@@ -1,6 +1,7 @@
 //! The area message bank (`0x80010000`): the strings a scene shows (`wiki: formats/area`).
 
 pub mod bank;
+pub mod po;
 
 use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
