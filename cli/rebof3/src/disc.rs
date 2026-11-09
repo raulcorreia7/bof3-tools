@@ -279,8 +279,8 @@ Usage: bof3 disc <COMMAND> [OPTIONS]
 Commands:
   extract   write every file of an image, plus its project XML
   lba-json  write the LBA table of an extracted tree
-  checksum  hash every file of an extracted tree
-  verify    compare a tree with its checksums; exit 1 on a mismatch
+  checksum  hash the .bin, .cue, .img and .iso files below a folder
+  verify    compare those files with their checksums; exit 1 on a mismatch
   rebuild   build a synthetic ISO from top-level files
 
 Every command has focused help: bof3 disc <COMMAND> --help.
@@ -288,8 +288,8 @@ Common switches: -i/--input PATH, -o/--output PATH, -q/--quiet.
 
 Examples:
   bof3 disc extract -i \"Breath of Fire III (USA).cue\" -o build/disc
-  bof3 disc checksum -i build/disc -o build/checksums.json
-  bof3 disc verify -i build/disc -o build/checksums.json
+  bof3 disc checksum -i dumps -o build/checksums.json
+  bof3 disc verify -i dumps -o build/checksums.json
 ";
 
 const EXTRACT_HELP: &str = "\
@@ -325,31 +325,31 @@ Example:
 ";
 
 const CHECKSUM_HELP: &str = "\
-bof3 disc checksum: hash every file of an extracted tree.
+bof3 disc checksum: hash the .bin, .cue, .img and .iso files below a folder.
 
 Usage: bof3 disc checksum -i DIR -o FILE.json [-q]
 
-  -i, --input DIR     extracted folder to hash (required)
+  -i, --input DIR     folder that holds the disc dump (required)
   -o, --output FILE   JSON checksums to write (required)
   -q, --quiet         no completion line (default: off)
 
 Example:
-  bof3 disc checksum -i build/disc -o build/checksums.json
+  bof3 disc checksum -i dumps -o build/checksums.json
 ";
 
 const VERIFY_HELP: &str = "\
-bof3 disc verify: compare an extracted tree with its checksums.
+bof3 disc verify: compare the .bin, .cue, .img and .iso files below a folder with their checksums.
 
 Usage: bof3 disc verify -i DIR -o FILE.json [-q]
 
-  -i, --input DIR     extracted folder to check (required)
+  -i, --input DIR     folder that holds the disc dump (required)
   -o, --output FILE   JSON checksums to compare against (required)
   -q, --quiet         no completion line (default: off)
 
 Exit status: 0 every file matches, 1 a mismatch, 2 an error.
 
 Example:
-  bof3 disc verify -i build/disc -o build/checksums.json
+  bof3 disc verify -i dumps -o build/checksums.json
 ";
 
 const REBUILD_HELP: &str = "\
