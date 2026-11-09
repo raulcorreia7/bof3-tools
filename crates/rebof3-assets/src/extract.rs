@@ -1,4 +1,10 @@
-//! Walks the disc image, classifies every file and every EMI slot, and writes the asset tree.
+//! Walks the disc image, classifies every file and every EMI slot, and writes
+//! the asset tree.
+//!
+//! Output layout: `<out>/<kind>/<disc path without .EMI>/<slot>.<ext>` for an EMI
+//! entry and `<out>/<kind>/<disc path>` for a whole disc file. Each EMI entry's
+//! stored bytes are written unchanged (`.img`, `.vh`, `.vb`, `.seq`, `.lz77`
+//! or `.bin`, the names `bof3 emi extract -e` uses) next to any derived file.
 
 use std::borrow::Cow;
 use std::fs;
@@ -24,7 +30,8 @@ use rebof3_formats::registry::Site;
 
 /// Name of the table written next to the asset tree.
 pub const TABLE_FILE: &str = "assets.jsonl";
-/// The archive whose entry 0 holds the fixed game tables (`wiki: data/records#gameemi-fixed-tables`, "Equipment and shop data").
+/// The archive whose entry 0 holds the fixed game tables (`wiki: data/records#gameemi-fixed-tables`,
+/// "Equipment and shop data").
 const GAME_TABLES_SOURCE: &str = "BIN/ETC/GAME.EMI";
 const TABLE_EVIDENCE: &str = "wiki: data/records#gameemi-fixed-tables (fixed table locations and record layouts); \
      C records: include/game/item.h, include/game/ability.h, include/game/character.h";
@@ -32,9 +39,11 @@ const TABLE_EVIDENCE: &str = "wiki: data/records#gameemi-fixed-tables (fixed tab
 pub const SUMMARY_FILE: &str = "summary.txt";
 /// The container extension that marks an EMI archive on the disc.
 const EMI_EXTENSION: &str = "EMI";
-/// Where the first sectors of a `.STR` file are searched for the MDEC frame magic that tells a movie from an audio bank (`wiki: formats/str`).
+/// Where the first sectors of a `.STR` file are searched for the MDEC frame
+/// magic that tells a movie from an audio bank (`wiki: formats/str`).
 const STR_PROBE_SECTORS: usize = 32;
-/// First payload byte of the STR frame header in a 2336-byte sector: the 8-byte XA subheader precedes it.
+/// First payload byte of the STR frame header in a 2336-byte sector: the 8-byte
+/// XA subheader precedes it.
 const STR_MAGIC_OFFSET: usize = 8;
 /// MDEC frame header magic (`wiki: formats/str`).
 const STR_MAGIC: [u8; 4] = [0x60, 0x01, 0x01, 0x80];
@@ -76,7 +85,8 @@ struct Output<'a> {
     evidence: String,
 }
 
-/// Reads the disc and writes every selected kind the image holds; the `text` kind reads the extracted disc through [`crate::text::extract`].
+/// Reads the disc and writes every selected kind the image holds; the `text` kind reads the
+/// extracted disc through [`crate::text::extract`].
 pub fn run(options: &Options) -> Result<Report> {
     let mut image = Image::open(&options.image)?;
     let entries = image.entries()?;
@@ -143,6 +153,12 @@ fn disc_path(entry: &Entry) -> String {
 }
 
 /// Every CLUT block the selected archives carry, with the archive that loads it.
+///
+/// The banks are the resident set a texture join may fall back on when its own archive has no
+/// bank for a row. The set is read from the archives on the disc, not from a table of families:
+/// a bank's archive is its disc path and identical banks collapse in the join rule. The scan
+/// reads each archive's table and palette-band payloads only, so it does not load the texture
+/// payloads a second time.
 fn resident_blocks(image: &mut Image, entries: &[Entry], selection: &Selection) -> Vec<ResidentClutBlock> {
     if !(selection.contains(Kind::Texture) || selection.contains(Kind::Palette)) {
         return Vec::new();
@@ -401,7 +417,8 @@ fn emi_rows(
     Ok(())
 }
 
-/// Writes the fixed game tables of entry 0 of `ETC/GAME.EMI` as one JSON file per table.
+/// Writes the fixed game tables of entry 0 of `ETC/GAME.EMI` as one JSON file per table. The entry
+/// itself stays a code image; its tables are outputs of it, not entries.
 fn game_table_rows(
     job: &Job,
     entry: &rebof3_emi::Entry,
@@ -442,6 +459,7 @@ fn game_table_rows(
             evidence: String::new(),
             note: String::new(),
         };
+        // The stored bytes are the table's span of the disc file: `offset` and `size` locate them in the archive.
         let original = Row { offset: table.archive_offset as u64, size: bytes.len() as u64, ..base.clone() };
         let output = Output {
             role: "raw",
@@ -461,7 +479,8 @@ fn game_table_rows(
     Ok(())
 }
 
-/// Whether the asset a row belongs to has a conversion.
+/// Whether the asset a row belongs to has a conversion. Modern mode writes the original bytes of an asset that has
+/// none: they are its only export.
 fn converts(base: &Row) -> bool {
     match base.kind {
         Kind::Cdda
@@ -475,6 +494,7 @@ fn converts(base: &Row) -> bool {
         | Kind::AreaMap
         | Kind::DataTable
         | Kind::XaAudio => true,
+        // Only the LZ77-packed form decodes; the other character sprites are stored as they are used.
         Kind::CharacterSprites => base.format == Format::CharacterSpritesLz77.name(),
         _ => false,
     }
@@ -552,6 +572,7 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
                 };
                 write_output(&base, output, options, report)?;
             }
+            // A sample's original bytes: its waveform data, as the VAB body stores it.
             if let Some(original) = clip.original {
                 let output = Output {
                     role: "vag",
@@ -568,7 +589,8 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
     Ok(())
 }
 
-/// The audio tracks of the CUE sheet: the sectors as the disc stores them (`.pcm`) and the selected audio container.
+/// The audio tracks of the CUE sheet: the sectors as the disc stores them (`.pcm`) and the
+/// selected audio container.
 fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Result<()> {
     let directory = options.out.join(Kind::Cdda.name());
     let mode = options.selection.mode();
@@ -586,6 +608,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
             if audio == AudioFormat::Wav {
                 written.extend(cue::extract_audio_tracks(sheet, &directory)?);
             } else {
+                // The cue layer writes WAVE; convert each finished track and keep only the chosen file.
                 let source = directory.join(".wav-source");
                 cue::extract_audio_tracks(sheet, &source)?;
                 temporary = Some(source.clone());

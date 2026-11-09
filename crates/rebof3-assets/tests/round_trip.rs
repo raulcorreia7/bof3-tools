@@ -1,4 +1,7 @@
-//! Export then import, byte for byte, over the texture kind of the retail disc. Point `BOF3_DISC_IMAGE` at its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
+//! Export then import, byte for byte, over the texture kind of the retail disc.
+//!
+//! The test skips when no disc image is present. Point `BOF3_DISC_IMAGE` at its
+//! cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -167,7 +170,8 @@ fn retail_terrains_round_trip_byte_exactly() {
     eprintln!("terrain round trip: {terrains} bundles return their stored bytes from the glTF and the OBJ");
 }
 
-/// ADPCM is lossy, so the proof is the samples: every VAG's decoded PCM encodes to a VAG that decodes to the same PCM.
+/// ADPCM is lossy, so the proof is the samples: every VAG's decoded PCM encodes to a VAG that decodes to the
+/// same PCM. The stored bytes are compared too, and the count of byte-identical VAGs is reported.
 #[test]
 fn retail_vags_round_trip_through_adpcm() {
     let Some(image) = support::retail_image() else {
@@ -184,6 +188,7 @@ fn retail_vags_round_trip_through_adpcm() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
+    // A bank's header and body are two slots of one archive; the report pairs them by source and load argument.
     let is_bank = |row: &&Row| row.role == "raw" && row.kind == Kind::AudioBank;
     let (mut vags, mut identical, mut failures) = (0, 0, Vec::new());
     for header_row in report.rows.iter().filter(is_bank).filter(|row| row.file_type == Some(6)) {
@@ -205,6 +210,7 @@ fn retail_vags_round_trip_through_adpcm() {
                 continue;
             }
         };
+        // VAG numbers are 1-based: slot 0 of the table is not a sample. An empty slot has no bytes to round-trip.
         for index in (1..vab.vags.len()).filter(|&index| !vab.vags[index].is_empty()) {
             vags += 1;
             let number = index as u32;
@@ -249,6 +255,7 @@ fn retail_tables_round_trip_byte_exactly() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
+    // The eight tables are in entry 0 of ETC/GAME.EMI, which the code kind writes as its stored bytes.
     let entry = report
         .rows
         .iter()
@@ -320,7 +327,8 @@ fn retail_encounters_round_trip_byte_exactly() {
     eprintln!("encounter round trip: {} blocks return their stored bytes from their JSON", blocks.len());
 }
 
-/// The layout of a map bundle keeps its byte codes, objects and height table.
+/// The layout of a map bundle keeps its byte codes, objects and height table. The stored bundle supplies the rest, so
+/// the layout must rebuild every bundle's stored bytes, which also checks the bundle codec on all of them.
 #[test]
 fn retail_map_layouts_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
@@ -362,7 +370,8 @@ fn retail_map_layouts_round_trip_byte_exactly() {
     eprintln!("map layout round trip: {} bundles return their stored bytes from their layout", bundles.len());
 }
 
-/// Every EMI container on the disc rebuilds from its own entries to the same bytes.
+/// Every EMI container on the disc rebuilds from its own entries to the same bytes. Replacing one entry of the
+/// first container changes that entry and no other.
 #[test]
 fn retail_emi_containers_rebuild_byte_exactly() {
     let Some(image_path) = support::retail_image() else {
@@ -409,7 +418,8 @@ fn retail_emi_containers_rebuild_byte_exactly() {
     );
 }
 
-/// Every sequence package on the disc comes back from its MIDI files: each sequence reads back from the MIDI that `to_midi` writes, and the packages encode to their stored bytes.
+/// Every sequence package on the disc comes back from its MIDI files: each sequence reads back from the MIDI
+/// that `to_midi` writes, and the packages encode to their stored bytes.
 #[test]
 fn retail_sequences_round_trip_through_midi() {
     let Some(image) = support::retail_image() else {

@@ -1,4 +1,6 @@
-//! The game's text codec and the message tables. The retail checks run over every message table on the owner's disc and skip when no disc image is present (set `BOF3_DISC_IMAGE`).
+//! The game's text codec and the message tables. The retail checks run over every message table on the owner's disc and
+//! skip when no disc image is present (set `BOF3_DISC_IMAGE`). The synthetic checks cover the codes the disc does not
+//! need in a table of its own.
 
 mod support;
 
@@ -119,6 +121,8 @@ fn the_retail_tables_rebuild_their_archives_and_patch_the_disc_to_its_own_bytes(
 
 #[test]
 fn the_codec_keeps_every_code_and_writes_it_back() {
+    // A letter, a space, a colour with its operand, the two fullwidth slots, a backspace, and a code with no operand
+    // at the end of the string, which is kept as a raw byte.
     let raw = [0x41, 0xFF, 0x05, 0x02, 0x8D, 0x8F, 0x90, 0x04];
     let text = codec::decode(Encoding::Message, &raw);
     assert_eq!(text, "A {COLOR:02}\u{FF0C}\u{FF1A}{BACKSPACE}{RAW:04}");
@@ -180,8 +184,10 @@ fn an_edited_message_takes_its_new_length_and_keeps_the_slots() {
 
 #[test]
 fn a_table_whose_layout_the_rule_does_not_describe_is_refused() {
+    // The table names offset 2 for slot 0, which is inside the table itself.
     let inside_table = [0x04, 0x00, 0x02, 0x00, 0x41, 0x00];
     assert!(table::parse(&inside_table).is_err());
+    // The table names an offset past the end of the table (6 bytes), where 6 itself is the end marker.
     let past_end = [0x04, 0x00, 0x07, 0x00, 0x41, 0x00];
     assert!(table::parse(&past_end).is_err());
 }

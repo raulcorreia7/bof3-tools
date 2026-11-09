@@ -1,4 +1,9 @@
 //! Round-trip coverage: how much of the disc's EMI content exports and imports to its own bytes.
+//!
+//! For each kind, the line counts the entries of that kind on the disc and the bytes they hold, and the part of them
+//! that round trips through the kind's own format. A kind with no round trip here reports zero, and [`has_round_trip`]
+//! says which kinds those are. The text line counts the entries that hold game strings, outside message tables and
+//! inside them. The `ETC/GAME.EMI` tables are counted one table at a time.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -35,7 +40,7 @@ impl Line {
         self.count_part(bytes, if both { bytes } else { 0 }, both);
     }
 
-    /// Counts one entry of `bytes` bytes, of which `both_bytes` round trip.
+    /// Counts one entry of `bytes` bytes, of which `both_bytes` round trip. `both` says whether the entry counts.
     fn count_part(&mut self, bytes: u64, both_bytes: u64, both: bool) {
         self.entries += 1;
         self.bytes += bytes;
@@ -51,11 +56,11 @@ impl Line {
 pub struct Report {
     pub kinds: BTreeMap<Kind, Line>,
     pub text: Line,
-    /// The palette tables of the character sprites, against their decoded bytes.
+    /// The palette tables of the character sprites, against their decoded bytes. The node data is not decoded.
     pub palettes: Line,
 }
 
-/// Whether the kind has a round trip in this module.
+/// Whether the kind has a round trip in this module. The other kinds report their entries with zero round-tripped.
 pub fn has_round_trip(kind: Kind) -> bool {
     matches!(kind, Kind::AreaMessage | Kind::AreaEncounters | Kind::DataTable | Kind::Text)
 }
@@ -96,7 +101,7 @@ pub fn run(image: &Path) -> Result<Report> {
     Ok(report)
 }
 
-/// Whether an entry of this format exports and imports to its own bytes.
+/// Whether an entry of this format exports and imports to its own bytes. Formats without a round trip are `false`.
 fn format_round_trips(format: Format, payload: &[u8]) -> bool {
     match format {
         Format::AreaMessageTable => table_round_trips(payload),
@@ -107,7 +112,8 @@ fn format_round_trips(format: Format, payload: &[u8]) -> bool {
     }
 }
 
-/// The palette tables of character sprites: the decoded bytes, and its palette tables when they export and import to the decoded bytes.
+/// The palette tables of character sprites: the decoded bytes, and its palette tables when they export and import to
+/// the decoded bytes. A container that is not in the palette layout is not counted.
 fn palettes(report: &mut Report, format: Format, payload: &[u8]) {
     match format {
         Format::CharacterSpritesLz77 => {

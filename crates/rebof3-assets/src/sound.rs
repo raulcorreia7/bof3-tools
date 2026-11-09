@@ -1,4 +1,9 @@
 //! Sound through `bof3player`: every playable item rendered to WAV, FLAC or Ogg Vorbis.
+//!
+//! The `bof3player` catalog lists every playable item of the disc's sound archives. Music, samples
+//! and XA streams render through a [`bof3player::Player`] to 16-bit PCM, which the selected
+//! [`AudioFormat`] writes. A music item's sequence package is the `.seq` of the same archive, which
+//! the `audio-sequence` kind keeps as stored bytes; its bank is the `.vh`/`.vb` pair.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
@@ -35,7 +40,8 @@ pub struct Clip {
     pub bytes: Vec<u8>,
     /// A music item's Standard MIDI File, written beside the rendered audio.
     pub midi: Option<Vec<u8>>,
-    /// The item's original bytes in the game's own format, when it has them: a sample's waveform data, as the VAB body stores it.
+    /// The item's original bytes in the game's own format, when it has them:
+    /// a sample's waveform data, as the VAB body stores it.
     pub original: Option<Original>,
 }
 
@@ -47,12 +53,17 @@ pub struct Original {
     pub bytes: Vec<u8>,
 }
 
-/// Opens the disc image as a `bof3player` library.
+/// Opens the disc image as a `bof3player` library. An image too small to be a game disc fails here.
 pub fn open(image: &Path) -> Result<Library<'static>> {
     discover::open_with(SourceKind::Disc, image, bof3player::names::game_names()).map_err(audio)
 }
 
 /// Renders every playable music, sample and XA item of `library` whose kind `wanted` selects.
+///
+/// `mode` limits the work: raw mode reads only the samples' original bytes, and modern mode skips them. The items
+/// render on all cores. Each file goes to `emit` in catalog order as soon as it and the
+/// items before it are rendered, so the run holds a few clips at a time. The result is one line
+/// per item that could not be rendered, in catalog order.
 pub fn render(
     library: &Library<'_>,
     wanted: impl Fn(Kind) -> bool,
@@ -139,6 +150,7 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
         let mut pcm = player.render_all().map_err(audio)?;
         let rate = player.sample_rate();
         let channels = player.channels();
+        // FLAC and Ogg music carries the intro and one loop; WAV keeps the full item.
         if matches!(container, AudioFormat::Flac | AudioFormat::Ogg)
             && let Some((_, end)) = window
         {
@@ -175,6 +187,7 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
         }
         _ => format!("bof3player catalog item {}; {} sectors from sector {}", item.id, item.sectors, item.sub_index),
     };
+    // A sample's original bytes are its waveform data, as the VAB body stores them.
     let original = match item.kind {
         ItemKind::Sample if mode.writes("vag", true) => library
             .export_vag(item)
@@ -298,7 +311,8 @@ impl Sounds {
         Ok(Self { library: open(image)? })
     }
 
-    /// Opens a single-track disc image read through `reader`, which may come from memory or from read callbacks.
+    /// Opens a single-track disc image read through `reader`, which may come from memory or from
+    /// read callbacks. A `.cue` sheet's audio track is not available this way.
     pub fn open_reader(reader: Box<dyn ReadSeek>) -> Result<Self> {
         let source = DiscSource::from_reader(reader).map_err(audio)?;
         Ok(Self { library: Library::open_with(source, bof3player::names::game_names()).map_err(audio)? })
@@ -347,7 +361,9 @@ impl Sounds {
 /// Interleaved samples rendered per call while a sequence plays.
 const RENDER_CHUNK: usize = 4096;
 
-/// Renders the sequence whose id is `sequence` in one archive, as the game's sound driver plays it with the archive's own sound bank, for at most `seconds`.
+/// Renders the sequence whose id is `sequence` in one archive, as the game's sound driver plays it with
+/// the archive's own sound bank, for at most `seconds`. `path` is the archive's disc path (`BIN/...`)
+/// and `archive` its bytes, so an edited archive plays as edited.
 pub fn sequence_pcm(path: &str, archive: &[u8], sequence: u32, seconds: f64) -> Result<Pcm> {
     let mut source = MemorySource::new();
     source.add(path, archive);

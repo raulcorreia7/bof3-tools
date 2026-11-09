@@ -1,4 +1,7 @@
-//! The patched disc image on the owner's disc: the sealing method, and a disc patched with its own files. Point `BOF3_DISC_IMAGE` at its cue sheet, or place the image in the (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
+//! The patched disc image on the owner's disc: the sealing method, and a disc patched with its own files. The
+//! synthetic cases are in `psx-cd/tests/patch.rs`.
+//!
+//! The tests skip when no disc image is present. Point `BOF3_DISC_IMAGE` at its cue sheet, or place the image in the (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -37,6 +40,7 @@ fn every_form1_sector_of_the_retail_data_track_is_sealed() {
             unsealed.push(lba);
         }
     }
+    // A sector past the last file or directory may be unsealed; the disc keeps such a sector as stored.
     let mut image = Image::open(&cue_path).expect("the disc opens");
     let covered_end = image
         .entries()

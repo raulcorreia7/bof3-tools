@@ -1,4 +1,5 @@
-//! The playable characters of `ETC/START.EMI` entry 8, both ways. The retail check reads the owner's disc and skips when no disc image is present (set `BOF3_DISC_IMAGE`).
+//! The playable characters of `ETC/START.EMI` entry 8, both ways. The retail check reads the owner's disc and skips
+//! when no disc image is present (set `BOF3_DISC_IMAGE`).
 
 mod support;
 

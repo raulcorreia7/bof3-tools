@@ -1,4 +1,7 @@
-//! The Psy-Q files over the retail disc: every joined texture through TIM and back, every sound bank through VAB and VH/VB, every sequence package through SEP and SEQ. The tests skip when no retail archive directory is present (`BOF3_DISC_DIR`).
+//! The Psy-Q files over the retail disc: every joined texture through TIM and back, every sound bank
+//! through VAB and VH/VB, every sequence package through SEP and SEQ. Each case asserts a pinned count.
+//!
+//! The tests skip when no retail archive directory is present (`BOF3_DISC_DIR`).
 
 mod support;
 
@@ -43,7 +46,9 @@ fn read_disc() -> Option<Vec<Disc>> {
     )
 }
 
-/// Every joined row: 883 rows of 203 textures.
+/// Every joined row: 883 rows of 203 textures. The TIM holds the texture's page, the row's depth and
+/// its CLUT place; reading it back gives the texture, the placement and the row, and splicing the row
+/// into the CLUT block that holds it gives the block.
 #[test]
 fn retail_joined_textures_round_trip_through_tim() {
     let Some(discs) = read_disc() else { return };
@@ -73,6 +78,7 @@ fn retail_joined_textures_round_trip_through_tim() {
                 assert_eq!((block.x, block.y), (row.clut.x, row.clut.y), "{name}: the CLUT place");
                 assert_eq!(block.words, row.words, "{name}: the CLUT row");
 
+                // The CLUT block that holds the row takes the row back unchanged.
                 let stored = blocks.get(&(row.palette_archive.as_str(), row.palette)).expect("the palette entry");
                 let block_entry = discs
                     .iter()

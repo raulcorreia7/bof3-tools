@@ -1,4 +1,9 @@
-//! SoundFont 2 back to a VAB bank: a synthetic bank, and every bank of the owner's disc. Point `BOF3_DISC_IMAGE` at its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
+//! SoundFont 2 back to a VAB bank: a synthetic bank, and every bank of the owner's disc.
+//!
+//! The ADPCM of a sample is lossy, so the first import is not the stored bank. The gate is the second round trip:
+//! importing what an export of an imported bank gives reproduces that bank byte for byte, and its SoundFont
+//! holds the same zones and frames. The disc test skips when no disc image is present. Point `BOF3_DISC_IMAGE`
+//! at its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -10,7 +15,8 @@ use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
 use rebof3_formats::vab::soundfont;
 
-/// The SoundFont with its sample names cleared.
+/// The SoundFont with its sample names cleared. A name is `VAG` and the bank's VAG number, which the import
+/// numbers in first-use order, so names are compared apart from the rest.
 fn without_names(mut font: SoundFont) -> SoundFont {
     for sample in &mut font.samples {
         sample.name.clear();

@@ -1,4 +1,11 @@
-//! The palette joins over the retail archives: 203 textures and 883 rows. Set `BOF3_DISC_DIR` to an extracted disc.
+//! The palette joins over the retail archives: 203 textures and 883 rows.
+//!
+//! The test skips when no retail archive directory is present. Set `BOF3_DISC_DIR` to an
+//! extracted disc. The counts
+//! are the world-map terrain rule plus the literal sites (`rebof3_emi::texture::SITES`).
+//!
+//! Every joined row is written to the test artifacts as its palette-applied PNG and its TIM, so
+//! the result can be inspected by eye (`target/tmp/retail_textures_join_their_proven_palette_rows`).
 
 mod support;
 
@@ -20,7 +27,8 @@ fn payloads(archive: &Archive, bytes: &[u8]) -> Vec<Vec<u8>> {
     (0..archive.entries().len()).filter_map(|slot| archive.payload(bytes, slot).ok().map(<[u8]>::to_vec)).collect()
 }
 
-/// Writes the texture view and one palette-applied PNG and TIM per joined row, plus the evidence, for inspection.
+/// Writes the texture view and one palette-applied PNG and TIM per joined row, plus the
+/// evidence, for inspection.
 fn write_artifacts(
     out: &Path,
     source: &str,
@@ -29,6 +37,7 @@ fn write_artifacts(
     rows: &std::collections::HashMap<usize, Vec<rebof3_formats::vram::RowUse>>,
     summary: &mut Vec<serde_json::Value>,
 ) {
+    // The output folder is flat, so the archive's folder joins its file name.
     let stem = source.replace('/', "-");
     let mut slots: Vec<usize> = rows.keys().copied().collect();
     slots.sort_unstable();
@@ -86,6 +95,7 @@ fn retail_textures_join_their_proven_palette_rows() {
         let payloads = payloads(&archive, &bytes);
         assert_eq!(payloads.len(), archive.entries().len(), "{}: unreadable slot", path.display());
         let slices: Vec<&[u8]> = payloads.iter().map(Vec::as_slice).collect();
+        // The site table matches on the archive's disc path, and its evidence reads that way.
         let relative = path.strip_prefix(&root).unwrap_or(path).to_string_lossy().replace('\\', "/");
         let joined = joined_rows(&relative, archive.entries(), &slices);
         write_artifacts(&out, &relative, &archive, &payloads, &joined, &mut summary);
@@ -125,7 +135,9 @@ fn retail_textures_join_their_proven_palette_rows() {
     assert_eq!(rows[0].depth.bits(), 8);
 }
 
-/// The battle family's cross-archive blocks: row 506 differs between `BATL_OVR.EMI` and `BATL_DRA.EMI`, and row 507 agrees in four archives but differs in `BATL_DRA.EMI`.
+/// The battle family's cross-archive blocks: row 506 differs between `BATL_OVR.EMI` and
+/// `BATL_DRA.EMI`, and row 507 agrees in four archives but differs in `BATL_DRA.EMI`. Either
+/// row is ambiguous for a disc-wide resident set, so the join refuses it.
 #[test]
 fn retail_battle_rows_show_cross_archive_bank_conflicts() {
     let Some(root) = support::retail_root() else {

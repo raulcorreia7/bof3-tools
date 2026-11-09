@@ -1,4 +1,6 @@
-//! The strings of the payloads that are not message tables. Every string on the owner's disc exports and imports to its own bytes; the retail check skips when no disc image is present (set `BOF3_DISC_IMAGE`).
+//! The strings of the payloads that are not message tables. Every string on the owner's disc exports and imports to
+//! its own bytes; the retail check skips when no disc image is present (set `BOF3_DISC_IMAGE`). The synthetic checks
+//! cover the edit rules that the disc does not need in a payload of their own.
 
 mod support;
 

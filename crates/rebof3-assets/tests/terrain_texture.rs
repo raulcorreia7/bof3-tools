@@ -1,4 +1,8 @@
-//! The textured top-down view over the retail area maps: every map bundle is drawn from its own area's replayed VRAM (`rebof3_emi::replay::scenes::field`). Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the test skips.
+//! The textured top-down view over the retail area maps: every map bundle is drawn from its own
+//! area's replayed VRAM (`rebof3_emi::replay::scenes::field`).
+//!
+//! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the test
+//! skips. Nothing it reads is written out.
 
 mod support;
 
@@ -77,5 +81,7 @@ fn retail_area_maps_draw_from_their_replayed_vram() {
          {clear} of {pixels} drawn pixels are the transparent colour"
     );
     assert_eq!(bundles, 200, "every map bundle decodes and draws");
+    // Every cell with a non-empty descriptor finds its page uploaded and its CLUT row written in
+    // its own area's scene.
     assert_eq!((textured, unwritten), (688_118, 0));
 }
