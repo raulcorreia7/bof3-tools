@@ -6,7 +6,7 @@
 
 use gpui::{AnyElement, Context, div, prelude::*, px};
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_emi::text::discover::{self, Found, Kind};
+use rebof3_formats::text::discover::{self, Found, Kind};
 
 use super::{Entry, Field, input, message};
 use crate::app::Editor;

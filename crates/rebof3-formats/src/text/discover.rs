@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::codec::Encoding;
+use rebof3_emi::text::codec::Encoding;
 
 /// Fewest bytes a record holds before it can be text.
 const MIN_LENGTH: usize = 3;

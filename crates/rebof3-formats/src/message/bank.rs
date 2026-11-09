@@ -10,8 +10,9 @@ use std::collections::BTreeMap;
 use psx_formats::bytes::u16_le;
 use serde::{Deserialize, Serialize};
 
+use rebof3_emi::text::codec::{self, Encoding};
+
 use crate::error::{Error, Result};
-use crate::text::codec::{self, Encoding};
 use crate::text::source::{Origin, PayloadSource};
 
 /// The messages of a bank, and the slot map.
@@ -25,7 +26,7 @@ pub struct Bank {
 
 /// One exported message: its place, the slots that reach it, its bytes and its text.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct Message {
+pub struct Message {
     #[serde(flatten)]
     pub origin: Origin,
     /// A stable id: `message[<first slot>]`.
@@ -147,7 +148,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// The bank as JSON, how many messages it lists, and the rows it wrote.
-pub(crate) fn export_counted(payload: &[u8], source: Option<&PayloadSource>) -> Result<(Vec<u8>, usize, Vec<Message>)> {
+pub fn export_counted(payload: &[u8], source: Option<&PayloadSource>) -> Result<(Vec<u8>, usize, Vec<Message>)> {
     let bank = parse(payload)?;
     if build(&bank)? != payload {
         return Err(Error::Import("the bank does not lay out to its own bytes; it is not exported".into()));

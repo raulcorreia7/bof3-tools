@@ -10,9 +10,9 @@ use psx_formats::gfx::vram;
 use rebof3_editor::project::{ArchivePath, Project};
 use rebof3_editor::schema::{self, Field};
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_emi::text::discover::{self, Kind};
 use rebof3_formats::Format;
 use rebof3_formats::map::MapBundle;
+use rebof3_formats::text::discover::{self, Kind};
 use rebof3_formats::vram::texture_words;
 
 fn disc() -> Option<PathBuf> {

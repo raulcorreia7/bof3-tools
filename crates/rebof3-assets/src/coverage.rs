@@ -10,13 +10,13 @@ use std::path::Path;
 
 use psx_cd::Image;
 use rebof3_emi::Archive;
-use rebof3_emi::text::discover;
 use rebof3_formats::game_tables::TABLES;
 use rebof3_formats::{Format, classify};
 
 use crate::error::Result;
 use crate::kind::Kind;
-use crate::text::{bank, strings};
+use rebof3_formats::message::bank;
+use rebof3_formats::text::{discover, strings};
 
 /// The disc path of the fixed game tables, whose eight tables are the data-table entries.
 const GAME_TABLES_SOURCE: &str = "BIN/ETC/GAME.EMI";

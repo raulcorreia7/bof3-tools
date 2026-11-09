@@ -219,7 +219,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let same = if kind == "area-encounters" {
             rebof3_formats::encounter::open::import(&document, &payload).map(|back| back == payload).unwrap_or(false)
         } else {
-            rebof3_assets::text::bank::import(&document).map(|back| back == payload).unwrap_or(false)
+            rebof3_formats::message::bank::import(&document).map(|back| back == payload).unwrap_or(false)
         };
         record(kind, same);
     }

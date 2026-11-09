@@ -36,6 +36,7 @@ pub mod scene;
 pub mod script;
 pub mod sep;
 pub mod sprite_bank;
+pub mod text;
 pub mod vab;
 pub mod vram;
 pub mod window;

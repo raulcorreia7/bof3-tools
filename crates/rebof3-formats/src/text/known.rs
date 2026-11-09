@@ -7,9 +7,9 @@
 //! `wiki: data/records#character-and-master-data` and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`.
 
 use rebof3_emi::characters;
-use rebof3_formats::Format;
-use rebof3_formats::game_tables::{self, PAYLOAD_START, TABLES, Table};
 
+use crate::game_tables::{self, PAYLOAD_START, TABLES, Table};
+use crate::registry::Format;
 use crate::text::source::PayloadSource;
 
 /// One string a documented table places.

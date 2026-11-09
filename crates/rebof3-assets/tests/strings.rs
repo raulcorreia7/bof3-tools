@@ -5,9 +5,9 @@
 mod support;
 
 use psx_cd::Image;
-use rebof3_assets::text::strings;
 use rebof3_emi::Archive;
-use rebof3_emi::text::discover;
+use rebof3_formats::text::discover;
+use rebof3_formats::text::strings;
 
 #[test]
 fn every_string_payload_on_the_retail_disc_exports_and_imports_to_its_own_bytes() {

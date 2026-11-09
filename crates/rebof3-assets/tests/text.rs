@@ -9,9 +9,9 @@ use std::path::Path;
 
 use psx_cd::Image;
 use rebof3_assets::disc::{self, Replacement};
-use rebof3_assets::text::bank::{self, Bank};
-use rebof3_assets::text::codec::{self, Encoding};
 use rebof3_emi::Archive;
+use rebof3_emi::text::codec::{self, Encoding};
+use rebof3_formats::message::bank::{self, Bank};
 use rebof3_formats::{Format, classify};
 
 /// Every message bank on the disc: its archive's disc path, its entry index and its payload.

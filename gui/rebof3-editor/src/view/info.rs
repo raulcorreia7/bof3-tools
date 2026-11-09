@@ -6,7 +6,6 @@ use psx_formats::sep::Package;
 use psx_formats::vab::Bank;
 use rebof3_emi::cue::CueTable;
 use rebof3_emi::entry::vab_body_index;
-use rebof3_emi::text::discover;
 use rebof3_emi::{character_bank, lz77};
 use rebof3_formats::Format;
 use rebof3_formats::clut::palette_bank;
@@ -15,6 +14,7 @@ use rebof3_formats::game_tables::name_text;
 use rebof3_formats::map::MapBundle;
 use rebof3_formats::scene::SceneTable;
 use rebof3_formats::script::ScriptBank;
+use rebof3_formats::text::discover;
 use rebof3_formats::vram::texture_words;
 
 use super::Entry;

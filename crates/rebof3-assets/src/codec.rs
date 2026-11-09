@@ -7,7 +7,10 @@
 //! op's needs, read the files, call [`Op::run`], write the bytes.
 
 use crate::error::Result;
-use crate::{import, sprites, tables, text};
+use rebof3_formats::message::bank;
+use rebof3_formats::text::strings;
+
+use crate::{import, sprites, tables};
 
 /// Which way a conversion goes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -164,10 +167,10 @@ pub static CODECS: &[Codec] = &[
     Codec {
         kind: "message",
         export: Some(Op::new("export message needs a message bank payload", "json", |job| {
-            text::bank::export(job.input)
+            Ok(bank::export(job.input)?)
         })),
         import: Some(Op::new("import message needs a JSON file from export message", "bin", |job| {
-            text::bank::import(job.input)
+            Ok(bank::import(job.input)?)
         })),
     },
     Codec {
@@ -175,12 +178,12 @@ pub static CODECS: &[Codec] = &[
         export: Some(Op {
             load_arg: true,
             ..Op::new("export strings needs a payload file", "json", |job| {
-                text::strings::export(job.input, job.load_arg)
+                Ok(strings::export(job.input, job.load_arg)?)
             })
         }),
         import: Some(
             Op::new("import strings needs a JSON file from export strings", "bin", |job| {
-                text::strings::import(job.input, companion(job))
+                Ok(strings::import(job.input, companion(job))?)
             })
             .with_companion("--payload", "import strings needs --payload, the file it was exported from"),
         ),

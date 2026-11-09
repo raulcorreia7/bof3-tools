@@ -79,7 +79,8 @@ impl Encoding {
         }
     }
 
-    pub(crate) fn operands(self) -> &'static [(u8, &'static str)] {
+    /// The codes of this encoding that take operand bytes, with their names.
+    pub fn operands(self) -> &'static [(u8, &'static str)] {
         match self {
             Self::Message | Self::Name => OPERAND,
             Self::Ascii => &[],
@@ -87,7 +88,7 @@ impl Encoding {
     }
 
     /// The character a byte draws as, or `None` when the byte is not a character of this encoding.
-    pub(crate) fn glyph(self, code: u8) -> Option<char> {
+    pub fn glyph(self, code: u8) -> Option<char> {
         match self {
             Self::Ascii => (0x20..=0x7E).contains(&code).then_some(char::from(code)),
             Self::Message | Self::Name => match code {

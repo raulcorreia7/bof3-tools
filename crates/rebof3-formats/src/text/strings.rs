@@ -1,6 +1,6 @@
 //! The strings of a payload that is not a message bank, as JSON: each string with its offset, its length and its text.
 //!
-//! The strings are the ones [`rebof3_emi::text::discover`] finds. The JSON lists only the strings. Import
+//! The strings are the ones [`rebof3_formats::text::discover`] finds. The JSON lists only the strings. Import
 //! takes the same payload back, so every byte between two strings stays as it was. An unedited export imports to its
 //! own bytes. A name in a fixed-width field must keep its length, so the records after it keep their offsets; a loose
 //! record may change length, and a payload that holds pointers to its records does not follow such a change.
@@ -9,7 +9,8 @@ use std::collections::BTreeMap;
 
 use rebof3_emi::Entry;
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_emi::text::discover::{self, Found, Kind};
+
+use crate::text::discover::{self, Found, Kind};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -40,7 +41,7 @@ struct Document {
 
 /// One string: where its bytes start, how many bytes they are, its name stride if it is a fixed-width field, and its text.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct Item {
+pub struct Item {
     #[serde(flatten)]
     pub origin: Origin,
     /// String length in bytes.
@@ -72,14 +73,7 @@ pub(crate) struct Item {
 
 impl Item {
     /// A known-table row: the field's bytes, its stride, and the table and record index it belongs to.
-    pub(crate) fn known(
-        origin: Origin,
-        raw: &[u8],
-        stride: usize,
-        text: String,
-        table: &str,
-        index: usize,
-    ) -> Result<Self> {
+    pub fn known(origin: Origin, raw: &[u8], stride: usize, text: String, table: &str, index: usize) -> Result<Self> {
         if codec::encode(Encoding::Message, &text)? != raw {
             return Err(Error::Import(format!("the name at {:#x} does not encode to its bytes", origin.offset)));
         }
@@ -105,7 +99,7 @@ pub fn export(payload: &[u8], load_address: Option<u32>) -> Result<Vec<u8>> {
 }
 
 /// The payload's scanned strings as rows, with the fields of `exclude` left out.
-pub(crate) fn rows(
+pub fn rows(
     payload: &[u8],
     load_address: Option<u32>,
     source: Option<&PayloadSource>,
@@ -140,7 +134,7 @@ pub(crate) fn rows(
 }
 
 /// The strings of `payload` as JSON, and how many strings it lists.
-pub(crate) fn export_counted(
+pub fn export_counted(
     payload: &[u8],
     load_address: Option<u32>,
     source: Option<&PayloadSource>,
@@ -152,7 +146,7 @@ pub(crate) fn export_counted(
 }
 
 /// The JSON document of already found rows.
-pub(crate) fn document(size: usize, items: &[Item]) -> Vec<u8> {
+pub fn document(size: usize, items: &[Item]) -> Vec<u8> {
     let document = Document { size, strings: items.to_vec() };
     serde_json::to_vec_pretty(&document).expect("the strings serialize")
 }
