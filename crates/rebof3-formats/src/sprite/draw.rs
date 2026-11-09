@@ -14,10 +14,10 @@
 //!   `Area_BuildClut` (`exe/slus_004_22@0x8014CE78`), which for kind 2 is row `480 + (sel >> 3)`,
 //!   column `(sel & 7) * 32`: the arena row and column `GFX_LoadPalette` wrote.
 //!
-//! A battle bank (`BPLD`, `BPLU`) is read the same way. `Battle_LoadPartySprites`
+//! Battle character sprites (`BPLD`, `BPLU`) are read the same way. `Battle_LoadPartySprites`
 //! (`emi/etc/game/00@0x80197AA4`) streams `BPLD` or `BPLU` to `0x8003B800` by `g_Battle.scroll_dir & 2`;
 //! `Battle_LoadBattleArchive` (`emi/etc/game/00@0x80197C94`) then runs `Party_BuildBattlers(PARTY_ORDER_BATTLE)`,
-//! which calls `Party_LoadMemberSprite` for every battle slot. The battle overlay reloads a bank mid-battle
+//! which calls `Party_LoadMemberSprite` for every battle slot. The battle overlay reloads character sprites mid-battle
 //! (`func_801E7948`, `emi/battle/battle/03@0x801E7948`) and stages palette 0 again for the slot at
 //! `GAME_PALETTE_STAGE + slot * 0x40` (`func_801E7634`, `func_801E7BA0`, `func_801E8684`). The slot, and
 //! so the sheet row and CLUT, is the member's place in the battle order, a run-time choice that moves the
@@ -91,7 +91,7 @@ impl SpriteSizes {
 
     /// The table as the executable (`SLUS_004.22`) stores it.
     pub fn from_executable(exe: &[u8]) -> Result<Self> {
-        let not_exe = |why: &str| Error::SpriteBank(format!("the executable has no g_SpriteSizes: {why}"));
+        let not_exe = |why: &str| Error::CharacterSprites(format!("the executable has no g_SpriteSizes: {why}"));
         if exe.get(..EXE_MAGIC.len()) != Some(&EXE_MAGIC[..]) {
             return Err(not_exe("it is not a PS-X EXE"));
         }
@@ -193,7 +193,7 @@ impl Placement {
     }
 }
 
-/// The code that reads a bank, by the family of the archive that streams it.
+/// The code that reads character sprites, by the family of the archive that streams it.
 ///
 /// `EMI_GetArchiveId` (`exe/slus_004_22@0x8016728C`) streams family 0 from `EMI_SLOT_PL`
 /// (`BIN/PLCHAR/PLnnn.EMI`) and families 1 and 2 from `EMI_SLOT_BPLD` and `EMI_SLOT_BPLU`
@@ -201,10 +201,10 @@ impl Placement {
 /// asks for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Reader {
-    /// A party bank: `Party_LoadMemberSprite` places it and loads palette [`FIELD_PALETTE`], called from
+    /// Party character sprites: `Party_LoadMemberSprite` places it and loads palette [`FIELD_PALETTE`], called from
     /// `Party_JoinMember` and `Party_BuildBattlers` (`emi/etc/game/00`).
     Field,
-    /// A battle bank: `Battle_LoadPartySprites` streams it and `Party_BuildBattlers(PARTY_ORDER_BATTLE)`
+    /// Battle character sprites: `Battle_LoadPartySprites` streams it and `Party_BuildBattlers(PARTY_ORDER_BATTLE)`
     /// places it through `Party_LoadMemberSprite`, palette [`FIELD_PALETTE`]; see the module documentation.
     Battle,
     /// No traced loader streams the archive.
@@ -245,7 +245,7 @@ impl Default for Placement {
     }
 }
 
-/// One texel a cell reads: its index, its colour, and whether both came from the staged bank.
+/// One texel a cell reads: its index, its colour, and whether both came from the staged character sprites.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Texel {
     /// The 8-bit index in the sheet.

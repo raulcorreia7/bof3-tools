@@ -1,7 +1,7 @@
-//! Script bank codec: the area (`0x800D3800`), battle (`0x800F0800`) and magic-effect
-//! (`0x800C3800`) banks.
+//! Script table codec: the area (`0x800D3800`), battle (`0x800F0800`) and magic-effect
+//! (`0x800C3800`) tables.
 //!
-//! One archive's script bank: a self-sizing directory, then its sections, each a `u16`
+//! One archive's script table: a self-sizing directory, then its sections, each a `u16`
 //! record-offset table and the record bytes. The reader is `Actor_BeginScript`
 //! (`exe/slus_004_22@0x8014D6DC`, `decomp/src/engine/slus/Actor_BeginScript.c`):
 //!
@@ -16,7 +16,7 @@
 //! `0x800D3800`, the battle handlers swap in `0x800F0800` (`func_801E6C84`,
 //! `emi/battle/battle/03@0x801E6C84`), and the magic-effect overlays swap in `0x800C3800`
 //! (`BMagic_Effect.c` in `decomp/src/overlays/bmagic/`), all the same format. The 37 magic-effect
-//! banks hold one section, so their directory is the single word `4`.
+//! tables hold one section, so their directory is the single word `4`.
 //!
 //! Each section's first word is `2*M`, the size of its M offset words, and it doubles as the first
 //! offset word. No record size is stored, so the table offsets are the only record boundaries. In
@@ -28,7 +28,7 @@
 //! record is an animation stream: [`program`] reads each record's steps as ops, and [`text`] writes
 //! and reads them one op per line.
 //!
-//! Layout and reader evidence: `wiki: formats/area#0x800d3800-area-script-bank`.
+//! Layout and reader evidence: `wiki: formats/area#0x800d3800-area-script-table`.
 
 pub mod program;
 pub mod text;
@@ -44,22 +44,22 @@ use crate::error::{Error, Result};
 use crate::identity::difference;
 use crate::registry::{Derived, Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
-/// The load address of an area's script bank.
+/// The load address of an area's script table.
 const AREA_ADDRESS: u32 = 0x800d_3800;
-/// The load address of the battle script bank.
+/// The load address of the battle script table.
 const BATTLE_ADDRESS: u32 = 0x800f_0800;
-/// The load address of the magic-effect script bank of the `BMAGIC*` archives.
+/// The load address of the magic-effect script table of the `BMAGIC*` archives.
 const MAGIC_ADDRESS: u32 = 0x800c_3800;
 
-/// The readers every script bank row cites.
+/// The readers every script table row cites.
 const STREAM_EVIDENCE: &str = "Actor_BeginScript (exe/slus_004_22@0x8014D6DC) reads a record of g_ScriptBank; \
 Actor_SeekScript (exe/slus_004_22@0x8014D910) and Actor_StageAnimStep, Actor_StepAnimLoop, Actor_StepAnimOnce, Actor_StepAnimReverse \
 play it as an animation stream; wiki: formats/area (`0x800D3800`)";
 
-/// The area script bank as a format-registry row.
+/// The area script table as a format-registry row.
 pub static AREA: Description = Description {
-    format: Format::AreaScriptBank,
-    name: "area script bank (0x800D3800)",
+    format: Format::AreaScriptTable,
+    name: "area script table (0x800D3800)",
     state: State::Codec,
     spec_state: "documented",
     codec_state: "decode+encode; ops and text",
@@ -72,10 +72,10 @@ pub static AREA: Description = Description {
     kind: "area-script",
 };
 
-/// The battle script bank as a format-registry row.
+/// The battle script table as a format-registry row.
 pub static BATTLE: Description = Description {
-    format: Format::BattleScriptBank,
-    name: "battle script bank (0x800F0800)",
+    format: Format::BattleScriptTable,
+    name: "battle script table (0x800F0800)",
     state: State::Codec,
     spec_state: "documented",
     codec_state: "decode+encode; ops and text",
@@ -88,10 +88,10 @@ pub static BATTLE: Description = Description {
     kind: "battle-script",
 };
 
-/// The magic-effect script bank as a format-registry row.
+/// The magic-effect script table as a format-registry row.
 pub static MAGIC: Description = Description {
-    format: Format::MagicTable,
-    name: "magic-effect script bank (0x800C3800)",
+    format: Format::MagicScriptTable,
+    name: "magic-effect script table (0x800C3800)",
     state: State::Codec,
     spec_state: "documented",
     codec_state: "decode+encode; ops and text",
@@ -101,10 +101,10 @@ pub static MAGIC: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "bmagic-table",
+    kind: "bmagic-script",
 };
 
-/// Decodes the bank to its ops and encodes it again; `Err` names the first difference.
+/// Decodes the table to its ops and encodes it again; `Err` names the first difference.
 fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
     let program = program::Program::decode(payload).map_err(|error| error.to_string())?;
     difference(&program.encode().map_err(|error| error.to_string())?, payload)
@@ -114,8 +114,8 @@ fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
 const DIRECTORY_WORD: usize = 4;
 /// The size of one table word: a record offset.
 const TABLE_WORD: usize = 2;
-/// The smallest bank: a one-word directory and one section's table word.
-const SMALLEST_BANK: usize = DIRECTORY_WORD + TABLE_WORD;
+/// The smallest table: a one-word directory and one section's table word.
+const SMALLEST_TABLE: usize = DIRECTORY_WORD + TABLE_WORD;
 
 /// One section: its stored offset words and the record bytes they name.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -135,9 +135,9 @@ pub struct ScriptSection {
     pub records: Vec<Vec<u8>>,
 }
 
-/// One archive's script bank: the directory and its sections.
+/// One archive's script table: the directory and its sections.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct ScriptBank {
+pub struct ScriptTable {
     /// The directory's own size, in bytes: `4 * L`, L the section count.
     pub dir_bytes: u32,
     /// The sections, in directory order; the last runs to the end of the
@@ -145,17 +145,17 @@ pub struct ScriptBank {
     pub sections: Vec<ScriptSection>,
 }
 
-impl ScriptBank {
+impl ScriptTable {
     /// Reads a `0x800D3800`, `0x800F0800` or `0x800C3800` payload.
     pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
         let len = bytes.len();
-        if len < SMALLEST_BANK {
-            return Err(Error::ScriptBankShape("the payload is shorter than a directory word and a table word"));
+        if len < SMALLEST_TABLE {
+            return Err(Error::ScriptTableShape("the payload is shorter than a directory word and a table word"));
         }
 
         let dir_bytes = u32_le(bytes, 0) as usize;
         if dir_bytes < DIRECTORY_WORD || !dir_bytes.is_multiple_of(DIRECTORY_WORD) || dir_bytes > len {
-            return Err(Error::ScriptBankShape("the directory size is not 4*L inside the payload"));
+            return Err(Error::ScriptTableShape("the directory size is not 4*L inside the payload"));
         }
 
         let section_count = dir_bytes / DIRECTORY_WORD;
@@ -163,7 +163,7 @@ impl ScriptBank {
         for index in 1..section_count {
             let base = u32_le(bytes, DIRECTORY_WORD * index) as usize;
             if base <= bases[index - 1] || base >= len {
-                return Err(Error::ScriptBankShape("a section offset is not strictly increasing inside the payload"));
+                return Err(Error::ScriptTableShape("a section offset is not strictly increasing inside the payload"));
             }
             bases.push(base);
         }
@@ -182,12 +182,12 @@ impl ScriptBank {
         &self.sections
     }
 
-    /// The section at `index`, if the bank holds one.
+    /// The section at `index`, if the table holds one.
     pub fn section(&self, index: usize) -> Option<&ScriptSection> {
         self.sections.get(index)
     }
 
-    /// The bank as JSON: the directory size and, per section, the stored
+    /// The table as JSON: the directory size and, per section, the stored
     /// table words, the record bytes as hex, and the record each table
     /// entry names.
     pub fn json(&self) -> String {
@@ -216,7 +216,7 @@ impl ScriptBank {
                 })
                 .collect(),
         };
-        serde_json::to_string_pretty(&document).expect("the script bank document is serializable")
+        serde_json::to_string_pretty(&document).expect("the script table document is serializable")
     }
 
     /// The payload bytes.
@@ -226,7 +226,7 @@ impl ScriptBank {
         for section in &self.sections {
             bases.push(bases[bases.len() - 1] + section_bytes(section));
         }
-        let mut out = Vec::with_capacity(*bases.last().expect("the bank holds at least one section"));
+        let mut out = Vec::with_capacity(*bases.last().expect("the table holds at least one section"));
         push_u32_le(&mut out, dir_bytes as u32);
         for base in &bases[1..bases.len() - 1] {
             push_u32_le(&mut out, *base as u32);
@@ -256,17 +256,17 @@ fn write_section(out: &mut Vec<u8>, section: &ScriptSection) {
 /// One section's table words and record bytes, from `[base, end)` of `bytes`.
 fn section(bytes: &[u8], base: usize, end: usize) -> Result<ScriptSection, Error> {
     if end - base < TABLE_WORD {
-        return Err(Error::ScriptBankShape("a section is shorter than its table word"));
+        return Err(Error::ScriptTableShape("a section is shorter than its table word"));
     }
     let table_bytes = u16_le(bytes, base) as usize;
     if table_bytes == 0 || !table_bytes.is_multiple_of(TABLE_WORD) || base + table_bytes > end {
-        return Err(Error::ScriptBankShape("a section's table size is not 2*M inside the section"));
+        return Err(Error::ScriptTableShape("a section's table size is not 2*M inside the section"));
     }
     let count = table_bytes / TABLE_WORD;
     let offsets: Vec<u16> = (0..count).map(|index| u16_le(bytes, base + TABLE_WORD * index)).collect();
     let limit = end - base;
     if offsets.iter().any(|offset| *offset as usize > limit) {
-        return Err(Error::ScriptBankShape("a record offset runs past the section end"));
+        return Err(Error::ScriptTableShape("a record offset runs past the section end"));
     }
     let mut distinct: Vec<usize> = Vec::with_capacity(count);
     for offset in &offsets {
@@ -275,7 +275,7 @@ fn section(bytes: &[u8], base: usize, end: usize) -> Result<ScriptSection, Error
         }
     }
     if distinct.windows(2).any(|pair| pair[1] <= pair[0]) {
-        return Err(Error::ScriptBankShape("record offsets repeat out of order"));
+        return Err(Error::ScriptTableShape("record offsets repeat out of order"));
     }
     let mut bounds = distinct[1..].to_vec();
     bounds.push(limit);
@@ -300,12 +300,12 @@ fn hex(bytes: &[u8]) -> String {
 
 /// The script records as JSON and the ops as [`text`]. The reader is `Actor_BeginScript` in
 /// `decomp/src/engine/slus/Actor_BeginScript.c`; the layout is
-/// `wiki: formats/area#0x800d3800-area-script-bank`.
+/// `wiki: formats/area#0x800d3800-area-script-table`.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
-    let bank = ScriptBank::decode(payload)?;
-    let listing = text::write(&program::Program::from_bank(&bank)).into_bytes();
+    let table = ScriptTable::decode(payload)?;
+    let listing = text::write(&program::Program::from_table(&table)).into_bytes();
     Ok(vec![
-        Derived { role: "json", extension: "json", data: bank.json().into_bytes() },
+        Derived { role: "json", extension: "json", data: table.json().into_bytes() },
         Derived { role: "script", extension: "txt", data: listing },
     ])
 }
@@ -314,7 +314,7 @@ fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
 mod tests {
     use super::*;
 
-    /// The bank the round-trip test reads: three sections, the first with a
+    /// The table the round-trip test reads: three sections, the first with a
     /// repeated offset word.
     ///
     /// ```text
@@ -323,7 +323,7 @@ mod tests {
     /// sec1 @33:  word [2], record [2,7)
     /// sec2 @40:  words [4, 8], records [4,8) [8,14)
     /// ```
-    fn bank() -> Vec<u8> {
+    fn table() -> Vec<u8> {
         let mut out = Vec::new();
         for word in [12u32, 33, 40] {
             push_u32_le(&mut out, word);
@@ -342,9 +342,9 @@ mod tests {
     }
 
     #[test]
-    fn a_bank_reads_its_sections_and_shares_a_record() {
-        let payload = bank();
-        let decoded = ScriptBank::decode(&payload).expect("a bank parses");
+    fn a_table_reads_its_sections_and_shares_a_record() {
+        let payload = table();
+        let decoded = ScriptTable::decode(&payload).expect("a table parses");
         assert_eq!(decoded.dir_bytes, 12);
         assert_eq!(decoded.sections.len(), 3);
 
@@ -364,15 +364,15 @@ mod tests {
 
     #[test]
     fn encode_then_decode_is_byte_identical() {
-        let payload = bank();
-        let decoded = ScriptBank::decode(&payload).expect("a bank parses");
+        let payload = table();
+        let decoded = ScriptTable::decode(&payload).expect("a table parses");
         assert_eq!(decoded.encode(), payload);
     }
 
     #[test]
     fn a_json_document_holds_the_records_as_hex() {
-        let payload = bank();
-        let decoded = ScriptBank::decode(&payload).expect("a bank parses");
+        let payload = table();
+        let decoded = ScriptTable::decode(&payload).expect("a table parses");
         let document: serde_json::Value = serde_json::from_str(&decoded.json()).expect("JSON reads");
         assert_eq!(document["dir_bytes"], 12);
         assert_eq!(document["sections"][0]["offsets"][2], 10);
@@ -380,16 +380,16 @@ mod tests {
         assert_eq!(document["sections"][1]["records"][0], "0e0f101112");
     }
 
-    /// A magic-effect bank: a one-word directory, then one section of two records.
+    /// A magic-effect table: a one-word directory, then one section of two records.
     #[test]
-    fn a_one_section_bank_reads_and_encodes_back() {
+    fn a_one_section_table_reads_and_encodes_back() {
         let mut payload = Vec::new();
         push_u32_le(&mut payload, 4);
         push_u16_le(&mut payload, 4);
         push_u16_le(&mut payload, 6);
         payload.extend_from_slice(&[1, 2, 3, 4, 5]);
 
-        let decoded = ScriptBank::decode(&payload).expect("a one-section bank parses");
+        let decoded = ScriptTable::decode(&payload).expect("a one-section table parses");
         assert_eq!(decoded.dir_bytes, 4);
         assert_eq!(decoded.sections.len(), 1);
         assert_eq!(decoded.sections[0].records, vec![vec![1, 2], vec![3, 4, 5]]);
@@ -398,43 +398,43 @@ mod tests {
 
     #[test]
     fn rejects_a_payload_shorter_than_a_directory() {
-        assert!(matches!(ScriptBank::decode(&[1, 2, 3]), Err(Error::ScriptBankShape(_))));
-        assert!(matches!(ScriptBank::decode(&[4, 0, 0, 0, 2]), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptTable::decode(&[1, 2, 3]), Err(Error::ScriptTableShape(_))));
+        assert!(matches!(ScriptTable::decode(&[4, 0, 0, 0, 2]), Err(Error::ScriptTableShape(_))));
     }
 
     #[test]
     fn rejects_a_directory_size_that_is_not_four_l() {
-        let mut payload = bank();
+        let mut payload = table();
         payload[0] = 10; // 10 is not 4*L
-        assert!(matches!(ScriptBank::decode(&payload), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
     }
 
     #[test]
     fn rejects_a_section_offset_that_is_not_strictly_increasing() {
-        let mut payload = bank();
+        let mut payload = table();
         payload[4] = 12; // section 1 at the section 0 base
-        assert!(matches!(ScriptBank::decode(&payload), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
     }
 
     #[test]
     fn rejects_a_table_size_that_is_not_two_m() {
-        let mut payload = bank();
+        let mut payload = table();
         payload[12] = 9;
-        assert!(matches!(ScriptBank::decode(&payload), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
     }
 
     #[test]
     fn rejects_a_record_offset_past_the_section_end() {
-        let mut payload = bank();
+        let mut payload = table();
         payload[42] = 40; // section 2's second offset word runs past 54 - 40 = 14
-        assert!(matches!(ScriptBank::decode(&payload), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
     }
 
     #[test]
     fn rejects_offsets_that_repeat_out_of_order() {
-        let mut payload = bank();
+        let mut payload = table();
         payload[16] = 0;
         payload[17] = 0; // section 0's third word drops below its predecessor
-        assert!(matches!(ScriptBank::decode(&payload), Err(Error::ScriptBankShape(_))));
+        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
     }
 }

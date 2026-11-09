@@ -32,9 +32,9 @@ use crate::widgets::{GAP, GAP_SMALL, button, checkbox, mono, muted, separator, t
 /// The archive whose entry 0 holds `s_EncounterEnemyOffsets`, and the executable with `g_SpriteSizes`.
 const GAME: &str = "BIN/ETC/GAME.EMI";
 const EXECUTABLE: &str = "SLUS_004.22";
-/// The load addresses of the area's scene table and script bank.
+/// The load addresses of the area's scene table and script table.
 const SCENE_TABLE: u32 = 0x800E_3800;
-const SCRIPT_BANK: u32 = 0x800D_3800;
+const SCRIPT_TABLE: u32 = 0x800D_3800;
 /// Screen pixels per map cell in the top-down layout, and the 16.16 fraction bits of a cell.
 const CELL_PIXELS: i32 = 32;
 const CELL_SHIFT: u32 = 16;
@@ -48,7 +48,7 @@ const LINE: f32 = 1.0;
 /// One enemy of the shown formation, ready to draw.
 struct Shown {
     placed: Placed,
-    /// The stage and the stream, when the scene record and the script bank give them.
+    /// The stage and the stream, when the scene record and the script table give them.
     sprite: Option<(Stage, Animation)>,
     player: Option<Player>,
 }
@@ -96,7 +96,7 @@ pub fn prepare(editor: &mut Editor) {
             .map(|index| entry.sibling(index).to_vec())
     };
     let table = sibling(SCENE_TABLE).and_then(|bytes| SceneTable::decode(&bytes).ok());
-    let program = sibling(SCRIPT_BANK).and_then(|bytes| Program::decode(&bytes).ok());
+    let program = sibling(SCRIPT_TABLE).and_then(|bytes| Program::decode(&bytes).ok());
     let disc = project.disc.clone();
 
     let Some(project) = editor.project.as_mut() else { return };

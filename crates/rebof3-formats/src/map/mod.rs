@@ -16,11 +16,11 @@
 //! ```text
 //! +0x00 u8  width                 +0x01 u8  height
 //! +0x02 u16 grid_off4     = 12 + W*H + align4(W*H)/4
-//! +0x04 u16 rect_off4[4]  bank A: 4-byte tile rectangles, stride 4 bytes,
+//! +0x04 u16 rect_off4[4]  rectangle table: 4-byte tile rectangles, stride 4 bytes,
 //!                                  selected by (descriptor >> 28) & 3
-//! +0x06 u16 quad_off4[4]  bank B: 8-byte tile quads, stride 8 bytes, same
-//!                                  selector; the banks interleave in memory as
-//!                                  A[i], B[i], A[i+1], B[i+1], ...
+//! +0x06 u16 quad_off4[4]  quad table: 8-byte tile quads, stride 8 bytes, same
+//!                                  selector; the tables interleave in memory as
+//!                                  R[i], Q[i], R[i+1], Q[i+1], ...
 //! +0x14 u16 code_off4     = 12 + W*H: per-cell byte codes, one byte per cell,
 //!                                  row stride `width`
 //! +0x1a u16 colour[2]     runtime colour words (RGB555), index (mask >> 3)
@@ -33,8 +33,8 @@
 //! ```
 //!
 //! Each of the four record regions ends with a zero word: the walks in
-//! `func_80157F98` (both loops), `func_801580A4`, `func_80158B24`,
-//! `func_8015507C` and `func_80155B40` stop on it. Every region's records tile
+//! `Area_RunBundleOpcodes` (both loops), `Area_CyclePalette`, `Area_IndexCells`,
+//! `Area_SetCellPalette` and `Area_DrawCellLayer` stop on it. Every region's records tile
 //! exactly onto the next region's start, which is why [`MapBundle::encode`]
 //! derives the offsets from the sections rather than storing them.
 //!
@@ -117,11 +117,11 @@ pub const CELL_BYTES: usize = 4;
 pub const GRID_BYTES: usize = 2;
 /// One grid-indexed tile descriptor word.
 pub const TILE_BYTES: usize = 4;
-/// One bank-A tile rectangle.
+/// One rectangle-table tile rectangle.
 pub const RECT_BYTES: usize = 4;
-/// One bank-B tile quad.
+/// One quad-table tile quad.
 pub const QUAD_BYTES: usize = 8;
-/// Tile tables in each bank, selected by `(descriptor >> 28) & 3`.
+/// Texture pages a bundle selects between, by `(descriptor >> 28) & 3`.
 pub const SELECTORS: usize = 4;
 
 /// One per-cell record: the four signed corner heights of the cell. Every
@@ -134,10 +134,10 @@ pub struct Cell {
     pub heights: [i8; CELL_BYTES],
 }
 
-/// One bank-A tile record: the texture rectangle the renderer expands into the
+/// One rectangle-table tile record: the texture rectangle the renderer expands into the
 /// quad's four UV pairs. Byte order is `dv`, `du`, `v`, `u`: the renderer takes
 /// byte 3 as `u` and byte 2 as `v`, and adds byte 1 to `u` and byte 0 to `v`
-/// for the far corner (`@0x80155560`, the four-byte-bank path).
+/// for the far corner (`@0x80155560`, the four-byte rectangle path).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TileRect {
     pub u: u8,
@@ -146,7 +146,7 @@ pub struct TileRect {
     pub dv: u8,
 }
 
-/// One bank-B tile record: four independent UV pairs, one per quad corner. Each
+/// One quad-table tile record: four independent UV pairs, one per quad corner. Each
 /// pair is stored as `(v, u)` bytes, and corner `k` reads the pair at bytes
 /// `(3, 2)`, `(1, 0)`, `(7, 6)` and `(5, 4)` for `k` = 0 to 3, before the
 /// corner-order flags apply (`exe/slus_004_22@0x80155560`, loads at
@@ -192,8 +192,8 @@ impl ListRecord {
 
 /// One `+0x24` record cell: a head of map coordinates and its record chain.
 /// The runner writes this cell's id into the `D_80141880` grid after the
-/// isometric transform (`func_80158B24`), and the two walkers advance through
-/// the chain by each record's size byte (`func_8015507C`, `func_80155B40`).
+/// isometric transform (`Area_IndexCells`), and the two walkers advance through
+/// the chain by each record's size byte (`Area_SetCellPalette`, `Area_DrawCellLayer`).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapCell {
     /// Head byte 0: map row.
@@ -206,10 +206,10 @@ pub struct MapCell {
 
 /// One `+0x28` object: a `u16` tag then the body's words, whose count the
 /// reader takes from the head (`func_801576FC` walks one object's body,
-/// `func_80157F98`'s second loop walks the objects).
+/// `Area_RunBundleOpcodes`'s second loop walks the objects).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapObject {
-    /// The tag `func_801576FC` passes to `func_80155E7C`.
+    /// The tag `func_801576FC` passes to `Area_TestCondition`.
     pub tag: u16,
     /// The body words after the head.
     pub words: Vec<u32>,
@@ -237,9 +237,9 @@ pub struct MapBundle {
     pub grid: Vec<u16>,
     /// The grid-indexed tile descriptor words, addressed `grid_end + cell * 4`.
     pub records: Vec<u32>,
-    /// Bank-A tile rectangles, one table per selector.
+    /// Rectangle-table tile rectangles, one table per selector.
     pub rects: [Vec<TileRect>; SELECTORS],
-    /// Bank-B tile quads, one table per selector.
+    /// Quad-table tile quads, one table per selector.
     pub quads: [Vec<TileQuad>; SELECTORS],
     /// The `+0x20` record list, opcode byte `& 0x3f`.
     pub list_a: Vec<ListRecord>,
@@ -613,11 +613,11 @@ impl Layout {
         }
         for selector in 0..SELECTORS {
             if (quads[selector] - rects[selector]) % RECT_BYTES != 0 {
-                return Err(Error::MapBundleShape("a bank-A table is not a whole number of 4-byte records"));
+                return Err(Error::MapBundleShape("a rectangle table is not a whole number of 4-byte records"));
             }
             let stop = rects.get(selector + 1).copied().unwrap_or(list_a);
             if (stop - quads[selector]) % QUAD_BYTES != 0 {
-                return Err(Error::MapBundleShape("a bank-B table is not a whole number of 8-byte records"));
+                return Err(Error::MapBundleShape("a quad table is not a whole number of 8-byte records"));
             }
         }
         if end > bytes.len() {

@@ -1,21 +1,21 @@
-//! A message bank as a PO catalogue for translators (GNU gettext, "PO Files").
+//! A message table as a PO catalogue for translators (GNU gettext, "PO Files").
 //!
 //! Each message is one entry: `msgctxt` is the stable id `message[<first slot>]`, `msgid` is the message's text with
 //! its control codes as `{TAG}` markup (`rebof3_emi::text::codec`), and `msgstr` is the translation. An empty
-//! `msgstr`, or one equal to the `msgid`, keeps the original bytes, so an untouched catalogue rebuilds the bank byte
+//! `msgstr`, or one equal to the `msgid`, keeps the original bytes, so an untouched catalogue rebuilds the table byte
 //! for byte. A translated `msgstr` is encoded with the same markup, so its codes, its `{END}` and its padding are the
 //! translator's to keep.
 
 use rebof3_emi::text::codec::{self, Encoding};
 
-use super::bank::{self, Bank};
+use super::table::{self, Table};
 use crate::error::{Error, Result};
 
 const HEADER: &str = "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n\n";
 
-/// The bank as a PO catalogue, one entry per message, with an empty `msgstr` for each.
+/// The table as a PO catalogue, one entry per message, with an empty `msgstr` for each.
 pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
-    let parsed = bank::parse(payload)?;
+    let parsed = table::parse(payload)?;
     let mut out = String::from(HEADER);
     for (index, message) in parsed.messages.iter().enumerate() {
         out.push_str(&format!("#. {} bytes\n", message.len()));
@@ -25,29 +25,29 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(out.into_bytes())
 }
 
-/// The bank bytes of `payload` with each translated message of `catalogue` put in place. Refuses an entry whose
-/// `msgctxt` names no message, text that does not encode, and a bank past its limit.
+/// The table bytes of `payload` with each translated message of `catalogue` put in place. Refuses an entry whose
+/// `msgctxt` names no message, text that does not encode, and a table past its limit.
 pub fn import(catalogue: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let text =
         std::str::from_utf8(catalogue).map_err(|error| Error::Import(format!("the PO file is not UTF-8: {error}")))?;
-    let mut parsed = bank::parse(payload)?;
+    let mut parsed = table::parse(payload)?;
     for entry in entries(text)? {
         let Some(context) = entry.context else { continue };
         let index = (0..parsed.messages.len())
             .find(|&index| id(&parsed, index) == context)
-            .ok_or_else(|| Error::Import(format!("the PO entry {context} names no message of the bank")))?;
+            .ok_or_else(|| Error::Import(format!("the PO entry {context} names no message of the table")))?;
         if entry.translation.is_empty() || entry.translation == entry.source {
             continue;
         }
         parsed.messages[index] = codec::encode(Encoding::Message, &entry.translation)
             .map_err(|error| Error::Import(format!("{context}: {error}")))?;
     }
-    bank::build_within_limit(&parsed)
+    table::build_within_limit(&parsed)
 }
 
-/// `message[<first slot>]`, the id `bank::export` gives too.
-fn id(bank: &Bank, message: usize) -> String {
-    let slot = bank.slots.iter().position(|slot| *slot == Some(message)).unwrap_or(message);
+/// `message[<first slot>]`, the id `table::export` gives too.
+fn id(table: &Table, message: usize) -> String {
+    let slot = table.slots.iter().position(|slot| *slot == Some(message)).unwrap_or(message);
     format!("message[{slot}]")
 }
 
@@ -140,27 +140,27 @@ mod tests {
     use super::*;
 
     fn sample() -> Vec<u8> {
-        let mut bank = vec![0u8; 4];
-        bank[0] = 4;
-        bank[2] = 4;
-        bank.extend(b"Hi");
-        bank.push(0);
-        bank
+        let mut table = vec![0u8; 4];
+        table[0] = 4;
+        table[2] = 4;
+        table.extend(b"Hi");
+        table.push(0);
+        table
     }
 
     #[test]
-    fn an_untouched_catalogue_rebuilds_the_bank() {
-        let bank = sample();
-        let po = export(&bank).unwrap();
-        assert_eq!(import(&po, &bank).unwrap(), bank);
+    fn an_untouched_catalogue_rebuilds_the_table() {
+        let table = sample();
+        let po = export(&table).unwrap();
+        assert_eq!(import(&po, &table).unwrap(), table);
     }
 
     #[test]
     fn a_translation_replaces_its_message() {
-        let bank = sample();
+        let table = sample();
         let po =
-            String::from_utf8(export(&bank).unwrap()).unwrap().replace("msgstr \"\"\n\n", "msgstr \"Yo{END}\"\n\n");
-        let rebuilt = import(po.as_bytes(), &bank).unwrap();
+            String::from_utf8(export(&table).unwrap()).unwrap().replace("msgstr \"\"\n\n", "msgstr \"Yo{END}\"\n\n");
+        let rebuilt = import(po.as_bytes(), &table).unwrap();
         assert_eq!(&rebuilt[4..], b"Yo\0");
     }
 }

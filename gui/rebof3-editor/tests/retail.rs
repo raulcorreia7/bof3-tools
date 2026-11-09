@@ -90,7 +90,7 @@ fn every_entry_round_trips_through_its_editor() {
                 }
             }
 
-            let found = discover::bank_records(payload).unwrap_or_else(|| discover::strings(payload, Some(load_arg)));
+            let found = discover::table_records(payload).unwrap_or_else(|| discover::strings(payload, Some(load_arg)));
             for string in found {
                 strings.0 += 1;
                 let encoding =

@@ -27,11 +27,11 @@ pub fn decodes(format: Format) -> bool {
         format,
         Format::CueTable
             | Format::AreaActorDefsTable
-            | Format::AreaScriptBank
-            | Format::BattleScriptBank
-            | Format::MagicTable
-            | Format::ClutBank
-            | Format::Lz77Blob
+            | Format::AreaScriptTable
+            | Format::BattleScriptTable
+            | Format::MagicScriptTable
+            | Format::ClutBlock
+            | Format::CharacterSpritesLz77
     )
 }
 

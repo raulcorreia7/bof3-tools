@@ -1,4 +1,4 @@
-//! The period sequence files: SEP (a package of sequences) and SEQ (one sequence), as Sony's *File
+//! The Psy-Q sequence files: SEP (a package of sequences) and SEQ (one sequence), as Sony's *File
 //! Formats* manual, chapter 4, lays them out. A studio exchanged both between its sound tools.
 //!
 //! The game stores a package as a SEP: `pQES`, a 16-bit version, then per sequence a 13-byte header

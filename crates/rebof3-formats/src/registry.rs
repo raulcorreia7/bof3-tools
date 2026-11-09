@@ -16,7 +16,8 @@ use rebof3_emi::Entry;
 
 use crate::vram::RowUse;
 use crate::{
-    cells, clut, cue, encounter, map, message, residue, resources, scene, script, sep, sprite_bank, vab, vram, window,
+    cells, character_sprites, clut, cue, encounter, map, message, residue, resources, scene, script, sep, vab, vram,
+    window,
 };
 
 /// The entry type of a code or data image: the load address picks the format.
@@ -54,23 +55,23 @@ impl State {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Format {
     VramUpload,
-    ClutBank,
+    ClutBlock,
     VabHeader,
     VabBody,
     SepPackage,
-    Lz77Blob,
-    CharacterBlob,
-    AreaMessageBank,
+    CharacterSpritesLz77,
+    CharacterSprites,
+    AreaMessageTable,
     AreaCellGrid,
-    AreaScriptBank,
-    BattleScriptBank,
+    AreaScriptTable,
+    BattleScriptTable,
     AreaActorDefsTable,
     AreaEncounterTable,
     AreaMapBundle,
     AreaAuxWindow,
     SharedResourceTable,
     CueTable,
-    MagicTable,
+    MagicScriptTable,
     CodeImage,
     Reserve,
     Unclassified,
@@ -216,13 +217,13 @@ const FORMATS: usize = Format::ALL.len();
 /// Every description, in scoreboard order (the order of [`Format::ALL`]).
 static REGISTRY: [&Description; FORMATS] = [
     &vram::UPLOAD,
-    &clut::BANK,
+    &clut::BLOCK,
     &vab::HEADER,
     &vab::BODY,
     &sep::PACKAGE,
-    &sprite_bank::LZ77_BLOB,
-    &sprite_bank::RAW_BLOB,
-    &message::BANK,
+    &character_sprites::LZ77,
+    &character_sprites::RAW,
+    &message::TABLE,
     &cells::GRID,
     &script::AREA,
     &script::BATTLE,
@@ -242,23 +243,23 @@ impl Format {
     /// Every format, in scoreboard order.
     pub const ALL: [Format; 21] = [
         Format::VramUpload,
-        Format::ClutBank,
+        Format::ClutBlock,
         Format::VabHeader,
         Format::VabBody,
         Format::SepPackage,
-        Format::Lz77Blob,
-        Format::CharacterBlob,
-        Format::AreaMessageBank,
+        Format::CharacterSpritesLz77,
+        Format::CharacterSprites,
+        Format::AreaMessageTable,
         Format::AreaCellGrid,
-        Format::AreaScriptBank,
-        Format::BattleScriptBank,
+        Format::AreaScriptTable,
+        Format::BattleScriptTable,
         Format::AreaActorDefsTable,
         Format::AreaEncounterTable,
         Format::AreaMapBundle,
         Format::AreaAuxWindow,
         Format::SharedResourceTable,
         Format::CueTable,
-        Format::MagicTable,
+        Format::MagicScriptTable,
         Format::CodeImage,
         Format::Reserve,
         Format::Unclassified,
@@ -298,7 +299,7 @@ impl Format {
 /// The file extension an entry's stored bytes are written with: the real format's name where the
 /// game uses one, and the entry's type tag where the container is the game's own.
 ///
-/// The names are the formats' own: `img` is the game's VRAM upload, `clut` its CLUT bank, `map` its
+/// The names are the formats' own: `img` is the game's VRAM upload, `clut` its CLUT block, `map` its
 /// map bundle, `vh`/`vb` the two halves of a VAB and `seq` a SEP package. The rest are the EMI entry
 /// with its type tag.
 pub fn extension(format: Format) -> &'static str {

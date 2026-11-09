@@ -25,7 +25,7 @@
 //! A scene replay does not run the per-frame transfer queue (`GFX_UpdateTransferQueue`), palette
 //! fades and cycling, or the palettes actors load at run time: they change what a frame shows, not
 //! what the archives load. A caller that knows an actor's upload adds it with [`Vram::load_image`]
-//! and [`Vram::load_palette`] (`GFX_LoadPalette`), as `crate::sprite` does for a sprite bank.
+//! and [`Vram::load_palette`] (`GFX_LoadPalette`), as `crate::sprite` does for a character sprites.
 
 pub mod scenes;
 
@@ -536,7 +536,7 @@ mod tests {
         (entry(3, (column << 24) | (row << 16) | (1 << 8), payload.len()), payload)
     }
 
-    fn bank(ram: u32, words: usize, value: u16) -> (Entry, Vec<u8>) {
+    fn block(ram: u32, words: usize, value: u16) -> (Entry, Vec<u8>) {
         let payload: Vec<u8> = (0..words).flat_map(|_| value.to_le_bytes()).collect();
         (entry(0, ram, payload.len()), payload)
     }
@@ -566,7 +566,7 @@ mod tests {
     #[test]
     fn an_upload_lands_at_its_rectangle_and_records_its_entry() {
         let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[bank(0x8000_0000, 4, 1), upload(2, 3, 0x1234)]);
+        load(&mut vram, "A.EMI", &[block(0x8000_0000, 4, 1), upload(2, 3, 0x1234)]);
         assert_eq!(vram.word(64, 96), 0x1234);
         assert_eq!(vram.word(95, 127), 0x1234);
         assert_eq!(vram.word(96, 96), 0);
@@ -596,7 +596,7 @@ mod tests {
     fn a_palette_reaches_vram_only_after_a_copy_and_an_upload() {
         let mut vram = Vram::new();
         // Arena row 3 (VRAM row 483).
-        load(&mut vram, "A.EMI", &[bank(ARENA_BASE + 3 * 0x200, 16, 0x7C00)]);
+        load(&mut vram, "A.EMI", &[block(ARENA_BASE + 3 * 0x200, 16, 0x7C00)]);
         vram.upload_palette();
         assert_eq!(vram.word(0, 483), 0, "nothing was pending");
         vram.copy_palette(2);
@@ -609,13 +609,13 @@ mod tests {
         assert_eq!(vram.word(16, 483), 0);
         let clut = Clut::new(0, 483).expect("a CLUT");
         assert_eq!(vram.clut_writer(clut, Depth::Four), Some(&Writer::entry("A.EMI", 0)));
-        assert_eq!(vram.clut_writer(clut, Depth::Eight), None, "the 8-bit row is not all one bank");
+        assert_eq!(vram.clut_writer(clut, Depth::Eight), None, "the 8-bit row is not all one block");
     }
 
     #[test]
     fn a_reset_clears_rows_28_to_31_before_it_copies() {
         let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[bank(ARENA_BASE + 28 * 0x200, 256, 5), bank(ARENA_BASE, 256, 6)]);
+        load(&mut vram, "A.EMI", &[block(ARENA_BASE + 28 * 0x200, 256, 5), block(ARENA_BASE, 256, 6)]);
         vram.reset_palette();
         vram.upload_palette();
         assert_eq!(vram.word(0, 480), 6);
@@ -626,7 +626,7 @@ mod tests {
     #[test]
     fn copied_words_carry_only_their_span() {
         let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[bank(ARENA_BASE + 15 * 0x200, 256, 9)]);
+        load(&mut vram, "A.EMI", &[block(ARENA_BASE + 15 * 0x200, 256, 9)]);
         vram.copy_words(15, 240, 16);
         vram.upload_palette();
         assert_eq!(vram.word(239, 495), 0);
@@ -638,7 +638,7 @@ mod tests {
     fn regions_merge_rows_of_one_writer() {
         let mut vram = Vram::new();
         load(&mut vram, "A.EMI", &[upload(0, 0, 1), upload(1, 0, 1)]);
-        load(&mut vram, "B.EMI", &[bank(ARENA_BASE, 16, 3)]);
+        load(&mut vram, "B.EMI", &[block(ARENA_BASE, 16, 3)]);
         vram.reset_palette();
         vram.upload_palette();
         let regions = vram.regions();

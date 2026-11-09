@@ -1,13 +1,13 @@
-//! A script bank as the programs its records hold: one animation stream per record, listed one op
+//! A script table as the programs its records hold: one animation stream per record, listed one op
 //! per line.
 //!
-//! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points an actor at a record of the bank and
+//! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points an actor at a record of the table and
 //! `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`) plays it: each step is a `show` (a frame and the
 //! ticks it stays) or a `jump` (the step to continue at), [`rebof3_formats::script::program::OPCODES`].
 //! Editing an operand rewrites its byte and keeps every other byte. A step is added or removed at the
 //! end of a stream only: game code names stream positions (the start position `Actor_BeginScript`
 //! takes, `script_pc` tests in the area and party code), and a step moved mid-stream would change
-//! what they name. No edit may grow the bank past its stored size.
+//! what they name. No edit may grow the table past its stored size.
 
 use gpui::{AnyElement, Context, Div, Stateful, div, prelude::*, px};
 use rebof3_formats::script::program::{CellAt, Op, Program, Record, Section, StepAt, Stream};
@@ -61,7 +61,7 @@ pub enum CellPart {
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     let program = match Program::decode(entry.payload()) {
         Ok(program) => program,
-        Err(error) => return muted(format!("Not a script bank: {error}")).into_any_element(),
+        Err(error) => return muted(format!("Not a script table: {error}")).into_any_element(),
     };
     let original = Program::decode(entry.original()).ok();
     let state = &editor.views.script;
@@ -318,8 +318,8 @@ fn appended_ticks(editor: &Editor, end: StepAt) -> u8 {
         .unwrap_or(APPENDED_TICKS)
 }
 
-/// The payload after `change`, refused when the bank would grow past `limit`, its stored size: what
-/// follows the bank in memory is not known to be free.
+/// The payload after `change`, refused when the table would grow past `limit`, its stored size: what
+/// follows the table in memory is not known to be free.
 pub fn rewritten(
     payload: &[u8],
     limit: usize,
@@ -330,14 +330,14 @@ pub fn rewritten(
     let bytes = program.encode().map_err(|error| error.to_string())?;
     if bytes.len() > limit {
         return Err(format!(
-            "the bank would grow to {} bytes past its stored {limit}: what follows it in memory is not known to be free",
+            "the table would grow to {} bytes past its stored {limit}: what follows it in memory is not known to be free",
             bytes.len()
         ));
     }
     Ok(bytes)
 }
 
-/// Applies `change` to the shown bank; the status line says why it is refused.
+/// Applies `change` to the shown table; the status line says why it is refused.
 fn report(editor: &mut Editor, change: impl FnOnce(&mut Program) -> rebof3_formats::Result<()>) {
     if let Some(message) = apply(editor, change) {
         editor.status = message;
@@ -430,8 +430,8 @@ mod tests {
 
     use super::*;
 
-    /// A one-section bank: a stream of two shows and a jump to the second, then two bytes of padding.
-    fn bank() -> Vec<u8> {
+    /// A one-section table: a stream of two shows and a jump to the second, then two bytes of padding.
+    fn table() -> Vec<u8> {
         let animation = Animation {
             steps: vec![Step { delay: 3, frame: 0 }, Step { delay: 5, frame: 0 }, Step { delay: JUMP, frame: 1 }],
             frames: vec![Frame { cells: vec![Cell { size: 5, x: -8, y: -16, u: 0, v: 0 }] }],
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn an_operand_edit_rewrites_one_byte() {
-        let payload = bank();
+        let payload = table();
         let edited =
             rewritten(&payload, payload.len(), |program| program.set_op(at(0), Op::Show { ticks: 9, frame: 0 }))
                 .expect("edits");
@@ -455,41 +455,41 @@ mod tests {
 
     #[test]
     fn an_append_uses_the_padding_and_a_second_is_refused() {
-        let payload = bank();
+        let payload = table();
         let append = |bytes: &[u8]| {
             rewritten(bytes, payload.len(), |program| program.insert_op(at(3), Op::Show { ticks: 1, frame: 0 }))
         };
         let once = append(&payload).expect("the padding takes the step");
         assert_eq!(once.len(), payload.len());
-        assert!(append(&once).is_err(), "the bank would grow");
+        assert!(append(&once).is_err(), "the table would grow");
     }
 
     #[test]
     fn removing_a_jump_target_is_refused() {
-        let payload = bank();
+        let payload = table();
         assert!(rewritten(&payload, payload.len(), |program| program.remove_op(at(1))).is_err());
         assert!(rewritten(&payload, payload.len(), |program| program.remove_op(at(2))).is_ok());
     }
 
-    /// Every retail script bank takes an operand edit that rewrites one byte, and the edit undone gives
+    /// Every retail script table takes an operand edit that rewrites one byte, and the edit undone gives
     /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
-    fn every_retail_script_bank_takes_an_operand_edit() {
+    fn every_retail_script_table_takes_an_operand_edit() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-script-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 
-        let formats = [Format::AreaScriptBank, Format::BattleScriptBank, Format::MagicTable];
-        let (mut banks, mut failures) = (0, Vec::new());
+        let formats = [Format::AreaScriptTable, Format::BattleScriptTable, Format::MagicScriptTable];
+        let (mut tables, mut failures) = (0, Vec::new());
         for path in project.archives.clone() {
             let archive = project.load(&path).expect("archive loads");
             for index in 0..archive.entries().len() {
                 if !formats.contains(&archive.formats[index]) {
                     continue;
                 }
-                banks += 1;
+                tables += 1;
                 let payload = archive.original(index).to_vec();
-                let program = Program::decode(&payload).expect("a retail bank decodes");
+                let program = Program::decode(&payload).expect("a retail table decodes");
                 let Some((section, record, step, ticks, frame)) = first_show(&program) else {
                     failures.push(format!("{}#{index}: no show op", path.0));
                     continue;
@@ -515,15 +515,15 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&folder);
-        eprintln!("script banks: {} of {banks} fail", failures.len());
-        assert_eq!(banks, 279, "area, battle and magic-effect script banks");
+        eprintln!("script tables: {} of {tables} fail", failures.len());
+        assert_eq!(tables, 279, "area, battle and magic-effect script tables");
         assert!(failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 
-    /// A retail area bank draws in the view, a field edit rewrites its byte, and a jump's label picks
+    /// A retail area table draws in the view, a field edit rewrites its byte, and a jump's label picks
     /// its target. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[gpui::test]
-    fn a_retail_area_bank_lists_and_edits(cx: &mut gpui::TestAppContext) {
+    fn a_retail_area_table_lists_and_edits(cx: &mut gpui::TestAppContext) {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-script-view-{}", std::process::id()));
         let project = folder.clone();
@@ -531,8 +531,8 @@ mod tests {
         editor.update(cx, |editor, _| {
             editor.select_archive(&crate::project::ArchivePath("BIN/WORLD00/AREA001.EMI".into()));
             let formats = &editor.archive.as_ref().expect("the area loads").formats;
-            let index = formats.iter().position(|format| *format == Format::AreaScriptBank);
-            editor.select_entry(index.expect("the area has a script bank"));
+            let index = formats.iter().position(|format| *format == Format::AreaScriptTable);
+            editor.select_entry(index.expect("the area has a script table"));
             editor.tab = crate::view::Tab::Script;
         });
         cx.update(|window, cx| window.draw(cx).clear());
@@ -554,7 +554,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&folder);
     }
 
-    /// The first show op of a bank: its place, ticks and frame.
+    /// The first show op of a table: its place, ticks and frame.
     fn first_show(program: &Program) -> Option<(usize, usize, usize, u8, u8)> {
         for (section, found) in program.sections.iter().enumerate() {
             for (record, record_found) in found.records.iter().enumerate() {

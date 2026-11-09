@@ -917,7 +917,7 @@ mod tests {
         assert_eq!(coded.iter().zip(&payload).filter(|(new, old)| new != old).count(), 1);
         let tinted = MapBundle::decode(&with_tile_field(&payload, 1, TileField::Clut, 2).unwrap()).unwrap();
         assert_eq!(tinted.records[1], 0x0280_0000);
-        assert!(with_tile_field(&payload, 1, TileField::PageBank, 9).is_err());
+        assert!(with_tile_field(&payload, 1, TileField::Page, 9).is_err());
 
         assert_eq!(with_battle(&[0x12], 1, 7).unwrap(), [0x17]);
         assert_eq!(with_battle(&[0x12], 0, 7).unwrap(), [0x72]);

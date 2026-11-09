@@ -64,7 +64,7 @@ impl Tab {
             Tab::Sound => "Sound",
             Tab::Decoded => "Decoded",
             Tab::Map => "Map",
-            Tab::Sprite => "Sprite bank",
+            Tab::Sprite => "Character sprites",
             Tab::Cells => "Cell grid",
             Tab::Vram => "VRAM",
             Tab::Script => "Script",
@@ -86,7 +86,7 @@ pub enum Field {
     TextFilter,
     /// The string that starts at this offset.
     Text(usize),
-    /// Message `n` of the shown message bank, as the compose view edits it.
+    /// Message `n` of the shown message table, as the compose view edits it.
     Message(usize),
     /// The tables view's filter.
     TableFilter,
@@ -98,9 +98,9 @@ pub enum Field {
     SequenceHeader { index: usize, part: sound::Part },
     /// The note the sound view plays tone `slot` of program block `block` at.
     ToneNote { block: u8, slot: u8 },
-    /// An operand of a script bank's step.
+    /// An operand of a script table's step.
     ScriptStep { at: StepAt, part: script::StepPart },
-    /// A field of a cell of a script bank's frame.
+    /// A field of a cell of a script table's frame.
     ScriptCell { at: CellAt, part: script::CellPart },
     /// A value of the area view.
     Area(area::Part),
@@ -196,7 +196,7 @@ static VIEWS: &[FormatViews] = &[
         tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
         prepare: Some(Reset { tab: None, run: texture::prepare }),
     },
-    FormatViews { format: Format::ClutBank, tabs: &[Tab::Palette, Tab::Vram, Tab::Layout], prepare: None },
+    FormatViews { format: Format::ClutBlock, tabs: &[Tab::Palette, Tab::Vram, Tab::Layout], prepare: None },
     FormatViews { format: Format::VabHeader, tabs: &[Tab::Sound], prepare: None },
     FormatViews { format: Format::VabBody, tabs: &[Tab::Sound], prepare: None },
     FormatViews { format: Format::SepPackage, tabs: &[Tab::Sound], prepare: None },
@@ -206,24 +206,24 @@ static VIEWS: &[FormatViews] = &[
         prepare: Some(Reset { tab: None, run: prepare_area }),
     },
     FormatViews {
-        format: Format::Lz77Blob,
+        format: Format::CharacterSpritesLz77,
         tabs: &[Tab::Sprite],
         prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
     },
     FormatViews {
-        format: Format::CharacterBlob,
+        format: Format::CharacterSprites,
         tabs: &[Tab::Sprite],
         prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
     },
     FormatViews {
-        format: Format::AreaMessageBank,
+        format: Format::AreaMessageTable,
         tabs: &[],
         prepare: Some(Reset { tab: Some(Tab::Text), run: compose::prepare }),
     },
     FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
-    FormatViews { format: Format::AreaScriptBank, tabs: &[Tab::Script], prepare: None },
-    FormatViews { format: Format::BattleScriptBank, tabs: &[Tab::Script], prepare: None },
-    FormatViews { format: Format::MagicTable, tabs: &[Tab::Script], prepare: None },
+    FormatViews { format: Format::AreaScriptTable, tabs: &[Tab::Script], prepare: None },
+    FormatViews { format: Format::BattleScriptTable, tabs: &[Tab::Script], prepare: None },
+    FormatViews { format: Format::MagicScriptTable, tabs: &[Tab::Script], prepare: None },
     FormatViews {
         format: Format::AreaEncounterTable,
         tabs: &[Tab::Formation],
@@ -431,23 +431,23 @@ mod tests {
     /// (`rebof3_formats::classify`).
     const PLACES: [(u16, u32); 20] = [
         (3, 0x8000_0000), // VRAM texture upload
-        (0, 0x8003_3800), // CLUT bank
+        (0, 0x8003_3800), // CLUT block
         (6, 0),           // VAB header
         (7, 0),           // VAB body
         (10, 0),          // SEP sequence package
-        (1, 0),           // LZ77 sprite bank
-        (0, 0x8003_b800), // raw sprite bank
-        (0, 0x8001_0000), // area message bank
+        (1, 0),           // LZ77 character sprites
+        (0, 0x8003_b800), // raw character sprites
+        (0, 0x8001_0000), // area message table
         (0, 0x8003_2000), // area cell grid
-        (0, 0x800d_3800), // area script bank
-        (0, 0x800f_0800), // battle script bank
+        (0, 0x800d_3800), // area script table
+        (0, 0x800f_0800), // battle script table
         (0, 0x800e_3800), // area actor definitions
         (0, 0x800e_4000), // area encounters
         (0, 0x8010_4000), // area map bundle
         (0, 0x8011_7000), // auxiliary module window
         (0, 0x8001_a000), // shared resource table
         (8, 0),           // cue table
-        (0, 0x800c_3800), // magic-effect script bank
+        (0, 0x800c_3800), // magic-effect script table
         (0, 0x8009_6800), // code image
         (2, 0),           // unclassified
     ];

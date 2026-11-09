@@ -17,7 +17,7 @@ use std::thread;
 use psx_cd::checksum::sha256_hex;
 use psx_cd::{Entry, Image, cue};
 use rebof3_emi::Archive;
-use rebof3_emi::texture::{Bank, ResidentBank};
+use rebof3_emi::texture::{ClutBlock, ResidentClutBlock};
 use rebof3_formats::{self as classify, Format, classify};
 
 use crate::decode::derive;
@@ -90,7 +90,7 @@ struct Output<'a> {
 pub fn run(options: &Options) -> Result<Report> {
     let mut image = Image::open(&options.image)?;
     let entries = image.entries()?;
-    let resident = resident_banks(&mut image, &entries, &options.selection);
+    let resident = resident_blocks(&mut image, &entries, &options.selection);
     let sheet = image.cue_sheet()?;
     let license = if options.selection.contains(Kind::System) { image.license()? } else { None };
     let (sender, receiver) = sync_channel::<Job>(options.jobs.max(1) * QUEUE_PER_WORKER);
@@ -131,7 +131,7 @@ fn send(sender: &std::sync::mpsc::SyncSender<Job>, source: String, bytes: Vec<u8
     sender.send(Job { source, bytes }).map_err(|_| Error::Usage("a worker thread stopped early".into()))
 }
 
-fn worker(receiver: &Mutex<Receiver<Job>>, options: &Options, report: &Mutex<Report>, resident: &[ResidentBank]) {
+fn worker(receiver: &Mutex<Receiver<Job>>, options: &Options, report: &Mutex<Report>, resident: &[ResidentClutBlock]) {
     loop {
         let job = receiver.lock().expect("receiver lock").recv();
         let Ok(job) = job else {
@@ -152,18 +152,18 @@ fn disc_path(entry: &Entry) -> String {
     entry.path.to_string_lossy().replace('\\', "/")
 }
 
-/// Every palette bank the selected archives carry, with the archive that loads it.
+/// Every CLUT block the selected archives carry, with the archive that loads it.
 ///
 /// The banks are the resident set a texture join may fall back on when its own archive has no
 /// bank for a row. The set is read from the archives on the disc, not from a table of families:
 /// a bank's archive is its disc path and identical banks collapse in the join rule. The scan
 /// reads each archive's table and palette-band payloads only, so it does not load the texture
 /// payloads a second time.
-fn resident_banks(image: &mut Image, entries: &[Entry], selection: &Selection) -> Vec<ResidentBank> {
+fn resident_blocks(image: &mut Image, entries: &[Entry], selection: &Selection) -> Vec<ResidentClutBlock> {
     if !(selection.contains(Kind::Texture) || selection.contains(Kind::Palette)) {
         return Vec::new();
     }
-    let mut banks = Vec::new();
+    let mut blocks = Vec::new();
     for entry in entries.iter().filter(|entry| !entry.is_directory) {
         let source = disc_path(entry);
         if !is_emi(&source) || !wanted(entry, selection) {
@@ -174,16 +174,16 @@ fn resident_banks(image: &mut Image, entries: &[Entry], selection: &Selection) -
             continue;
         };
         for (slot, slot_entry) in archive.entries().iter().enumerate() {
-            if Bank::new(slot, slot_entry.ram_ptr, slot_entry.size as usize).is_none() {
+            if ClutBlock::new(slot, slot_entry.ram_ptr, slot_entry.size as usize).is_none() {
                 continue;
             }
             let Ok(payload) = archive.read_payload(&mut reader, slot) else {
                 continue;
             };
-            banks.extend(ResidentBank::new(&source, slot, slot_entry.ram_ptr, &payload));
+            blocks.extend(ResidentClutBlock::new(&source, slot, slot_entry.ram_ptr, &payload));
         }
     }
-    banks
+    blocks
 }
 
 /// A disc file as a `Read + Seek` source: reads its bytes through the image's sector mapping.
@@ -269,7 +269,7 @@ fn is_movie(bytes: &[u8]) -> bool {
         .any(|sector| sector.get(STR_MAGIC_OFFSET..STR_MAGIC_OFFSET + STR_MAGIC.len()) == Some(&STR_MAGIC))
 }
 
-fn process(job: &Job, options: &Options, report: &mut Report, resident: &[ResidentBank]) -> Result<()> {
+fn process(job: &Job, options: &Options, report: &mut Report, resident: &[ResidentClutBlock]) -> Result<()> {
     if is_emi(&job.source) {
         match Archive::parse(&job.bytes) {
             Ok(archive) => return emi_rows(job, &archive, options, report, resident),
@@ -326,7 +326,7 @@ fn emi_rows(
     archive: &Archive,
     options: &Options,
     report: &mut Report,
-    resident: &[ResidentBank],
+    resident: &[ResidentClutBlock],
 ) -> Result<()> {
     let stem = job.source.strip_suffix(&format!(".{EMI_EXTENSION}")).unwrap_or(&job.source);
     let mut payloads = Vec::with_capacity(archive.entries().len());
@@ -494,8 +494,8 @@ fn converts(base: &Row) -> bool {
         | Kind::AreaMap
         | Kind::DataTable
         | Kind::XaAudio => true,
-        // Only the LZ77-packed form decodes; the other sprite blobs are stored as they are used.
-        Kind::CharacterBank => base.format == Format::Lz77Blob.name(),
+        // Only the LZ77-packed form decodes; the other character sprites are stored as they are used.
+        Kind::CharacterSprites => base.format == Format::CharacterSpritesLz77.name(),
         _ => false,
     }
 }
