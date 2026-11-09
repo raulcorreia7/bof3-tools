@@ -9,23 +9,23 @@
 //! | Module | Format | Spec |
 //! | --- | --- | --- |
 //! | [`vram`] | texture upload (type 3) | `wiki: formats/graphics#chunk-layout` |
-//! | [`clut`] | CLUT bank | `wiki: formats/graphics#palette` |
+//! | [`clut`] | CLUT block | `wiki: formats/graphics#palette` |
 //! | [`vab`], [`sep`], [`cue`] | sound bank, sequence package, cue table | `wiki: formats/audio` |
-//! | [`sprite_bank`] | character sprite bank | `wiki: formats/character` |
+//! | [`character_sprites`] | character sprites | `wiki: formats/character` |
 //! | [`message`], [`cells`], [`script`], [`scene`], [`encounter`], [`map`], [`window`], [`resources`] | area formats | `wiki: formats/area` |
 //! | [`residue`] | code images, reserved slots, unclassified entries | |
 //!
 //! [`field`] is not a format either: it reads the executable's field tables and the setup stream of an
 //! area program.
 //!
-//! [`animation`] is not a format: it is the actor animation stream that both the sprite banks and the
-//! script banks hold, shared like [`text`].
+//! [`animation`] is not a format: it is the actor animation stream that both the character sprites and the
+//! script tables hold, shared like [`text`].
 
 #![forbid(unsafe_code)]
 
 pub mod animation;
 pub mod cells;
-pub mod character_bank;
+pub mod character_sprites;
 pub mod characters;
 pub mod clut;
 pub mod coverage;
@@ -47,7 +47,7 @@ pub mod scene;
 pub mod script;
 pub mod sep;
 pub mod sprite;
-pub mod sprite_bank;
+pub mod sprite_palettes;
 pub mod text;
 pub mod vab;
 pub mod vram;

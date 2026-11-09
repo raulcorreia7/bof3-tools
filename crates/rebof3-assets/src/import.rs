@@ -11,9 +11,9 @@ pub fn characters(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     Ok(rebof3_formats::characters::import(json, payload)?)
 }
 
-/// The palettes of one sprite bank from the JSON of `sprites::character_bank`, written over the decoded bank.
-pub fn character_bank(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    Ok(rebof3_formats::character_bank::import(json, payload)?)
+/// The palettes of one character sprites from the JSON of `sprites::character_sprites`, written over the decoded sprites.
+pub fn character_sprites(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
+    Ok(rebof3_formats::sprite_palettes::import(json, payload)?)
 }
 
 /// An EMI container with the entries named in `replace` swapped for new payloads. Every other entry keeps its

@@ -13,9 +13,9 @@ fn palette() -> Vec<u8> {
     words
 }
 
-/// A one-section script bank: a stream of two frames that loops on its second step, and two bytes of
+/// A one-section script table: a stream of two frames that loops on its second step, and two bytes of
 /// padding.
-fn script_bank() -> Vec<u8> {
+fn script_table() -> Vec<u8> {
     let stream = [
         2, 3, // frames, steps
         4, 0, 6, 1, 0x80, 1, // show 0 for 4, show 1 for 6, jump to step 1
@@ -40,26 +40,26 @@ fn render() -> String {
     let dir = std::env::temp_dir().join(format!("bof3-convert-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("bank.clut"), palette()).unwrap();
+    std::fs::write(dir.join("block.clut"), palette()).unwrap();
     std::fs::write(dir.join("stub.bin"), [0u8; 8]).unwrap();
     let mut out = String::new();
-    run(&dir, &["assets", "export", "palette", "bank.clut"], &mut out);
-    out.push_str(&std::fs::read_to_string(dir.join("bank.json")).unwrap());
+    run(&dir, &["assets", "export", "palette", "block.clut"], &mut out);
+    out.push_str(&std::fs::read_to_string(dir.join("block.json")).unwrap());
     out.push_str("\n\n");
-    run(&dir, &["assets", "import", "palette", "bank.json", "-o", "sub/back.clut"], &mut out);
+    run(&dir, &["assets", "import", "palette", "block.json", "-o", "sub/back.clut"], &mut out);
     assert_eq!(std::fs::read(dir.join("sub/back.clut")).unwrap(), palette());
-    run(&dir, &["assets", "export", "palette", "bank.clut", "--out", "other.json"], &mut out);
+    run(&dir, &["assets", "export", "palette", "block.clut", "--out", "other.json"], &mut out);
     run(&dir, &["assets", "export", "palette"], &mut out);
     run(&dir, &["assets", "export", "palette", "a", "b"], &mut out);
     run(&dir, &["assets", "export", "bogus", "a"], &mut out);
     run(&dir, &["assets", "export"], &mut out);
-    std::fs::write(dir.join("bank.emi0"), script_bank()).unwrap();
-    run(&dir, &["assets", "export", "script", "bank.emi0"], &mut out);
-    out.push_str(&std::fs::read_to_string(dir.join("bank.txt")).unwrap());
+    std::fs::write(dir.join("table.emi0"), script_table()).unwrap();
+    run(&dir, &["assets", "export", "script", "table.emi0"], &mut out);
+    out.push_str(&std::fs::read_to_string(dir.join("table.txt")).unwrap());
     out.push('\n');
-    run(&dir, &["assets", "import", "script", "bank.txt", "--payload", "bank.emi0", "-o", "back.emi0"], &mut out);
-    assert_eq!(std::fs::read(dir.join("back.emi0")).unwrap(), script_bank());
-    run(&dir, &["assets", "import", "script", "bank.txt"], &mut out);
+    run(&dir, &["assets", "import", "script", "table.txt", "--payload", "table.emi0", "-o", "back.emi0"], &mut out);
+    assert_eq!(std::fs::read(dir.join("back.emi0")).unwrap(), script_table());
+    run(&dir, &["assets", "import", "script", "table.txt"], &mut out);
     run(&dir, &["assets", "import", "strings", "stub.bin"], &mut out);
     run(&dir, &["assets", "import", "encounters", "stub.bin"], &mut out);
     run(&dir, &["assets", "export", "vag", "stub.bin", "stub.bin"], &mut out);

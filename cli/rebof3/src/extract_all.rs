@@ -372,7 +372,7 @@ fn run_export(job: &ExportJob) -> Result<(), String> {
             let name = job.target.file_stem().unwrap_or_default().to_string_lossy();
             rebof3_formats::map::terrain::glb_of_mesh(&mesh, &name).ok_or("no cell to draw")?
         }
-        Export::Message => rebof3_formats::message::bank::export(&bytes).map_err(|e| e.to_string())?,
+        Export::Message => rebof3_formats::message::table::export(&bytes).map_err(|e| e.to_string())?,
         Export::Soundfont(body) => {
             let body = fs::read(body).map_err(|error| error.to_string())?;
             let title = job.target.file_stem().unwrap_or_default().to_string_lossy();

@@ -2,7 +2,7 @@
 //!
 //! A type-1 EMI entry is `[u32 LE decoded size][u16 0xFFFF][control stream]`.
 //! The control stream is the codec the game decompresses in
-//! `src/slus/func_80164064.c`; a frame is either a literal run or a
+//! `src/engine/slus/LZ77_DecodeStep.c`; a frame is either a literal run or a
 //! back-reference into the last [`WINDOW`] decoded bytes:
 //!
 //! - `ctrl & 0x10` set: literal run of `0x20 - (ctrl & 0x1F)` bytes; a count of

@@ -1,4 +1,4 @@
-//! The period files over the retail disc: every joined texture through TIM and back, every bank
+//! The Psy-Q files over the retail disc: every joined texture through TIM and back, every sound bank
 //! through VAB and VH/VB, every sequence package through SEP and SEQ. Each case asserts a pinned count.
 //!
 //! The tests skip when no retail archive directory is present (`BOF3_DISC_DIR`).
@@ -48,11 +48,11 @@ fn read_disc() -> Option<Vec<Disc>> {
 
 /// Every joined row: 883 rows of 203 textures. The TIM holds the texture's page, the row's depth and
 /// its CLUT place; reading it back gives the texture, the placement and the row, and splicing the row
-/// into the palette bank that holds it gives the bank.
+/// into the CLUT block that holds it gives the block.
 #[test]
 fn retail_joined_textures_round_trip_through_tim() {
     let Some(discs) = read_disc() else { return };
-    let banks: BTreeMap<(&str, usize), &[u8]> = discs
+    let blocks: BTreeMap<(&str, usize), &[u8]> = discs
         .iter()
         .flat_map(|disc| {
             disc.payloads.iter().enumerate().map(|(slot, payload)| ((disc.path.as_str(), slot), payload.as_slice()))
@@ -78,22 +78,22 @@ fn retail_joined_textures_round_trip_through_tim() {
                 assert_eq!((block.x, block.y), (row.clut.x, row.clut.y), "{name}: the CLUT place");
                 assert_eq!(block.words, row.words, "{name}: the CLUT row");
 
-                // The palette bank that holds the row takes the row back unchanged.
-                let bank = banks.get(&(row.palette_archive.as_str(), row.palette)).expect("the palette entry");
-                let bank_entry = discs
+                // The CLUT block that holds the row takes the row back unchanged.
+                let stored = blocks.get(&(row.palette_archive.as_str(), row.palette)).expect("the palette entry");
+                let block_entry = discs
                     .iter()
                     .find(|other| other.path == row.palette_archive)
                     .map(|other| &other.archive.entries()[row.palette])
                     .expect("the palette archive");
-                let at = texture::Bank::new(row.palette, bank_entry.ram_ptr, bank.len())
-                    .and_then(|bank| texture::arena_word(row.clut).map(|word| word - bank.arena_word))
-                    .expect("the row lies in its bank");
-                assert_eq!(clut::splice(bank, at, &block.words).expect("splices"), *bank, "{name}: the bank");
+                let at = texture::ClutBlock::new(row.palette, block_entry.ram_ptr, stored.len())
+                    .and_then(|clut_block| texture::arena_word(row.clut).map(|word| word - clut_block.arena_word))
+                    .expect("the row lies in its CLUT block");
+                assert_eq!(clut::splice(stored, at, &block.words).expect("splices"), *stored, "{name}: the block");
                 spliced += 1;
             }
         }
     }
-    assert_eq!((textures, rows, spliced), (203, 883, 883), "joined textures, rows and banks spliced");
+    assert_eq!((textures, rows, spliced), (203, 883, 883), "joined textures, rows and blocks spliced");
 }
 
 /// Every texture upload, joined or not, as a 15-bit TIM without a CLUT: 593 uploads.
@@ -159,19 +159,19 @@ fn retail_sequence_packages_round_trip_through_sep_and_seq() {
             packages += 1;
             let payload = &disc.payloads[slot];
             let name = format!("{} #{slot}", disc.path);
-            assert_eq!(&sep::period::export_sep(payload).expect("a SEP file"), payload, "{name}: export");
-            assert_eq!(&sep::period::import_sep(payload).expect("a SEP file"), payload, "{name}: import");
+            assert_eq!(&sep::psyq::export_sep(payload).expect("a SEP file"), payload, "{name}: export");
+            assert_eq!(&sep::psyq::import_sep(payload).expect("a SEP file"), payload, "{name}: import");
 
             let package = psx_formats::sep::Package::parse(payload).expect("a package");
             let files: Vec<Vec<u8>> = (0..package.sequences.len())
-                .map(|index| sep::period::export_seq(payload, index).expect("a SEQ file"))
+                .map(|index| sep::psyq::export_seq(payload, index).expect("a SEQ file"))
                 .collect();
             let parts: Vec<(&[u8], u16)> = files
                 .iter()
                 .zip(&package.sequences)
                 .map(|(file, sequence)| (file.as_slice(), sequence.seq_id))
                 .collect();
-            assert_eq!(&sep::period::import_seq(&parts).expect("the SEQ files"), payload, "{name}: SEQ files");
+            assert_eq!(&sep::psyq::import_seq(&parts).expect("the SEQ files"), payload, "{name}: SEQ files");
             sequences += files.len();
         }
     }

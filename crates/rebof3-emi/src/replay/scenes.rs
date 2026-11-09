@@ -136,7 +136,7 @@ pub fn menu(base: Scene, archive: &str) -> Option<Scene> {
 }
 
 /// A Fairy Village event over `base`: `Fairy_LoadCommu01` to `Fairy_LoadCommu05` stream
-/// `COMMU01` to `COMMU05`, and `func_801F17A4 (commu00/00)` runs `GFX_ResetPalette` once the
+/// `COMMU01` to `COMMU05`, and `Fairy_FinishEventLoad (commu00/00)` runs `GFX_ResetPalette` once the
 /// stream is ready.
 pub fn village(base: Scene, archive: &str) -> Scene {
     let name = format!("{}: {}", Kind::Village.label(), stem(archive));
@@ -164,13 +164,13 @@ pub fn battle(base: Scene, archive: &str) -> Scene {
 /// An archive a battle streams part-way, over the battle `base`, with the copy its ready step
 /// runs:
 ///
-/// - `BATL_DRA`: `func_800A4700` streams it; `func_800A4744` copies rows 26 and 27.
-/// - `BATL_RE2`: `func_800A4B2C` streams it; `func_800A4BB4` copies row 27.
-/// - `BATL_RET`: `func_801D3E80` streams it; `func_801D3F6C` copies row 26.
-/// - `BATL_OVR`: `Battle_LoadEndOverlay` streams it; its `func_801EEC40 (batl_ovr/00)` copies row 26.
+/// - `BATL_DRA`: `Battle_LoadDraArchive` streams it; `Battle_FinishDraLoad` copies rows 26 and 27.
+/// - `BATL_RE2`: `Battle_LoadRe2Archive` streams it; `Battle_FinishRe2Load` copies row 27.
+/// - `BATL_RET`: `func_801D3E80` streams it; `Battle_FinishEffectLoad` copies row 26.
+/// - `BATL_OVR`: `Battle_LoadEndOverlay` streams it; its `Battle_StartGameOver (batl_ovr/00)` copies row 26.
 /// - `BATL_SE`, `COMN_SE`: `func_801D25A0` and `func_801D656C` stream them; they carry no palette.
 /// - `BMAGIC` archives (slots `0x122` to `0x1B1`, `KAIZAR_*` and `MAGIC*`):
-///   `Battle_LoadSelectionEffect (battle/15)` streams one; `func_801D3F6C` clears the
+///   `Battle_LoadSelectionEffect (battle/15)` streams one; `Battle_FinishEffectLoad` clears the
 ///   effect-loading state and copies row 26 once the stream is ready.
 ///
 /// Returns `None` for an archive a battle does not stream.

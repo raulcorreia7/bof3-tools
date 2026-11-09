@@ -2,7 +2,7 @@
 //! of a payload as JSON, the strings a documented table places, and the source of a string.
 //!
 //! The byte encodings themselves are `rebof3_emi::text::codec`, a primitive the game tables and
-//! enemy records share. A message bank is the `message` module; any other payload goes through
+//! enemy records share. A message table is the `message` module; any other payload goes through
 //! [`strings`]. [`discover`] holds the scan rules (`wiki: data/text`).
 
 pub mod check;

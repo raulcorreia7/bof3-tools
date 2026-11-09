@@ -2,7 +2,7 @@
 //!
 //! For each kind, the line counts the entries of that kind on the disc and the bytes they hold, and the part of them
 //! that round trips through the kind's own format. A kind with no round trip here reports zero, and [`has_round_trip`]
-//! says which kinds those are. The text line counts the entries that hold game strings, outside message banks and
+//! says which kinds those are. The text line counts the entries that hold game strings, outside message tables and
 //! inside them. The `ETC/GAME.EMI` tables are counted one table at a time.
 
 use std::collections::BTreeMap;
@@ -15,7 +15,7 @@ use rebof3_formats::{Format, classify};
 
 use crate::error::Result;
 use crate::kind::Kind;
-use rebof3_formats::message::bank;
+use rebof3_formats::message::table;
 use rebof3_formats::text::{discover, strings};
 
 /// The disc path of the fixed game tables, whose eight tables are the data-table entries.
@@ -51,12 +51,12 @@ impl Line {
     }
 }
 
-/// The lines of a disc: one per kind that has entries, the text line, and the palette line of the sprite banks.
+/// The lines of a disc: one per kind that has entries, the text line, and the palette line of the character sprites.
 #[derive(Debug, Default)]
 pub struct Report {
     pub kinds: BTreeMap<Kind, Line>,
     pub text: Line,
-    /// The palette tables of the sprite banks, against their decoded bytes. The node data is not decoded.
+    /// The palette tables of the character sprites, against their decoded bytes. The node data is not decoded.
     pub palettes: Line,
 }
 
@@ -87,7 +87,7 @@ pub fn run(image: &Path) -> Result<Report> {
             {
                 report.text.count(payload.len() as u64, text);
             }
-            if matches!(format, Format::Lz77Blob | Format::CharacterBlob) {
+            if matches!(format, Format::CharacterSpritesLz77 | Format::CharacterSprites) {
                 palettes(&mut report, format, payload);
             }
             if source == GAME_TABLES_SOURCE && index == GAME_TABLES_SLOT {
@@ -104,7 +104,7 @@ pub fn run(image: &Path) -> Result<Report> {
 /// Whether an entry of this format exports and imports to its own bytes. Formats without a round trip are `false`.
 fn format_round_trips(format: Format, payload: &[u8]) -> bool {
     match format {
-        Format::AreaMessageBank => bank_round_trips(payload),
+        Format::AreaMessageTable => table_round_trips(payload),
         Format::AreaEncounterTable => rebof3_formats::encounter::open::export(payload)
             .and_then(|json| rebof3_formats::encounter::open::import(&json, payload))
             .is_ok_and(|rebuilt| rebuilt == payload),
@@ -112,36 +112,36 @@ fn format_round_trips(format: Format, payload: &[u8]) -> bool {
     }
 }
 
-/// The palette tables of a sprite bank: the decoded bank's bytes, and its palette tables when they export and import to
-/// the decoded bytes. A bank that is not in the palette layout is not counted.
+/// The palette tables of character sprites: the decoded bytes, and its palette tables when they export and import to
+/// the decoded bytes. A container that is not in the palette layout is not counted.
 fn palettes(report: &mut Report, format: Format, payload: &[u8]) {
     match format {
-        Format::Lz77Blob => {
+        Format::CharacterSpritesLz77 => {
             let Ok(decoded) = rebof3_emi::lz77::decode(payload) else { return };
             palette_tables(report, &decoded);
         }
-        Format::CharacterBlob => palette_tables(report, payload),
+        Format::CharacterSprites => palette_tables(report, payload),
         _ => (),
     }
 }
 
 fn palette_tables(report: &mut Report, decoded: &[u8]) {
-    let Ok(bank) = rebof3_formats::character_bank::parse(decoded) else { return };
-    let both = rebof3_formats::character_bank::export(decoded)
-        .and_then(|json| rebof3_formats::character_bank::import(&json, decoded))
+    let Ok(sprites) = rebof3_formats::sprite_palettes::parse(decoded) else { return };
+    let both = rebof3_formats::sprite_palettes::export(decoded)
+        .and_then(|json| rebof3_formats::sprite_palettes::import(&json, decoded))
         .is_ok_and(|rebuilt| rebuilt == decoded);
-    let typed = if both { bank.table_bytes() as u64 } else { 0 };
+    let typed = if both { sprites.table_bytes() as u64 } else { 0 };
     report.palettes.count_part(decoded.len() as u64, typed, both);
 }
 
-fn bank_round_trips(payload: &[u8]) -> bool {
-    bank::export(payload).and_then(|json| bank::import(&json)).is_ok_and(|rebuilt| rebuilt == payload)
+fn table_round_trips(payload: &[u8]) -> bool {
+    table::export(payload).and_then(|json| table::import(&json)).is_ok_and(|rebuilt| rebuilt == payload)
 }
 
 /// The text of an entry: `None` when it holds none, otherwise whether that text round trips.
 fn text_round_trips(entry: &rebof3_emi::Entry, payload: &[u8]) -> Option<bool> {
-    if let Some(records) = discover::bank_records(payload) {
-        return (!records.is_empty()).then(|| bank_round_trips(payload));
+    if let Some(records) = discover::table_records(payload) {
+        return (!records.is_empty()).then(|| table_round_trips(payload));
     }
     let base = strings::load_address(entry);
     if discover::strings(payload, base).is_empty() {

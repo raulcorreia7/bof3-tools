@@ -2,7 +2,7 @@
 //! lines below its bottom, glyphs the font has no picture for, and text only the running game holds.
 //!
 //! These are warnings, not refusals: the game draws such a message anyway (the retail fishing book has four-line
-//! pages, `wiki: data/text`). Only text the codec cannot encode and a bank past [`crate::message::bank::LIMIT`] are
+//! pages, `wiki: data/text`). Only text the codec cannot encode and a table past [`crate::message::table::LIMIT`] are
 //! refused, where the bytes are made.
 
 use super::font::{CELL_HEIGHT, Font};

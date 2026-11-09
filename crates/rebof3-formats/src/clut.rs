@@ -1,22 +1,22 @@
-//! The CLUT bank (entry type 0 in the palette arena band): colour rows the loader copies into
+//! The CLUT block (entry type 0 in the palette arena band): colour rows the loader copies into
 //! VRAM (`wiki: formats/graphics#palette`).
 
 use psx_formats::clut::{self, Palette};
 use psx_formats::gfx::texture::Clut;
 use rebof3_emi::Entry;
-use rebof3_emi::texture::{self as draw, Bank};
+use rebof3_emi::texture::{self as draw, ClutBlock as Placement};
 
 use crate::error::{Error, Result};
 use crate::identity::difference;
 use crate::registry::{Derived, Description, Format, RoundTrip, Selector, State};
 
-/// The load-address window that holds CLUT banks.
+/// The load-address window that holds CLUT blocks.
 const BAND: std::ops::RangeInclusive<u32> = 0x8003_3800..=0x8003_6e00;
 
-/// The bank as a format-registry row.
-pub static BANK: Description = Description {
-    format: Format::ClutBank,
-    name: "CLUT bank (type 0 in the palette arena band)",
+/// The block as a format-registry row.
+pub static BLOCK: Description = Description {
+    format: Format::ClutBlock,
+    name: "CLUT block (type 0 in the palette arena band)",
     state: State::Codec,
     spec_state: "documented",
     codec_state: "decode+encode",
@@ -29,7 +29,7 @@ pub static BANK: Description = Description {
     kind: "palette",
 };
 
-/// Decodes the bank and encodes it again; `Err` names the first difference.
+/// Decodes the block and encodes it again; `Err` names the first difference.
 fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
     let palette = Palette::decode(payload).map_err(|error| error.to_string())?;
     difference(&palette.encode(), payload)
@@ -44,14 +44,14 @@ fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
     ])
 }
 
-/// A palette bank: its color words, their RGBA view, and where the arena loads it in VRAM.
+/// A CLUT block: its color words, their RGBA view, and where the arena loads it in VRAM.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PaletteBank {
+pub struct ClutBlock {
     /// The color words in stored order.
     pub words: Vec<u16>,
     /// The RGBA view of `words` (see [`color_rgba`]).
     pub colors: Vec<[u8; 4]>,
-    /// The VRAM position of the first color, when the bank loads into the palette arena.
+    /// The VRAM position of the first color, when the block loads into the palette arena.
     pub vram: Option<Clut>,
 }
 
@@ -61,15 +61,15 @@ pub fn color_rgba(word: u16) -> [u8; 4] {
     clut::word_to_view(word)
 }
 
-/// The palette bank a type-0 payload loaded at `load_arg` holds.
-pub fn palette_bank(load_arg: u32, payload: &[u8]) -> Result<PaletteBank> {
+/// The CLUT block a type-0 payload loaded at `load_arg` holds.
+pub fn clut_block(load_arg: u32, payload: &[u8]) -> Result<ClutBlock> {
     let words = clut::Palette::decode(payload)?.words().to_vec();
     let colors = words.iter().map(|&word| clut::word_to_view(word)).collect();
-    let vram = Bank::new(0, load_arg, payload.len()).map(|bank| draw::clut_at(bank.arena_word));
-    Ok(PaletteBank { words, colors, vram })
+    let vram = Placement::new(0, load_arg, payload.len()).map(|block| draw::clut_at(block.arena_word));
+    Ok(ClutBlock { words, colors, vram })
 }
 
-/// The JSON of a palette bank, as the export writes it (`<slot>.json`).
+/// The JSON of a CLUT block, as the export writes it (`<slot>.json`).
 pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(clut::Palette::decode(payload)?.json().into_bytes())
 }
@@ -91,18 +91,18 @@ pub fn import(json: &[u8]) -> Result<Vec<u8>> {
     Ok(clut::Palette::from_words(words)?.encode())
 }
 
-/// `bank` with `words` written over its color words from word `offset`: the palette a TIM's CLUT block
-/// returns to. Every other byte of the bank stays, so a block that holds the bank's own words gives the
-/// bank back.
-pub fn splice(bank: &[u8], offset: usize, words: &[u16]) -> Result<Vec<u8>> {
-    let end = offset.checked_add(words.len()).filter(|end| end * 2 <= bank.len()).ok_or_else(|| {
+/// `block` with `words` written over its color words from word `offset`: the palette a TIM's CLUT block
+/// returns to. Every other byte of the block stays, so a block that holds the block's own words gives the
+/// block back.
+pub fn splice(block: &[u8], offset: usize, words: &[u16]) -> Result<Vec<u8>> {
+    let end = offset.checked_add(words.len()).filter(|end| end * 2 <= block.len()).ok_or_else(|| {
         Error::Import(format!(
-            "{} color words at word {offset} run past the bank's {} words",
+            "{} color words at word {offset} run past the block's {} words",
             words.len(),
-            bank.len() / 2
+            block.len() / 2
         ))
     })?;
-    let mut out = bank.to_vec();
+    let mut out = block.to_vec();
     for (slot, word) in out[offset * 2..end * 2].as_chunks_mut::<2>().0.iter_mut().zip(words) {
         *slot = word.to_le_bytes();
     }
@@ -115,13 +115,13 @@ mod tests {
 
     #[test]
     fn a_row_replaces_only_its_words() {
-        let bank: Vec<u8> = (0..32u16).flat_map(|word| word.to_le_bytes()).collect();
+        let block: Vec<u8> = (0..32u16).flat_map(|word| word.to_le_bytes()).collect();
         let row: Vec<u16> = (100..116).collect();
-        let spliced = splice(&bank, 16, &row).unwrap();
-        assert_eq!(&spliced[..32], &bank[..32]);
+        let spliced = splice(&block, 16, &row).unwrap();
+        assert_eq!(&spliced[..32], &block[..32]);
         assert_eq!(u16::from_le_bytes([spliced[32], spliced[33]]), 100);
         let same: Vec<u16> = (16..32).collect();
-        assert_eq!(splice(&bank, 16, &same).unwrap(), bank);
-        assert!(splice(&bank, 24, &row).is_err());
+        assert_eq!(splice(&block, 16, &same).unwrap(), block);
+        assert!(splice(&block, 24, &row).is_err());
     }
 }

@@ -86,9 +86,9 @@ fn derive(load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
 /// A palette row a texture is drawn with, joined from a draw site.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RowUse {
-    /// The EMI slot of the palette bank that holds the row.
+    /// The EMI slot of the CLUT block that holds the row.
     pub palette: usize,
-    /// The disc path of the archive that loads the bank; the texture's own archive,
+    /// The disc path of the archive that loads the block; the texture's own archive,
     /// unless the row came from another archive of the resident set.
     pub palette_archive: String,
     /// The row's VRAM position.
@@ -97,7 +97,7 @@ pub struct RowUse {
     pub depth: Depth,
     /// The row's colors as RGBA (see [`color_rgba`]).
     pub colors: Vec<[u8; 4]>,
-    /// The row's color words, as the bank stores them.
+    /// The row's color words, as the block stores them.
     pub words: Vec<u16>,
     /// The source lines that join the row to the texture.
     pub evidence: String,
@@ -106,9 +106,9 @@ pub struct RowUse {
 /// A texture read at one palette row: its texel indices and the row's colors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexedImage {
-    /// The EMI slot of the palette bank that holds the row.
+    /// The EMI slot of the CLUT block that holds the row.
     pub palette: usize,
-    /// The disc path of the archive that loads the bank.
+    /// The disc path of the archive that loads the block.
     pub palette_archive: String,
     /// The row's VRAM position.
     pub clut: Clut,

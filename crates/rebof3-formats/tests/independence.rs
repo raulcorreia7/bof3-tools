@@ -7,7 +7,7 @@ use std::path::Path;
 /// The modules of `src/` that hold one format each.
 const FORMATS: [&str; 19] = [
     "cells",
-    "character_bank",
+    "sprite_palettes",
     "characters",
     "clut",
     "cue",
@@ -21,14 +21,14 @@ const FORMATS: [&str; 19] = [
     "script",
     "sep",
     "sprite",
-    "sprite_bank",
+    "character_sprites",
     "vab",
     "vram",
     "window",
 ];
 
 /// The modules a format may import: the registry row types, the identity check, the error type, the
-/// glTF writer, the text codec and the animation stream the sprite and script banks both hold.
+/// glTF writer, the text codec and the animation stream the sprite and script tables both hold.
 const SHARED: [&str; 6] = ["registry", "identity", "error", "gltf", "text", "animation"];
 
 /// The source files of one format: `<format>.rs`, or every file of `<format>/`.
@@ -43,7 +43,7 @@ fn sources(source: &Path, format: &str) -> Vec<String> {
         .collect()
 }
 
-/// Whether `text` names the path `needle`, not a longer name that starts with it (`sprite` and `sprite_bank`).
+/// Whether `text` names the path `needle`, not a longer name that starts with it (`sprite` and `character_sprites`).
 fn mentions(text: &str, needle: &str) -> bool {
     text.match_indices(needle).any(|(start, _)| {
         let next = text[start + needle.len()..].chars().next();

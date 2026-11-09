@@ -2,8 +2,8 @@
 //!
 //! Two formats hold animations, so this module is shared. Work `+0x50` points at one from either
 //! source: `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) takes `table + table[n]` of a
-//! sprite bank section's animation table, and `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) takes
-//! a record of the script bank `g_ScriptBank` names. `Actor_SeekScript`
+//! character sprites section's animation table, and `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) takes
+//! a record of the script table `g_ScriptBank` names. `Actor_SeekScript`
 //! (`exe/slus_004_22@0x8014D910`) then reads it:
 //!
 //! | Offset | Size | Field | Meaning |

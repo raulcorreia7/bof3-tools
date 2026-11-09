@@ -1,4 +1,4 @@
-//! Every retail sprite bank decodes and encodes to its own bytes, every section's animations stitch
+//! Every retail character sprites decodes and encodes to its own bytes, every section's animations stitch
 //! through the VRAM model, and every section's sprite sheet imports back to the stored section.
 //!
 //! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/` and `SLUS_004.22`);
@@ -30,30 +30,30 @@ fn archives(folder: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Every sprite-bank entry the classifier names, decoded: where it is and its bank bytes.
-fn banks(root: &Path) -> Vec<(String, Vec<u8>)> {
+/// Every character-sprites entry the classifier names, decoded: where it is and its container bytes.
+fn containers(root: &Path) -> Vec<(String, Vec<u8>)> {
     let mut paths = Vec::new();
     archives(&root.join("BIN"), &mut paths);
     paths.sort();
-    let mut banks = Vec::new();
+    let mut found = Vec::new();
     for path in paths {
         let Ok(bytes) = fs::read(&path) else { continue };
         let Ok(archive) = Archive::parse(&bytes) else { continue };
         for (index, entry) in archive.entries().iter().enumerate() {
             let Ok(payload) = archive.payload(&bytes, index) else { continue };
-            let bank = match classify(entry, payload) {
-                Format::Lz77Blob => lz77::decode(payload).expect("a type-1 bank decodes"),
-                Format::CharacterBlob => payload.to_vec(),
+            let container = match classify(entry, payload) {
+                Format::CharacterSpritesLz77 => lz77::decode(payload).expect("a type-1 container decodes"),
+                Format::CharacterSprites => payload.to_vec(),
                 _ => continue,
             };
-            banks.push((format!("{}#{index}", path.strip_prefix(root).unwrap_or(&path).display()), bank));
+            found.push((format!("{}#{index}", path.strip_prefix(root).unwrap_or(&path).display()), container));
         }
     }
-    banks
+    found
 }
 
 #[test]
-fn every_retail_sprite_bank_round_trips_and_stitches() {
+fn every_retail_character_sprites_round_trips_and_stitches() {
     let Some(root) = support::retail_disc() else {
         return;
     };
@@ -65,25 +65,25 @@ fn every_retail_sprite_bank_round_trips_and_stitches() {
     let (mut outside, mut unresolved, mut imported, mut repacked) = (0, 0, 0, 0);
     // Per reader: entries, sections and frames drawn with the palette the reader loads.
     let mut proven = std::collections::BTreeMap::<&str, (usize, usize, usize)>::new();
-    for (place, bytes) in banks(&root) {
+    for (place, bytes) in containers(&root) {
         entries += 1;
-        let Ok(bank) = sprite::decode(&bytes) else { continue };
+        let Ok(sprites) = sprite::decode(&bytes) else { continue };
         decoded += 1;
         let reader = Reader::of(place.split('#').next().unwrap_or(&place));
         if reader.palette().is_some() {
             let counts = proven.entry(if reader == Reader::Battle { "battle" } else { "field" }).or_default();
             counts.0 += 1;
-            counts.1 += bank.sections.len();
+            counts.1 += sprites.sections.len();
             counts.2 +=
-                bank.sections.iter().flat_map(|section| &section.animations).map(|a| a.frames.len()).sum::<usize>();
+                sprites.sections.iter().flat_map(|section| &section.animations).map(|a| a.frames.len()).sum::<usize>();
         }
-        match sprite::encode(&bank) {
+        match sprite::encode(&sprites) {
             Ok(encoded) if encoded == bytes => {}
             Ok(_) => failures.push(format!("{place}: encodes to other bytes")),
             Err(error) => failures.push(format!("{place}: {error}")),
         }
 
-        for (number, section) in bank.sections.iter().enumerate() {
+        for (number, section) in sprites.sections.iter().enumerate() {
             sections += 1;
             sheets += section.images.len();
             for image in &section.images {
@@ -128,14 +128,18 @@ fn every_retail_sprite_bank_round_trips_and_stitches() {
     }
 
     eprintln!(
-        "sprite banks: {decoded} of {entries} entries decode and encode ({sections} sections, {sheets} frame sheets, \
+        "character sprites: {decoded} of {entries} entries decode and encode ({sections} sections, {sheets} frame sheets, \
          {animations} animations, {placed} played by a record, {frames} frames); {stitched} frames stitched, \
          {outside} cell texels past their sheet, {unresolved} pixels past the palette; {imported} of {sections} \
          sheets import to the stored section; {repacked} of {sheets} sheets pack again into their stored bytes"
     );
     eprintln!("proven palette (entries, sections, frames): {proven:?}");
     assert!(failures.is_empty(), "{} failures: {:?}", failures.len(), failures.iter().take(8).collect::<Vec<_>>());
-    assert!(decoded > 0 && imported == sections, "{decoded} banks, {imported} of {sections} sheets");
-    assert_eq!(proven.get("battle"), Some(&(38, 114, 18310)), "battle banks drawn with the palette their reader loads");
-    assert_eq!(proven.get("field"), Some(&(19, 57, 14892)), "field banks drawn with the palette their reader loads");
+    assert!(decoded > 0 && imported == sections, "{decoded} sprites, {imported} of {sections} sheets");
+    assert_eq!(
+        proven.get("battle"),
+        Some(&(38, 114, 18310)),
+        "battle sprites drawn with the palette their reader loads"
+    );
+    assert_eq!(proven.get("field"), Some(&(19, 57, 14892)), "field sprites drawn with the palette their reader loads");
 }

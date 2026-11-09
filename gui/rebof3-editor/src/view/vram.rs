@@ -392,12 +392,12 @@ mod tests {
     fn sample() -> Vram {
         let mut vram = Vram::new();
         let sheet: Vec<u8> = (0..1024u16).flat_map(|_| 0x2121u16.to_le_bytes()).collect();
-        let bank: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
+        let block: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
         let entries = [
             TableEntry { size: sheet.len() as u32, offset: 0, ram_ptr: 1 << 8, first4: 0, file_type: 3 },
-            TableEntry { size: bank.len() as u32, offset: 0, ram_ptr: 0x8003_3800, first4: 0, file_type: 0 },
+            TableEntry { size: block.len() as u32, offset: 0, ram_ptr: 0x8003_3800, first4: 0, file_type: 0 },
         ];
-        vram.load("BIN/A.EMI", &entries, &[&sheet, &bank]);
+        vram.load("BIN/A.EMI", &entries, &[&sheet, &block]);
         vram.reset_palette();
         vram.upload_palette();
         vram
@@ -429,7 +429,7 @@ mod tests {
     }
 
     /// AREA024's scene replays from the disc with the project's edits: the literal site's page and
-    /// row come from the area's entries 7 and 8, and an edit to the bank's first colour shows in VRAM
+    /// row come from the area's entries 7 and 8, and an edit to the block's first colour shows in VRAM
     /// at the next replay. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn a_retail_scene_replays_with_the_projects_edits() {
@@ -449,10 +449,10 @@ mod tests {
         );
 
         let loaded = project.load(&ArchivePath(area.into())).expect("the area loads");
-        let mut bank = project.payload(&loaded, 8).to_vec();
+        let mut block = project.payload(&loaded, 8).to_vec();
         let first = usize::from(clut.x) * 2 + (usize::from(clut.y) - 483) * 512;
-        bank[first..first + 2].copy_from_slice(&0x7C1Fu16.to_le_bytes());
-        project.set(&loaded, 8, bank);
+        block[first..first + 2].copy_from_slice(&0x7C1Fu16.to_le_bytes());
+        project.set(&loaded, 8, block);
         assert!(!replayed.is_current(&scene, &project), "an edit makes the replay stale");
         let again = super::scene::replay(&mut project, &scene);
         assert_eq!(again.vram.word(160, 483), 0x7C1F);

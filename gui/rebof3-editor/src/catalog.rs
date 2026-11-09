@@ -91,8 +91,8 @@ enum Label {
     Stem,
     /// `Area 105 (WORLD02)`: the series number and the disc folder.
     Area,
-    /// `Area 5 enemy bank (ENEMY005)`.
-    EnemyBank,
+    /// `Area 5 enemy archive (ENEMY005)`.
+    EnemyArchive,
     /// `Boss 12 (BOSS012)`.
     Boss,
     /// `Spell effect 160 (MAGIC160)`.
@@ -120,11 +120,11 @@ const NO_ROW: &str = "no catalog row names this archive";
 /// The catalog table, in display order. A format row beats a family row; among family rows the first
 /// match wins.
 static RULES: &[Rule] = &[
-    // Characters: the party's field and battle banks.
+    // Characters: the party's field and battle archives.
     Rule {
         pick: Pick::Series("PL"),
         group: Which::Characters,
-        section: "Field banks (PL, digits are character ids)",
+        section: "Field archives (PL, digits are character ids)",
         label: Label::Members,
         source: "EMI_SLOT_PL, EMI_FAMILY_PL; wiki: formats/character",
     },
@@ -138,30 +138,30 @@ static RULES: &[Rule] = &[
     Rule {
         pick: Pick::Series("BPLD"),
         group: Which::Characters,
-        section: "Battle banks (BPLD, digits are character ids)",
+        section: "Battle archives (BPLD, digits are character ids)",
         label: Label::Members,
         source: "EMI_SLOT_BPLD, EMI_FAMILY_BPLD; wiki: formats/emi",
     },
     Rule {
         pick: Pick::Series("BPLU"),
         group: Which::Characters,
-        section: "Battle banks (BPLU, digits are character ids)",
+        section: "Battle archives (BPLU, digits are character ids)",
         label: Label::Members,
         source: "EMI_SLOT_BPLU, EMI_FAMILY_BPLU; wiki: formats/emi",
     },
     Rule {
         pick: Pick::Folder("BPLCHAR"),
         group: Which::Characters,
-        section: "Battle form banks",
+        section: "Battle form archives",
         label: Label::Stem,
-        source: "BPLCHAR holds the battle character sprite banks and forms; wiki: formats/disc",
+        source: "BPLCHAR holds the battle character sprites and forms; wiki: formats/disc",
     },
     // Enemies and bosses.
     Rule {
         pick: Pick::Series("ENEMY"),
         group: Which::Enemies,
-        section: "Enemy banks, one per area",
-        label: Label::EnemyBank,
+        section: "Enemy archives, one per area",
+        label: Label::EnemyArchive,
         source: "EMI_SLOT_ENEMY; the battle start streams slot 9 + g_GameAreaId (wiki: formats/emi)",
     },
     Rule {
@@ -610,14 +610,14 @@ fn title(label: Label, prefix: &str, folder: &str, stem: &str) -> String {
     match label {
         Label::Stem => stem.to_string(),
         Label::Area => numbered(number("AREA").map(|n| format!("Area {n} ({world})"))),
-        Label::EnemyBank => numbered(number("ENEMY").map(|n| format!("Area {n} enemy bank ({stem})"))),
+        Label::EnemyArchive => numbered(number("ENEMY").map(|n| format!("Area {n} enemy archive ({stem})"))),
         Label::Boss => numbered(number("BOSS").map(|n| format!("Boss {n} ({stem})"))),
         Label::Spell => numbered(number("MAGIC").map(|n| format!("Spell effect {n} ({stem})"))),
         Label::Members => numbered(members(stem, prefix).map(|names| format!("{stem}: {names}"))),
     }
 }
 
-/// The party a bank name spells: each character after the prefix is a character id in hex.
+/// The party an archive name spells: each character after the prefix is a character id in hex.
 fn members(stem: &str, prefix: &str) -> Option<String> {
     let names: Option<Vec<&str>> = stem
         .strip_prefix(prefix)?
@@ -879,7 +879,7 @@ mod tests {
         let catalog = catalog(&disc("catalog-order"));
 
         assert_eq!(titles(&catalog, Which::Areas), ["Area 2 (WORLD00)", "Area 10 (WORLD00)", "Area 100 (WORLD01)"]);
-        assert_eq!(titles(&catalog, Which::Enemies)[0], "Area 1 enemy bank (ENEMY001)");
+        assert_eq!(titles(&catalog, Which::Enemies)[0], "Area 1 enemy archive (ENEMY001)");
         assert_eq!(
             titles(&catalog, Which::Characters),
             ["PL012: Ryu (young), Nina (young), Garr", "PL27A: Garr, Ryu (adult), Whelp"]

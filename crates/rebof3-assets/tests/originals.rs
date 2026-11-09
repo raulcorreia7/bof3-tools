@@ -219,7 +219,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let same = if kind == "area-encounters" {
             rebof3_formats::encounter::open::import(&document, &payload).map(|back| back == payload).unwrap_or(false)
         } else {
-            rebof3_formats::message::bank::import(&document).map(|back| back == payload).unwrap_or(false)
+            rebof3_formats::message::table::import(&document).map(|back| back == payload).unwrap_or(false)
         };
         record(kind, same);
     }
@@ -440,7 +440,7 @@ fn raw_mode_writes_the_disc_bytes_of_every_kind() {
         Kind::AudioBank,
         Kind::AudioSequence,
         Kind::AudioCues,
-        Kind::CharacterBank,
+        Kind::CharacterSprites,
         Kind::AreaActorDefs,
         Kind::AreaEncounters,
         Kind::AreaMap,

@@ -1,8 +1,8 @@
-//! A sprite bank as the game shows it (`rebof3_formats::sprite`, `wiki: formats/character`): each section's
+//! A character sprites as the game shows it (`rebof3_formats::sprite`, `wiki: formats/character`): each section's
 //! animations played at the game's tick, every frame stitched through the VRAM model, the frame sheet
 //! the cells cut from, and the palettes.
 //!
-//! The frame is drawn from a [`Stage`]: the sheet and the palette written into VRAM where the bank's
+//! The frame is drawn from a [`Stage`]: the sheet and the palette written into VRAM where the character sprites'
 //! reader puts them, then read back through the texture page and CLUT the draw sets. The palette is
 //! the one the reader loads when the reader is traced ([`Reader::palette`]); otherwise the frame is
 //! drawn in grey by texel index and the palettes are listed as a ranked suggestion that the user
@@ -10,7 +10,7 @@
 //! cell texels outside the sheet are counted, not guessed.
 //!
 //! A palette edit writes the colour in place; an imported sprite sheet rewrites the section. Both go
-//! back through `rebof3_assets::sprites`, so an unchanged bank keeps its stored bytes and an LZ77
+//! back through `rebof3_assets::sprites`, so an unchanged sprites keeps its stored bytes and an LZ77
 //! entry is packed again only when it changed.
 
 use std::cell::Cell as Shared;
@@ -25,8 +25,8 @@ use rebof3_assets::decode::color_rgba;
 use rebof3_assets::sprites::{self, SpriteSizes};
 use rebof3_emi::replay::Vram;
 use rebof3_formats::sprite::{
-    self as format, Animation, Bank, Bounds, COLOURS, Frame, Image, Palette, Placement, Playback, Player, Reader,
-    Section, Stage, TICK_MICROS, animation_bounds, cell_rect, compose, duration_ms, frame_bounds, ticks_of,
+    self as format, Animation, Bounds, COLOURS, CharacterSprites, Frame, Image, Palette, Placement, Playback, Player,
+    Reader, Section, Stage, TICK_MICROS, animation_bounds, cell_rect, compose, duration_ms, frame_bounds, ticks_of,
 };
 
 use super::Entry;
@@ -76,10 +76,10 @@ enum Colours {
     Grey,
 }
 
-/// The bank of the shown entry, decoded once per entry and project revision.
+/// The sprites of the shown entry, decoded once per entry and project revision.
 struct Loaded {
     key: (String, usize, u64),
-    bank: Result<Bank, String>,
+    sprites: Result<CharacterSprites, String>,
     reader: Reader,
 }
 
@@ -146,14 +146,14 @@ impl Default for State {
 }
 
 impl State {
-    /// The bank, when it decodes.
-    fn bank(&self) -> Option<&Bank> {
-        self.loaded.as_ref()?.bank.as_ref().ok()
+    /// The sprites, when it decodes.
+    fn sprites(&self) -> Option<&CharacterSprites> {
+        self.loaded.as_ref()?.sprites.as_ref().ok()
     }
 
     /// The shown section.
     fn section(&self) -> Option<&Section> {
-        self.bank()?.sections.get(self.section)
+        self.sprites()?.sections.get(self.section)
     }
 
     /// The shown animation.
@@ -229,7 +229,7 @@ impl State {
         Some(format!(
             "section {} of {}, animation {} of {}, frame {}, tick {}",
             self.section,
-            self.bank()?.sections.len(),
+            self.sprites()?.sections.len(),
             self.animation,
             section.animations.len(),
             player.frame(),
@@ -238,7 +238,7 @@ impl State {
     }
 }
 
-/// Decodes the shown bank, reads `g_SpriteSizes` and stages the shown sheet and palette, each when what
+/// Decodes the shown sprites, reads `g_SpriteSizes` and stages the shown sheet and palette, each when what
 /// it reads changed.
 pub fn prepare(editor: &mut Editor) {
     let Some(entry) = editor.current() else { return };
@@ -246,11 +246,11 @@ pub fn prepare(editor: &mut Editor) {
     let key = (entry.archive.path.0.clone(), entry.index, project.revision());
     let disc = project.disc.clone();
     let fresh = editor.views.sprite.loaded.as_ref().is_none_or(|loaded| loaded.key != key).then(|| {
-        let bank = sprites::unpack(entry.payload())
+        let sprites = sprites::unpack(entry.payload())
             .and_then(|(_, bytes)| Ok(format::decode(&bytes)?))
             .map_err(|error| error.to_string());
         let reader = Reader::of(&key.0);
-        Rc::new(Loaded { key, bank, reader })
+        Rc::new(Loaded { key, sprites, reader })
     });
     let state = &mut editor.views.sprite;
 
@@ -271,7 +271,9 @@ pub fn prepare(editor: &mut Editor) {
     }
 
     let Some(loaded) = state.loaded.clone() else { return };
-    let Some(section) = loaded.bank.as_ref().ok().and_then(|bank| bank.sections.get(state.section)) else { return };
+    let Some(section) = loaded.sprites.as_ref().ok().and_then(|sprites| sprites.sections.get(state.section)) else {
+        return;
+    };
     state.animation = state.animation.min(section.animations.len().saturating_sub(1));
     if state.palette.is_some_and(|palette| palette >= section.palettes.len()) {
         state.palette = None;
@@ -281,7 +283,7 @@ pub fn prepare(editor: &mut Editor) {
     }
     let palette = match state.colours() {
         Colours::Palette(palette) => palette,
-        // Grey still stages a palette, so the stage knows which CLUT words are the bank's.
+        // Grey still stages a palette, so the stage knows which CLUT words are the character sprites'.
         Colours::Grey => 0,
     };
     let (Some(sheet), Some(colours)) = (section.image_of(state.animation), section.palettes.get(palette)) else {
@@ -297,17 +299,17 @@ pub fn prepare(editor: &mut Editor) {
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
     let state = &editor.views.sprite;
-    let Some(loaded) = state.loaded.as_ref() else { return muted("Reading the bank…").into_any_element() };
-    let bank = match &loaded.bank {
-        Ok(bank) => bank,
-        Err(error) => return muted(format!("Not a sprite bank: {error}")).into_any_element(),
+    let Some(loaded) = state.loaded.as_ref() else { return muted("Reading the sprites…").into_any_element() };
+    let sprites = match &loaded.sprites {
+        Ok(sprites) => sprites,
+        Err(error) => return muted(format!("Not a character sprites: {error}")).into_any_element(),
     };
-    let Some(section) = bank.sections.get(state.section) else {
-        return muted("The bank has no sections.").into_any_element();
+    let Some(section) = sprites.sections.get(state.section) else {
+        return muted("The sprites has no sections.").into_any_element();
     };
 
     let mut sections = div().flex().flex_wrap().items_center().gap(px(GAP)).child("Section");
-    for number in 0..bank.sections.len() {
+    for number in 0..sprites.sections.len() {
         sections = sections.child(tab(("section", number), number.to_string(), number == state.section).on_click(
             cx.listener(move |editor, _, _, cx| {
                 let state = &mut editor.views.sprite;
@@ -339,13 +341,15 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .into_any_element()
 }
 
-/// What the reader of the bank proves.
+/// What the reader of the sprites proves.
 fn reader_note(reader: Reader) -> String {
     match reader {
-        Reader::Field => "Party bank: Party_LoadMemberSprite places it and loads palette 0.".into(),
-        Reader::Battle => "Battle bank: Battle_LoadPartySprites streams it and Party_BuildBattlers places it through \
+        Reader::Field => "Party sprites: Party_LoadMemberSprite places it and loads palette 0.".into(),
+        Reader::Battle => {
+            "Battle sprites: Battle_LoadPartySprites streams it and Party_BuildBattlers places it through \
                            Party_LoadMemberSprite, palette 0; the battle slot moves it in VRAM, not its colours."
-            .into(),
+                .into()
+        }
         Reader::Unknown => "No traced loader reads this archive; drawn with the field placement.".into(),
     }
 }
@@ -776,7 +780,7 @@ fn palette_editor(state: &State, section: &Section, entry: &Entry<'_>, cx: &mut 
     let original = sprites::unpack(entry.original())
         .ok()
         .and_then(|(_, bytes)| format::decode(&bytes).ok())
-        .and_then(|bank| bank.sections.into_iter().nth(state.section));
+        .and_then(|sprites| sprites.sections.into_iter().nth(state.section));
     let (palette, colour) = state.colour;
     let word = section.palettes.get(palette).and_then(|colours| colours.get(colour)).copied().unwrap_or_default();
 
@@ -881,15 +885,15 @@ pub fn with_colour(
     change: &dyn Fn(u16) -> u16,
 ) -> Result<Vec<u8>, String> {
     let (_, bytes) = sprites::unpack(payload).map_err(|error| error.to_string())?;
-    let mut bank = format::decode(&bytes).map_err(|error| error.to_string())?;
-    let word = bank
+    let mut sprites = format::decode(&bytes).map_err(|error| error.to_string())?;
+    let word = sprites
         .sections
         .get_mut(section)
         .and_then(|section| section.palettes.get_mut(palette))
         .and_then(|colours| colours.get_mut(colour))
-        .ok_or("the colour is not in the bank")?;
+        .ok_or("the colour is not in the sprites")?;
     *word = change(*word);
-    let encoded = format::encode(&bank).map_err(|error| error.to_string())?;
+    let encoded = format::encode(&sprites).map_err(|error| error.to_string())?;
     sprites::pack(payload, &encoded).map_err(|error| error.to_string())
 }
 
@@ -1026,9 +1030,9 @@ mod tests {
         SpriteSizes::from_rows(rows)
     }
 
-    fn state(bank: &[u8]) -> State {
-        let bank = format::decode(bank).map_err(|error| error.to_string());
-        let loaded = Loaded { key: (String::new(), 0, 0), bank, reader: Reader::Field };
+    fn state(sprites: &[u8]) -> State {
+        let sprites = format::decode(sprites).map_err(|error| error.to_string());
+        let loaded = Loaded { key: (String::new(), 0, 0), sprites, reader: Reader::Field };
         let mut state = State { loaded: Some(Rc::new(loaded)), ..State::default() };
         state.restart();
         state
@@ -1046,14 +1050,14 @@ mod tests {
 
     #[test]
     fn a_colour_edit_survives_the_lz77_round_trip() {
-        let bank = section();
-        let raw = with_colour(&bank, 0, 0, 3, &|_| 0x7FFF).expect("edits");
+        let sprites = section();
+        let raw = with_colour(&sprites, 0, 0, 3, &|_| 0x7FFF).expect("edits");
         assert_eq!(format::decode(&raw).expect("decodes").sections[0].palettes[0][3], 0x7FFF);
-        assert_eq!(raw.len(), bank.len());
+        assert_eq!(raw.len(), sprites.len());
 
-        let packed = with_colour(&lz77::encode(&bank), 0, 0, 3, &|_| 0x7FFF).expect("edits");
+        let packed = with_colour(&lz77::encode(&sprites), 0, 0, 3, &|_| 0x7FFF).expect("edits");
         assert_eq!(lz77::decode(&packed).expect("decodes"), raw);
-        assert!(with_colour(&bank, 0, 1, 0, &|word| word).is_err(), "palette 1 is not in the bank");
+        assert!(with_colour(&sprites, 0, 1, 0, &|word| word).is_err(), "palette 1 is not in the sprites");
     }
 
     #[test]
@@ -1072,7 +1076,7 @@ mod tests {
     fn an_exported_sheet_imports_through_the_files() {
         let folder = std::env::temp_dir().join(format!("bof3-edit-sprite-sheet-{}", std::process::id()));
         std::fs::create_dir_all(&folder).expect("folder");
-        let json_path = folder.join("bank.json");
+        let json_path = folder.join("sprites.json");
         let packed = lz77::encode(&section());
         assert!(write_sheet(&json_path, &packed, 0, 0, &sizes()).starts_with("Wrote"));
         let (json, png) = read_sheet(&json_path).expect("reads back");
@@ -1080,7 +1084,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&folder);
     }
 
-    /// A retail party bank draws, plays and steps in the view. Point `BOF3_DISC_DIR` at an extracted
+    /// A retail party sprites draws, plays and steps in the view. Point `BOF3_DISC_DIR` at an extracted
     /// disc; without it the test skips.
     #[gpui::test]
     fn a_retail_party_bank_plays(cx: &mut TestAppContext) {
@@ -1093,15 +1097,20 @@ mod tests {
         editor.update(cx, |editor, _| {
             editor.select_archive(&ArchivePath("BIN/PLCHAR/PL012.EMI".into()));
             let formats = &editor.archive.as_ref().expect("the archive loads").formats;
-            let index = formats.iter().position(|format| matches!(format, rebof3_formats::Format::Lz77Blob));
-            editor.select_entry(index.expect("the archive has a sprite bank"));
+            let index =
+                formats.iter().position(|format| matches!(format, rebof3_formats::Format::CharacterSpritesLz77));
+            editor.select_entry(index.expect("the archive has a character sprites"));
             editor.tab = Tab::Sprite;
         });
         cx.update(|window, cx| window.draw(cx).clear());
 
         let (before, after) = editor.update(cx, |editor, _| {
             let state = &mut editor.views.sprite;
-            assert_eq!(state.colours(), Colours::Palette(format::FIELD_PALETTE), "a party bank's palette is proven");
+            assert_eq!(
+                state.colours(),
+                Colours::Palette(format::FIELD_PALETTE),
+                "party character sprites' palette is proven"
+            );
             assert!(state.staged.is_some(), "the first animation's sheet is staged");
             let before = state.summary().expect("the view shows a frame");
             state.step();
@@ -1114,28 +1123,28 @@ mod tests {
         let _ = std::fs::remove_dir_all(&folder);
     }
 
-    /// Every retail sprite bank takes a colour edit and keeps every other byte of the decoded bank. Point
+    /// Every retail character sprites takes a colour edit and keeps every other byte of the decoded sprites. Point
     /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
-    fn every_retail_bank_takes_a_colour_edit() {
+    fn every_retail_character_sprites_take_a_colour_edit() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-sprite-colour-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 
-        let (mut banks, mut failures) = (0, Vec::new());
+        let (mut count, mut failures) = (0, Vec::new());
         for path in project.archives.clone() {
             let archive = project.load(&path).expect("archive loads");
             for index in 0..archive.entries().len() {
                 let payload = archive.original(index);
-                let Ok((_, bank)) = sprites::unpack(payload) else { continue };
-                banks += 1;
+                let Ok((_, bytes)) = sprites::unpack(payload) else { continue };
+                count += 1;
 
                 let edited = with_colour(payload, 0, 0, 1, &|word| word ^ 1)
                     .and_then(|bytes| sprites::unpack(&bytes).map_err(|error| error.to_string()));
-                let decoded = format::decode(&bank).expect("unpacked banks decode");
-                let at = bank.len() - format::encode(&decoded).expect("encodes").len()
-                    + palette_offset(&bank).expect("a palette");
-                let mut expected = bank.clone();
+                let decoded = format::decode(&bytes).expect("unpacked sprites decode");
+                let at = bytes.len() - format::encode(&decoded).expect("encodes").len()
+                    + palette_offset(&bytes).expect("a palette");
+                let mut expected = bytes.clone();
                 expected[at] ^= 1;
                 if edited.map(|(_, bytes)| bytes).as_ref() != Ok(&expected) {
                     failures.push(format!("{}#{index}", path.0));
@@ -1144,14 +1153,14 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&folder);
-        eprintln!("sprite banks: {} of {banks} fail a colour edit", failures.len());
-        assert!(banks > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
+        eprintln!("character sprites: {} of {count} fail a colour edit", failures.len());
+        assert!(count > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 
-    /// The bank offset of colour 1 of palette 0 of section 0: the section's palette table offset, then
+    /// The sprites offset of colour 1 of palette 0 of section 0: the section's palette table offset, then
     /// the palette's offset from the table.
-    fn palette_offset(bank: &[u8]) -> Option<usize> {
-        let word = |at: usize| Some(u32::from_le_bytes(bank.get(at..at + 4)?.try_into().ok()?) as usize);
+    fn palette_offset(sprites: &[u8]) -> Option<usize> {
+        let word = |at: usize| Some(u32::from_le_bytes(sprites.get(at..at + 4)?.try_into().ok()?) as usize);
         let section = if word(0)? == format::CONTAINER_HEAD as usize { word(0)? } else { 0 };
         let table = section + word(section + 4)?;
         Some(table + word(table)? + 2)

@@ -3,7 +3,7 @@
 //! A rule names a texture page and a CLUT row; the replay says which entries wrote them. The
 //! texture is the upload that wrote the page's first word, and the palette is the one entry that
 //! wrote the whole row, `depth.colors()` words. A row with words from two entries, or none, does
-//! not join. Because the replay keeps load order, a bank another archive loaded serves a row only
+//! not join. Because the replay keeps load order, a block another archive loaded serves a row only
 //! when it is the one the scene left there.
 //!
 //! The rules are the ones in [`crate::texture`]: the literal draw sites ([`super::SITES`]) of the
@@ -111,9 +111,9 @@ mod tests {
         let mut vram = Vram::new();
         let sheet: Vec<u8> = vec![0x11; 2048];
         // Rectangle column 22, row 8: VRAM (704, 256).
-        let bank: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
-        let entries = [entry(3, (22 << 24) | (8 << 16) | (1 << 8), sheet.len()), entry(0, 0x8003_3F40, bank.len())];
-        vram.load("BIN/WORLD00/AREA024.EMI", &entries, &[&sheet, &bank]);
+        let block: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
+        let entries = [entry(3, (22 << 24) | (8 << 16) | (1 << 8), sheet.len()), entry(0, 0x8003_3F40, block.len())];
+        vram.load("BIN/WORLD00/AREA024.EMI", &entries, &[&sheet, &block]);
         vram.reset_palette();
         vram.upload_palette();
 

@@ -14,7 +14,7 @@
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
 //!
 //! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`; the game's
-//! formats (sprite banks, maps, scripts, tables) live in `rebof3-formats`. The
+//! formats (character sprites, maps, scripts, tables) live in `rebof3-formats`. The
 //! crate is `no_std + alloc` without the `std` feature, which keeps [`emi`] (the container table
 //! read from bytes) and [`cue`].
 

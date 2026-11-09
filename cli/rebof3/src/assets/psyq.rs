@@ -17,16 +17,16 @@ pub(super) const EXPORT_TIM_HELP: &str = "\
 bof3 assets export tim: write a texture as a PlayStation TIM file.
 
 Usage: bof3 assets export tim PAYLOAD --load-arg HEX [-o OUT]
-       bof3 assets export tim PAYLOAD --load-arg HEX --depth 4|8 --palette BANK --clut X,Y
+       bof3 assets export tim PAYLOAD --load-arg HEX --depth 4|8 --palette CLUT_BLOCK --clut X,Y
                                        [--palette-offset WORDS] [-o OUT]
 
-  PAYLOAD                  stored texture payload
-      --load-arg HEX       the entry's load address (required); it gives the image's VRAM place
-      --depth 4|8          write an indexed TIM with a CLUT block (default: a 15-bit TIM, no CLUT)
-      --palette BANK       color-word file for --depth (required with it)
-      --palette-offset N   first word of the palette row (default: 0)
-      --clut X,Y           the CLUT row's VRAM place, in words and rows (required with --depth)
-  -o, --output OUT         TIM to write (default: PAYLOAD.tim)
+  PAYLOAD                   stored texture payload
+      --load-arg HEX        the entry's load address (required); it gives the image's VRAM place
+      --depth 4|8           write an indexed TIM with a CLUT block (default: a 15-bit TIM, no CLUT)
+      --palette CLUT_BLOCK  color-word file for --depth (required with it)
+      --palette-offset N    first word of the palette row (default: 0)
+      --clut X,Y            the CLUT row's VRAM place, in words and rows (required with --depth)
+  -o, --output OUT          TIM to write (default: PAYLOAD.tim)
 
 The TIM header carries the image's and the CLUT's VRAM coordinates, so a tool that lays textures out
 in VRAM reads them from the file. A texture no draw site joins to a palette row has no CLUT of its own:
@@ -34,28 +34,29 @@ give one with --depth, --palette and --clut, or write the 15-bit TIM.
 
 Examples:
   bof3 assets export tim payload.img --load-arg 0x16080100 -o 7.tim
-  bof3 assets export tim payload.img --load-arg 0x16080100 --depth 4 --palette bank.clut --clut 160,483 -o 7.tim
+  bof3 assets export tim payload.img --load-arg 0x16080100 --depth 4 --palette block.clut --clut 160,483 -o 7.tim
 ";
 
 pub(super) const IMPORT_TIM_HELP: &str = "\
 bof3 assets import tim: read a TIM file back into a texture payload and its palette.
 
 Usage: bof3 assets import tim FILE.tim [-o OUT] [--load-arg HEX]
-                                       [--palette OUT [--bank BANK [--palette-offset WORDS]]]
+                                       [--palette OUT [--clut-block CLUT_BLOCK [--palette-offset WORDS]]]
 
-  FILE.tim                 a TIM whose image is whole 32-by-32-word rectangles on a 32-word grid
-  -o, --output OUT         payload to write (default: FILE.img)
-      --load-arg HEX       the entry's stored load address; its other bits are kept in the one printed
-      --palette OUT        write the CLUT block's color words (needs a CLUT block)
-      --bank BANK          with --palette: write BANK with the CLUT block's words spliced in instead
-      --palette-offset N   first word of the row in BANK (default: 0)
+  FILE.tim                  a TIM whose image is whole 32-by-32-word rectangles on a 32-word grid
+  -o, --output OUT          payload to write (default: FILE.img)
+      --load-arg HEX        the entry's stored load address; its other bits are kept in the one printed
+      --palette OUT         write the CLUT block's color words (needs a CLUT block)
+      --clut-block CLUT_BLOCK
+                            with --palette: write CLUT_BLOCK with the CLUT block's words spliced in instead
+      --palette-offset N    first word of the row in CLUT_BLOCK (default: 0)
 
 Prints the image's place and the load argument it implies. Write that load argument into the
 entry's table row to move the texture; the payload alone keeps the entry where it is.
 
 Examples:
   bof3 assets import tim 7.tim -o payload.img --load-arg 0x16080100
-  bof3 assets import tim 7.tim -o payload.img --palette bank.new --bank bank.clut --palette-offset 16
+  bof3 assets import tim 7.tim -o payload.img --palette block.new --clut-block block.clut --palette-offset 16
 ";
 
 pub(super) const IMPORT_VAB_HELP: &str = "\
@@ -134,7 +135,7 @@ Usage: bof3 assets import sep FILE.sep [-o OUT]
   -o, --output OUT    package to write (default: FILE.bin)
 ";
 
-/// `bof3 assets export tim PAYLOAD --load-arg HEX [--depth 4|8 --palette BANK --clut X,Y ...]`.
+/// `bof3 assets export tim PAYLOAD --load-arg HEX [--depth 4|8 --palette CLUT_BLOCK --clut X,Y ...]`.
 #[derive(Parser)]
 struct ExportTim {
     files: Vec<PathBuf>,
@@ -168,7 +169,7 @@ pub(super) fn export_tim(args: &[String]) -> Result<i32> {
         Some(bits @ (4 | 8)) => {
             let bank = args
                 .palette
-                .ok_or_else(|| Error::Usage("--depth needs --palette, the bank that holds the row".into()))?;
+                .ok_or_else(|| Error::Usage("--depth needs --palette, the CLUT block that holds the row".into()))?;
             let clut = args.clut.ok_or_else(|| {
                 Error::Usage("--depth needs --clut X,Y, the CLUT row's VRAM place; none is guessed".into())
             })?;
@@ -194,7 +195,7 @@ fn clut_part(text: &str, flag: &str) -> Result<u16> {
     u16::try_from(number(text.trim(), flag)?).map_err(|_| Error::Usage(format!("{flag} needs 16-bit numbers")))
 }
 
-/// `bof3 assets import tim FILE.tim [-o OUT] [--load-arg HEX] [--palette OUT [--bank BANK ...]]`.
+/// `bof3 assets import tim FILE.tim [-o OUT] [--load-arg HEX] [--palette OUT [--clut-block CLUT_BLOCK ...]]`.
 #[derive(Parser)]
 struct ImportTim {
     files: Vec<PathBuf>,
@@ -204,8 +205,8 @@ struct ImportTim {
     load_arg: Option<String>,
     #[arg(long)]
     palette: Option<PathBuf>,
-    #[arg(long)]
-    bank: Option<PathBuf>,
+    #[arg(long = "clut-block", alias = "bank")]
+    clut_block: Option<PathBuf>,
     #[arg(long = "palette-offset")]
     palette_offset: Option<String>,
 }
@@ -214,8 +215,8 @@ pub(super) fn import_tim(args: &[String]) -> Result<i32> {
     let args: ImportTim = parse(args)?;
     let input = single(args.files, "import tim needs a TIM file")?;
     let base = optional_number(args.load_arg.as_deref(), "--load-arg")?;
-    if args.bank.is_some() && args.palette.is_none() {
-        return Err(Error::Usage("--bank needs --palette, the file to write the spliced bank to".into()));
+    if args.clut_block.is_some() && args.palette.is_none() {
+        return Err(Error::Usage("--clut-block needs --palette, the file to write the spliced CLUT block to".into()));
     }
     let texture = vram::import_tim(&read_file(&input)?)?;
     let out = with_extension_of(args.output, &input, "img");
@@ -236,10 +237,10 @@ pub(super) fn import_tim(args: &[String]) -> Result<i32> {
             .clut
             .ok_or_else(|| Error::Usage("--palette needs a TIM with a CLUT block; this one has none".into()))?;
         println!("  CLUT at ({}, {}), {} rows of {} words", clut.x, clut.y, clut.height, clut.width);
-        let bytes = match args.bank {
-            Some(bank) => {
+        let bytes = match args.clut_block {
+            Some(block) => {
                 let offset = optional_number(args.palette_offset.as_deref(), "--palette-offset")?.unwrap_or(0) as usize;
-                rebof3_formats::clut::splice(&read_file(&bank)?, offset, &clut.words)?
+                rebof3_formats::clut::splice(&read_file(&block)?, offset, &clut.words)?
             }
             None => clut.words.iter().flat_map(|word| word.to_le_bytes()).collect(),
         };
@@ -297,6 +298,6 @@ pub(super) fn import_seq(args: &[String]) -> Result<i32> {
         .map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) })
         .collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
-    write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::period::import_seq(&borrowed)?)?;
+    write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::psyq::import_seq(&borrowed)?)?;
     Ok(EXIT_OK)
 }

@@ -1,4 +1,4 @@
-//! The strings of the payloads that are not message banks. Every string on the owner's disc exports and imports to
+//! The strings of the payloads that are not message tables. Every string on the owner's disc exports and imports to
 //! its own bytes; the retail check skips when no disc image is present (set `BOF3_DISC_IMAGE`). The synthetic checks
 //! cover the edit rules that the disc does not need in a payload of their own.
 
@@ -29,7 +29,7 @@ fn every_string_payload_on_the_retail_disc_exports_and_imports_to_its_own_bytes(
                 continue;
             }
             let payload = archive.payload(&container, index).expect("the payload is in the archive");
-            if discover::bank_records(payload).is_some() {
+            if discover::table_records(payload).is_some() {
                 continue;
             }
             let base = strings::load_address(entry);
@@ -53,6 +53,6 @@ fn every_string_payload_on_the_retail_disc_exports_and_imports_to_its_own_bytes(
             }
         }
     }
-    assert!(with_strings > 0, "the disc has strings outside the message banks");
-    eprintln!("{payloads} payloads round trip; {with_strings} hold {found} strings outside the message banks");
+    assert!(with_strings > 0, "the disc has strings outside the message tables");
+    eprintln!("{payloads} payloads round trip; {with_strings} hold {found} strings outside the message tables");
 }

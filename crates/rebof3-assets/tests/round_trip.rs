@@ -93,7 +93,7 @@ fn retail_textures_round_trip_byte_exactly() {
                     .filter_map(|bank| fs::read(bank).ok())
                     .any(|bytes| holds_run(&bytes, &texture.palette));
                 if !found {
-                    failures.push(format!("{}: its CLUT row is not in a palette bank of its archive", path.display()));
+                    failures.push(format!("{}: its CLUT row is not in a CLUT block of its archive", path.display()));
                 }
             }
             (Ok(other), _) => failures.push(format!("{}: imported as {other:?}, not its kind", path.display())),
@@ -121,7 +121,7 @@ fn retail_textures_round_trip_byte_exactly() {
     }
     assert!(palettes > 0, "no palette JSON under {}", palette_root.display());
     let banks = palette_files.iter().filter(|path| path.extension().is_some_and(|ext| ext == "clut")).count();
-    assert_eq!(palettes, banks, "every palette bank has a JSON");
+    assert_eq!(palettes, banks, "every CLUT block has a JSON");
     eprintln!("palette round trip: {palettes} banks return their stored bytes");
 
     assert!(views > 0, "no texture view under {}", texture_root.display());

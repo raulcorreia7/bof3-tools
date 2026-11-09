@@ -3,10 +3,10 @@
 //!
 //! A studio laid textures and CLUTs out in VRAM by hand and wrote the coordinates into TIM headers.
 //! This game states them in two places. A type-3 entry's load argument names its column, row and
-//! width; a type-0 palette bank's load address names where it sits in the palette arena, and the
+//! width; a type-0 CLUT block's load address names where it sits in the palette arena, and the
 //! arena reaches VRAM in one upload at (0, 480). Moving either rewrites that one table field, which
 //! the project keeps as a placement edit and rebuilds byte for byte when it is set back. Everything
-//! else the replay writes (palette words of a compressed bank, uploads by named code) is placed by
+//! else the replay writes (palette words of a compressed block, uploads by named code) is placed by
 //! code and cannot move here. The draw sites in the executable and overlays name pages and rows as
 //! literals, so a moved texture is no longer found by them; the detail lists those sites.
 //!
@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 use gpui::{AnyElement, Context, Div, Hsla, ParentElement, Styled, div, prelude::*, px, rgba};
 use rebof3_emi::replay::{Kind as WriteKind, Writer};
-use rebof3_emi::texture::{ARENA_BASE, ARENA_BYTES, ARENA_ROW_WORDS, ARENA_VRAM_ROW, Bank, clut_at, sheet};
+use rebof3_emi::texture::{ARENA_BASE, ARENA_BYTES, ARENA_ROW_WORDS, ARENA_VRAM_ROW, ClutBlock, clut_at, sheet};
 use rebof3_formats::vram::Placement;
 use rebof3_formats::{Format, classify};
 
@@ -35,14 +35,14 @@ const VRAM_WIDTH: u16 = 1024;
 const VRAM_HEIGHT: u16 = 512;
 /// Words between the faint guide lines: a 4-bit texture page is 64 words wide.
 const GUIDE_STEP: u16 = 64;
-/// Words one step moves a palette bank sideways: one 4-bit row.
+/// Words one step moves a CLUT block sideways: one 4-bit row.
 const PALETTE_STEP: usize = 16;
 /// Screen size of the label text and the least rectangle width that fits one, in pixels.
 const LABEL_SIZE: f32 = 10.0;
 const LABEL_MIN: f32 = 28.0;
 /// The tallest the placement list grows before it scrolls, in pixels.
 const LIST_HEIGHT: f32 = 170.0;
-/// Fills, as `0xRRGGBBAA`: a texture, a palette bank, a placement set in code, a collision.
+/// Fills, as `0xRRGGBBAA`: a texture, a CLUT block, a placement set in code, a collision.
 const TEXTURE_FILL: u32 = 0x4FC3_F750;
 const PALETTE_FILL: u32 = 0xFFB7_4D60;
 const CODE_FILL: u32 = 0x9696_A050;
@@ -74,7 +74,7 @@ impl Rect {
 pub enum Kind {
     /// A type-3 entry: its load argument names the place.
     Texture,
-    /// A type-0 palette bank: its load address names its place in the palette arena.
+    /// A type-0 CLUT block: its load address names its place in the palette arena.
     Palette,
     /// Code: nothing in the data moves it.
     Code,
@@ -85,7 +85,7 @@ pub enum Kind {
 pub struct Placed {
     pub writer: Writer,
     pub kind: Kind,
-    /// One rectangle, or up to three for a palette bank that starts or ends inside an arena row.
+    /// One rectangle, or up to three for a CLUT block that starts or ends inside an arena row.
     pub rects: Vec<Rect>,
     /// The depth, and whether a draw site names it.
     pub depth: String,
@@ -125,7 +125,7 @@ impl Step {
     const ALL: [(Step, &'static str); 4] = [(Step::Left, "◀"), (Step::Right, "▶"), (Step::Up, "▲"), (Step::Down, "▼")];
 }
 
-/// The rectangles a palette bank covers in VRAM: the arena row it starts in, the whole rows after it,
+/// The rectangles a CLUT block covers in VRAM: the arena row it starts in, the whole rows after it,
 /// and the part of the row it ends in.
 fn palette_rects(arena_word: usize, words: usize) -> Vec<Rect> {
     let row_words = usize::from(ARENA_ROW_WORDS);
@@ -182,16 +182,16 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
                         sites,
                     )
                 }
-                Format::ClutBank => {
-                    let Some(bank) = Bank::new(slot, entry.ram_ptr, payload.len()) else { continue };
+                Format::ClutBlock => {
+                    let Some(block) = ClutBlock::new(slot, entry.ram_ptr, payload.len()) else { continue };
                     let joined = joins.filter(|join| join.palette == writer);
                     let (depths, sites): (BTreeSet<u32>, Vec<String>) =
                         joined.map(|join| (join.depth.bits(), join.rule.evidence())).unzip();
-                    let mut depth = format!("{} colours", bank.words);
+                    let mut depth = format!("{} colours", block.words);
                     if !depths.is_empty() {
                         depth = format!("{depth}; {}", depth_text(&depths));
                     }
-                    (Kind::Palette, palette_rects(bank.arena_word, bank.words), depth, sites)
+                    (Kind::Palette, palette_rects(block.arena_word, block.words), depth, sites)
                 }
                 _ => continue,
             };
@@ -216,7 +216,7 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
             }
             (_, WriteKind::Palette) => (
                 "palette words".to_string(),
-                "Palette words of a compressed bank, copied by the loader to the arena; this view does not move them."
+                "Palette words of a compressed block, copied by the loader to the arena; this view does not move them."
                     .to_string(),
             ),
             _ => (
@@ -250,7 +250,7 @@ fn depth_text(depths: &BTreeSet<u32>) -> String {
 }
 
 /// The overlaps between placements. Placements set in code are not compared: the palette arena upload
-/// alone covers every bank.
+/// alone covers every block.
 pub fn collisions(placed: &[Placed]) -> Vec<Collision> {
     let mut found = Vec::new();
     for (first, one) in placed.iter().enumerate().filter(|(_, placed)| placed.kind != Kind::Code) {
@@ -482,7 +482,7 @@ fn legend(placements: usize, collisions: usize) -> Div {
         .items_center()
         .gap(px(GAP))
         .child(key(TEXTURE_FILL, "texture (load argument)"))
-        .child(key(PALETTE_FILL, "palette bank (load address)"))
+        .child(key(PALETTE_FILL, "CLUT block (load address)"))
         .child(key(CODE_FILL, "set in code, cannot move"))
         .child(key(COLLISION_FILL, "collision"))
         .child(mono(format!("{placements} placements, {collisions} collisions")).text_color(color(MUTED)))
@@ -632,7 +632,7 @@ mod tests {
     }
 
     #[test]
-    fn a_palette_bank_spans_the_arena_rows_it_covers() {
+    fn a_clut_block_spans_the_arena_rows_it_covers() {
         // 256 words from the arena start: one whole row at (0, 480).
         assert_eq!(palette_rects(0, 256), vec![Rect { x: 0, y: 480, width: 256, height: 1 }]);
         // 32 words from 240: the tail of row 480 and the head of row 481.
@@ -657,7 +657,7 @@ mod tests {
         assert_eq!(found, vec![Collision { first: 0, second: 1, area: at(32, 480, 32, 1) }]);
     }
 
-    /// AREA024's scene: its texture and bank are placed from the type-3 entry and the arena, a move
+    /// AREA024's scene: its texture and block are placed from the type-3 entry and the arena, a move
     /// there and back leaves the project unedited, and the archive rebuilds as it was.
     /// Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
@@ -675,9 +675,9 @@ mod tests {
         let rect = texture.rects[0];
         assert!((rect.x..rect.x + rect.width).contains(&704) && (rect.y..rect.y + rect.height).contains(&256));
         assert!(texture.depth.contains("bpp"), "{}", texture.depth);
-        let bank = placed.iter().find(|placed| placed.writer == Writer::entry(area, 8)).expect("entry 8");
-        assert_eq!(bank.kind, Kind::Palette);
-        assert!(bank.rects.iter().any(|rect| rect.y >= 480));
+        let block = placed.iter().find(|placed| placed.writer == Writer::entry(area, 8)).expect("entry 8");
+        assert_eq!(block.kind, Kind::Palette);
+        assert!(block.rects.iter().any(|rect| rect.y >= 480));
 
         let loaded = project.load(&ArchivePath(area.into())).expect("loads");
         let before = project.current_archive(&loaded).expect("rebuilds");

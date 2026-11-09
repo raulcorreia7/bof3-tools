@@ -231,7 +231,7 @@ fn retail_joins_and_the_suggestion_scorer() {
 }
 
 /// The battle archives a battle streams part-way: each texture a battle draw site names is joined
-/// in its home scene at the site's depth, with the row the archive's own palette bank loads.
+/// in its home scene at the site's depth, with the row the archive's own CLUT block loads.
 #[test]
 fn retail_battle_archive_joins() {
     use rebof3_emi::texture::scene as joins;

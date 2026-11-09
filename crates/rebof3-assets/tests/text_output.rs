@@ -1,5 +1,5 @@
 //! The text kind's files: the stored payload, one JSON row per string and a plain-text view,
-//! beside a run-wide index. The synthetic archive exercises the bank, a string table and the
+//! beside a run-wide index. The synthetic archive exercises the table, a string table and the
 //! payloads the scan drops; the retail disc is covered by the hands-on run in the task report.
 
 mod support;
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use rebof3_assets::text;
 use rebof3_emi::pack::{self, Payload};
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_formats::message::bank;
+use rebof3_formats::message::table;
 use rebof3_formats::text::strings;
 
 /// Every file under `directory`, relative to it and with forward slashes.
@@ -36,8 +36,8 @@ fn messages() -> Vec<u8> {
         codec::encode(Encoding::Message, "{BOX:05}Old man{NEWLINE}Is it true?{END}").unwrap(),
         codec::encode(Encoding::Message, "You won the battle{END}").unwrap(),
     ];
-    let bank = bank::Bank { messages: texts.to_vec(), slots: vec![Some(0), Some(1), None] };
-    bank::build(&bank).unwrap()
+    let table = table::Table { messages: texts.to_vec(), slots: vec![Some(0), Some(1), None] };
+    table::build(&table).unwrap()
 }
 
 /// Four `8`-byte labels, the shape a menu table has.
@@ -97,19 +97,19 @@ fn a_text_run_writes_the_payload_its_rows_and_the_index() {
     assert!(!files.iter().any(|file| file.starts_with("text/BIN/ETC/TEST/2")), "the sprite payload writes nothing");
     assert!(files.contains("text/index.jsonl"));
 
-    let bank_bytes = fs::read(out.join("text/BIN/ETC/TEST/0.bin")).unwrap();
-    let bank_json = fs::read(out.join("text/BIN/ETC/TEST/0.json")).unwrap();
-    assert_eq!(bank::import(&bank_json).unwrap(), bank_bytes);
-    let document: serde_json::Value = serde_json::from_slice(&bank_json).unwrap();
+    let table_bytes = fs::read(out.join("text/BIN/ETC/TEST/0.bin")).unwrap();
+    let table_json = fs::read(out.join("text/BIN/ETC/TEST/0.json")).unwrap();
+    assert_eq!(table::import(&table_json).unwrap(), table_bytes);
+    let document: serde_json::Value = serde_json::from_slice(&table_json).unwrap();
     let row = &document["messages"][0];
     assert_eq!(row["source"], "BIN/ETC/TEST.EMI");
     assert_eq!(row["entry"], 0);
     assert_eq!(row["ram"], serde_json::json!(0x8001_0000u32 + row["offset"].as_u64().unwrap() as u32));
-    assert_eq!(row["found"], "bank header");
+    assert_eq!(row["found"], "table header");
     assert_eq!(row["kind"], "message");
     let start = row["offset"].as_u64().unwrap() as usize;
     let length = row["length"].as_u64().unwrap() as usize;
-    assert_eq!(row["bytes"], serde_json::Value::String(hex(&bank_bytes[start..start + length])));
+    assert_eq!(row["bytes"], serde_json::Value::String(hex(&table_bytes[start..start + length])));
 
     let labels_bytes = fs::read(out.join("text/BIN/ETC/TEST/1.bin")).unwrap();
     let labels_json = fs::read(out.join("text/BIN/ETC/TEST/1.json")).unwrap();
@@ -132,10 +132,10 @@ fn a_text_run_writes_the_payload_its_rows_and_the_index() {
         "text": "Attack{END}"
     })));
 
-    let artifacts = support::out_dir("text_output-bank_round_trip");
-    support::write(&artifacts, "bank.bin", &bank_bytes);
-    support::write(&artifacts, "bank.json", String::from_utf8(bank_json).unwrap());
-    support::write(&artifacts, "bank.txt", fs::read_to_string(out.join("text/BIN/ETC/TEST/0.txt")).unwrap());
+    let artifacts = support::out_dir("text_output-table_round_trip");
+    support::write(&artifacts, "table.bin", &table_bytes);
+    support::write(&artifacts, "table.json", String::from_utf8(table_json).unwrap());
+    support::write(&artifacts, "table.txt", fs::read_to_string(out.join("text/BIN/ETC/TEST/0.txt")).unwrap());
 }
 
 #[test]
@@ -160,10 +160,7 @@ fn a_plan_lists_what_the_scan_drops() {
     plan.list = true;
     let report = text::extract_with(&plan).unwrap();
     assert!(
-        report
-            .notes
-            .iter()
-            .any(|note| note == "text scan drop: BIN/ETC/TEST.EMI#2 character sprite blob, LZ77 (type 1)")
+        report.notes.iter().any(|note| note == "text scan drop: BIN/ETC/TEST.EMI#2 character sprites, LZ77 (type 1)")
     );
     assert!(files_under(&out).is_empty(), "a plan writes nothing");
 }

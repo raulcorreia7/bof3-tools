@@ -1,7 +1,7 @@
 //! Where the game's text sits in a payload: the scan the deleted Python text tool ran, ported so
 //! that the Rust tools find the same strings with the same spans.
 //!
-//! A message bank holds its own offset table, and its records are its strings ([`bank_records`]). Any other payload
+//! A message table holds its own offset table, and its records are its strings ([`table_records`]). Any other payload
 //! holds two kinds of string. A fixed-width name table holds names at a stride, found by the lattice search. Other
 //! text is a record that ends at its terminator, or at the pointer table that reaches it ([`strings`]). The rules
 //! and the evidence for them are in `wiki: data/text`.
@@ -36,15 +36,15 @@ const MIN_LETTERS_RUN: usize = 5;
 const LETTER_PERCENT: usize = 55;
 /// Bytes below this value are control codes, never the start of text in a run.
 const CONTROL_LIMIT: u8 = 0x20;
-/// Records of a message bank that decide whether the bank holds text.
-const BANK_SAMPLE: usize = 64;
+/// Records of a message table that decide whether the table holds text.
+const TABLE_SAMPLE: usize = 64;
 /// Consecutive image pointers that make a pointer table.
 const POINTER_WORDS: usize = 2;
 
 /// What kind of string a [`Found`] is.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Kind {
-    /// A record of a message bank, delimited by the bank's offset table.
+    /// A record of a message table, delimited by the table's offset table.
     Message,
     /// A name in a fixed-width table whose records are `stride` bytes apart.
     Field { stride: usize },
@@ -60,11 +60,11 @@ pub struct Found {
     pub kind: Kind,
 }
 
-/// The records of a message bank that holds text, or `None` for any other payload and for a bank whose records
+/// The records of a message table that holds text, or `None` for any other payload and for a table whose records
 /// read as code. Records that are shorter than [`MIN_LENGTH`] are left out.
-pub fn bank_records(payload: &[u8]) -> Option<Vec<Found>> {
-    let offsets = bank_slots(payload)?;
-    if !bank_holds_text(payload, &offsets) {
+pub fn table_records(payload: &[u8]) -> Option<Vec<Found>> {
+    let offsets = table_slots(payload)?;
+    if !table_holds_text(payload, &offsets) {
         return None;
     }
     let bounds = distinct_sorted(&offsets);
@@ -88,7 +88,7 @@ pub fn bank_records(payload: &[u8]) -> Option<Vec<Found>> {
     Some(found)
 }
 
-/// The strings of a payload that is not a message bank, in offset order. `base` is the address the payload loads
+/// The strings of a payload that is not a message table, in offset order. `base` is the address the payload loads
 /// at, which the pointer-table test needs; `None` when the payload has none.
 pub fn strings(payload: &[u8], base: Option<u32>) -> Vec<Found> {
     let runs = scan_runs(payload);
@@ -134,9 +134,9 @@ fn distinct_sorted(values: &[usize]) -> Vec<usize> {
     values.iter().copied().collect::<BTreeSet<_>>().into_iter().collect()
 }
 
-/// The offset table of a message bank: its first word is the table's length in bytes, and every entry points
+/// The offset table of a message table: its first word is the table's length in bytes, and every entry points
 /// inside the payload, in order. `None` when the payload does not start with such a table.
-fn bank_slots(payload: &[u8]) -> Option<Vec<usize>> {
+fn table_slots(payload: &[u8]) -> Option<Vec<usize>> {
     if payload.len() < 8 {
         return None;
     }
@@ -155,10 +155,10 @@ fn bank_slots(payload: &[u8]) -> Option<Vec<usize>> {
     Some(offsets)
 }
 
-/// Whether at least half of a bank's first records read as text.
-fn bank_holds_text(payload: &[u8], offsets: &[usize]) -> bool {
+/// Whether at least half of a table's first records read as text.
+fn table_holds_text(payload: &[u8], offsets: &[usize]) -> bool {
     let bounds = distinct_sorted(offsets);
-    let records: Vec<&[u8]> = (0..bounds.len().min(BANK_SAMPLE))
+    let records: Vec<&[u8]> = (0..bounds.len().min(TABLE_SAMPLE))
         .filter(|&index| bounds[index] < payload.len())
         .map(|index| {
             let stop = bounds.get(index + 1).copied().unwrap_or(payload.len());
@@ -172,7 +172,7 @@ fn bank_holds_text(payload: &[u8], offsets: &[usize]) -> bool {
     good * 2 >= records.len()
 }
 
-/// Whether one bank record reads as game text rather than code bytes.
+/// Whether one table record reads as game text rather than code bytes.
 fn record_is_text(record: &[u8]) -> bool {
     let end = record.iter().rposition(|byte| *byte != 0).map_or(0, |last| last + 1);
     let body = &record[..end];
@@ -184,7 +184,7 @@ fn record_is_text(record: &[u8]) -> bool {
     (letters >= 4 && letters * 100 >= 40 * body.len()) || (letters >= 3 && fills >= 1)
 }
 
-/// The length of a bank record: up to and including its terminator, or the whole span when it has none. An
+/// The length of a table record: up to and including its terminator, or the whole span when it has none. An
 /// operand may be zero, so a control code and its operand are skipped together.
 fn record_end(span: &[u8]) -> usize {
     let mut index = 0;

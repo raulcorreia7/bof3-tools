@@ -2,8 +2,8 @@
 //! draw rules that name both.
 //!
 //! The palette arena is a 16 KB band of RAM. The engine copies it to a working copy and
-//! uploads that copy with one `LoadImage` of `rect(0, 480, 256, 32)` (exe `func_8014E22C`,
-//! `src/slus/func_8014E22C.c`). A type-0 palette loaded at RAM `ram` therefore
+//! uploads that copy with one `LoadImage` of `rect(0, 480, 256, 32)` (exe `GFX_UploadPalette`,
+//! `src/engine/slus/GFX_UploadPalette.c`). A type-0 palette loaded at RAM `ram` therefore
 //! sits at arena word `(ram - ARENA_BASE) / 2`, which is VRAM column `% 256` and row
 //! `480 + / 256`. A type-3 entry is a texture sheet placed by its load argument
 //! ([`sheet`]).
@@ -11,19 +11,19 @@
 //! A texture's palette is named by a draw rule, never by the texture payload:
 //!
 //! - [`SITES`] lists the functions whose texture page and CLUT are both literals. A site joins
-//!   when its page is covered by exactly one sheet and its CLUT row is held by exactly one bank.
+//!   when its page is covered by exactly one sheet and its CLUT row is held by exactly one block.
 //! - [`terrain_joins`] applies the world-map tile-descriptor rule: bit 31 selects the depth,
-//!   bits 24-27 the CLUT index and bits 28-29 the texture-page bank. It joins the same way.
+//!   bits 24-27 the CLUT index and bits 28-29 the texture page. It joins the same way.
 //!
 //! [`scene`] resolves the same rules in a replayed VRAM ([`crate::replay`]), where load order
-//! decides which upload and which bank a page and a row hold. [`suggest`] ranks a depth and rows
+//! decides which upload and which block a page and a row hold. [`suggest`] ranks a depth and rows
 //! for a texture no rule joins; a suggestion is never a join.
 //!
-//! Banks are looked up over the resident set of palette banks ([`ResidentBank`]) the caller
-//! loaded, so a bank one archive carries can serve another archive's texture (the battle icon
-//! rows). The texture's own archive wins when it holds the row; otherwise identical banks
-//! collapse and disagreeing banks make the row ambiguous. The rule never guesses: more than one
-//! sheet or more than one distinct bank leaves the texture unjoined.
+//! Blocks are looked up over the resident set of CLUT blocks ([`ResidentClutBlock`]) the caller
+//! loaded, so a block one archive carries can serve another archive's texture (the battle icon
+//! rows). The texture's own archive wins when it holds the row; otherwise identical blocks
+//! collapse and disagreeing blocks make the row ambiguous. The rule never guesses: more than one
+//! sheet or more than one distinct block leaves the texture unjoined.
 //!
 //! The encoded words are the graph-type-0 encoding, the runtime the US disc selects
 //! (`GetGraphType()` reads `D_8018B15C`; `SetVideoMode(MODE_NTSC)` and `_reset(3)` leave it
@@ -48,31 +48,31 @@ pub const ARENA_ROW_WORDS: u16 = 256;
 pub const TERRAIN_CLUT_ROW: u16 = 483;
 /// The VRAM column of the first world-map terrain texture page.
 pub const TERRAIN_PAGE_X: u16 = 320;
-/// VRAM words between world-map terrain page banks (descriptor bits 28-29).
+/// VRAM words between world-map terrain pages (descriptor bits 28-29).
 pub const TERRAIN_PAGE_STEP: u16 = 128;
 /// The VRAM row of every world-map terrain texture page.
 pub const TERRAIN_PAGE_Y: u16 = 256;
 
 /// Descriptor bits 24-27 hold the terrain CLUT index.
 const TERRAIN_CLUT_INDEX_SHIFT: u32 = 24;
-/// Descriptor bits 28-29 hold the terrain page bank.
-const TERRAIN_PAGE_BANK_SHIFT: u32 = 28;
+/// Descriptor bits 28-29 hold the terrain page.
+const TERRAIN_PAGE_SHIFT: u32 = 28;
 /// Descriptor bit 31 selects the terrain depth: clear is 8bpp, set is 4bpp.
 const TERRAIN_DEPTH_BIT: u32 = 31;
 
 /// A type-0 palette in the arena: its entry, and where its first word sits in the arena.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Bank {
+pub struct ClutBlock {
     /// EMI slot of the palette entry.
     pub slot: usize,
-    /// Arena word of the bank's first color.
+    /// Arena word of the block's first color.
     pub arena_word: usize,
-    /// Color words in the bank.
+    /// Color words in the block.
     pub words: usize,
 }
 
-impl Bank {
-    /// The bank loaded from a type-0 entry at `ram` with `payload_bytes` bytes, or `None`
+impl ClutBlock {
+    /// The block loaded from a type-0 entry at `ram` with `payload_bytes` bytes, or `None`
     /// when it does not load into the arena.
     pub fn new(slot: usize, ram: u32, payload_bytes: usize) -> Option<Self> {
         if !(ARENA_BASE..ARENA_BASE + ARENA_BYTES).contains(&ram) {
@@ -81,7 +81,7 @@ impl Bank {
         Some(Self { slot, arena_word: ((ram - ARENA_BASE) / 2) as usize, words: payload_bytes / 2 })
     }
 
-    /// Whether the whole CLUT row at `clut`, `depth.colors()` words long, lies in this bank.
+    /// Whether the whole CLUT row at `clut`, `depth.colors()` words long, lies in this block.
     pub fn holds(&self, clut: Clut, depth: Depth) -> bool {
         let Some(first) = arena_word(clut) else {
             return false;
@@ -90,42 +90,42 @@ impl Bank {
     }
 }
 
-/// A palette bank with the archive that loads it and the color words it holds.
+/// A CLUT block with the archive that loads it and the color words it holds.
 ///
 /// A caller builds the resident set by loading the archives it has; nothing here assumes which
-/// archives those are. Banks that load the same words at the same arena position are one bank.
+/// archives those are. Blocks that load the same words at the same arena position are one block.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResidentBank {
-    /// Disc path of the archive that loads the bank (`BIN/BATTLE/BATL_OVR.EMI`).
+pub struct ResidentClutBlock {
+    /// Disc path of the archive that loads the block (`BIN/BATTLE/BATL_OVR.EMI`).
     pub archive: String,
-    /// The bank's entry and arena span.
-    pub bank: Bank,
+    /// The block's entry and arena span.
+    pub block: ClutBlock,
     /// The color words, in stored order.
     pub values: Vec<u16>,
 }
 
-impl ResidentBank {
-    /// The bank a type-0 payload loaded at `ram` holds, or `None` when it does not load into
+impl ResidentClutBlock {
+    /// The block a type-0 payload loaded at `ram` holds, or `None` when it does not load into
     /// the arena.
     pub fn new(archive: impl Into<String>, slot: usize, ram: u32, payload: &[u8]) -> Option<Self> {
-        let bank = Bank::new(slot, ram, payload.len())?;
+        let block = ClutBlock::new(slot, ram, payload.len())?;
         let (pairs, _) = payload.as_chunks::<2>();
         let values = pairs.iter().map(|pair| u16::from_le_bytes(*pair)).collect();
-        Some(Self { archive: archive.into(), bank, values })
+        Some(Self { archive: archive.into(), block, values })
     }
 
-    /// Whether the whole CLUT row at `clut`, `depth.colors()` words long, lies in this bank.
+    /// Whether the whole CLUT row at `clut`, `depth.colors()` words long, lies in this block.
     pub fn holds(&self, clut: Clut, depth: Depth) -> bool {
-        self.bank.holds(clut, depth)
+        self.block.holds(clut, depth)
     }
 
-    /// The row's `depth.colors()` color words, or `None` when the row is not in this bank.
+    /// The row's `depth.colors()` color words, or `None` when the row is not in this block.
     pub fn row(&self, clut: Clut, depth: Depth) -> Option<&[u16]> {
         if !self.holds(clut, depth) {
             return None;
         }
         let first = arena_word(clut)?;
-        let start = first - self.bank.arena_word;
+        let start = first - self.block.arena_word;
         self.values.get(start..start + depth.colors())
     }
 }
@@ -136,7 +136,7 @@ pub fn arena_word(clut: Clut) -> Option<usize> {
     Some(usize::from(row) * usize::from(ARENA_ROW_WORDS) + usize::from(clut.x))
 }
 
-/// The VRAM position of arena word `arena_word`: the first color of a bank loaded there.
+/// The VRAM position of arena word `arena_word`: the first color of a block loaded there.
 pub fn clut_at(arena_word: usize) -> Clut {
     let row = arena_word / usize::from(ARENA_ROW_WORDS);
     Clut { x: (arena_word % usize::from(ARENA_ROW_WORDS)) as u16, y: ARENA_VRAM_ROW + row as u16 }
@@ -340,8 +340,8 @@ pub enum Rule {
 pub struct Join<'a> {
     /// EMI slot of the texture sheet the page is covered by.
     pub texture: usize,
-    /// The palette bank that holds the row.
-    pub palette: &'a ResidentBank,
+    /// The CLUT block that holds the row.
+    pub palette: &'a ResidentClutBlock,
     /// The CLUT row's VRAM position.
     pub clut: Clut,
     /// The texel depth the page's color mode selects.
@@ -350,16 +350,16 @@ pub struct Join<'a> {
     pub rule: Rule,
 }
 
-/// The joins of one archive, given its texture sheets and the resident palette banks.
+/// The joins of one archive, given its texture sheets and the resident CLUT blocks.
 ///
-/// A site joins only when exactly one sheet covers its page and exactly one distinct bank holds
+/// A site joins only when exactly one sheet covers its page and exactly one distinct block holds
 /// its CLUT row. Anything else is left out, so the result never guesses between candidates.
 ///
 /// The texture's own archive wins when it holds the row; otherwise the resident set is
-/// consulted and identical banks collapse. A cross-archive bank is what serves the battle icon
+/// consulted and identical blocks collapse. A cross-archive block is what serves the battle icon
 /// rows, whose pages are in `BATTLE.EMI` and whose palettes are in `BATL_OVR.EMI` and
 /// `BATL_DRA.EMI`.
-pub fn joins<'a>(archive: &str, sheets: &[Sheet], banks: &[&'a ResidentBank]) -> Vec<Join<'a>> {
+pub fn joins<'a>(archive: &str, sheets: &[Sheet], blocks: &[&'a ResidentClutBlock]) -> Vec<Join<'a>> {
     SITES
         .iter()
         .filter(|site| archive == site.archive || archive.ends_with(&format!("/{}", site.archive)))
@@ -373,7 +373,7 @@ pub fn joins<'a>(archive: &str, sheets: &[Sheet], banks: &[&'a ResidentBank]) ->
                 return None;
             }
             let texture = only(sheets.iter().filter(|sheet| sheet.covers(tpage.x, tpage.y)))?;
-            let palette = holder(archive, banks, clut, depth)?;
+            let palette = holder(archive, blocks, clut, depth)?;
             Some(Join { texture: texture.slot, palette, clut, depth, rule: Rule::Site(site) })
         })
         .collect()
@@ -382,15 +382,15 @@ pub fn joins<'a>(archive: &str, sheets: &[Sheet], banks: &[&'a ResidentBank]) ->
 /// The joins implied by a world-map bundle's tile descriptor words.
 ///
 /// Each descriptor names one row and one page (`func_80155560`): bit 31 selects the depth,
-/// bits 24-27 the CLUT index, and bits 28-29 the page bank. In 8bpp the CLUT is
+/// bits 24-27 the CLUT index, and bits 28-29 the texture page. In 8bpp the CLUT is
 /// `(0, 483 + index)`; in 4bpp it is `(16 * index, 483)`. The page is
-/// `(320 + 128 * bank, 256)`. The same uniqueness rule applies: one covering sheet and one
-/// holding bank, or no join. Repeated descriptors yield one join.
+/// `(320 + 128 * block, 256)`. The same uniqueness rule applies: one covering sheet and one
+/// holding block, or no join. Repeated descriptors yield one join.
 pub fn terrain_joins<'a>(
     archive: &str,
     records: &[u32],
     sheets: &[Sheet],
-    banks: &[&'a ResidentBank],
+    blocks: &[&'a ResidentClutBlock],
 ) -> Vec<Join<'a>> {
     let mut joins: Vec<Join<'a>> = Vec::new();
     for &descriptor in records {
@@ -400,7 +400,7 @@ pub fn terrain_joins<'a>(
         let Some(texture) = only(sheets.iter().filter(|sheet| sheet.covers(page_x, page_y))) else {
             continue;
         };
-        let Some(palette) = holder(archive, banks, clut, depth) else {
+        let Some(palette) = holder(archive, blocks, clut, depth) else {
             continue;
         };
         let join = Join { texture: texture.slot, palette, clut, depth, rule: Rule::Terrain { page_x, page_y } };
@@ -422,37 +422,42 @@ pub fn terrain_descriptor(descriptor: u32) -> Option<(u16, u16, Clut, Depth)> {
     } else {
         (Clut::new(index * 16, TERRAIN_CLUT_ROW)?, Depth::Four)
     };
-    let bank = ((descriptor >> TERRAIN_PAGE_BANK_SHIFT) & 3) as u16;
-    Some((TERRAIN_PAGE_X + bank * TERRAIN_PAGE_STEP, TERRAIN_PAGE_Y, clut, depth))
+    let page = ((descriptor >> TERRAIN_PAGE_SHIFT) & 3) as u16;
+    Some((TERRAIN_PAGE_X + page * TERRAIN_PAGE_STEP, TERRAIN_PAGE_Y, clut, depth))
 }
 
-/// The one bank that holds the row: the archive's own when it has one, else the family's.
-fn holder<'a>(archive: &str, banks: &[&'a ResidentBank], clut: Clut, depth: Depth) -> Option<&'a ResidentBank> {
-    let own: Vec<&ResidentBank> =
-        banks.iter().copied().filter(|bank| bank.archive == archive && bank.holds(clut, depth)).collect();
+/// The one block that holds the row: the archive's own when it has one, else the family's.
+fn holder<'a>(
+    archive: &str,
+    blocks: &[&'a ResidentClutBlock],
+    clut: Clut,
+    depth: Depth,
+) -> Option<&'a ResidentClutBlock> {
+    let own: Vec<&ResidentClutBlock> =
+        blocks.iter().copied().filter(|block| block.archive == archive && block.holds(clut, depth)).collect();
     if !own.is_empty() {
         return one(own.into_iter());
     }
-    one(banks.iter().copied().filter(|bank| bank.holds(clut, depth)))
+    one(blocks.iter().copied().filter(|block| block.holds(clut, depth)))
 }
 
-/// The single distinct bank among `banks`, comparing the arena span and the color words.
-fn one<'a>(banks: impl Iterator<Item = &'a ResidentBank>) -> Option<&'a ResidentBank> {
-    let mut distinct: Vec<&ResidentBank> = Vec::new();
-    for bank in banks {
-        if !distinct.iter().any(|seen| same_bank(seen, bank)) {
-            distinct.push(bank);
+/// The single distinct block among `blocks`, comparing the arena span and the color words.
+fn one<'a>(blocks: impl Iterator<Item = &'a ResidentClutBlock>) -> Option<&'a ResidentClutBlock> {
+    let mut distinct: Vec<&ResidentClutBlock> = Vec::new();
+    for block in blocks {
+        if !distinct.iter().any(|seen| same_block(seen, block)) {
+            distinct.push(block);
         }
     }
     match distinct.as_slice() {
-        [bank] => Some(bank),
+        [block] => Some(block),
         _ => None,
     }
 }
 
-/// Whether two resident banks load the same words at the same arena position.
-fn same_bank(left: &ResidentBank, right: &ResidentBank) -> bool {
-    left.bank.arena_word == right.bank.arena_word && left.values == right.values
+/// Whether two resident blocks load the same words at the same arena position.
+fn same_block(left: &ResidentClutBlock, right: &ResidentClutBlock) -> bool {
+    left.block.arena_word == right.block.arena_word && left.values == right.values
 }
 
 /// The single item of `items`, or `None` when there are none or several.
@@ -466,13 +471,13 @@ fn only<T>(items: impl Iterator<Item = T>) -> Option<T> {
 mod tests {
     use super::*;
 
-    fn bank_with(archive: &str, slot: usize, ram: u32, words: u16, seed: u16) -> ResidentBank {
+    fn block_with(archive: &str, slot: usize, ram: u32, words: u16, seed: u16) -> ResidentClutBlock {
         let payload: Vec<u8> = (0..words).flat_map(|word| (0x8000 | (word + seed)).to_le_bytes()).collect();
-        ResidentBank::new(archive, slot, ram, &payload).expect("the bank loads into the arena")
+        ResidentClutBlock::new(archive, slot, ram, &payload).expect("the block loads into the arena")
     }
 
-    fn bank(archive: &str, slot: usize, ram: u32, words: u16) -> ResidentBank {
-        bank_with(archive, slot, ram, words, 0)
+    fn block(archive: &str, slot: usize, ram: u32, words: u16) -> ResidentClutBlock {
+        block_with(archive, slot, ram, words, 0)
     }
 
     fn sheet(slot: usize, x: u16, y: u16) -> Sheet {
@@ -481,14 +486,14 @@ mod tests {
 
     #[test]
     fn a_terrain_descriptor_splits_into_depth_page_and_clut() {
-        // 8bpp, CLUT index 5, page bank 2: page (576, 256), row 488.
+        // 8bpp, CLUT index 5, page 2: page (576, 256), row 488.
         let descriptor = (2 << 28) | (5 << 24);
         let (page_x, page_y, clut, depth) = terrain_descriptor(descriptor).expect("a live descriptor");
         assert_eq!((page_x, page_y), (576, 256));
         assert_eq!((clut.x, clut.y), (0, 488));
         assert_eq!(depth, Depth::Eight);
 
-        // 4bpp, CLUT index 3, page bank 1: page (448, 256), column 48.
+        // 4bpp, CLUT index 3, page 1: page (448, 256), column 48.
         let descriptor = (1 << 31) | (1 << 28) | (3 << 24);
         let (page_x, _, clut, depth) = terrain_descriptor(descriptor).expect("a live descriptor");
         assert_eq!(page_x, 448);
@@ -501,15 +506,15 @@ mod tests {
     fn the_terrain_rule_refuses_overlapping_sheets_and_banks() {
         let archive = "BIN/WORLD00/AREA000.EMI";
         let sheets = [sheet(7, 576, 256), sheet(8, 576, 256)];
-        let banks = [bank(archive, 3, 0x8003_3E00, 2304)];
+        let blocks = [block(archive, 3, 0x8003_3E00, 2304)];
         let descriptor = (2 << 28) | (5 << 24);
-        assert!(terrain_joins(archive, &[descriptor], &sheets, &banks.iter().collect::<Vec<_>>()).is_empty());
+        assert!(terrain_joins(archive, &[descriptor], &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty());
 
         let sheets = [sheet(7, 576, 256)];
-        let banks = [bank(archive, 3, 0x8003_3E00, 2304), bank_with(archive, 4, 0x8003_3E00, 2304, 1)];
+        let blocks = [block(archive, 3, 0x8003_3E00, 2304), block_with(archive, 4, 0x8003_3E00, 2304, 1)];
         assert!(
-            terrain_joins(archive, &[descriptor], &sheets, &banks.iter().collect::<Vec<_>>()).is_empty(),
-            "two different banks at the same row are ambiguous"
+            terrain_joins(archive, &[descriptor], &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(),
+            "two different blocks at the same row are ambiguous"
         );
     }
 
@@ -517,12 +522,12 @@ mod tests {
     fn a_terrain_join_records_the_sheet_and_the_row() {
         let archive = "BIN/WORLD00/AREA000.EMI";
         let sheets = [sheet(7, 576, 256)];
-        let banks = [bank(archive, 3, 0x8003_3E00, 2304)];
+        let blocks = [block(archive, 3, 0x8003_3E00, 2304)];
         let descriptor = (2 << 28) | (5 << 24);
-        let joins = terrain_joins(archive, &[descriptor, descriptor], &sheets, &banks.iter().collect::<Vec<_>>());
+        let joins = terrain_joins(archive, &[descriptor, descriptor], &sheets, &blocks.iter().collect::<Vec<_>>());
         assert_eq!(joins.len(), 1, "a repeated descriptor is one row");
         assert_eq!(joins[0].texture, 7);
-        assert_eq!(joins[0].palette.bank.slot, 3);
+        assert_eq!(joins[0].palette.block.slot, 3);
         assert_eq!((joins[0].clut.x, joins[0].clut.y), (0, 488));
         assert_eq!(joins[0].rule, Rule::Terrain { page_x: 576, page_y: 256 });
     }
@@ -535,19 +540,19 @@ mod tests {
     #[test]
     fn a_bank_from_another_archive_of_the_family_serves_the_row() {
         let (own, sheets, ram) = area024();
-        let other = bank("BIN/WORLD00/AREA099.EMI", 8, ram, 16);
+        let other = block("BIN/WORLD00/AREA099.EMI", 8, ram, 16);
         let joins = joins(own, &sheets, &[&other]);
         assert_eq!(joins.len(), 1);
         assert_eq!(joins[0].palette.archive, "BIN/WORLD00/AREA099.EMI");
-        assert_eq!(joins[0].palette.bank.slot, 8);
+        assert_eq!(joins[0].palette.block.slot, 8);
     }
 
     #[test]
     fn the_archives_own_bank_wins_over_the_family() {
         let (own, sheets, ram) = area024();
-        let own_bank = bank_with(own, 1, ram, 16, 3);
-        let other = bank_with("BIN/WORLD00/AREA099.EMI", 8, ram, 16, 9);
-        let joins = joins(own, &sheets, &[&own_bank, &other]);
+        let own_block = block_with(own, 1, ram, 16, 3);
+        let other = block_with("BIN/WORLD00/AREA099.EMI", 8, ram, 16, 9);
+        let joins = joins(own, &sheets, &[&own_block, &other]);
         assert_eq!(joins.len(), 1);
         assert_eq!(joins[0].palette.archive, own);
     }
@@ -555,12 +560,16 @@ mod tests {
     #[test]
     fn identical_family_banks_collapse_and_disagreeing_ones_refuse() {
         let (own, sheets, ram) = area024();
-        let same =
-            [bank_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), bank_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 7)];
+        let same = [
+            block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7),
+            block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 7),
+        ];
         assert_eq!(joins(own, &sheets, &same.iter().collect::<Vec<_>>()).len(), 1);
 
-        let different =
-            [bank_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), bank_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8)];
+        let different = [
+            block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7),
+            block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8),
+        ];
         assert!(joins(own, &sheets, &different.iter().collect::<Vec<_>>()).is_empty());
     }
 
@@ -572,9 +581,9 @@ mod tests {
         assert!(!panel.reads_page_of("BIN/BMAGIC/MAGIC218.EMI"));
         let archive = "BIN/BATTLE/BATTLE.EMI";
         let sheets = [sheet(4, 896, 256)];
-        let banks = [bank(archive, 6, 0x8003_6C00, 256)];
+        let blocks = [block(archive, 6, 0x8003_6C00, 256)];
         assert!(
-            joins(archive, &sheets, &banks.iter().collect::<Vec<_>>()).is_empty(),
+            joins(archive, &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(),
             "BATTLE's own sheet is not BATL_DRA's"
         );
     }

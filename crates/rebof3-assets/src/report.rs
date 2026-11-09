@@ -138,7 +138,7 @@ impl Report {
         let mut out = String::new();
         let _ = writeln!(
             out,
-            "{:<16} {:>7} {:>13} {:>7} {:>13}  {:<9} handling",
+            "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} handling",
             "kind", "entries", "bytes", "files", "written", "state"
         );
         let mut total = Tally::default();
@@ -148,7 +148,7 @@ impl Report {
             };
             let _ = writeln!(
                 out,
-                "{:<16} {:>7} {:>13} {:>7} {:>13}  {:<9} {}",
+                "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} {}",
                 kind.name(),
                 tally.entries,
                 tally.bytes,
@@ -164,7 +164,7 @@ impl Report {
         }
         let _ = writeln!(
             out,
-            "{:<16} {:>7} {:>13} {:>7} {:>13}",
+            "{:<17} {:>7} {:>13} {:>7} {:>13}",
             "TOTAL", total.entries, total.bytes, total.files, total.written
         );
         let coverage = self.coverage(&tallies);

@@ -15,7 +15,7 @@ use std::path::Path;
 use psx_formats::{Error, clut};
 use rebof3_emi::{Archive, Entry};
 
-/// Type-0 entries load here as CLUT banks (`wiki: formats/graphics#palette`).
+/// Type-0 entries load here as CLUT blocks (`wiki: formats/graphics#palette`).
 const CLUT_BAND: std::ops::RangeInclusive<u32> = 0x8003_3800..=0x8003_6e00;
 /// Palette entries the asset census counts in that band (575 entries,
 /// 1,119,296 bytes); the band also holds 45 other type-0 payloads.

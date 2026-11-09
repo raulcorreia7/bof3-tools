@@ -1,12 +1,12 @@
-//! The message window over every retail text bank: the font decodes, every message lays out and renders, and
-//! the banks rebuild byte for byte.
+//! The message window over every retail text table: the font decodes, every message lays out and renders, and
+//! the tables rebuild byte for byte.
 
 mod support;
 
 use std::collections::BTreeSet;
 
 use rebof3_emi::Archive;
-use rebof3_formats::message::{bank, po};
+use rebof3_formats::message::{po, table};
 use rebof3_formats::text::font::Font;
 use rebof3_formats::text::layout::{self, Context, PageEnd, Shape};
 use rebof3_formats::text::render;
@@ -16,7 +16,7 @@ use rebof3_formats::{Format, classify};
 const SHEET: usize = 3;
 const TEXT_PALETTE: usize = 8;
 const FRAME_PALETTE: usize = 9;
-/// The largest retail bank, in bytes.
+/// The largest retail table, in bytes.
 const LARGEST: usize = 21547;
 
 fn font(root: &std::path::Path) -> Font {
@@ -31,7 +31,7 @@ fn font(root: &std::path::Path) -> Font {
 fn every_retail_message_lays_out_renders_and_rebuilds() {
     let Some(root) = support::retail_root() else { return };
     let font = font(&root);
-    let (mut banks, mut messages, mut pages, mut proven, mut rebuilt) = (0, 0, 0, 0, 0);
+    let (mut tables, mut messages, mut pages, mut proven, mut rebuilt) = (0, 0, 0, 0, 0);
     let (mut choices, mut runtime, mut blank, mut missing_glyphs) = (0, 0, 0, BTreeSet::new());
     let (mut wide, mut largest, mut catalogues) = (0, 0, 0);
     for path in rebof3_emi::archives_under(&root) {
@@ -39,21 +39,21 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
         let archive = Archive::parse(&bytes).unwrap();
         for index in 0..archive.entries().len() {
             let payload = archive.payload(&bytes, index).unwrap();
-            if classify(&archive.entries()[index], payload) != Format::AreaMessageBank {
+            if classify(&archive.entries()[index], payload) != Format::AreaMessageTable {
                 continue;
             }
-            let Ok(parsed) = bank::parse(payload) else { continue };
-            if rebof3_formats::text::discover::bank_records(payload).is_none() {
+            let Ok(parsed) = table::parse(payload) else { continue };
+            if rebof3_formats::text::discover::table_records(payload).is_none() {
                 continue;
             }
-            banks += 1;
+            tables += 1;
             largest = largest.max(payload.len());
-            rebuilt += usize::from(bank::build(&parsed).ok().as_deref() == Some(payload));
+            rebuilt += usize::from(table::build(&parsed).ok().as_deref() == Some(payload));
             let catalogue = po::export(payload).unwrap();
             catalogues += usize::from(po::import(&catalogue, payload).ok().as_deref() == Some(payload));
             for message in &parsed.messages {
                 messages += 1;
-                let laid = layout::layout(message, Context { bank: Some(payload), runtime: None });
+                let laid = layout::layout(message, Context { table: Some(payload), runtime: None });
                 proven += usize::from(laid.unproven.is_empty());
                 for page in &laid.pages {
                     pages += 1;
@@ -82,12 +82,12 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
         }
     }
     assert_eq!(
-        (banks, messages, pages, proven, rebuilt, choices, runtime, blank, wide),
+        (tables, messages, pages, proven, rebuilt, choices, runtime, blank, wide),
         (165, 10510, 18540, 7933, 165, 721, 3139, 9, 492),
-        "banks, messages, pages, messages without runtime text, byte-exact banks, choices, runtime placeholders, blank pages, pages wider than the window"
+        "tables, messages, pages, messages without runtime text, byte-exact tables, choices, runtime placeholders, blank pages, pages wider than the window"
     );
-    assert_eq!(catalogues, 165, "banks whose PO catalogue rebuilds them byte for byte");
-    assert!(largest <= bank::LIMIT, "the largest retail bank, {largest} bytes, is within the limit");
+    assert_eq!(catalogues, 165, "tables whose PO catalogue rebuilds them byte for byte");
+    assert!(largest <= table::LIMIT, "the largest retail table, {largest} bytes, is within the limit");
     assert_eq!(largest, LARGEST);
     // 0xFF is the one drawn byte the font sheet has no glyph for.
     assert_eq!(missing_glyphs.into_iter().collect::<Vec<_>>(), [0xFF]);
@@ -102,8 +102,8 @@ fn a_retail_window_renders_to_png() {
     let Ok(bytes) = bytes else { return };
     let archive = Archive::parse(&bytes).unwrap();
     let payload = archive.payload(&bytes, 18).unwrap();
-    let parsed = bank::parse(payload).unwrap();
-    let laid = layout::layout(&parsed.messages[1], Context { bank: Some(payload), runtime: None });
+    let parsed = table::parse(payload).unwrap();
+    let laid = layout::layout(&parsed.messages[1], Context { table: Some(payload), runtime: None });
     let image =
         render::window(&font, &laid.pages[0], laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
     let png = psx_formats::gfx::png::rgba_png(image.width as u32, image.height as u32, &image.pixels);

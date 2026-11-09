@@ -41,7 +41,7 @@ pub fn sep(archive_path: impl AsRef<Path>, index: usize) -> Result<Package> {
     Ok(Package::parse(&read_entry(archive_path, index)?)?)
 }
 
-/// Decodes entry `index` as a CLUT bank.
+/// Decodes entry `index` as a CLUT block.
 pub fn palette(archive_path: impl AsRef<Path>, index: usize) -> Result<Palette> {
     Ok(Palette::decode(&read_entry(archive_path, index)?)?)
 }

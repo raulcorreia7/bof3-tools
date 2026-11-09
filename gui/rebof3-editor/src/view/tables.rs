@@ -6,7 +6,7 @@ use gpui::{AnyElement, Context, Div, anchored, deferred, div, prelude::*, px};
 use super::{Entry, Field, Menu, editing_menu, input};
 use crate::app::{Editor, Menu as WindowMenu};
 use crate::fonts;
-use crate::schema::{self, Column, Field as Kind, Names, Sheet};
+use crate::schema::{self, Column, Field as Kind, Names, Table};
 use crate::theme::{EDITED, MUTED, RAISED, color};
 use crate::widgets::{
     GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, menu_item, menu_panel, muted, separator, strong, tab,
@@ -27,7 +27,7 @@ pub struct State {
 }
 
 /// The sheets of the shown entry.
-fn sheets(entry: &Entry<'_>) -> Vec<Sheet> {
+fn sheets(entry: &Entry<'_>) -> Vec<Table> {
     schema::sheets_for(&entry.archive.path.0, entry.index, entry.format())
 }
 
@@ -132,7 +132,7 @@ fn width(column: &Column) -> f32 {
     }
 }
 
-fn row_name(payload: &[u8], sheet: &Sheet, row: usize) -> Option<String> {
+fn row_name(payload: &[u8], sheet: &Table, row: usize) -> Option<String> {
     let column = sheet.columns.iter().find(|column| matches!(column.field, Kind::Name(_)))?;
     Some(schema::name_text(&payload[sheet.range(row)], column))
 }

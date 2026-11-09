@@ -2,7 +2,7 @@
 //!
 //! The upload's VRAM words read at 4, 8 or 16 bits per texel. A 4- or 8-bit texture is drawn with a
 //! palette row: one a rule joins to it in the scene that loads it (`rebof3_emi::texture::scene`),
-//! a suggested row of that scene (`rebof3_emi::texture::suggest`), a row of a palette bank in the
+//! a suggested row of that scene (`rebof3_emi::texture::suggest`), a row of a CLUT block in the
 //! same archive, or a grey ramp. A suggestion is listed, never chosen for the user. Painting writes
 //! texel indices (or 16-bit colors) back into the words and the words back into the upload's
 //! rectangles.
@@ -82,9 +82,9 @@ enum Source {
     Joined(usize),
     /// A row the suggestion ranks, which no rule names.
     Suggested(usize),
-    /// Row `row` of the palette bank in entry `bank`.
-    Bank {
-        bank: usize,
+    /// Row `row` of the CLUT block in entry `block`.
+    ClutBlock {
+        block: usize,
         row: usize,
     },
     Grey,
@@ -224,8 +224,8 @@ fn palette(entry: &Entry<'_>, state: &State, depth: Depth) -> Vec<u16> {
     match &state.source {
         Source::Joined(at) => state.joined.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Suggested(at) => state.suggested.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
-        Source::Bank { bank, row } => {
-            words_of(entry.sibling(*bank)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
+        Source::ClutBlock { block, row } => {
+            words_of(entry.sibling(*block)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
         }
         Source::Grey => (0..colors).map(|index| grey(index, colors)).collect(),
     }
@@ -490,7 +490,7 @@ fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut C
     column.child(inks)
 }
 
-/// The open chooser of palette rows: joined rows, the rows of every palette bank, and the grey ramp.
+/// The open chooser of palette rows: joined rows, the rows of every CLUT block, and the grey ramp.
 fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Editor>) -> gpui::Stateful<Div> {
     let state = &editor.views.texture;
     let mut choices: Vec<(Source, String, Option<String>)> = Vec::new();
@@ -500,13 +500,13 @@ fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Ed
     for (at, row) in state.suggested.iter().enumerate().filter(|(_, row)| row.depth == depth) {
         choices.push((Source::Suggested(at), label(row, "suggested"), Some(row.evidence.clone())));
     }
-    for (bank, format) in entry.archive.formats.iter().enumerate() {
-        if *format != Format::ClutBank {
+    for (block, format) in entry.archive.formats.iter().enumerate() {
+        if *format != Format::ClutBlock {
             continue;
         }
-        let rows = entry.sibling(bank).len() / 2 / depth.colors();
+        let rows = entry.sibling(block).len() / 2 / depth.colors();
         for row in 0..rows {
-            choices.push((Source::Bank { bank, row }, format!("bank {bank} row {row}"), None));
+            choices.push((Source::ClutBlock { block, row }, format!("block {block} row {row}"), None));
         }
     }
     choices.push((Source::Grey, "grey ramp".into(), None));
@@ -549,7 +549,7 @@ fn describe(source: &Source, state: &State) -> String {
     match source {
         Source::Joined(at) => state.joined.get(*at).map_or("joined row".into(), |row| label(row, "joined")),
         Source::Suggested(at) => state.suggested.get(*at).map_or("suggested row".into(), |row| label(row, "suggested")),
-        Source::Bank { bank, row } => format!("bank {bank} row {row}"),
+        Source::ClutBlock { block, row } => format!("block {block} row {row}"),
         Source::Grey => "grey ramp".into(),
     }
 }

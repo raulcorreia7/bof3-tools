@@ -37,11 +37,11 @@ use crate::gltf::{self, Primitive};
 pub const HEIGHT_SCALE: i32 = 16;
 /// The side of the texel block a tile with mode `0` names, in texels.
 pub const BLOCK_TEXELS: u16 = 16;
-/// The tile-bank selector a tile descriptor names: bits 28-29.
+/// The page selector a tile descriptor names: bits 28-29.
 const SELECTOR_SHIFT: u32 = 28;
 /// The tile mode: bits 8-11, `0` for the 16x16 block.
 const MODE_SHIFT: u32 = 8;
-/// The bit that picks the quad bank over the rectangle bank.
+/// The bit that picks the quad table over the rectangle table.
 const QUAD_BIT: u32 = 1 << 11;
 /// The corner-order flags. Bit 18 turns the corners a quarter, bit 16 flips them across `x` and bit
 /// 17 across `z` (`@0x80155560`, `:119-157`).
@@ -60,7 +60,7 @@ const COORDINATE_SPAN: f32 = 256.0;
 pub struct Terrain {
     /// The mesh: one quad per cell, grouped by material.
     pub obj: String,
-    /// One material per tile-bank selector, with no texture.
+    /// One material per page selector, with no texture.
     pub mtl: String,
 }
 
@@ -76,7 +76,7 @@ pub struct Mesh {
     pub positions: Vec<[i32; 3]>,
     /// Texture coordinates per corner, in bytes of a texture page that no field names.
     pub uvs: Vec<[u16; 2]>,
-    /// The tile-bank selector of each cell: the material it is drawn with.
+    /// The page selector of each cell: the material it is drawn with.
     pub selectors: Vec<u8>,
     /// The height-byte table, one signed byte per cell, when the payload ships it. The height query
     /// reads it; the mesh does not.
@@ -121,7 +121,7 @@ pub fn of_mesh(mesh: &Mesh, mtl_name: &str) -> Terrain {
     for cell in 0..cells {
         let selector = mesh.selectors[cell];
         if current != Some(selector) {
-            writeln!(obj, "usemtl bank{selector}").expect("a String never fails");
+            writeln!(obj, "usemtl page{selector}").expect("a String never fails");
             current = Some(selector);
         }
         for [x, y, z] in &mesh.positions[4 * cell..4 * cell + 4] {
@@ -138,7 +138,7 @@ pub fn of_mesh(mesh: &Mesh, mtl_name: &str) -> Terrain {
     let mut mtl =
         String::from("# Materials carry no texture: a tile's page and palette are not named by the payload.\n");
     for selector in 0..SELECTORS {
-        writeln!(mtl, "newmtl bank{selector}\nKd 1.0 1.0 1.0\n").expect("a String never fails");
+        writeln!(mtl, "newmtl page{selector}\nKd 1.0 1.0 1.0\n").expect("a String never fails");
     }
     Terrain { obj, mtl }
 }
@@ -153,7 +153,7 @@ pub fn from_payload(payload: &[u8], mtl_name: &str) -> Result<Terrain> {
     Ok(of_mesh(&mesh_from_payload(payload)?, mtl_name))
 }
 
-/// The terrain as a binary glTF (`.glb`), with one primitive per tile-bank material and the same
+/// The terrain as a binary glTF (`.glb`), with one primitive per page material and the same
 /// corners as the OBJ. Each quad is two triangles that face up: corners 0, 2, 3 and 0, 3, 1. Returns
 /// `None` when the mesh has no cell.
 pub fn glb_of_mesh(mesh: &Mesh, name: &str) -> Option<Vec<u8>> {
@@ -211,16 +211,16 @@ fn glb_with(mesh: &Mesh, name: &str, colours: Option<&[[f32; 4]]>, nodes: &[gltf
         ]);
     }
     primitives.retain(|primitive| !primitive.indices.is_empty());
-    let materials: Vec<String> = (0..SELECTORS).map(|selector| format!("bank{selector}")).collect();
+    let materials: Vec<String> = (0..SELECTORS).map(|selector| format!("page{selector}")).collect();
     let names: Vec<&str> = materials.iter().map(String::as_str).collect();
     gltf::glb_with(name, &positions, &uvs, colours, &primitives, &names, nodes)
 }
 
-/// The tile-bank selector and the four texture-coordinate corners of a cell, in corner order.
+/// The page selector and the four texture-coordinate corners of a cell, in corner order.
 ///
 /// A cell with grid value `0` is empty and has the zero tile. Otherwise the grid value indexes the
 /// descriptor words. Mode `0` names a 16x16 block from the descriptor's low byte. Otherwise bit 11
-/// picks the rectangle bank (index `descriptor & 0xFF`) or the quad bank (index `descriptor & 0x7FF`).
+/// picks the rectangle table (index `descriptor & 0xFF`) or the quad table (index `descriptor & 0x7FF`).
 fn tile(bundle: &MapBundle, cell: usize) -> (usize, [[u8; 2]; 4]) {
     match descriptor(bundle, cell) {
         Some(descriptor) => tile_of(bundle, descriptor),
@@ -228,7 +228,7 @@ fn tile(bundle: &MapBundle, cell: usize) -> (usize, [[u8; 2]; 4]) {
     }
 }
 
-/// The tile-bank selector and the four texture-coordinate corners of a descriptor word, in corner
+/// The page selector and the four texture-coordinate corners of a descriptor word, in corner
 /// order (`func_80155560`).
 pub(super) fn tile_of(bundle: &MapBundle, descriptor: u32) -> (usize, [[u8; 2]; 4]) {
     let selector = ((descriptor >> SELECTOR_SHIFT) & 3) as usize;

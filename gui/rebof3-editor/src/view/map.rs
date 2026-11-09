@@ -1,4 +1,4 @@
-//! An area map bundle seen from above: one square per cell. A cell's hue is its tile bank and its
+//! An area map bundle seen from above: one square per cell. A cell's hue is its texture page and its
 //! brightness the mean of its four corner heights; a cell with no tile is left out.
 //!
 //! The textured mode draws each cell's tile instead, read from the VRAM of the area's own scene
@@ -38,11 +38,11 @@ const PANEL_WIDTH: f32 = 220.0;
 /// The alpha of a cell with no tile, and of a drawn cell.
 const EMPTY: u8 = 0;
 const OPAQUE: u8 = 0xFF;
-/// The darkest and brightest a cell's colour gets, as a fraction of its bank's hue.
+/// The darkest and brightest a cell's colour gets, as a fraction of its page's hue.
 const LOW_SHADE: f32 = 0.35;
 const HIGH_SHADE: f32 = 1.0;
-/// One hue per tile-bank selector (bits 28-29 of the tile descriptor).
-const BANK_HUES: [[u8; 3]; 4] = [[0x6F, 0xB8, 0x5A], [0x5A, 0x8F, 0xD0], [0xD0, 0xA0, 0x4F], [0xB8, 0x6A, 0xC8]];
+/// One hue per page selector (bits 28-29 of the tile descriptor).
+const PAGE_HUES: [[u8; 3]; 4] = [[0x6F, 0xB8, 0x5A], [0x5A, 0x8F, 0xD0], [0xD0, 0xA0, 0x4F], [0xB8, 0x6A, 0xC8]];
 /// The corners in stored order, as the mesh builder places them.
 const CORNER_NAMES: [&str; CELL_BYTES] = ["near", "east", "south", "far"];
 
@@ -53,7 +53,7 @@ pub struct State {
     /// The cell under the pointer.
     hover: Option<usize>,
     image: Rc<Shared<Bounds<Pixels>>>,
-    /// Draw the cells flat, by tile bank and height, instead of textured.
+    /// Draw the cells flat, by texture page and height, instead of textured.
     flat: bool,
     /// The textured view of the shown entry, when its area's scene replays.
     textured: Option<Rc<Textured>>,
@@ -114,7 +114,7 @@ fn mean_heights(bundle: &MapBundle) -> Vec<i32> {
         .collect()
 }
 
-/// One RGBA pixel per cell, row-major: the cell's bank hue, darker for a lower cell. A cell whose grid
+/// One RGBA pixel per cell, row-major: the cell's page hue, darker for a lower cell. A cell whose grid
 /// value is 0 holds no tile and draws nothing.
 pub fn cell_colors(bundle: &MapBundle) -> Vec<[u8; 4]> {
     let heights = mean_heights(bundle);
@@ -129,7 +129,7 @@ pub fn cell_colors(bundle: &MapBundle) -> Vec<[u8; 4]> {
                 return [0, 0, 0, EMPTY];
             }
             let shade = LOW_SHADE + (HIGH_SHADE - LOW_SHADE) * (heights[cell] - low) as f32 / span;
-            let [red, green, blue] = BANK_HUES[usize::from(selectors[cell]) % BANK_HUES.len()];
+            let [red, green, blue] = PAGE_HUES[usize::from(selectors[cell]) % PAGE_HUES.len()];
             let scale = |channel: u8| (f32::from(channel) * shade).round() as u8;
             [scale(red), scale(green), scale(blue), OPAQUE]
         })
@@ -257,7 +257,7 @@ fn modes(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div {
             editor.views.map.flat = false;
             cx.notify();
         })))
-        .child(tab("map-flat", "Banks and heights", shown.is_none()).on_click(cx.listener(|editor, _, _, cx| {
+        .child(tab("map-flat", "Pages and heights", shown.is_none()).on_click(cx.listener(|editor, _, _, cx| {
             editor.views.map.flat = true;
             cx.notify();
         })));
