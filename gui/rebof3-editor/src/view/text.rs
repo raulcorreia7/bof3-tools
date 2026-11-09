@@ -1,4 +1,8 @@
-//! The strings of an entry: a message table's records, or the strings a scan finds in any other payload.
+//! The strings of an entry: a message table's records, or the strings a scan finds in any other
+//! payload.
+//!
+//! A string is rewritten in place. New text must encode to no more bytes than the old string took;
+//! the rest of its span is filled with terminators, so no offset table or pointer moves.
 
 use gpui::{AnyElement, Context, div, prelude::*, px};
 use rebof3_emi::text::codec::{self, Encoding};
@@ -170,7 +174,8 @@ mod tests {
         out
     }
 
-    /// Every retail string lays out as message windows, and the windows print every glyph of the string in order.
+    /// Every retail string lays out as message windows, and the windows print every glyph of the string in
+    /// order. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_string_prints_all_its_glyphs() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };

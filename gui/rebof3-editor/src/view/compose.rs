@@ -1,5 +1,9 @@
-//! A message table as the player sees it: each message drawn in the game's font and window, page by page, with the
-//! findings of `rebof3_formats::text::check` and an editor that rebuilds the table.
+//! A message table as the player sees it: each message drawn in the game's font and window, page by page,
+//! with the findings of `rebof3_formats::text::check` and an editor that rebuilds the table.
+//!
+//! The font is read from `ETC/FIRST.EMI` (`rebof3_formats::text::font`). The preview is the window alone over a
+//! black backdrop, since the field behind it is the game's. A message edit is encoded, put in the table and the table
+//! rebuilt; it is refused when the text cannot be encoded or the table would outgrow its space.
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -181,7 +185,8 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     div().flex().gap(px(GAP)).child(list).child(preview).into_any_element()
 }
 
-/// Rewrites message `index` of the shown table from `text`.
+/// Rewrites message `index` of the shown table from `text`. Refuses text the codec cannot encode, an empty message
+/// and a table that would outgrow its space.
 pub fn message_changed(editor: &mut Editor, index: usize, text: &str) -> Option<String> {
     let entry = editor.current()?;
     let mut parsed = match table::parse(entry.payload()) {

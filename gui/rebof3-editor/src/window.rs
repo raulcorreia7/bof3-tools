@@ -1,5 +1,5 @@
-//! Drawing the editor window: a menu bar, the archive browser on the left, the entry list next to it, the entry views
-//! in the middle and a status line at the bottom.
+//! Drawing the editor window: a menu bar, the archive browser on the left, the entry list next to
+//! it, the entry views in the middle and a status line at the bottom.
 
 use gpui::{
     AnyElement, ClickEvent, Context, Div, FontWeight, IntoElement, Render, Window, anchored, deferred, div, prelude::*,
@@ -48,6 +48,8 @@ impl Render for Editor {
         div()
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::on_key))
+            // A press closes the open field and starts the undo step of what the press does; the release
+            // ends it, so one undo takes back a whole drag.
             .capture_any_mouse_down(cx.listener(|editor, _, _, _| {
                 editor.stop_editing();
                 editor.begin_step();

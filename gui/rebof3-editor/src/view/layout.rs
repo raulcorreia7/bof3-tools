@@ -1,5 +1,17 @@
-//! The VRAM layout of a scene, in the manner of a texture-packing tool: every texture and palette placement as a
-//! labelled rectangle, the collisions between them, and each entry's depth.
+//! The VRAM layout of a scene, in the manner of a texture-packing tool: every texture and palette
+//! placement as a labelled rectangle, the collisions between them, and each entry's depth.
+//!
+//! A studio laid textures and CLUTs out in VRAM by hand and wrote the coordinates into TIM headers.
+//! This game states them in two places. A type-3 entry's load argument names its column, row and
+//! width; a type-0 CLUT block's load address names where it sits in the palette arena, and the
+//! arena reaches VRAM in one upload at (0, 480). Moving either rewrites that one table field, which
+//! the project keeps as a placement edit and rebuilds byte for byte when it is set back. Everything
+//! else the replay writes (palette words of a compressed block, uploads by named code) is placed by
+//! code and cannot move here. The draw sites in the executable and overlays name pages and rows as
+//! literals, so a moved texture is no longer found by them; the detail lists those sites.
+//!
+//! The placements come from the replay's archives with the project's placements applied, not from
+//! the VRAM the replay ends with, so an upload a later one overwrites still shows, and the overlap shows.
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -113,8 +125,8 @@ impl Step {
     const ALL: [(Step, &'static str); 4] = [(Step::Left, "◀"), (Step::Right, "▶"), (Step::Up, "▲"), (Step::Down, "▼")];
 }
 
-/// The rectangles a CLUT block covers in VRAM: the arena row it starts in, the whole rows after it, and the part of
-/// the row it ends in.
+/// The rectangles a CLUT block covers in VRAM: the arena row it starts in, the whole rows after it,
+/// and the part of the row it ends in.
 fn palette_rects(arena_word: usize, words: usize) -> Vec<Rect> {
     let row_words = usize::from(ARENA_ROW_WORDS);
     let words = words.min((usize::from(VRAM_HEIGHT - ARENA_VRAM_ROW) * row_words).saturating_sub(arena_word));
@@ -142,8 +154,8 @@ fn palette_rects(arena_word: usize, words: usize) -> Vec<Rect> {
     rects
 }
 
-/// Every placement the scene's archives make, with the project's placements applied, then the writes the replay shows
-/// that no entry's data places.
+/// Every placement the scene's archives make, with the project's placements applied, then the
+/// writes the replay shows that no entry's data places.
 pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
     let mut placed = Vec::new();
     let mut seen = BTreeSet::new();
@@ -237,7 +249,8 @@ fn depth_text(depths: &BTreeSet<u32>) -> String {
     }
 }
 
-/// The overlaps between placements.
+/// The overlaps between placements. Placements set in code are not compared: the palette arena upload
+/// alone covers every block.
 pub fn collisions(placed: &[Placed]) -> Vec<Collision> {
     let mut found = Vec::new();
     for (first, one) in placed.iter().enumerate().filter(|(_, placed)| placed.kind != Kind::Code) {
@@ -644,8 +657,9 @@ mod tests {
         assert_eq!(found, vec![Collision { first: 0, second: 1, area: at(32, 480, 32, 1) }]);
     }
 
-    /// AREA024's scene: its texture and block are placed from the type-3 entry and the arena, a move there and back
-    /// leaves the project unedited, and the archive rebuilds as it was.
+    /// AREA024's scene: its texture and block are placed from the type-3 entry and the arena, a move
+    /// there and back leaves the project unedited, and the archive rebuilds as it was.
+    /// Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn a_retail_scene_lays_out_and_moves_back() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };

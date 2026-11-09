@@ -1,5 +1,6 @@
-//! What the area view reads and draws, without the window: the area's decoded entries, the render scene built from
-//! them, the cameras and the edits.
+//! What the area view reads and draws, without the window: the area's decoded entries, the render
+//! scene built from them, the cameras and the edits. Every edit returns a whole new payload in which
+//! only the edited bytes differ, so an untouched entry rebuilds byte for byte.
 
 use rebof3_emi::replay::Vram;
 use rebof3_emi::texture::scene::resolve;
@@ -16,8 +17,9 @@ use rebof3_render::math::{self, rot_matrix};
 use rebof3_render::{Blend, Camera, Depth, Primitive, Scene, Texture};
 use serde_json::json;
 
-/// The load addresses of the area entries the view reads beside the bundle: the packed battle grid (`func_801C6FD4`),
-/// the scene table (`Area_FindSceneRecord`) and the encounter block (`Area_PickEncounter`).
+/// The load addresses of the area entries the view reads beside the bundle: the packed battle grid
+/// (`func_801C6FD4`), the scene table (`Area_FindSceneRecord`) and the encounter block
+/// (`Area_PickEncounter`).
 pub const BATTLE_GRID: u32 = 0x8003_2000;
 pub const SCENE_TABLE: u32 = 0x800E_3800;
 pub const ENCOUNTERS: u32 = 0x800E_4000;
@@ -49,7 +51,8 @@ const FIXED_ONE: f32 = 65536.0;
 /// The empty slot of an encounter row.
 pub const EMPTY_SLOT: u8 = 0xFF;
 
-/// What the view shows over the terrain.
+/// What the view shows over the terrain. The cell layers paint in the order below, and the first one
+/// that has something to say about a cell colours it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Layers {
     pub terrain: bool,
@@ -217,8 +220,8 @@ impl Area {
     }
 }
 
-/// Walks the area's setup stream (`g_AreaLoads[area]` word 0) and joins each placing record to the scene record its
-/// id names.
+/// Walks the area's setup stream (`g_AreaLoads[area]` word 0) and joins each placing record to the
+/// scene record its id names.
 fn read_actors(
     exe: &Executable<'_>,
     area: usize,
@@ -265,7 +268,9 @@ impl View {
         Self::Game { x2: area.bundle.width.into(), y2: area.bundle.height.into() }
     }
 
-    /// The camera transform.
+    /// The camera transform. The game camera is `RotMatrix(angle)` over the GTE's world axes
+    /// (`to_gte`: model `x`, model `z`, minus model `y`), translated so the followed point sits on the
+    /// axis at the view distance, as `Area_UpdateCamera` places it.
     pub fn camera(&self, area: &Area) -> Camera {
         match *self {
             View::Orbit { target, yaw, pitch, distance } => Camera::orbit(target, yaw, pitch, distance, ORBIT_FOV),
@@ -308,7 +313,8 @@ impl Hit {
     }
 }
 
-/// The render scene of an area: the terrain, the shown cell layers and the actor markers.
+/// The render scene of an area: the terrain, the shown cell layers and the actor markers. The picked
+/// quad or actor draws highlighted.
 pub fn scene(area: &Area, layers: Layers, camera: &Camera, picked: Option<Hit>) -> Scene {
     let mut primitives = Vec::with_capacity(area.quads.len() * 2);
     for (index, quad) in area.quads.iter().enumerate() {
@@ -626,7 +632,8 @@ pub fn with_corner(payload: &[u8], cell: usize, corner: usize, height: i8) -> Re
     })
 }
 
-/// The bundle with every corner of `cell` moved by `steps`.
+/// The bundle with every corner of `cell` moved by `steps`. A corner is a signed byte, so a move that
+/// would leave it is refused.
 pub fn with_raised(payload: &[u8], cell: usize, steps: i8) -> Result<Vec<u8>, String> {
     edit_bundle(payload, |bundle| {
         let record = bundle.cells.get_mut(cell).ok_or("no such cell")?;
@@ -646,7 +653,8 @@ pub fn with_code(payload: &[u8], cell: usize, code: u8) -> Result<Vec<u8>, Strin
     })
 }
 
-/// The bundle with `field` of descriptor `index` set to `value`.
+/// The bundle with `field` of descriptor `index` set to `value`. Every quad that names the
+/// descriptor changes with it.
 pub fn with_tile_field(payload: &[u8], index: usize, field: TileField, value: u32) -> Result<Vec<u8>, String> {
     let mut bundle = MapBundle::decode(payload).map_err(|error| error.to_string())?;
     let word = bundle.records.get_mut(index).ok_or("no such descriptor")?;
@@ -657,7 +665,8 @@ pub fn with_tile_field(payload: &[u8], index: usize, field: TileField, value: u3
     Ok(bundle.encode())
 }
 
-/// Decodes the bundle, edits it, and encodes it.
+/// Decodes the bundle, edits it, and encodes it. The encoder writes the decoded sections back in
+/// place, and an edit changes no section's length, so every other byte stays.
 fn edit_bundle(
     payload: &[u8],
     edit: impl FnOnce(&mut MapBundle) -> Result<(), &'static str>,
@@ -698,8 +707,8 @@ pub fn with_actor_facing(area: &Area, actor: usize, facing: u8) -> Result<Vec<u8
     setup::with_facing(program, &actor.record, facing).map_err(|error| error.to_string())
 }
 
-/// The area program with actor `actor` naming scene id `scene`, which must be a row of the area's scene table: the id
-/// selects the sprite page, CLUT row and script section.
+/// The area program with actor `actor` naming scene id `scene`, which must be a row of the area's
+/// scene table: the id selects the sprite page, CLUT row and script section.
 pub fn with_actor_scene(area: &Area, actor: usize, scene: u16) -> Result<Vec<u8>, String> {
     let (actor, program) = actor_and_program(area, actor)?;
     if !area.scenes.iter().any(|record| record.id == scene) {
@@ -714,8 +723,9 @@ fn actor_and_program(area: &Area, actor: usize) -> Result<(&Actor, &[u8]), Strin
     Ok((actor, program))
 }
 
-/// The encounter block with slot `slot` of row `row` set: slots `0` to `7` are enemy indexes ([`EMPTY_SLOT`] for
-/// none), slot `8` the appearance rate.
+/// The encounter block with slot `slot` of row `row` set: slots `0` to `7` are enemy indexes
+/// ([`EMPTY_SLOT`] for none), slot `8` the appearance rate. An index past the block's enemy records
+/// is refused.
 pub fn with_encounter(block: &[u8], row: usize, slot: usize, value: u8) -> Result<Vec<u8>, String> {
     let parsed = EncounterBlock::parse(block).map_err(|error| error.to_string())?;
     let mut encounter = *parsed.encounters.get(row).ok_or("no such encounter row")?;
@@ -742,8 +752,11 @@ fn actor_node(index: usize) -> String {
     format!("actor {index}")
 }
 
-/// The area as a binary glTF: the terrain mesh with its grey levels as vertex colours ([`terrain::glb_of_bundle`]),
-/// then named nodes.
+/// The area as a binary glTF: the terrain mesh with its grey levels as vertex colours
+/// ([`terrain::glb_of_bundle`]), then named nodes. `cells` holds the byte codes and the battle grid;
+/// `actors` holds one `actor N` node per actor, at its place on the ground; `encounters` holds the
+/// formations and one `zone N` node per zone row, at the rectangle's centre. The mesh's units are a
+/// cell across and a height step of [`HEIGHT_SCALE`] up.
 pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
     let bundle = &area.bundle;
     let mut cells = terrain::cells_node(bundle);
@@ -832,8 +845,10 @@ pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
     terrain::glb_of_bundle(bundle, name, &nodes)
 }
 
-/// What a glTF carries back: the bundle with the mesh's corner heights ([`terrain::import`]), and the area program
-/// with each actor at its `actor N` node.
+/// What a glTF carries back: the bundle with the mesh's corner heights ([`terrain::import`]), and the
+/// area program with each actor at its `actor N` node. A node's height is not read: the ground gives
+/// it. A node off the half-cell grid or outside the map is refused. The program is `None` when no
+/// actor moved.
 pub fn import(area: &Area, bundle: &[u8], glb: &[u8]) -> Result<(Vec<u8>, Option<Vec<u8>>), String> {
     let rebuilt = terrain::import(glb, bundle).map_err(|error| error.to_string())?;
     let Some((_, original)) = &area.program else { return Ok((rebuilt, None)) };

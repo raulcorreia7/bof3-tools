@@ -1,5 +1,5 @@
-//! A scene's replayed VRAM, from the project's archives with their edits: what the VRAM view shows and where the
-//! texture view finds its joins and resident palette rows.
+//! A scene's replayed VRAM, from the project's archives with their edits: what the VRAM view shows
+//! and where the texture view finds its joins and resident palette rows.
 
 use std::rc::Rc;
 
@@ -33,7 +33,8 @@ pub fn catalog(project: &Project) -> Vec<Scene> {
     scenes::catalog(project.archives.iter().map(|path| path.0.as_str()))
 }
 
-/// Replays `scene` over the project, reading any archive it has not read yet.
+/// Replays `scene` over the project, reading any archive it has not read yet. An archive the disc
+/// lacks is skipped and named in [`Vram::missing`].
 pub fn replay(project: &mut Project, scene: &Scene) -> Rc<Replayed> {
     for path in scene.archives() {
         let _ = project.load(&ArchivePath(path.to_string()));

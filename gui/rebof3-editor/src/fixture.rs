@@ -1,5 +1,5 @@
-//! A synthetic disc for the tests: one archive of entries built in code, so a test can open a project without the
-//! retail disc.
+//! A synthetic disc for the tests: one archive of entries built in code, so a test can open a project
+//! without the retail disc.
 
 use std::fs;
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ pub struct Entry<'a> {
 pub struct Disc(PathBuf);
 
 impl Disc {
-    /// A disc whose one archive, [`ARCHIVE`], holds `entries`.
+    /// A disc whose one archive, [`ARCHIVE`], holds `entries`. `name` keeps the folders of two tests apart.
     pub fn new(name: &str, entries: &[Entry<'_>]) -> Self {
         Self::with_archives(name, &[(ARCHIVE, entries)])
     }

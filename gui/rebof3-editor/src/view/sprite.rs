@@ -1,6 +1,17 @@
 //! A character sprites as the game shows it (`rebof3_formats::sprite`, `wiki: formats/character`): each section's
-//! animations played at the game's tick, every frame stitched through the VRAM model, the frame sheet the cells cut
-//! from, and the palettes.
+//! animations played at the game's tick, every frame stitched through the VRAM model, the frame sheet
+//! the cells cut from, and the palettes.
+//!
+//! The frame is drawn from a [`Stage`]: the sheet and the palette written into VRAM where the character sprites'
+//! reader puts them, then read back through the texture page and CLUT the draw sets. The palette is
+//! the one the reader loads when the reader is traced ([`Reader::palette`]); otherwise the frame is
+//! drawn in grey by texel index and the palettes are listed as a ranked suggestion that the user
+//! applies. A pixel whose colour the staged palette does not give is drawn in the marker colour, and
+//! cell texels outside the sheet are counted, not guessed.
+//!
+//! A palette edit writes the colour in place; an imported sprite sheet rewrites the section. Both go
+//! back through `rebof3_assets::sprites`, so an unchanged sprites keeps its stored bytes and an LZ77
+//! entry is packed again only when it changed.
 
 use std::cell::Cell as Shared;
 use std::path::{Path, PathBuf};
@@ -52,8 +63,8 @@ const LINE: f32 = 1.0;
 const CROSS: f32 = 6.0;
 /// The width of the animation list.
 const LIST_WIDTH: f32 = 330.0;
-/// Ticks a step with delay byte 0 lasts: the step function decrements the byte before it tests for zero, so 0 wraps
-/// through 255.
+/// Ticks a step with delay byte 0 lasts: the step function decrements the byte before it tests
+/// for zero, so 0 wraps through 255.
 const ZERO_DELAY_TICKS: u32 = 256;
 
 /// A palette the frame is drawn with.
@@ -227,8 +238,8 @@ impl State {
     }
 }
 
-/// Decodes the shown sprites, reads `g_SpriteSizes` and stages the shown sheet and palette, each when what it reads
-/// changed.
+/// Decodes the shown sprites, reads `g_SpriteSizes` and stages the shown sheet and palette, each when what
+/// it reads changed.
 pub fn prepare(editor: &mut Editor) {
     let Some(entry) = editor.current() else { return };
     let Some(project) = editor.project.as_ref() else { return };
@@ -838,7 +849,7 @@ fn play(editor: &mut Editor, cx: &mut Context<Editor>) {
     .detach();
 }
 
-/// Plays the ticks due since the clock of play `generation` started.
+/// Plays the ticks due since the clock of play `generation` started. Returns false once that play ended.
 fn advance(editor: &mut Editor, generation: u64) -> bool {
     let state = &mut editor.views.sprite;
     let Some(mut clock) = state.clock.filter(|clock| clock.generation == generation) else { return false };
@@ -930,8 +941,8 @@ fn write_sheet(json_path: &Path, payload: &[u8], section: usize, palette: usize,
     }
 }
 
-/// Asks for a sprite sheet's JSON, reads the PNG it names from the same folder, and puts the sheet back into the
-/// shown entry.
+/// Asks for a sprite sheet's JSON, reads the PNG it names from the same folder, and puts the sheet back
+/// into the shown entry.
 fn import_sheet(editor: &mut Editor, cx: &mut Context<Editor>) {
     let Some(sizes) = editor.views.sprite.sizes().copied() else { return };
     let picked = cx.prompt_for_paths(gpui::PathPromptOptions {
@@ -1073,7 +1084,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&folder);
     }
 
-    /// A retail party sprites draws, plays and steps in the view.
+    /// A retail party sprites draws, plays and steps in the view. Point `BOF3_DISC_DIR` at an extracted
+    /// disc; without it the test skips.
     #[gpui::test]
     fn a_retail_party_bank_plays(cx: &mut TestAppContext) {
         let Some(disc) = crate::retail_support::retail_disc() else {
@@ -1111,7 +1123,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&folder);
     }
 
-    /// Every retail character sprites takes a colour edit and keeps every other byte of the decoded sprites.
+    /// Every retail character sprites takes a colour edit and keeps every other byte of the decoded sprites. Point
+    /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_character_sprites_take_a_colour_edit() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };
@@ -1144,8 +1157,8 @@ mod tests {
         assert!(count > 0 && failures.is_empty(), "{:?}", failures.iter().take(8).collect::<Vec<_>>());
     }
 
-    /// The sprites offset of colour 1 of palette 0 of section 0: the section's palette table offset, then the
-    /// palette's offset from the table.
+    /// The sprites offset of colour 1 of palette 0 of section 0: the section's palette table offset, then
+    /// the palette's offset from the table.
     fn palette_offset(sprites: &[u8]) -> Option<usize> {
         let word = |at: usize| Some(u32::from_le_bytes(sprites.get(at..at + 4)?.try_into().ok()?) as usize);
         let section = if word(0)? == format::CONTAINER_HEAD as usize { word(0)? } else { 0 };

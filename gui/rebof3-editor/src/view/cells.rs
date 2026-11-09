@@ -1,6 +1,9 @@
-//! An area's packed 4-bit cell grid (`0x80032000`) drawn as the map's cells, one colour per value. The grid holds one
-//! nibble per map cell, at linear index `x + width * y`: the high nibble for an even index, the low nibble for an odd
-//! one (`emi/etc/game/00@0x801C6FD4`, `wiki: formats/area`).
+//! An area's packed 4-bit cell grid (`0x80032000`) drawn as the map's cells, one colour per value.
+//!
+//! The grid holds one nibble per map cell, at linear index `x + width * y`: the high nibble for an even
+//! index, the low nibble for an odd one (`emi/etc/game/00@0x801C6FD4`, `wiki: formats/area`). The
+//! width and height come from the map bundle of the same archive. Painting writes one nibble and
+//! keeps every other byte.
 
 use std::cell::Cell as Shared;
 use std::rc::Rc;
@@ -235,8 +238,8 @@ mod tests {
         assert_eq!(colors[1][3], OPAQUE);
     }
 
-    /// Every retail cell grid finds its map size and covers the map, and repainting a cell with its own value keeps
-    /// the payload.
+    /// Every retail cell grid finds its map size and covers the map, and repainting a cell with its own
+    /// value keeps the payload. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_grid_covers_its_map() {
         let Some(disc) = crate::retail_support::retail_disc() else { return };

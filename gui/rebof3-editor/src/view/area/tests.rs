@@ -1,4 +1,5 @@
-//! The area view over the retail disc: every area reads, renders and takes each edit back to the bytes it read.
+//! The area view over the retail disc: every area reads, renders and takes each edit back to the bytes
+//! it read. Point `BOF3_DISC_DIR` at an extracted disc; without it the tests skip.
 
 use gpui::TestAppContext;
 use rebof3_formats::Format;
@@ -42,8 +43,8 @@ fn bundle_index(project: &mut Project, archive: &ArchivePath) -> Option<usize> {
     project.load(archive).ok()?.formats.iter().position(|format| *format == Format::AreaMapBundle)
 }
 
-/// Each edit the view offers, at the value the data already holds, writes the same bytes; a changed value changes
-/// only its own bytes.
+/// Each edit the view offers, at the value the data already holds, writes the same bytes; a changed
+/// value changes only its own bytes. Returns the round trips made.
 fn round_trips(area: &Area, bundle: &[u8]) -> usize {
     let mut trips = 0;
     let mut same = |name: &str, rebuilt: Result<Vec<u8>, String>, original: &[u8]| {
@@ -159,6 +160,8 @@ fn every_retail_area_reads_renders_and_round_trips() {
         coverage.gltf_round_trips += 1;
     }
     eprintln!("{coverage:?}");
+    // Every setup stream walks; one places no actor, and the 7 kind C records have no position, so
+    // 5,280 of the 5,287 records are actors.
     let expected = Coverage {
         areas: AREAS,
         textured: AREAS,

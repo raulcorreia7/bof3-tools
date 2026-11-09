@@ -1,4 +1,10 @@
 //! A scene's whole VRAM, replayed from its archives (`rebof3_emi::replay`).
+//!
+//! The frame buffer draws as 16-bit words, with an outline around each region and the entry that
+//! wrote it under the pointer. Picking a region and a depth decodes it from VRAM with any CLUT row
+//! the scene holds, so a texture can be read with a palette another archive loaded. The scene is
+//! one of the default resident sets (`rebof3_emi::replay::scenes`); it starts as the scene that
+//! loads the shown entry.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -422,8 +428,9 @@ mod tests {
         }
     }
 
-    /// AREA024's scene replays from the disc with the project's edits: the literal site's page and row come from the
-    /// area's entries 7 and 8, and an edit to the block's first colour shows in VRAM at the next replay.
+    /// AREA024's scene replays from the disc with the project's edits: the literal site's page and
+    /// row come from the area's entries 7 and 8, and an edit to the block's first colour shows in VRAM
+    /// at the next replay. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn a_retail_scene_replays_with_the_projects_edits() {
         use crate::project::{ArchivePath, Project};

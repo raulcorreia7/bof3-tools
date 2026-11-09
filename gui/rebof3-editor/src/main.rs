@@ -78,8 +78,8 @@ fn main() -> ExitCode {
     if failed.get() { ExitCode::FAILURE } else { ExitCode::SUCCESS }
 }
 
-/// Starts the toolkit, or explains why it cannot start. gpui panics when the system gives it no GPU context (it has
-/// no software renderer), so the panic is caught and reported as an error.
+/// Starts the toolkit, or explains why it cannot start. gpui panics when the system gives it no GPU
+/// context (it has no software renderer), so the panic is caught and reported as an error.
 fn start() -> Option<Application> {
     let hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));

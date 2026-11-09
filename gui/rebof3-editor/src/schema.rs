@@ -1,4 +1,8 @@
 //! Record layouts the editor shows as spreadsheet columns.
+//!
+//! Each column reads and writes the record bytes directly, at the offsets the decompilation's
+//! headers give (`include/game/item.h`, `ability.h`, `enemy.h` and `character.h`), so a column edit
+//! changes exactly the bytes it names and every byte no column names keeps its stored value.
 
 use rebof3_formats::Format;
 use rebof3_formats::encounter::{
@@ -531,8 +535,8 @@ fn actor_def_sheet() -> Table {
     }
 }
 
-/// A type-8 cue record (`EMICue`, `include/audio/cue.h`): the SPU voice, VAB program and tone of one sound effect,
-/// packed in four bytes.
+/// A type-8 cue record (`EMICue`, `include/audio/cue.h`): the SPU voice, VAB program and tone of one
+/// sound effect, packed in four bytes.
 fn cue_sheet() -> Table {
     use Field::*;
     Table {
@@ -553,8 +557,8 @@ fn cue_sheet() -> Table {
     }
 }
 
-/// VAB bank geometry (`include/audio/vab.h`): the `VabHdr` header, the fixed program table and the tone table, whose
-/// blocks the header's program count gives.
+/// VAB bank geometry (`include/audio/vab.h`): the `VabHdr` header, the fixed program table and the
+/// tone table, whose blocks the header's program count gives.
 const VAB_HEADER_SIZE: usize = 0x20;
 const VAB_PROGRAM_TABLE: usize = 0x20;
 const VAB_PROGRAM_SIZE: usize = 0x10;
@@ -565,7 +569,8 @@ const VAB_TONES_PER_PROGRAM: usize = 16;
 /// `VabHdr.ps`, the header's program count, which sizes the tone table.
 const VAB_PROGRAM_COUNT: usize = 0x12;
 
-/// `VabHdr` (PsyQ `libsnd.h`): the bank's master volume, pan and attributes.
+/// `VabHdr` (PsyQ `libsnd.h`): the bank's master volume, pan and attributes. The counts and sizes
+/// that lay out the header are left out, so an edit cannot move a table.
 fn vab_bank_sheet() -> Table {
     use Field::*;
     Table {
@@ -636,8 +641,8 @@ fn vab_tone_sheet() -> Table {
     }
 }
 
-/// The names a reference column shows: the item and ability names of `GAME.EMI` entry 0, and the enemy names of the
-/// shown encounter block.
+/// The names a reference column shows: the item and ability names of `GAME.EMI` entry 0, and the
+/// enemy names of the shown encounter block.
 #[derive(Default)]
 pub struct Names {
     items: [Vec<String>; CATEGORY_TABLES.len()],
@@ -646,8 +651,8 @@ pub struct Names {
 }
 
 impl Names {
-    /// The names in `game`, the payload of `GAME.EMI` entry 0, and in `shown`, the shown entry's payload when it is
-    /// an encounter block.
+    /// The names in `game`, the payload of `GAME.EMI` entry 0, and in `shown`, the shown entry's payload
+    /// when it is an encounter block.
     pub fn new(game: Option<&[u8]>, shown: Option<&[u8]>) -> Self {
         let names = |table: tables::Table| -> Vec<String> {
             game.and_then(|payload| table.records(payload).ok())

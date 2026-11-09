@@ -1,5 +1,7 @@
-//! Previews of a bank through the audio library: a sample as the library auditions it, and one note of a program or
-//! of a single tone as the game's sound driver plays it.
+//! Previews of a bank through the audio library: a sample as the library auditions it, and one note of a
+//! program or of a single tone as the game's sound driver plays it. The bank is packed with a one-note
+//! sequence into an archive the library reads, so every preview has the driver's pitch, envelope, loop,
+//! interpolation and mix, and the library's stereo 44.1 kHz output.
 
 use bof3player::catalog::{Item, Kind as ItemKind};
 use bof3player::{Library, MemorySource, NoNaming};
@@ -12,8 +14,8 @@ use rebof3_emi::pack::{Payload, pack_payloads};
 const PREVIEW_PATH: &str = "PREVIEW.EMI";
 /// The table's version word of a preview archive; the library does not read it.
 const PREVIEW_ARCHIVE_VERSION: u32 = 0;
-/// A preview note's clock: 60 quarter notes a minute at 60 ticks each, so one tick of the sequence is one 1/60 s tick
-/// of the driver.
+/// A preview note's clock: 60 quarter notes a minute at 60 ticks each, so one tick of the sequence is one
+/// 1/60 s tick of the driver.
 const PREVIEW_TEMPO_US: u32 = 1_000_000;
 const PREVIEW_RESOLUTION: u16 = 60;
 const PREVIEW_TICKS_PER_SECOND: f64 = 60.0;
@@ -50,16 +52,19 @@ pub struct Note {
     pub hold: f64,
 }
 
-/// Renders sample `sample` of a bank as the library auditions it: keyed on at the centre note of the first audible
-/// tone that names it, with that tone's envelope and volume, centred, and released after one pass of the sample.
+/// Renders sample `sample` of a bank as the library auditions it: keyed on at the centre note of the first
+/// audible tone that names it, with that tone's envelope and volume, centred, and released after one pass
+/// of the sample. `header` and `body` are the bank's `.vh` and `.vb`, so an edited bank plays as edited.
 pub fn sample_pcm(header: &[u8], body: &[u8], sample: u32) -> Result<Pcm, String> {
     let archive = bank_archive(header, body, None)?;
     render_preview(&archive, |item| item.kind == ItemKind::Sample && item.sub_index == sample)
         .ok_or_else(|| format!("the bank has no sample {sample}"))?
 }
 
-/// Renders one note as the game's sound driver plays it: keyed on at full velocity on the driver's first tick, held
-/// for `note.hold` seconds, then released, with the driver's two-second tail.
+/// Renders one note as the game's sound driver plays it: keyed on at full velocity on the driver's first
+/// tick, held for `note.hold` seconds, then released, with the driver's two-second tail. Every tone the
+/// note keys has its pitch from its centre note and fine tune, its envelope, its sample's loop and its
+/// volume and pan.
 pub fn note_pcm(header: &[u8], body: &[u8], note: &Note) -> Result<Pcm, String> {
     let (header, program) = match note.keys {
         Keys::Program(program) => (header.to_vec(), program),
@@ -214,8 +219,8 @@ mod tests {
         pcm.samples.iter().skip(which).step_by(pcm.channels as usize).copied().collect()
     }
 
-    /// The frequency of the left channel over its first `seconds` after `skip` seconds, from its rising zero
-    /// crossings.
+    /// The frequency of the left channel over its first `seconds` after `skip` seconds, from its rising
+    /// zero crossings.
     fn frequency(pcm: &Pcm, skip: f64, seconds: f64) -> f64 {
         let rate = f64::from(pcm.sample_rate);
         let left = channel(pcm, 0);

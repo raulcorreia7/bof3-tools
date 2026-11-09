@@ -1,4 +1,6 @@
-//! The views of one entry.
+//! The views of one entry. Each view reads the entry's current payload and writes a whole new
+//! payload back through [`Editor::set_payload`], so undo, save and export see every view's edits the
+//! same way.
 
 mod area;
 mod cells;
@@ -176,7 +178,8 @@ struct Reset {
     run: fn(&mut Editor),
 }
 
-/// What the editor shows for one format: the views beside Info and Hex, and the reset a view needs before it draws.
+/// What the editor shows for one format: the views beside Info and Hex, and the reset a view needs
+/// before it draws. This table is the only place the editor maps a format to its views.
 struct FormatViews {
     /// The format the row is for.
     format: Format,
@@ -347,8 +350,8 @@ pub fn editing(editor: &Editor, field: Field) -> Option<&LineEdit> {
     editor.editing.as_ref().filter(|(which, _)| *which == WindowField::View(field)).map(|(_, edit)| edit)
 }
 
-/// The text field of `which`: it shows `text`, or `hint` while `text` is empty, and a click gives it the keyboard,
-/// starting from `text`.
+/// The text field of `which`: it shows `text`, or `hint` while `text` is empty, and a click gives it the
+/// keyboard, starting from `text`.
 pub fn input(
     editor: &Editor,
     id: impl Into<ElementId>,
@@ -467,8 +470,9 @@ mod tests {
             .collect()
     }
 
-    /// Shows every view of every format over an empty, a short and a noise payload, and draws the window each time: a
-    /// view reports a bad payload, and none panics.
+    /// Shows every view of every format over an empty, a short and a noise payload, and draws the window
+    /// each time: a view reports a bad payload, and none panics. The game and party tables get their own
+    /// archives, since their sheets apply to one entry of one archive.
     #[gpui::test]
     fn every_view_survives_a_bad_payload(cx: &mut TestAppContext) {
         let noise = noise();
@@ -509,7 +513,8 @@ mod tests {
         }
     }
 
-    /// An area map draws textured from its own scene's VRAM.
+    /// An area map draws textured from its own scene's VRAM. Point `BOF3_DISC_DIR` at an extracted
+    /// disc; without it the test skips.
     #[gpui::test]
     fn a_retail_area_map_draws_textured(cx: &mut TestAppContext) {
         let Some(disc) = crate::retail_support::retail_disc() else {

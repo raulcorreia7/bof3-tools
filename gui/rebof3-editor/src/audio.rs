@@ -1,4 +1,9 @@
 //! Plays rendered PCM on the default output device.
+//!
+//! The stream opens at the clip's own rate when the device offers it, so the audio library's 44.1 kHz
+//! output reaches the device sample for sample. On a device without that rate, [`convert`] resamples the
+//! clip with a band-limited sinc filter (rubato's FFT resampler), which keeps the treble that linear
+//! interpolation dulls and the aliasing it adds out of the audible band.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -15,7 +20,9 @@ const STEREO: u16 = 2;
 /// Frames the resampler takes per FFT block; it rounds this up to suit the rate pair.
 const RESAMPLE_CHUNK: usize = 1024;
 
-/// Interleaved PCM as float frames of `channels` at `rate`, or why it cannot be resampled.
+/// Interleaved PCM as float frames of `channels` at `rate`, or why it cannot be resampled. Mono goes to
+/// every channel; stereo goes to the first two and is averaged on a mono device. Another rate is reached
+/// with rubato's FFT resampler, a band-limited sinc filter, over the whole clip.
 pub fn convert(pcm: &Pcm, rate: u32, channels: usize) -> Result<Vec<f32>, String> {
     let source = pcm.channels.max(1) as usize;
     let mut stereo = Vec::with_capacity(pcm.samples.len() / source * 2);
@@ -121,8 +128,8 @@ impl Player {
     }
 }
 
-/// The device's float output at `rate`, stereo when it can, or its default output when no float output runs at
-/// `rate`.
+/// The device's float output at `rate`, stereo when it can, or its default output when no float output
+/// runs at `rate`.
 fn stream_config(device: &cpal::Device, rate: u32) -> Result<cpal::StreamConfig, String> {
     let at_rate = device
         .supported_output_configs()
