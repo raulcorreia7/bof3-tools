@@ -4,8 +4,9 @@
 use psx_formats::clut::Palette;
 use rebof3_emi::Entry;
 
+use crate::error::Result;
 use crate::identity::difference;
-use crate::registry::{Description, Format, RoundTrip, Selector, State};
+use crate::registry::{Derived, Description, Format, RoundTrip, Selector, State};
 
 /// The load-address window that holds CLUT banks.
 const BAND: std::ops::RangeInclusive<u32> = 0x8003_3800..=0x8003_6e00;
@@ -21,10 +22,20 @@ pub static BANK: Description = Description {
     extension: "clut",
     selector: Selector::LoadWindow(BAND),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: Some(derive),
 };
 
 /// Decodes the bank and encodes it again; `Err` names the first difference.
 fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
     let palette = Palette::decode(payload).map_err(|error| error.to_string())?;
     difference(&palette.encode(), payload)
+}
+
+/// The palette as JSON and as a swatch strip PNG.
+fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
+    let palette = Palette::decode(payload)?;
+    Ok(vec![
+        Derived { role: "json", extension: "json", data: palette.json().into_bytes() },
+        Derived { role: "png", extension: "png", data: palette.png_strip() },
+    ])
 }

@@ -19,6 +19,7 @@ pub static HEADER: Description = Description {
     extension: "vh",
     selector: Selector::Type(vab::HEADER_TYPE),
     round_trip: RoundTrip::Bank,
+    derive: None,
 };
 
 /// The body as a format-registry row.
@@ -32,6 +33,7 @@ pub static BODY: Description = Description {
     extension: "vb",
     selector: Selector::Type(vab::BODY_TYPE),
     round_trip: RoundTrip::Bank,
+    derive: None,
 };
 
 /// Parses a header with its body and encodes the header again; `Err` names what differs.

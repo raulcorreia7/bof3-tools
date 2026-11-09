@@ -28,6 +28,7 @@ pub static TABLE: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::None,
+    derive: None,
 };
 
 /// Bytes in the block.

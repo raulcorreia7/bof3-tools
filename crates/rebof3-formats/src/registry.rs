@@ -112,6 +112,19 @@ pub enum RoundTrip {
     None,
 }
 
+/// A file derived from a payload.
+pub struct Derived {
+    /// What the file is for: `png`, `json` or `decoded`.
+    pub role: &'static str,
+    /// The file extension, without the dot.
+    pub extension: &'static str,
+    /// The file's bytes.
+    pub data: Vec<u8>,
+}
+
+/// The files a format adds to the stored bytes of an entry, from its load argument and payload.
+pub type Derive = fn(load_arg: u32, payload: &[u8]) -> crate::error::Result<Vec<Derived>>;
+
 /// What one format module knows about one format it reads.
 #[derive(Clone, Debug)]
 pub struct Description {
@@ -133,6 +146,8 @@ pub struct Description {
     pub selector: Selector,
     /// The identity round trip of the format's codec.
     pub round_trip: RoundTrip,
+    /// The open files the format adds to the stored bytes, when it has any.
+    pub derive: Option<Derive>,
 }
 
 /// The extension of an entry whose container is the game's own: the EMI entry with its type tag.

@@ -17,4 +17,5 @@ pub static AUX: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::None,
+    derive: None,
 };

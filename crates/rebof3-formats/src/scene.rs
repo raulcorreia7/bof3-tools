@@ -20,7 +20,7 @@ use rebof3_emi::Entry;
 
 use crate::error::{Error, Result};
 use crate::identity::difference;
-use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
+use crate::registry::{Derived, Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
 /// The load address of the table.
 const LOAD_ADDRESS: u32 = 0x800e_3800;
@@ -36,6 +36,7 @@ pub static ACTOR_DEFS: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: Some(derive),
 };
 
 /// Decodes the table and encodes it again; `Err` names the first difference.
@@ -143,4 +144,11 @@ impl SceneTable {
         }
         out
     }
+}
+
+/// The scene records as JSON. The record is `AreaActorDef` in `decomp/include/world/area.h`, the
+/// one C definition of a scene record; its format is `wiki: formats/area#0x800e3800-scenestep-table`.
+fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
+    let data = SceneTable::decode(payload)?.json().into_bytes();
+    Ok(vec![Derived { role: "json", extension: "json", data }])
 }

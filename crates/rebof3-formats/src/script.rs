@@ -41,7 +41,7 @@ use rebof3_emi::Entry;
 
 use crate::error::{Error, Result};
 use crate::identity::difference;
-use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
+use crate::registry::{Derived, Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
 /// The load address of an area's script bank.
 const AREA_ADDRESS: u32 = 0x800d_3800;
@@ -61,6 +61,7 @@ pub static AREA: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[AREA_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: Some(derive),
 };
 
 /// The battle script bank as a format-registry row.
@@ -74,6 +75,7 @@ pub static BATTLE: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[BATTLE_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: None,
 };
 
 /// The magic-effect script bank as a format-registry row.
@@ -87,6 +89,7 @@ pub static MAGIC: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&[MAGIC_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: None,
 };
 
 /// Decodes the bank and encodes it again; `Err` names the first difference.
@@ -281,6 +284,14 @@ fn hex(bytes: &[u8]) -> String {
         let _ = write!(out, "{byte:02x}");
     }
     out
+}
+
+/// The script records as JSON. The reader is `Actor_BeginScript` in
+/// `decomp/src/engine/slus/Actor_BeginScript.c`; the layout is
+/// `wiki: formats/area#0x800d3800-area-script-bank`.
+fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
+    let data = ScriptBank::decode(payload)?.json().into_bytes();
+    Ok(vec![Derived { role: "json", extension: "json", data }])
 }
 
 #[cfg(test)]

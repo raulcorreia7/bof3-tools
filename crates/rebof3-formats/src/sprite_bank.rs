@@ -1,9 +1,10 @@
 //! The character sprite bank, stored as a type-1 LZ77 blob or as a raw type-0 container
 //! (`wiki: formats/character#container`).
 
-use rebof3_emi::TYPE_LZ77;
+use rebof3_emi::{TYPE_LZ77, lz77};
 
-use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
+use crate::error::Result;
+use crate::registry::{Derived, Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
 
 /// Load arguments of the raw bank: the whole container and the five section positions
 /// (`wiki: formats/character#load-arguments`).
@@ -20,6 +21,7 @@ pub static LZ77_BLOB: Description = Description {
     extension: "lz77",
     selector: Selector::Type(TYPE_LZ77),
     round_trip: RoundTrip::None,
+    derive: Some(derive),
 };
 
 /// The raw bank as a format-registry row.
@@ -33,4 +35,10 @@ pub static RAW_BLOB: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&RAW_ADDRESSES),
     round_trip: RoundTrip::None,
+    derive: None,
 };
+
+/// The LZ77-decoded blob, as the game's own decoder produces it.
+fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
+    Ok(vec![Derived { role: "decoded", extension: "bin", data: lz77::decode(payload)? }])
+}

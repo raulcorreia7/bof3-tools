@@ -6,20 +6,11 @@ use std::collections::HashMap;
 
 use psx_formats::gfx::texture::{Clut, Depth, texel_indices};
 use psx_formats::gfx::{clut, png, tim, vram};
-use rebof3_emi::lz77;
 use rebof3_emi::texture::{self as draw, Bank};
 use rebof3_formats::map::MapBundle;
 use rebof3_formats::{Format, classify};
 
-/// A file derived from a payload.
-pub struct Derived {
-    /// What the file is for: `png`, `json` or `decoded`.
-    pub role: &'static str,
-    /// The file extension, without the dot.
-    pub extension: &'static str,
-    /// The file's bytes.
-    pub data: Vec<u8>,
-}
+pub use rebof3_formats::registry::Derived;
 
 /// A palette row a texture is drawn with, joined from a draw site.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -105,44 +96,10 @@ pub struct TextureWords {
 
 /// The files a format's decoder adds to the stored bytes.
 pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_formats::Result<Vec<Derived>> {
-    Ok(match format {
-        Format::VramUpload => {
-            let image = vram::upload_image(payload, vram::Descriptor::from_load_argument(load_arg))?;
-            vec![Derived { role: "png", extension: "png", data: png::rgba_png(image.width, image.height, &image.rgba) }]
-        }
-        Format::ClutBank => {
-            let palette = clut::Palette::decode(payload)?;
-            vec![
-                Derived { role: "json", extension: "json", data: palette.json().into_bytes() },
-                Derived { role: "png", extension: "png", data: palette.png_strip() },
-            ]
-        }
-        Format::CueTable => vec![Derived {
-            // The record is `EmiCue` in `decomp/include/audio/cue.h`, the one C
-            // definition of a cue record; its format is
-            // `wiki: formats/audio#emi-type-8-cue-records`.
-            role: "json",
-            extension: "json",
-            data: rebof3_emi::cue::CueTable::decode(payload)?.json().into_bytes(),
-        }],
-        Format::AreaActorDefsTable => vec![Derived {
-            // The record is `AreaActorDef` in `decomp/include/world/area.h`, the one C
-            // definition of a scene record; its format is
-            // `wiki: formats/area#0x800e3800-scenestep-table`.
-            role: "json",
-            extension: "json",
-            data: rebof3_formats::scene::SceneTable::decode(payload)?.json().into_bytes(),
-        }],
-        Format::AreaScriptBank => vec![Derived {
-            // The reader is `Actor_BeginScript` in `decomp/src/engine/slus/Actor_BeginScript.c`;
-            // the layout is `wiki: formats/area#0x800d3800-area-script-bank`.
-            role: "json",
-            extension: "json",
-            data: rebof3_formats::script::ScriptBank::decode(payload)?.json().into_bytes(),
-        }],
-        Format::Lz77Blob => vec![Derived { role: "decoded", extension: "bin", data: lz77::decode(payload)? }],
-        _ => Vec::new(),
-    })
+    match format.describe().derive {
+        Some(derive) => derive(load_arg, payload),
+        None => Ok(Vec::new()),
+    }
 }
 
 /// The SoundFont 2 file of one VAB bank, from its header and body. `title` names the file inside it. Each

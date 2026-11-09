@@ -20,6 +20,7 @@ pub static PACKAGE: Description = Description {
     extension: "seq",
     selector: Selector::Type(sep::TYPE),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: None,
 };
 
 /// Parses the package and encodes it again; `Err` names the first difference.

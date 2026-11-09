@@ -66,6 +66,7 @@ pub static BUNDLE: Description = Description {
     extension: "map",
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
+    derive: None,
 };
 
 /// Decodes the bundle and encodes it again; `Err` names the first difference.

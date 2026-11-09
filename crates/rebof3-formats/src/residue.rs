@@ -28,6 +28,7 @@ pub static CODE: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Load(&CODE_ADDRESSES),
     round_trip: RoundTrip::None,
+    derive: None,
 };
 
 /// The reserved slots as a format-registry row; `classify` selects them by their all-zero payload.
@@ -41,6 +42,7 @@ pub static RESERVE: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Fallback,
     round_trip: RoundTrip::None,
+    derive: None,
 };
 
 /// The entries no rule matched, as a format-registry row.
@@ -54,4 +56,5 @@ pub static UNCLASSIFIED: Description = Description {
     extension: EMI_EXTENSION,
     selector: Selector::Fallback,
     round_trip: RoundTrip::None,
+    derive: None,
 };
