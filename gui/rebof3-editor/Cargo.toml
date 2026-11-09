@@ -20,6 +20,8 @@ serde.workspace = true
 serde_json.workspace = true
 gpui.workspace = true
 cpal = "0.18.2"
+# The output resampler for a device that does not run at the library's 44.1 kHz.
+rubato = "5.0.1"
 
 [lints]
 workspace = true
