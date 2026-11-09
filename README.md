@@ -69,6 +69,14 @@ editor only reads the disc. Edits are saved to `my-mod/edits/`, and **Project â†
 edited archive into `my-mod/disc/`, then reads it back to confirm that it holds exactly the edited
 payloads.
 
+The left panel has two trees, switched at its top (**Game** and **Disc**) and remembered in the project
+folder. **Game** is the catalog: characters, enemies and bosses, areas and maps, battle, interface,
+audio, text, data tables, movies and other, each with its entry count, in the game's own order (area
+number, enemy bank, boss, spell effect). Every entry of every archive is in it once, and a name no rule
+places is under Unsorted with the reason. **Disc** is the file tree. The filter works in both, and
+each line opens the views below. [docs/editor.md](docs/editor.md#game-catalog) says how the catalog files
+an entry.
+
 | View    | Entries                       | What you can do                                                    |
 | ------- | ----------------------------- | ------------------------------------------------------------------ |
 | Info    | every entry                   | type, load address, size, format and what is known about it        |
@@ -82,6 +90,7 @@ payloads.
 | Map     | area map bundles              | the map from above, textured from its area's replayed VRAM or coloured by tile bank and height; export the textured map as PNG; edit a cell's corner heights |
 | 3D      | area map bundles              | the area as the field renderer draws it, through a free or the game's camera, drawn with OpenGL ES or in software; layers for exits, cell codes, the battle grid, encounter zones and actors; paint codes and battle values, raise cells, edit tile descriptors, move and turn actors, edit encounter rows; export and import glTF |
 | Sprite bank | character sprite banks, raw or LZ77 | play each section's animations at the game's tick (loop, once, reverse; step by tick or step) with the frame stitched through VRAM and its cells outlined; the frame sheet; edit any palette colour; export and import a PNG sprite sheet with Aseprite JSON |
+| Formation | area encounter blocks | each encounter's enemies placed as the field places them for battle, drawn through the area's VRAM and animated, for each scroll direction |
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
 | Script  | area, battle and magic-effect script banks | each record's animation stream one op per line: `show` a frame for its ticks, `jump` to a labelled step; edit any operand or cell; add or remove a step at the end of a stream; export and import the bank as text |
 | Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |

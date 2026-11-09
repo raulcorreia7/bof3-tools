@@ -82,7 +82,8 @@ pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32]) -> Vec<Join>
             let Some(tpage) = Tpage::from_word(site.tpage) else { continue };
             let Color::Indexed(depth) = tpage.color else { continue };
             let clut = Clut::from_word(site.clut);
-            if let Some((texture, palette)) = resolve(vram, tpage.x, tpage.y, clut, depth) {
+            let Some((texture, palette)) = resolve(vram, tpage.x, tpage.y, clut, depth) else { continue };
+            if texture.as_entry().is_some_and(|(archive, _)| site.reads_page_of(archive)) {
                 push(Join { texture, palette, page: (tpage.x, tpage.y), clut, depth, rule: Rule::Site(site) });
             }
         }

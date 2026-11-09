@@ -178,6 +178,7 @@ Kinds:
   seq             one sequence of a package as a SEQ file
   sep             a sequence package as a SEP file
   message         a message bank as JSON
+  message-po      a message bank as a PO catalogue for translators
   script          a script bank's animation streams as text, one op per line
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
@@ -214,6 +215,7 @@ Kinds:
   disc            a patched copy of the whole disc
   soundfont       a SoundFont 2 file back into a VAB bank
   message         message JSON back into a bank
+  message-po      a translated PO catalogue back into a bank (needs --payload)
   script          script text back into its bank
   strings         strings JSON back into its payload
   characters      character JSON back into ETC/START.EMI entry 8
@@ -309,6 +311,21 @@ Usage: bof3 assets export message PAYLOAD [-o OUT]
 
 Example:
   bof3 assets export message bank.bin -o bank.json
+";
+
+const EXPORT_MESSAGE_PO_HELP: &str = "\
+bof3 assets export message-po: write a message bank as a PO catalogue.
+
+Usage: bof3 assets export message-po PAYLOAD [-o OUT]
+
+  PAYLOAD             message-bank payload
+  -o, --output OUT    PO file to write (default: PAYLOAD.po)
+
+Each message is an entry: msgctxt message[N], msgid the text with its control
+codes as {TAG} markup, an empty msgstr for the translation.
+
+Example:
+  bof3 assets export message-po bank.bin -o bank.po
 ";
 
 const EXPORT_SCRIPT_HELP: &str = "\
@@ -521,6 +538,21 @@ Example:
   bof3 assets import message bank.json -o bank.bin
 ";
 
+const IMPORT_MESSAGE_PO_HELP: &str = "\
+bof3 assets import message-po: read a translated PO catalogue back into a bank.
+
+Usage: bof3 assets import message-po PO --payload PAYLOAD [-o OUT]
+
+  PO                  PO file from export message-po
+  --payload PAYLOAD   the bank it was exported from
+  -o, --output OUT    bank to write (default: PO.bin)
+
+An empty msgstr keeps the original message; the bank is refused past its limit.
+
+Example:
+  bof3 assets import message-po bank.po --payload bank.bin -o bank.new
+";
+
 const IMPORT_SCRIPT_HELP: &str = "\
 bof3 assets import script: read script text back into its bank.
 
@@ -615,6 +647,7 @@ fn export_help(kind: &str) -> &'static str {
         "vag" => EXPORT_VAG_HELP,
         "sequence" => EXPORT_SEQUENCE_HELP,
         "message" => EXPORT_MESSAGE_HELP,
+        "message-po" => EXPORT_MESSAGE_PO_HELP,
         "script" => EXPORT_SCRIPT_HELP,
         "strings" => EXPORT_STRINGS_HELP,
         "characters" => EXPORT_CHARACTERS_HELP,
@@ -642,6 +675,7 @@ fn import_help(kind: &str) -> &'static str {
         "disc" => IMPORT_DISC_HELP,
         "soundfont" => IMPORT_SOUNDFONT_HELP,
         "message" => IMPORT_MESSAGE_HELP,
+        "message-po" => IMPORT_MESSAGE_PO_HELP,
         "script" => IMPORT_SCRIPT_HELP,
         "strings" => IMPORT_STRINGS_HELP,
         "characters" => IMPORT_CHARACTERS_HELP,
@@ -857,7 +891,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(
-                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, script, strings, characters, character-bank and sprite-sheet"
+                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-bank and sprite-sheet"
             ),
             Direction::Import => {
                 format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")

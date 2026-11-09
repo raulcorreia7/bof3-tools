@@ -33,6 +33,7 @@ pub mod cue;
 pub mod encounter;
 pub mod error;
 pub mod field;
+pub mod formation;
 pub mod game_tables;
 pub mod gltf;
 pub mod identity;

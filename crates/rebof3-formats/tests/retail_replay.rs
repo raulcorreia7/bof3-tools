@@ -227,5 +227,26 @@ fn retail_joins_and_the_suggestion_scorer() {
         100.0 * depth_hits as f64 / total as f64,
         100.0 * row_hits as f64 / total as f64
     );
-    assert_eq!(joined.len(), 202, "the textures the rules join in some scene");
+    assert_eq!(joined.len(), 204, "the textures the rules join in some scene");
+}
+
+/// The battle archives a battle streams part-way: each texture a battle draw site names is joined
+/// in its home scene at the site's depth, with the row the archive's own palette bank loads.
+#[test]
+fn retail_battle_archive_joins() {
+    use rebof3_emi::texture::scene as joins;
+
+    let Some(mut disc) = Disc::open() else { return };
+    // (archive, texture slot, depth bits, CLUT x, CLUT y, palette slot): BATL_DRA by
+    // func_800AE9C4 (battle/15), BATL_OVR by func_801EF3B4 (batl_ovr/00).
+    let expected = [("BIN/BATTLE/BATL_DRA.EMI", 0, 4, 16, 506, 3), ("BIN/BATTLE/BATL_OVR.EMI", 1, 8, 0, 506, 2)];
+    for (archive, slot, bits, x, y, palette) in expected {
+        let scene = scenes::home(archive).expect("a home scene");
+        let vram = disc.replay(&scene);
+        let found = joins::scene_joins(&scene, &vram, &[]);
+        let texture = Writer::entry(archive, slot);
+        let join = found.iter().find(|join| join.texture == texture).unwrap_or_else(|| panic!("{archive} #{slot}"));
+        assert_eq!((join.depth.bits(), join.clut.x, join.clut.y), (bits, x, y), "{archive} #{slot}");
+        assert_eq!(join.palette, Writer::entry(archive, palette), "{archive} #{slot}");
+    }
 }

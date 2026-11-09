@@ -46,6 +46,8 @@ pub enum Error {
     /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
     /// reader assumes.
     SpriteBank(String),
+    /// An encounter formation that does not place: a missing encounter, enemy or placement table.
+    Formation(String),
     /// A sound item that could not be read or rendered.
     Audio(String),
     /// An open-format file that an import cannot read back to the stored bytes.
@@ -78,6 +80,7 @@ impl fmt::Display for Error {
             Self::CharacterTable(message) | Self::CharacterBank(message) => f.write_str(message),
             Self::AnimationStream(message) => write!(f, "animation stream: {message}"),
             Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
+            Self::Formation(message) => write!(f, "formation: {message}"),
             Self::Audio(message) | Self::Import(message) => f.write_str(message),
             Self::Field(message) => write!(f, "field: {message}"),
         }
