@@ -41,7 +41,8 @@ pub fn multiply(a: &Matrix, b: &Matrix) -> Matrix {
     std::array::from_fn(|row| std::array::from_fn(|column| (0..3).map(|k| a[row][k] * b[k][column]).sum()))
 }
 
-/// The rotation PsyQ's `RotMatrix` builds from GTE angles (`RotMatrix`, `exe/slus_004_22@0x80179738`, the PsyQ 3.7 `libgte` object): `Rx * Ry * Rz`, so a vector turns about z first, then y, then x.
+/// The rotation PsyQ's `RotMatrix` builds from GTE angles (`RotMatrix`, `exe/slus_004_22@0x80179738`,
+/// the PsyQ 3.7 `libgte` object): `Rx * Ry * Rz`, so a vector turns about z first, then y, then x.
 pub fn rot_matrix(angle: [i32; 3]) -> Matrix {
     let [x, y, z] = angle.map(|units| units as f32 / TURN * std::f32::consts::TAU);
     let (sx, cx) = x.sin_cos();
@@ -53,7 +54,8 @@ pub fn rot_matrix(angle: [i32; 3]) -> Matrix {
     multiply(&multiply(&rx, &ry), &rz)
 }
 
-/// The barycentric weights of `point` in the screen triangle `a`, `b`, `c`, when it lies inside or on an edge; `None` for a point outside or a degenerate triangle.
+/// The barycentric weights of `point` in the screen triangle `a`, `b`, `c`, when it lies inside or
+/// on an edge; `None` for a point outside or a degenerate triangle.
 pub fn barycentric(a: [f32; 2], b: [f32; 2], c: [f32; 2], point: [f32; 2]) -> Option<[f32; 3]> {
     let area = edge(a, b, c);
     if area.abs() < f32::EPSILON {
@@ -76,6 +78,7 @@ mod tests {
 
     #[test]
     fn rot_matrix_turns_about_z_then_x() {
+        // A quarter turn about z takes x to y; a quarter turn about x then takes y to z.
         let m = rot_matrix([1024, 0, 1024]);
         let v = apply(&m, [1.0, 0.0, 0.0]);
         assert!((v[0]).abs() < 1e-5 && (v[1]).abs() < 1e-5 && (v[2] - 1.0).abs() < 1e-5, "{v:?}");

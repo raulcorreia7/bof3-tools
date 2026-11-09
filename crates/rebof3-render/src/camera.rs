@@ -1,4 +1,7 @@
-//! Cameras: a view rotation and translation and a pinhole projection, the GTE's model (`screen = offset + H * (x, y) / z`, psx-spx "GTE Coordinate Calculation Commands").
+//! Cameras: a view rotation and translation and a pinhole projection, the GTE's model
+//! (`screen = offset + H * (x, y) / z`, psx-spx "GTE Coordinate Calculation Commands").
+//!
+//! View space has `x` right, `y` down and `z` into the screen, as the GTE's.
 
 use crate::math::{self, Matrix};
 
@@ -25,7 +28,8 @@ impl Camera {
         math::add(math::apply(&self.rotation, model), self.translation)
     }
 
-    /// The pixel of a view-space point in a `width` x `height` frame.
+    /// The pixel of a view-space point in a `width` x `height` frame. The point must be past
+    /// [`Camera::near`].
     pub fn project(&self, view: [f32; 3], width: usize, height: usize) -> [f32; 2] {
         let focal = self.focal * width as f32 / self.frame_width;
         [width as f32 / 2.0 + focal * view[0] / view[2], height as f32 / 2.0 + focal * view[1] / view[2]]
@@ -48,7 +52,8 @@ impl Camera {
         }
     }
 
-    /// A camera at `eye` looking at `target`, with model `up` pointing up on screen and a horizontal field of view of `fov` radians.
+    /// A camera at `eye` looking at `target`, with model `up` pointing up on screen and a horizontal
+    /// field of view of `fov` radians.
     pub fn look_at(eye: [f32; 3], target: [f32; 3], up: [f32; 3], fov: f32) -> Self {
         let forward = math::normalize(math::sub(target, eye));
         let right = math::normalize(math::cross(forward, up));
@@ -59,7 +64,8 @@ impl Camera {
         Self { rotation, translation, focal: frame_width / 2.0 / (fov / 2.0).tan(), frame_width, near: 8.0 }
     }
 
-    /// A camera orbiting `target` at `distance`, turned `yaw` about the model's up axis and raised `pitch` above the horizon (radians).
+    /// A camera orbiting `target` at `distance`, turned `yaw` about the model's up axis and raised
+    /// `pitch` above the horizon (radians). The model's `y` is up.
     pub fn orbit(target: [f32; 3], yaw: f32, pitch: f32, distance: f32, fov: f32) -> Self {
         let pitch = pitch.clamp(-1.55, 1.55);
         let offset = [pitch.cos() * yaw.sin(), pitch.sin(), pitch.cos() * yaw.cos()];
