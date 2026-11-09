@@ -36,7 +36,7 @@ publish = false
 rebof3-formats = { path = "crates/rebof3-formats", version = "0.2.0" }
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
 rebof3-emi = { path = "crates/rebof3-emi", version = "0.2.0", default-features = false }
-rebof3-render = { path = "crates/rebof3-render", version = "0.2.0" }
+rebof3-render = { path = "crates/rebof3-render", version = "0.2.0", default-features = false }
 emi = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
 bof3player = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3", default-features = false }
 psx-cd = { git = "https://github.com/raulcorreia7/bof3-player.git", tag = "v0.1.3", version = "0.1.3" }

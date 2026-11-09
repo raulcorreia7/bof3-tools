@@ -2,6 +2,7 @@
 //! payload back through [`Editor::set_payload`], so undo, save and export see every view's edits the
 //! same way.
 
+mod area;
 mod cells;
 mod decoded;
 mod hex;
@@ -45,6 +46,7 @@ pub enum Tab {
     Vram,
     Script,
     Layout,
+    Area,
 }
 
 impl Tab {
@@ -64,6 +66,7 @@ impl Tab {
             Tab::Vram => "VRAM",
             Tab::Script => "Script",
             Tab::Layout => "Layout",
+            Tab::Area => "3D",
         }
     }
 }
@@ -93,6 +96,8 @@ pub enum Field {
     ScriptStep { at: StepAt, part: script::StepPart },
     /// A field of a cell of a script bank's frame.
     ScriptCell { at: CellAt, part: script::CellPart },
+    /// A value of the area view.
+    Area(area::Part),
 }
 
 impl Field {
@@ -127,6 +132,7 @@ pub struct Views {
     pub vram: vram::State,
     pub script: script::State,
     pub layout: layout::State,
+    pub area: area::State,
 }
 
 impl Views {
@@ -188,8 +194,8 @@ static VIEWS: [FormatViews; 12] = [
     FormatViews { format: Format::SepPackage, tabs: &[Tab::Sound], prepare: None },
     FormatViews {
         format: Format::AreaMapBundle,
-        tabs: &[Tab::Map],
-        prepare: Some(Reset { tab: Some(Tab::Map), run: map::prepare }),
+        tabs: &[Tab::Map, Tab::Area],
+        prepare: Some(Reset { tab: None, run: prepare_area }),
     },
     FormatViews {
         format: Format::Lz77Blob,
@@ -206,6 +212,15 @@ static VIEWS: [FormatViews; 12] = [
     FormatViews { format: Format::BattleScriptBank, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::MagicTable, tabs: &[Tab::Script], prepare: None },
 ];
+
+/// Draws the map bundle's shown view: the top-down map or the area in 3D.
+fn prepare_area(editor: &mut Editor) {
+    match editor.tab {
+        Tab::Map => map::prepare(editor),
+        Tab::Area => area::prepare(editor),
+        _ => {}
+    }
+}
 
 /// The tabs `format` adds.
 fn views_of(format: Format) -> &'static [Tab] {
@@ -297,6 +312,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Vram => vram::show(editor, &entry, cx),
         Tab::Script => script::show(editor, &entry, cx),
         Tab::Layout => layout::show(editor, &entry, cx),
+        Tab::Area => area::show(editor, &entry, cx),
     };
     div()
         .flex()
@@ -361,6 +377,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
         Field::ToneNote { block, slot } => sound::note_changed(editor, block, slot, text),
         Field::ScriptStep { at, part } => script::step_changed(editor, at, part, text),
         Field::ScriptCell { at, part } => script::cell_changed(editor, at, part, text),
+        Field::Area(part) => area::field_changed(editor, part, text),
     }
 }
 
