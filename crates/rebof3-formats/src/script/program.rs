@@ -68,7 +68,7 @@ pub struct Opcode {
 
 /// The two opcodes of the step stream, read from the step functions.
 pub static OPCODES: [Opcode; 2] = [
-    // `func_8014DB98` (exe/slus_004_22@0x8014DB98): `unk_4A = script[pc]`, `selected = script[pc + 1]`,
+    // `Actor_StageAnimStep` (exe/slus_004_22@0x8014DB98): `unk_4A = script[pc]`, `selected = script[pc + 1]`,
     // `pc += 2`, `unk_5A = frame_table[selected]`. The loop and once step functions call it for every
     // step whose first byte is under 0x80.
     Opcode {
@@ -76,19 +76,19 @@ pub static OPCODES: [Opcode; 2] = [
         codes: 0x00..=JUMP - 1,
         bytes: STEP_BYTES,
         operands: [Operand::Ticks, Operand::Frame],
-        handler: "func_8014DB98 (exe/slus_004_22@0x8014DB98)",
+        handler: "Actor_StageAnimStep (exe/slus_004_22@0x8014DB98)",
         does: "stages the frame and the ticks it stays",
     },
-    // `func_8014D978` (exe/slus_004_22@0x8014D978) and `func_8014DAEC` (exe/slus_004_22@0x8014DAEC): at
-    // an expired delay, `if (script[pc] >= 0x80) pc = script[pc + 1] << 1`, then `func_8014DB98` stages
-    // the step there. `func_8014DA24` (exe/slus_004_22@0x8014DA24), which plays a stream backwards,
+    // `Actor_StepAnimLoop` (exe/slus_004_22@0x8014D978) and `Actor_StepAnimOnce` (exe/slus_004_22@0x8014DAEC): at
+    // an expired delay, `if (script[pc] >= 0x80) pc = script[pc + 1] << 1`, then `Actor_StageAnimStep` stages
+    // the step there. `Actor_StepAnimReverse` (exe/slus_004_22@0x8014DA24), which plays a stream backwards,
     // does not test the byte and shows the step as a frame for 128 or more ticks.
     Opcode {
         mnemonic: "jump",
         codes: JUMP..=0xFF,
         bytes: STEP_BYTES,
         operands: [Operand::Code, Operand::Target],
-        handler: "func_8014D978 (exe/slus_004_22@0x8014D978), func_8014DAEC (exe/slus_004_22@0x8014DAEC)",
+        handler: "Actor_StepAnimLoop (exe/slus_004_22@0x8014D978), Actor_StepAnimOnce (exe/slus_004_22@0x8014DAEC)",
         does: "continues at the target step",
     },
 ];

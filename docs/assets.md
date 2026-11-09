@@ -127,8 +127,8 @@ every byte the open form does not name.
 - **Script banks.** `export script PAYLOAD` writes an area, battle or magic-effect script bank as text,
   one op per line; `import script TEXT --payload PAYLOAD` reads it back. A record is the animation
   stream `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`) plays: `show frame F ticks T` stages a
-  frame for its ticks (`func_8014DB98`), and `jump LABEL` continues at a labelled step (`func_8014D978`,
-  `func_8014DAEC`); every first byte selects one of the two. `frame` and `cell` lines give the frames,
+  frame for its ticks (`Actor_StageAnimStep`), and `jump LABEL` continues at a labelled step (`Actor_StepAnimLoop`,
+  `Actor_StepAnimOnce`); every first byte selects one of the two. `frame` and `cell` lines give the frames,
   `pad` the bytes before the next record, and `raw` a record that does not read as a stream. The
   text carries every byte, so an unchanged export imports to the stored bank. A jump names a label, so a
   step added in the text moves the jumps after it; the import refuses a bank larger than `--payload`,

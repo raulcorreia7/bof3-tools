@@ -2,7 +2,7 @@
 //!
 //! A bank is a container of three sections (its first word is [`CONTAINER_HEAD`]: `BPLCHAR`, `PLCHAR`
 //! and `ETC/START.EMI` entry 7), or one section by itself (the `BPLCHAR` entries at `0x8003B80C` and the
-//! other section positions). `func_801C1254` (`emi/etc/game/00@0x801C1254`) points an actor's work
+//! other section positions). `Party_LoadMemberSprite` (`emi/etc/game/00@0x801C1254`) points an actor's work
 //! `+0x4C` at section `n` (`0x8003B800 + header[n]`), and the readers below take its four header words:
 //!
 //! | Offset | Field | Reader | Meaning |
@@ -15,7 +15,7 @@
 //! `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) takes record `n` (the actor's script record,
 //! work `+0x4B`): it queues sheet `record[0]` for upload, points work `+0x50` at animation `record[1]`
 //! and stores `record[2]` in work `+0x2A`, which `Area_DrawObjectSprite` reads as "mirror the actor".
-//! `GFX_LoadPalette` (`exe/slus_004_22@0x80166C48`) copies one palette; `func_801C1254` asks for
+//! `GFX_LoadPalette` (`exe/slus_004_22@0x80166C48`) copies one palette; `Party_LoadMemberSprite` asks for
 //! palette 0.
 //!
 //! In every retail section the parts follow the header in this order: the sheet table and the sheets,
@@ -329,11 +329,11 @@ pub fn encode(bank: &Bank) -> Result<Vec<u8>> {
 }
 
 /// The evidence behind the format, for a view or a report.
-pub const EVIDENCE: &str = "func_801C1254 (emi/etc/game/00@0x801C1254) picks the section and placement; \
+pub const EVIDENCE: &str = "Party_LoadMemberSprite (emi/etc/game/00@0x801C1254) picks the section and placement; \
 Actor_SelectScriptBank (exe/slus_004_22@0x8014DC08) reads the header, records, sheets and animations; \
 GFX_UpdateTransferQueue, GFX_ExpandRgb555, GFX_DecodeLzss (exe/slus_004_22@0x8014E6D0, 0x8014E7F8, 0x8014E8FC) \
-upload a sheet; GFX_LoadPalette (exe/slus_004_22@0x80166C48) stages a palette; Actor_SeekScript, func_8014DB98, \
-func_8014D978, func_8014DAEC, func_8014DA24 play the steps; Area_DrawObjectSprite, Area_DrawSpriteCell, \
+upload a sheet; GFX_LoadPalette (exe/slus_004_22@0x80166C48) stages a palette; Actor_SeekScript, Actor_StageAnimStep, \
+Actor_StepAnimLoop, Actor_StepAnimOnce, Actor_StepAnimReverse play the steps; Area_DrawObjectSprite, Area_DrawSpriteCell, \
 Area_BuildClut (exe/slus_004_22@0x8014C4D4, 0x8014CF9C, 0x8014CE78) draw the cells with g_SpriteSizes \
 (exe/slus_004_22@0x8017F53C)";
 

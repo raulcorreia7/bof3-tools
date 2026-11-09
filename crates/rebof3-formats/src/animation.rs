@@ -14,7 +14,7 @@
 //! | - | 2 × `frames` | `frame_offset` | frame offsets from the start of this table, staged at work `+0x54` |
 //! | - | - | `frame` | a cell count, then that many 5-byte cells |
 //!
-//! `func_8014DB98` stages a step: the delay byte goes to work `+0x4A` and the frame's offset to
+//! `Actor_StageAnimStep` stages a step: the delay byte goes to work `+0x4A` and the frame's offset to
 //! work `+0x5A`, which `Area_DrawObjectSprite` (`exe/slus_004_22@0x8014C4D4`) draws. A step whose
 //! delay byte is [`JUMP`] or more is a jump: its second byte is the step to continue at. The three
 //! step functions are in [`Player`].
@@ -31,7 +31,7 @@
 
 use crate::error::{Error, Result};
 
-/// A delay byte at or above this makes the step a jump (`entry[0] >= 0x80` in `func_8014D978`).
+/// A delay byte at or above this makes the step a jump (`entry[0] >= 0x80` in `Actor_StepAnimLoop`).
 pub const JUMP: u8 = 0x80;
 /// `SYS_Main` (`exe/slus_004_22@0x8014AAC8`) runs one game frame per `VSync(2)`, and a step function
 /// runs once a frame, so one tick is two NTSC fields of `1001 / 60000` seconds.
@@ -201,12 +201,12 @@ impl Animation {
 /// The step function a handler calls once a tick.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Playback {
-    /// `func_8014D978`: past the last step the stream starts again; a jump moves to its step.
+    /// `Actor_StepAnimLoop`: past the last step the stream starts again; a jump moves to its step.
     #[default]
     Loop,
-    /// `func_8014DAEC`: past the last step the stream holds its frame; a jump moves to its step.
+    /// `Actor_StepAnimOnce`: past the last step the stream holds its frame; a jump moves to its step.
     Once,
-    /// `func_8014DA24`: the stream runs backwards and starts again from its end; a jump is not read.
+    /// `Actor_StepAnimReverse`: the stream runs backwards and starts again from its end; a jump is not read.
     Reverse,
 }
 
@@ -328,7 +328,7 @@ impl Player {
         animation.steps.get(self.position / STEP_BYTES).and_then(|step| step.jump())
     }
 
-    /// `func_8014DB98`: stages the step at the position and moves past it.
+    /// `Actor_StageAnimStep`: stages the step at the position and moves past it.
     fn stage(&mut self, animation: &Animation) {
         let index = self.position / STEP_BYTES;
         let step = animation.steps.get(index).copied().unwrap_or(Step { delay: 0, frame: 0 });

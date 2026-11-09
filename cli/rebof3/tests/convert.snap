@@ -217,8 +217,8 @@ wrote bank.txt
 
 ; A script bank: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)
 ; points an actor at a record and Actor_SeekScript (exe/slus_004_22@0x8014D910) plays it.
-; show: stage a frame for its ticks (func_8014DB98; a tick is 33.4 ms, 0 lasts 256).
-; jump: continue at a step (func_8014D978, func_8014DAEC). Labels name the steps jumps reach.
+; show: stage a frame for its ticks (Actor_StageAnimStep; a tick is 33.4 ms, 0 lasts 256).
+; jump: continue at a step (Actor_StepAnimLoop, Actor_StepAnimOnce). Labels name the steps jumps reach.
 bof3-script 1
 
 section 0

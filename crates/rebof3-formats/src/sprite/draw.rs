@@ -2,7 +2,7 @@
 //! the field reader puts them, then each cell's texels fetched back through the texture page and CLUT
 //! the draw sets.
 //!
-//! Where a field actor's sprite goes is set by `func_801C1254` (`emi/etc/game/00@0x801C1254`) for the
+//! Where a field actor's sprite goes is set by `Party_LoadMemberSprite` (`emi/etc/game/00@0x801C1254`) for the
 //! party member in slot `s`: texture page 5 (work `+0x25`), sheet row `s * 0x50` (`+0x26`), CLUT
 //! selector `s + 0x78` (`+0x27`), palette kind 2 (`+0x28`), and `GFX_LoadPalette(0x80035600 + s * 0x40,
 //! 0)`. From those:
@@ -34,7 +34,7 @@ const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
 const EXE_TEXT_ADDRESS: usize = 0x18;
 const EXE_TEXT_START: usize = 0x800;
 
-/// The texture page `func_801C1254` gives a field actor (`unk_25 = 5`).
+/// The texture page `Party_LoadMemberSprite` gives a field actor (`unk_25 = 5`).
 pub const FIELD_PAGE: u8 = 5;
 /// Sheet rows each party slot owns (`unk_26 = slot * 0x50`).
 pub const FIELD_SLOT_ROWS: u8 = 0x50;
@@ -43,7 +43,7 @@ pub const FIELD_CLUT_SELECTOR: u8 = 0x78;
 /// The RAM `GFX_LoadPalette` stages party slot 0's palette at (`GAME_PALETTE_STAGE`), and the stride.
 pub const FIELD_PALETTE_STAGE: u32 = 0x8003_5600;
 const FIELD_PALETTE_STRIDE: u32 = 0x40;
-/// The palette `func_801C1254` stages: `GFX_LoadPalette(..., 0)`.
+/// The palette `Party_LoadMemberSprite` stages: `GFX_LoadPalette(..., 0)`.
 pub const FIELD_PALETTE: usize = 0;
 
 /// `page << 6`: a texture page is 64 words wide.
@@ -120,7 +120,7 @@ pub struct Placement {
 }
 
 impl Placement {
-    /// The placement `func_801C1254` gives party slot `slot` in the field.
+    /// The placement `Party_LoadMemberSprite` gives party slot `slot` in the field.
     pub fn field(slot: u8) -> Self {
         Self {
             page: FIELD_PAGE,
@@ -168,7 +168,7 @@ impl Placement {
 /// asks for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Reader {
-    /// A party bank: `func_801C1254` places it and loads palette [`FIELD_PALETTE`], called from
+    /// A party bank: `Party_LoadMemberSprite` places it and loads palette [`FIELD_PALETTE`], called from
     /// `Party_JoinMember` and `Party_BuildBattlers` (`emi/etc/game/00`).
     Field,
     /// A battle bank: its reader is not traced, so its placement and palette are not proven.

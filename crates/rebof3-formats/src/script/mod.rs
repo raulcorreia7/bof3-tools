@@ -53,7 +53,7 @@ const MAGIC_ADDRESS: u32 = 0x800c_3800;
 
 /// The readers every script bank row cites.
 const STREAM_EVIDENCE: &str = "Actor_BeginScript (exe/slus_004_22@0x8014D6DC) reads a record of g_ScriptBank; \
-Actor_SeekScript (exe/slus_004_22@0x8014D910) and func_8014DB98, func_8014D978, func_8014DAEC, func_8014DA24 \
+Actor_SeekScript (exe/slus_004_22@0x8014D910) and Actor_StageAnimStep, Actor_StepAnimLoop, Actor_StepAnimOnce, Actor_StepAnimReverse \
 play it as an animation stream; wiki: formats/area (`0x800D3800`)";
 
 /// The area script bank as a format-registry row.

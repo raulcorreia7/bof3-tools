@@ -76,9 +76,11 @@ pub fn write(program: &Program) -> String {
         "; A script bank: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)"
     );
     let _ = writeln!(out, "; points an actor at a record and Actor_SeekScript (exe/slus_004_22@0x8014D910) plays it.");
-    let _ = writeln!(out, "; show: stage a frame for its ticks (func_8014DB98; a tick is 33.4 ms, 0 lasts 256).");
-    let _ =
-        writeln!(out, "; jump: continue at a step (func_8014D978, func_8014DAEC). Labels name the steps jumps reach.");
+    let _ = writeln!(out, "; show: stage a frame for its ticks (Actor_StageAnimStep; a tick is 33.4 ms, 0 lasts 256).");
+    let _ = writeln!(
+        out,
+        "; jump: continue at a step (Actor_StepAnimLoop, Actor_StepAnimOnce). Labels name the steps jumps reach."
+    );
     let _ = writeln!(out, "{MAGIC} {VERSION}");
     for (index, section) in program.sections.iter().enumerate() {
         let _ = writeln!(out, "\nsection {index}");
