@@ -137,22 +137,31 @@ then the formats that nothing else in the container uses, then the ones others d
 
 ## Implementation status
 
-Moved into `rebof3-formats`, one commit each: the registry with `classify` and the coverage table;
-`script`, `scene` and `map` (with the terrain and layout conversion and glTF export);
-`game_tables` and `encounter` with their JSON conversion; the VAG and MIDI conversion into `vab`
-and `sep`; and the per-format `derive` function, which replaces the `match` in
-`rebof3-assets::decode::derive`. `message`, `cells`, `window` and `resources` are description-only
-rows. The registry replaces the six `match`es in `Format` and the coverage table's codec calls.
+Everything that is a format moved into `rebof3-formats`, one commit per move:
 
-Left, for a follow-up:
+- the registry with `classify`, the coverage table and each format's `kind`, `derive` and `open`
+  hooks, which replace the `match`es in `Format`, `Kind::of_format`, `decode::derive` and the
+  per-format branches of `extract.rs`;
+- `script`, `scene`, `map` (terrain, layout and glTF), `game_tables` and `encounter`;
+- `vab` (with `vag` and `soundfont`) and `sep` (with `midi`);
+- `clut` and `vram`, with the palette and texture PNG, TIM and JSON conversion and their imports;
+- `message` (the bank and its JSON) and the shared `text` module (scan rules, strings, known
+  tables, string sources);
+- description-only rows: `cells`, `window`, `resources`, `residue`.
 
-- The palette and texture conversion (`decode::palette_json`, the texture PNGs, the row joins,
-  `import::palette` and `import::texture`) still lives in `rebof3-assets`; it belongs to `clut` and `vram`.
-- The text modules (`emi/text/discover.rs`, `assets/text*`) and the SoundFont conversion, which
-  needs `bof3player::spu` and so would add a dependency to the formats crate.
-- `kind.rs::of_format`, the `if format ==` branches in `extract.rs` and the editor's
-  `tabs()`/`prepare()` matches are not yet table-driven (rule 4).
-- `sprite_bank`, `characters`, `character_bank`, `sprites.rs` and `view/sprite.rs` are left
-  untouched on purpose (the sprite-frames lane edits them), apart from one import line in
-  `characters.rs` and one in `view/sprite.rs`. `GameTableShort` stays in the container error for
-  `characters.rs`.
+`joins` (a texture's palette rows over a whole archive) and `text` read several formats, so they
+are not formats. No format module imports them except `message`, which uses `text`; the
+independence test lists `text` as shared. SoundFont fits in `vab` because `bof3player` depends only
+on `psx-formats` and its own `emi` crate, so there is no cycle; the crate takes it for the SPU
+envelope steps.
+
+The editor maps a format to its views through one table (`VIEWS` in `view/mod.rs`).
+
+Left:
+
+- `sprite_bank`, `characters` and `character_bank` stay in `rebof3-emi` while the sprite-frames
+  lane edits them. `GameTableShort` stays in the container error for `characters.rs`. They move
+  last.
+- `rebof3-assets` keeps the disc walk, the output tree, the report, the kinds, the CLI codec table,
+  the sound rendering and the text extraction run, which are not formats.
+- `Kind::of_format` reads the row's `kind` name; the kinds themselves stay in `rebof3-assets`.
