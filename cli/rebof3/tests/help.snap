@@ -9,6 +9,7 @@ Commands:
   disc    extract, checksum, verify and rebuild a PlayStation disc image
   emi     list, extract, pack and inspect EMI archives
   assets  extract every disc asset, or convert one asset to and from its open form
+  observe run the disc on a route and record how the game draws each texture
 
 Options:
   -h, --help     print this text, or a command's own help
@@ -32,6 +33,7 @@ Commands:
   disc    extract, checksum, verify and rebuild a PlayStation disc image
   emi     list, extract, pack and inspect EMI archives
   assets  extract every disc asset, or convert one asset to and from its open form
+  observe run the disc on a route and record how the game draws each texture
 
 Options:
   -h, --help     print this text, or a command's own help
@@ -903,4 +905,26 @@ reserve          none      all-zero payloads that reserve a RAM slot
 unknown          raw       entries and files no rule classifies
 data-table       decoded   fixed game tables from ETC/GAME.EMI entry 0: stored bytes and JSON for items, equipment, shops, abilities, level growth
 text             decoded   game strings and message banks as JSON, from the extracted disc
+
+$ bof3 observe --help
+[exit 0]
+bof3 observe: run the disc on a scripted route and record which depth and palette the
+game draws each texture upload with. The result is a cache the editor reads; it is kept
+in ROOT/build/cache/observe/<disc sha>/<route>.json and rebuilt when the route or the
+machine changes.
+
+Usage: bof3 observe --route NAME|FILE.toml [-i IMAGE.cue] [--root DIR] [--force] [-q]
+
+Options:
+  -r, --route NAME   a built-in route (new-game) or a route file (required)
+  -i, --input PATH   disc image or .cue sheet (default: the image in inputs/external)
+      --root DIR     the project folder whose build/cache holds the result
+                     (default: the current folder)
+      --force        run the route even when a fresh cache exists
+  -q, --quiet        print the summary only, no progress
+  -h, --help         print this text
+
+Examples:
+  bof3 observe --route new-game
+  bof3 observe --route new-game -i "Breath of Fire III (USA).cue" --root my-mod
 
