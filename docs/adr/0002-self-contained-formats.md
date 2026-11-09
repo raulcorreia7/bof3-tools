@@ -38,7 +38,7 @@ LZ77 blob, no open form for the reserve) is absent, and the description says so.
 | `decode` / `encode` | `decode(&[u8]) -> Result<T>`, `T::encode(&self) -> Vec<u8>` | Identity on unchanged data: `encode(decode(b)) == b` for every retail payload. A payload that does not parse is an error, never a panic. |
 | `export` / `import` | `export(&[u8]) -> Result<Vec<u8>>`, `import(&[u8], base) -> Result<Vec<u8>>` | The standard files: indexed PNG for textures and palettes, WAV for samples, SF2 for banks, MIDI for sequences, glTF and OBJ for terrain, JSON or CSV for tables and text. `import(export(b), b)` is `b`. |
 | `describe` | a `Description` static | The game meaning and the evidence: the name, the selector that recognises the entry (type and load address), the extension, the documentation and codec state, the citation, and the round-trip check. |
-| tests | in the module and in `tests/` | Synthetic cases always run. Retail cases run on `BOF3_DISC_DIR` (the extracted disc) and `BOF3_DISC_IMAGE` (the cue sheet) and skip without them. Each retail case asserts a pinned count, so a skip cannot pass for a result. |
+| tests | in the module and in `tests/` | Synthetic cases always run. Retail cases read `BOF3_DISC_DIR` (the extracted disc) and `BOF3_DISC_IMAGE` (the cue sheet). Unset, a case skips and passes; set but invalid, it fails with the path; `BOF3_REQUIRE_RETAIL=1` (`make check-retail`) turns every skip into a failure. Each retail case asserts a pinned count. |
 
 Dependency rules:
 
@@ -109,8 +109,7 @@ the report, the kinds and the command-line codec table.
 
 One format per commit, behaviour-preserving. Each commit keeps every test, the command-line output
 (`cli/rebof3/tests/help.snap`), the editor behaviour and the byte-exact rebuilds, and ends with
-`make check` and the retail tests running with `BOF3_DISC_DIR`, `BOF3_EMI_ROOT` and
-`BOF3_DISC_IMAGE` set. The test count is compared before and after.
+`make check` and `make check-retail` (`BOF3_DISC_DIR` and `BOF3_DISC_IMAGE` set). The test count is compared before and after.
 
 Order: the registry first (the classifier and the coverage table, which every later move reads),
 then the formats that nothing else in the container uses, then the ones others depend on:
