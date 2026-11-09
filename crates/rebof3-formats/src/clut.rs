@@ -23,6 +23,7 @@ pub static BANK: Description = Description {
     selector: Selector::LoadWindow(BAND),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    kind: "palette",
 };
 
 /// Decodes the bank and encodes it again; `Err` names the first difference.

@@ -91,29 +91,10 @@ kinds! {
 }
 
 impl Kind {
-    /// The kind of an EMI entry's format.
+    /// The kind of an EMI entry's format, from the format's registry row.
     pub fn of_format(format: Format) -> Self {
-        match format {
-            Format::VramUpload => Self::Texture,
-            Format::ClutBank => Self::Palette,
-            Format::VabHeader | Format::VabBody => Self::AudioBank,
-            Format::SepPackage => Self::AudioSequence,
-            Format::Lz77Blob | Format::CharacterBlob => Self::CharacterBank,
-            Format::AreaMessageBank => Self::AreaMessage,
-            Format::AreaCellGrid => Self::AreaCells,
-            Format::AreaScriptBank => Self::AreaScript,
-            Format::BattleScriptBank => Self::BattleScript,
-            Format::AreaActorDefsTable => Self::AreaActorDefs,
-            Format::AreaEncounterTable => Self::AreaEncounters,
-            Format::AreaMapBundle => Self::AreaMap,
-            Format::AreaAuxWindow => Self::AreaModule,
-            Format::SharedResourceTable => Self::ResourceTable,
-            Format::CueTable => Self::AudioCues,
-            Format::MagicTable => Self::MagicTable,
-            Format::CodeImage => Self::Code,
-            Format::Reserve => Self::Reserve,
-            Format::Unclassified => Self::Unknown,
-        }
+        let name = format.describe().kind;
+        Self::ALL.iter().copied().find(|kind| kind.name() == name).unwrap_or_else(|| panic!("{name} is not a kind"))
     }
 
     /// Parses one `--only` name.
@@ -252,5 +233,17 @@ impl Selection {
     /// Whether the selection leaves out every kind an EMI entry can have.
     pub fn is_only(&self, kind: Kind) -> bool {
         self.kinds == [kind]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_format_names_a_kind() {
+        for format in Format::ALL {
+            assert!(Kind::ALL.iter().any(|kind| kind.name() == format.describe().kind), "{}", format.name());
+        }
     }
 }

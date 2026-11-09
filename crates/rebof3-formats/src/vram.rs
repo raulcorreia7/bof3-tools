@@ -20,6 +20,7 @@ pub static UPLOAD: Description = Description {
     selector: Selector::Type(vram::UPLOAD_TYPE),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    kind: "texture",
 };
 
 /// Decodes the upload and encodes it again; `Err` names the first difference.

@@ -18,4 +18,5 @@ pub static SHARED: Description = Description {
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::None,
     derive: None,
+    kind: "resource-table",
 };

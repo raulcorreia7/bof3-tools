@@ -20,6 +20,7 @@ pub static HEADER: Description = Description {
     selector: Selector::Type(vab::HEADER_TYPE),
     round_trip: RoundTrip::Bank,
     derive: None,
+    kind: "audio-bank",
 };
 
 /// The body as a format-registry row.
@@ -34,6 +35,7 @@ pub static BODY: Description = Description {
     selector: Selector::Type(vab::BODY_TYPE),
     round_trip: RoundTrip::Bank,
     derive: None,
+    kind: "audio-bank",
 };
 
 /// Parses a header with its body and encodes the header again; `Err` names what differs.

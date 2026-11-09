@@ -37,6 +37,7 @@ pub static ACTOR_DEFS: Description = Description {
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    kind: "area-actor-defs",
 };
 
 /// Decodes the table and encodes it again; `Err` names the first difference.

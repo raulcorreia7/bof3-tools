@@ -22,6 +22,7 @@ pub static LZ77_BLOB: Description = Description {
     selector: Selector::Type(TYPE_LZ77),
     round_trip: RoundTrip::None,
     derive: Some(derive),
+    kind: "character-bank",
 };
 
 /// The raw bank as a format-registry row.
@@ -36,6 +37,7 @@ pub static RAW_BLOB: Description = Description {
     selector: Selector::Load(&RAW_ADDRESSES),
     round_trip: RoundTrip::None,
     derive: None,
+    kind: "character-bank",
 };
 
 /// The LZ77-decoded blob, as the game's own decoder produces it.

@@ -148,6 +148,8 @@ pub struct Description {
     pub round_trip: RoundTrip,
     /// The open files the format adds to the stored bytes, when it has any.
     pub derive: Option<Derive>,
+    /// The asset kind the format's files are written under: the name of `rebof3_assets::Kind`.
+    pub kind: &'static str,
 }
 
 /// The extension of an entry whose container is the game's own: the EMI entry with its type tag.

@@ -62,6 +62,7 @@ pub static AREA: Description = Description {
     selector: Selector::Load(&[AREA_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    kind: "area-script",
 };
 
 /// The battle script bank as a format-registry row.
@@ -76,6 +77,7 @@ pub static BATTLE: Description = Description {
     selector: Selector::Load(&[BATTLE_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
+    kind: "battle-script",
 };
 
 /// The magic-effect script bank as a format-registry row.
@@ -90,6 +92,7 @@ pub static MAGIC: Description = Description {
     selector: Selector::Load(&[MAGIC_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
+    kind: "bmagic-table",
 };
 
 /// Decodes the bank and encodes it again; `Err` names the first difference.
