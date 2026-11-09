@@ -9,11 +9,13 @@ mod info;
 mod map;
 mod message;
 mod palette;
+mod scene;
 mod sound;
 mod sprite;
 mod tables;
 mod text;
 mod texture;
+mod vram;
 
 use gpui::{AnyElement, Context, Div, ElementId, Keystroke, Stateful, div, prelude::*, px};
 use rebof3_emi::classify::Format;
@@ -37,6 +39,7 @@ pub enum Tab {
     Map,
     Sprite,
     Cells,
+    Vram,
 }
 
 impl Tab {
@@ -53,6 +56,7 @@ impl Tab {
             Tab::Map => "Map",
             Tab::Sprite => "Sprite bank",
             Tab::Cells => "Cell grid",
+            Tab::Vram => "VRAM",
         }
     }
 }
@@ -107,6 +111,7 @@ pub struct Views {
     pub map: map::State,
     pub sprite: sprite::State,
     pub cells: cells::State,
+    pub vram: vram::State,
 }
 
 impl Views {
@@ -119,12 +124,12 @@ impl Views {
 /// Resets the state of a view whose entry changed, before the window draws it.
 pub fn prepare(editor: &mut Editor) {
     let Some(entry) = editor.current() else { return };
+    if editor.tab == Tab::Vram && tabs(&entry).contains(&Tab::Vram) {
+        vram::prepare(editor);
+    }
+    let Some(entry) = editor.current() else { return };
     if entry.format() == Format::VramUpload {
-        let mut texture = std::mem::take(&mut editor.views.texture);
-        if let Some(entry) = editor.current() {
-            texture.prepare(&entry);
-        }
-        editor.views.texture = texture;
+        texture::prepare(editor);
     }
 }
 
@@ -169,8 +174,8 @@ impl Entry<'_> {
 pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
     let mut tabs = vec![Tab::Info, Tab::Hex];
     match entry.format() {
-        Format::VramUpload => tabs.push(Tab::Texture),
-        Format::ClutBank => tabs.push(Tab::Palette),
+        Format::VramUpload => tabs.extend([Tab::Texture, Tab::Vram]),
+        Format::ClutBank => tabs.extend([Tab::Palette, Tab::Vram]),
         Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
         Format::AreaMapBundle => tabs.push(Tab::Map),
         Format::Lz77Blob | Format::CharacterBlob => tabs.push(Tab::Sprite),
@@ -217,6 +222,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Map => map::show(editor, &entry, cx),
         Tab::Sprite => sprite::show(editor, &entry, cx),
         Tab::Cells => cells::show(editor, &entry, cx),
+        Tab::Vram => vram::show(editor, &entry, cx),
     };
     div()
         .flex()

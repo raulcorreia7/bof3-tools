@@ -73,7 +73,8 @@ payloads.
 | ------- | ----------------------------- | ------------------------------------------------------------------ |
 | Info    | every entry                   | type, load address, size, format and what is known about it        |
 | Hex     | every entry                   | edit bytes; read and write the value at the cursor as any int width |
-| Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a joined or chosen palette; paint     |
+| Texture | VRAM uploads                  | view at 4, 8 or 16 bits with a palette row a draw rule joins in the scene that loads it, or pick one; a ranked depth and row suggestion when no rule joins; paint |
+| VRAM    | VRAM uploads, palette banks   | the whole 1024×512 VRAM of a field, world-map, menu, battle or effect scene, replayed from its archives; each region outlined with the entry that wrote it; decode any region at any depth with any CLUT row; export PNG |
 | Palette | palette banks                 | edit any color's 5-bit channels and semi-transparency bit          |
 | Tables  | `ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, area encounter blocks, actor definitions, cue tables, VAB headers | spreadsheets of items, equipment, shops, abilities, level growth, party members, encounters, enemies and their AI blocks, actor definitions, sound cues, and a sound bank's programs and tones; drops, equipment, skills and encounter slots show the name they point at |
 | Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
