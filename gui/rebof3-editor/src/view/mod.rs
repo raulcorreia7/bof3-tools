@@ -133,6 +133,7 @@ pub fn prepare(editor: &mut Editor) {
     match entry.format() {
         Format::VramUpload => texture::prepare(editor),
         Format::AreaMapBundle if editor.tab == Tab::Map => map::prepare(editor),
+        Format::Lz77Blob | Format::CharacterBlob if editor.tab == Tab::Sprite => sprite::prepare(editor),
         _ => {}
     }
 }

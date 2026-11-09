@@ -22,9 +22,10 @@
 //! A palette word in VRAM is owned by the entry that wrote that arena word, carried through the
 //! working copy. Which steps make up a scene is in [`scenes`].
 //!
-//! Not modelled: the per-frame transfer queue (`GFX_UpdateTransferQueue`), palette fades and
-//! cycling, and the palettes actors load at run time (`GFX_LoadPalette`). They change what a frame
-//! shows, not what the archives load.
+//! A scene replay does not run the per-frame transfer queue (`GFX_UpdateTransferQueue`), palette
+//! fades and cycling, or the palettes actors load at run time: they change what a frame shows, not
+//! what the archives load. A caller that knows an actor's upload adds it with [`Vram::load_image`]
+//! and [`Vram::load_palette`] (`GFX_LoadPalette`), as `crate::sprite` does for a sprite bank.
 
 pub mod scenes;
 
@@ -280,6 +281,27 @@ impl Vram {
         self.work = words;
         self.work_owners = owners;
         self.pending = false;
+    }
+
+    /// `GFX_LoadPalette` (`exe/slus_004_22@0x80166C48`): writes `words` at RAM `ram` of the arena and at
+    /// the same place of the working copy (`dst` and `dst + 0x4000`), and raises `g_GfxPalettePending`
+    /// so the next [`Vram::upload_palette`] sends them. Words outside the arena are dropped.
+    pub fn load_palette(&mut self, ram: u32, words: &[u16], writer: Writer) {
+        let owner = self.owner(writer, Kind::Palette);
+        for (index, &word) in words.iter().enumerate() {
+            let address = u64::from(ram) + 2 * index as u64;
+            let Some(at) = address.checked_sub(u64::from(ARENA_BASE)).map(|offset| (offset / 2) as usize) else {
+                continue;
+            };
+            if at >= ARENA_WORDS {
+                break;
+            }
+            self.arena[at] = word;
+            self.arena_owners[at] = owner;
+            self.work[at] = word;
+            self.work_owners[at] = owner;
+        }
+        self.pending = true;
     }
 
     /// `LoadImage`: writes `width`×`height` words, row-major, at `x`, `y`, clipped to VRAM.

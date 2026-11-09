@@ -476,6 +476,7 @@ Kinds:
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
   character-bank  a sprite bank's palette tables as JSON
+  sprite-sheet    a sprite bank section as a PNG sheet and Aseprite JSON
 
 Every kind has focused help: bof3 assets export <KIND> --help.
 Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette BANK,
@@ -506,6 +507,7 @@ Kinds:
   strings         strings JSON back into its payload
   characters      character JSON back into ETC/START.EMI entry 8
   character-bank  palette JSON back into a sprite bank
+  sprite-sheet    a PNG sheet and Aseprite JSON back into a sprite bank
 
 Every kind has focused help: bof3 assets import <KIND> --help.
 Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
@@ -634,6 +636,21 @@ Usage: bof3 assets export character-bank PAYLOAD [-o OUT]
 
 Example:
   bof3 assets export character-bank bank.bin -o palettes.json
+
+$ bof3 assets export sprite-sheet --help
+[exit 0]
+bof3 assets export sprite-sheet: write a sprite bank section as a PNG sheet and Aseprite JSON.
+
+Usage: bof3 assets export sprite-sheet PAYLOAD --exe SLUS_004.22 [--section N] [--palette N] [-o OUT]
+
+  PAYLOAD             stored sprite bank payload, raw or LZ77
+      --exe PATH      the executable, which holds the cell sizes (required)
+      --section N     the container section (default: 0)
+      --palette N     the section palette to draw with (default: 0, the one the field stages)
+  -o, --output OUT    PNG to write; the JSON goes next to it (default: PAYLOAD.png)
+
+Example:
+  bof3 assets export sprite-sheet PL012-3.lz77 --exe SLUS_004.22 --section 1 -o ryu.png
 
 $ bof3 assets import texture --help
 [exit 0]
@@ -833,6 +850,20 @@ Usage: bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]
 
 Example:
   bof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
+
+$ bof3 assets import sprite-sheet --help
+[exit 0]
+bof3 assets import sprite-sheet: read a PNG sheet and Aseprite JSON back into a sprite bank.
+
+Usage: bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe SLUS_004.22 [-o OUT]
+
+  JSON                Aseprite JSON from export sprite-sheet; the PNG it names sits next to it
+      --payload PATH  the stored payload it was exported from (required)
+      --exe PATH      the executable, which holds the cell sizes (required)
+  -o, --output OUT    payload to write, stored like PAYLOAD (default: JSON.bin)
+
+Example:
+  bof3 assets import sprite-sheet ryu.json --payload PL012-3.lz77 --exe SLUS_004.22 -o PL012-3.new.lz77
 
 $ bof3 assets kinds
 [exit 0]

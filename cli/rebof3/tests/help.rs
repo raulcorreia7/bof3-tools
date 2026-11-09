@@ -21,8 +21,18 @@ const ASSETS: &[&str] = &[
     "export",
     "import",
 ];
-const EXPORT: &[&str] =
-    &["texture", "palette", "terrain", "vag", "sequence", "message", "strings", "characters", "character-bank"];
+const EXPORT: &[&str] = &[
+    "texture",
+    "palette",
+    "terrain",
+    "vag",
+    "sequence",
+    "message",
+    "strings",
+    "characters",
+    "character-bank",
+    "sprite-sheet",
+];
 const IMPORT: &[&str] = &[
     "texture",
     "palette",
@@ -39,6 +49,7 @@ const IMPORT: &[&str] = &[
     "strings",
     "characters",
     "character-bank",
+    "sprite-sheet",
 ];
 
 fn invocations() -> Vec<Vec<&'static str>> {
