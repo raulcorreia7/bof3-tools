@@ -5,6 +5,7 @@
 //! enemy records share. A message bank is the `message` module; any other payload goes through
 //! [`strings`]. [`discover`] holds the scan rules (`wiki: data/text`).
 
+pub mod check;
 pub mod discover;
 pub mod font;
 pub mod known;

@@ -503,8 +503,7 @@ impl<'a> Machine<'a> {
             }
             _ => Shape::Byte(op),
         };
-        let glyph =
-            Glyph { x: self.x, y: self.y + GLYPH_DROP, shape, color: self.color, animated: self.animated };
+        let glyph = Glyph { x: self.x, y: self.y + GLYPH_DROP, shape, color: self.color, animated: self.animated };
         self.page().glyphs.push(glyph);
         self.x += GLYPH_ADVANCE;
         at

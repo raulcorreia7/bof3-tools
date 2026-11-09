@@ -6,7 +6,7 @@ mod support;
 use std::collections::BTreeSet;
 
 use rebof3_emi::Archive;
-use rebof3_formats::message::bank;
+use rebof3_formats::message::{bank, po};
 use rebof3_formats::text::font::Font;
 use rebof3_formats::text::layout::{self, Context, PageEnd, Shape};
 use rebof3_formats::text::render;
@@ -16,6 +16,8 @@ use rebof3_formats::{Format, classify};
 const SHEET: usize = 3;
 const TEXT_PALETTE: usize = 8;
 const FRAME_PALETTE: usize = 9;
+/// The largest retail bank, in bytes.
+const LARGEST: usize = 21547;
 
 fn font(root: &std::path::Path) -> Font {
     let bytes = std::fs::read(root.join("ETC/FIRST.EMI")).expect("FIRST.EMI");
@@ -31,7 +33,7 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
     let font = font(&root);
     let (mut banks, mut messages, mut pages, mut proven, mut rebuilt) = (0, 0, 0, 0, 0);
     let (mut choices, mut runtime, mut blank, mut missing_glyphs) = (0, 0, 0, BTreeSet::new());
-    let mut wide = 0;
+    let (mut wide, mut largest, mut catalogues) = (0, 0, 0);
     for path in rebof3_emi::archives_under(&root) {
         let bytes = std::fs::read(&path).unwrap();
         let archive = Archive::parse(&bytes).unwrap();
@@ -45,7 +47,10 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
                 continue;
             }
             banks += 1;
+            largest = largest.max(payload.len());
             rebuilt += usize::from(bank::build(&parsed).ok().as_deref() == Some(payload));
+            let catalogue = po::export(payload).unwrap();
+            catalogues += usize::from(po::import(&catalogue, payload).ok().as_deref() == Some(payload));
             for message in &parsed.messages {
                 messages += 1;
                 let laid = layout::layout(message, Context { bank: Some(payload), runtime: None });
@@ -63,7 +68,14 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
                             missing_glyphs.insert(byte);
                         }
                     }
-                    let image = render::window(&font, page, laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
+                    let image = render::window(
+                        &font,
+                        page,
+                        laid.placement.kind.size(),
+                        laid.placement.framed,
+                        usize::MAX,
+                        [0; 3],
+                    );
                     blank += usize::from(image.pixels.chunks(4).all(|p| p[..3] == image.pixels[..3]));
                 }
             }
@@ -74,6 +86,9 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
         (165, 10510, 18540, 7933, 165, 721, 3139, 9, 492),
         "banks, messages, pages, messages without runtime text, byte-exact banks, choices, runtime placeholders, blank pages, pages wider than the window"
     );
+    assert_eq!(catalogues, 165, "banks whose PO catalogue rebuilds them byte for byte");
+    assert!(largest <= bank::LIMIT, "the largest retail bank, {largest} bytes, is within the limit");
+    assert_eq!(largest, LARGEST);
     // 0xFF is the one drawn byte the font sheet has no glyph for.
     assert_eq!(missing_glyphs.into_iter().collect::<Vec<_>>(), [0xFF]);
 }
@@ -89,7 +104,8 @@ fn a_retail_window_renders_to_png() {
     let payload = archive.payload(&bytes, 18).unwrap();
     let parsed = bank::parse(payload).unwrap();
     let laid = layout::layout(&parsed.messages[1], Context { bank: Some(payload), runtime: None });
-    let image = render::window(&font, &laid.pages[0], laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
+    let image =
+        render::window(&font, &laid.pages[0], laid.placement.kind.size(), laid.placement.framed, usize::MAX, [0; 3]);
     let png = psx_formats::gfx::png::rgba_png(image.width as u32, image.height as u32, &image.pixels);
     support::write(&support::out_dir("retail_text_window"), "window.png", png);
 }

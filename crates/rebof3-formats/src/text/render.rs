@@ -9,7 +9,7 @@
 //! `B + F` where STP is set (`func_8014FB80 (exe/slus_004_22@0x8014FB80)`, texture page `0x2F`).
 
 use super::font::{CELL_HEIGHT, CELL_WIDTH, Font, TILE_SIDE, TILE_TOP, message_cell, number_cell};
-use super::layout::{Choice, Glyph, GLYPH_ADVANCE, Page, Shape};
+use super::layout::{Choice, GLYPH_ADVANCE, Glyph, Page, Shape};
 
 /// The frame's outer margin, in pixels (the outer line sits two pixels outside the window).
 pub const MARGIN: i32 = 2;
@@ -70,7 +70,11 @@ impl Canvas {
     }
 
     fn rgba(&self) -> Rgba {
-        let pixels = self.words.iter().flat_map(|c| [c[0] << 3 | c[0] >> 2, c[1] << 3 | c[1] >> 2, c[2] << 3 | c[2] >> 2, 255]).collect();
+        let pixels = self
+            .words
+            .iter()
+            .flat_map(|c| [c[0] << 3 | c[0] >> 2, c[1] << 3 | c[1] >> 2, c[2] << 3 | c[2] >> 2, 255])
+            .collect();
         Rgba { width: self.width as usize, height: self.height as usize, pixels }
     }
 }
@@ -146,7 +150,13 @@ fn draw(font: &Font, canvas: &mut Canvas, glyph: &Glyph, offset: (i32, i32)) {
     for row in 0..CELL_HEIGHT {
         for column in 0..CELL_WIDTH.min(GLYPH_ADVANCE as usize) {
             let word = font.text_word(glyph.color, font.texel(u + column, v + row));
-            canvas.texel(offset.0 + glyph.x + column as i32, offset.1 + glyph.y + row as i32, word, NEUTRAL, Blend::Add);
+            canvas.texel(
+                offset.0 + glyph.x + column as i32,
+                offset.1 + glyph.y + row as i32,
+                word,
+                NEUTRAL,
+                Blend::Add,
+            );
         }
     }
 }
