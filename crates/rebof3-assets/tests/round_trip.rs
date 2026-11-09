@@ -226,12 +226,12 @@ fn retail_vags_round_trip_through_adpcm() {
             if decoded_again.get(..pcm.len()) != Some(pcm.as_slice()) {
                 failures.push(format!("{} VAG {index}: the encode changes its samples", header_path.display()));
             }
-            let wav = decode::pcm_wav(&pcm).unwrap();
-            if decode::vab_vag_wav(&header, &body, number).ok().as_deref() != Some(wav.as_slice()) {
+            let wav = rebof3_formats::vab::vag::pcm_wav(&pcm).unwrap();
+            if rebof3_formats::vab::vag::vab_vag_wav(&header, &body, number).ok().as_deref() != Some(wav.as_slice()) {
                 failures
                     .push(format!("{} VAG {index}: the bank export differs from its samples", header_path.display()));
             }
-            if import::vag(&wav).unwrap() != encoded {
+            if rebof3_formats::vab::vag::import(&wav).unwrap() != encoded {
                 failures.push(format!("{} VAG {index}: the WAVE path differs from the samples", header_path.display()));
             }
             identical += usize::from(encoded == stored);

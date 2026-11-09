@@ -9,12 +9,13 @@ use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use psx_formats::VAB_SAMPLE_RATE;
 use psx_formats::sep::{Package, Sequence};
 use psx_formats::vab::{Bank, Tone};
-use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
-use rebof3_assets::import;
+use rebof3_assets::decode::soundfont;
 use rebof3_assets::sound::sequence_pcm;
 use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 use rebof3_emi::entry::vab_body_index;
 use rebof3_formats::Format;
+use rebof3_formats::sep::midi::export as sequence_midi;
+use rebof3_formats::vab::vag::pcm_wav;
 
 use super::{Entry, Field, input};
 use crate::app::Editor;
@@ -430,7 +431,7 @@ fn import_sample(editor: &mut Editor, header: usize, body: usize, index: u32, cx
     let archive = entry.archive.path.clone();
     editor.open_file("WAVE file to import (mono, 16-bit, 44100 Hz)", cx, move |editor, wav| {
         let replaced = editor.rewrite_entries(&archive, &[header, body], |payloads| {
-            let vag = import::vag(&wav).map_err(|error| error.to_string())?;
+            let vag = rebof3_formats::vab::vag::import(&wav).map_err(|error| error.to_string())?;
             let (header, body) = with_sample(payloads[0], payloads[1], index, &vag)?;
             Ok(vec![header, body])
         });

@@ -379,7 +379,7 @@ fn run_export(job: &ExportJob) -> Result<(), String> {
             let title = job.target.file_stem().unwrap_or_default().to_string_lossy();
             decode::soundfont(&bytes, &body, &title).map_err(|e| e.to_string())?
         }
-        Export::Sequence(index) => decode::sequence_midi(&bytes, *index).map_err(|e| e.to_string())?,
+        Export::Sequence(index) => rebof3_formats::sep::midi::export(&bytes, *index).map_err(|e| e.to_string())?,
     };
     if let Some(parent) = job.target.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;

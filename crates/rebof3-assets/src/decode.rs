@@ -145,31 +145,6 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_formats::
     })
 }
 
-/// The rate of a VAG at pitch `0x1000`, in hertz. A VAG has no rate of its own; its samples are written at this one.
-pub const VAG_RATE: u32 = 44_100;
-
-/// The PCM of a VAG as a mono 16-bit WAVE file at [`VAG_RATE`].
-pub fn pcm_wav(pcm: &[i16]) -> crate::Result<Vec<u8>> {
-    psx_formats::wav::pcm(pcm, VAG_RATE, 1).map_err(|error| crate::Error::Audio(error.to_string()))
-}
-
-/// Sequence `index` of a sequence package (`.seq`) as a format 0 Standard MIDI File.
-pub fn sequence_midi(package: &[u8], index: usize) -> crate::Result<Vec<u8>> {
-    Ok(psx_formats::sep::Package::parse(package)?.to_midi(index)?)
-}
-
-/// One VAG's stored bytes as a WAVE file at [`VAG_RATE`].
-pub fn vag_wav(vag: &[u8]) -> crate::Result<Vec<u8>> {
-    pcm_wav(&psx_formats::adpcm::decode_stream(vag))
-}
-
-/// The VAG `index` of a VAB bank as a WAVE file: the bank's header and body, and the VAG's index in the
-/// header's VAG table.
-pub fn vab_vag_wav(header: &[u8], body: &[u8], index: u32) -> crate::Result<Vec<u8>> {
-    let vab = psx_formats::vab::Bank::parse(header, body)?;
-    pcm_wav(&vab.decode_vag(body, index)?)
-}
-
 /// The SoundFont 2 file of one VAB bank, from its header and body. `title` names the file inside it. Each
 /// tone's volume envelope is timed by the audio library's own envelope steps, from the registers the voice
 /// plays.

@@ -952,7 +952,7 @@ fn import_sequence(args: &[String]) -> Result<i32> {
         .map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) })
         .collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
-    write_output(&args.output.unwrap_or(default), &import::sequence(&borrowed)?)?;
+    write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::midi::import(&borrowed)?)?;
     Ok(EXIT_OK)
 }
 

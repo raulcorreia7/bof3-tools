@@ -35,6 +35,8 @@ pub enum Error {
         /// The block size.
         bytes: usize,
     },
+    /// A sound item that could not be read or rendered.
+    Audio(String),
     /// An open-format file that an import cannot read back to the stored bytes.
     Import(String),
 }
@@ -60,7 +62,7 @@ impl fmt::Display for Error {
             Self::GameTableShort { table, bytes, needed } => {
                 write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
             }
-            Self::Import(message) => f.write_str(message),
+            Self::Audio(message) | Self::Import(message) => f.write_str(message),
         }
     }
 }

@@ -142,17 +142,19 @@ pub static CODECS: &[Codec] = &[
             files: 2,
             index: Index::Required("export vag needs --index, the VAG's number in the bank"),
             ..Op::new("export vag needs a header (.vh) and a body (.vb) file", "{index}.wav", |job| {
-                decode::vab_vag_wav(job.input, companion(job), job.index.unwrap_or(0))
+                Ok(rebof3_formats::vab::vag::vab_vag_wav(job.input, companion(job), job.index.unwrap_or(0))?)
             })
         }),
-        import: Some(Op::new("import vag needs a WAVE file", "vag", |job| import::vag(job.input))),
+        import: Some(Op::new("import vag needs a WAVE file", "vag", |job| {
+            Ok(rebof3_formats::vab::vag::import(job.input)?)
+        })),
     },
     Codec {
         kind: "sequence",
         export: Some(Op {
             index: Index::Optional,
             ..Op::new("export sequence needs a sequence package (.seq) file", "mid", |job| {
-                decode::sequence_midi(job.input, job.index.unwrap_or(0) as usize)
+                Ok(rebof3_formats::sep::midi::export(job.input, job.index.unwrap_or(0) as usize)?)
             })
         }),
         import: None,
