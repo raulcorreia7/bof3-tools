@@ -1,17 +1,4 @@
-//! Character sprites: their palettes as JSON, and each section as a PNG sprite sheet with Aseprite JSON.
-//!
-//! The format lives in `rebof3_formats::sprite` (frame sheets, animations, records and the draw) and
-//! `rebof3_formats::sprite_palettes` (the palette JSON). This module is what the `bof3` command and the
-//! editor share: it takes an entry payload as the disc stores it, raw or LZ77, and gives it back in the
-//! same form, so the two agree on every byte.
-//!
-//! # Cross-reference
-//!
-//! | Family | C record (`decomp/include`) |
-//! | --- | --- |
-//! | character sprites | `Actor` (`include/sys/actor.h`): `+0x4C` section, `+0x50` steps, `+0x54` frame table; `SpriteCell` (`src/engine/slus/slus.h`) |
-//!
-//! The layout is in `wiki: formats/character`.
+//! Character sprites: their palettes as JSON, and each section as a PNG sprite sheet with Aseprite JSON. The layout is in `wiki: formats/character`.
 
 use rebof3_emi::lz77;
 use rebof3_formats::sprite;
@@ -21,7 +8,7 @@ use crate::Result;
 pub use rebof3_formats::sprite::{Sheet, SpriteSizes};
 pub use rebof3_formats::sprite_palettes::{CharacterSprites, parse};
 
-/// The JSON of the palettes of one character sprites. `payload` is the decoded sprites: a whole container, or one section.
+/// The JSON of the palettes of one character sprites.
 pub fn character_sprites(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(rebof3_formats::sprite_palettes::export(payload)?)
 }
@@ -35,8 +22,7 @@ pub enum Packing {
     Lz77,
 }
 
-/// The sprites bytes of a stored payload, and how it was stored. A payload that reads as character sprites is raw;
-/// otherwise it must unpack to one.
+/// The sprites bytes of a stored payload, and how it was stored.
 pub fn unpack(payload: &[u8]) -> Result<(Packing, Vec<u8>)> {
     if sprite::decode(payload).is_ok() {
         return Ok((Packing::Raw, payload.to_vec()));
@@ -46,8 +32,7 @@ pub fn unpack(payload: &[u8]) -> Result<(Packing, Vec<u8>)> {
     Ok((Packing::Lz77, sprites))
 }
 
-/// The payload that stores `sprites` the way `original` stored its sprites: `original` itself while the sprites
-/// is unchanged, so an LZ77 entry keeps its stored stream.
+/// The payload that stores `sprites` the way `original` stored its sprites: `original` itself while the sprites is unchanged, so an LZ77 entry keeps its stored stream.
 pub fn pack(original: &[u8], sprites: &[u8]) -> Result<Vec<u8>> {
     let (packing, stored) = unpack(original)?;
     if stored == sprites {
@@ -69,15 +54,13 @@ pub fn sprite_sizes(executable: &[u8]) -> Result<SpriteSizes> {
     Ok(SpriteSizes::from_executable(executable)?)
 }
 
-/// Section `section` of the stored `payload` as a sprite sheet drawn with palette `palette`. `image` is the
-/// PNG's file name, which the JSON names.
+/// Section `section` of the stored `payload` as a sprite sheet drawn with palette `palette`.
 pub fn sprite_sheet(payload: &[u8], section: usize, palette: usize, sizes: &SpriteSizes, image: &str) -> Result<Sheet> {
     let sprites = sprite::decode(&unpack(payload)?.1)?;
     Ok(sprite::export(&sprites, section, palette, sizes, image)?)
 }
 
-/// The stored payload with a sprite sheet read back into the section it names; see
-/// `rebof3_formats::sprite::import` for what changes.
+/// The stored payload with a sprite sheet read back into the section it names; see `rebof3_formats::sprite::import` for what changes.
 pub fn import_sprite_sheet(json: &[u8], png: &[u8], payload: &[u8], sizes: &SpriteSizes) -> Result<Vec<u8>> {
     let sprites = sprite::decode(&unpack(payload)?.1)?;
     let imported = sprite::encode(&sprite::import(&sprites, sizes, json, png)?)?;

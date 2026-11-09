@@ -1,10 +1,4 @@
-//! The table of asset codecs: for each kind, how its stored bytes become an open form (export) and
-//! come back (import).
-//!
-//! A [`Codec`] row names the kind and holds an [`Op`] per direction. An op says which files it
-//! reads, which options it takes, the messages for what is missing, the default output extension and
-//! the function that does the work, so a command line can be built from the table: parse, check the
-//! op's needs, read the files, call [`Op::run`], write the bytes.
+//! The table of asset codecs: for each kind, how its stored bytes become an open form (export) and come back (import).
 
 use crate::error::Result;
 use rebof3_formats::message::table;

@@ -1,8 +1,4 @@
-//! The original bytes of every asset: the catalog's hashes match the disc
-//! slices, and every kind with a codec comes back to its own bytes.
-//!
-//! The test skips when the disc image is not there. Point `BOF3_DISC_IMAGE` at
-//! its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
+//! The original bytes of every asset: the catalog's hashes match the disc slices, and every kind with a codec comes back to its own bytes. Point `BOF3_DISC_IMAGE` at its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -23,9 +19,7 @@ use rebof3_formats::vram::TextureImport;
 
 /// The extracted tree and its catalog, extracted once for the whole file.
 struct Extracted {
-    /// The directory the tree is in. A static is never dropped, so the last test to finish removes it ([`Finished`]).
-    /// A run that is killed first leaves it under the target directory, and the next run wipes it; it never lands in
-    /// the system temp directory.
+    /// The directory the tree is in.
     directory: PathBuf,
     /// The tree's root.
     tree: PathBuf,
@@ -54,8 +48,7 @@ const READERS: usize = 2;
 /// How many of them have finished.
 static FINISHED: AtomicUsize = AtomicUsize::new(0);
 
-/// Held for the length of a test that reads the tree. The last one to drop removes the tree, so a full run leaves no
-/// gigabytes behind. A filtered run that skips a reader leaves the tree for the next run to wipe.
+/// Held for the length of a test that reads the tree.
 struct Finished;
 
 impl Drop for Finished {
@@ -113,7 +106,6 @@ fn the_catalog_hashes_match_the_disc_slices() {
     let mut disc = Image::open(&image).expect("the disc opens");
     let entries = disc.entries().expect("the file table reads");
     let mut checked = 0;
-    // The rows are in source order, so one disc file is read once for all its slots.
     let mut current: Option<(&str, Option<Vec<u8>>)> = None;
     for row in extracted.report.rows.iter().filter(|row| row.role == "raw" && row.slot.is_some()) {
         if current.as_ref().is_none_or(|(source, _)| *source != row.source) {
@@ -158,7 +150,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         }
     };
 
-    // A texture: its 16 bpp view reads back to the stored words.
     for path in with_suffix(tree, ".img") {
         if !path.to_string_lossy().contains("texture/") {
             continue;
@@ -175,7 +166,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         record("texture", same);
     }
 
-    // A palette: its JSON reads back to the stored words.
     for path in with_suffix(tree, ".clut") {
         if !path.to_string_lossy().contains("palette/") {
             continue;
@@ -188,7 +178,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         record("palette", same);
     }
 
-    // A map bundle: its layout JSON reads back to the stored bytes.
     for path in with_suffix(tree, ".map") {
         if !path.to_string_lossy().contains("area-map/") {
             continue;
@@ -202,7 +191,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         record("area-map", same);
     }
 
-    // An encounter block: its JSON reads back to the stored bytes.
     for path in with_suffix(tree, ".emi0") {
         let name = path.to_string_lossy().into_owned();
         let kind = if name.contains("area-encounters/") {
@@ -224,7 +212,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         record(kind, same);
     }
 
-    // A cue table and a scene table: the codec rebuilds them.
     for path in with_suffix(tree, ".emi8") {
         let payload = fs::read(&path).unwrap();
         let same = rebof3_emi::cue::CueTable::decode(&payload).map(|table| table.encode() == payload).unwrap_or(false);
@@ -241,7 +228,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         record("area-actor-defs", same);
     }
 
-    // A sequence: its MIDI reads back to the stored package.
     for path in with_suffix(tree, ".seq") {
         let stored = fs::read(&path).unwrap();
         let Ok(package) = psx_formats::sep::Package::parse(&stored) else { continue };
@@ -258,11 +244,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         record("audio-sequence", same);
     }
 
-    // A sound bank: its SoundFont reads back to a rebuilt bank, never the stored one. The import writes a fresh
-    // header (default program volume and pan, ADSR fields searched from the SoundFont envelope) and re-encodes
-    // every sample to ADPCM, so the bank bytes differ by design (`tests/soundfont.rs` gates the second round trip).
-    // The kept content is the SoundFont: the rebuilt bank must export to the same zones, envelopes and samples.
-    // The banks are independent and each takes a while, so they run on all cores.
+    // A sound bank: its SoundFont reads back to a rebuilt bank, never the stored one.
     let banks = with_suffix(tree, ".sf2");
     let next = AtomicUsize::new(0);
     let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(banks.len()).max(1);
@@ -293,7 +275,6 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         eprintln!("{kind}: {same} of {count} come back to their own bytes");
     }
     assert!(!round_trip.is_empty(), "the disc holds assets to round trip");
-    // Every kind comes back byte for byte; a sound bank comes back as the same SoundFont content.
     for (kind, (count, same)) in &round_trip {
         assert_eq!(same, count, "{kind} comes back to its own bytes");
     }
@@ -320,10 +301,7 @@ fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) 
     (header_equal, same)
 }
 
-/// Raw mode writes only the disc's own bytes, for every kind. Each file is one of: a slice of a disc file (an EMI
-/// entry, or a game table inside entry 0 of `ETC/GAME.EMI`), a whole disc file, the license sectors, an audio
-/// track's sectors, a sound bank as header followed by body, or a sample as the bank body stores it. No conversion is
-/// written, and the tree holds exactly the files the catalog lists.
+/// Raw mode writes only the disc's own bytes, for every kind.
 #[test]
 fn raw_mode_writes_the_disc_bytes_of_every_kind() {
     let Some(image) = support::retail_image() else {

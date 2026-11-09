@@ -12,13 +12,11 @@ pub const COLUMNS: [&str; 15] = [
 ];
 /// Marks a column that does not apply to the row.
 pub const NONE: &str = "-";
-/// The `format` of a file rendered from a `bof3player` catalog item. Such a file is an output of the
-/// item, not a stored payload, so the summary does not count it as an entry.
+/// The `format` of a file rendered from a `bof3player` catalog item.
 pub const RENDERED_ITEM: &str = "bof3player item";
-/// The `format` of a file derived from a game table in `ETC/GAME.EMI` entry 0. Like a rendered item, it
-/// is an output of the entry, so the summary does not count it as an entry.
+/// The `format` of a file derived from a game table in `ETC/GAME.EMI` entry 0.
 pub const DERIVED_TABLE: &str = "game table (derived)";
-/// The `format` of the text run's index. Like the two above, it is an output of the run, not an entry.
+/// The `format` of the text run's index.
 pub const TEXT_INDEX: &str = "text index";
 
 /// Whether a row's file is an output of an item or entry, not an entry of its own.
@@ -115,7 +113,7 @@ impl Report {
         out
     }
 
-    /// Payloads per kind. A payload with several outputs counts once.
+    /// Payloads per kind.
     fn payloads(&self) -> BTreeMap<Kind, Tally> {
         let mut tallies: BTreeMap<Kind, Tally> = BTreeMap::new();
         let mut seen = std::collections::HashSet::new();

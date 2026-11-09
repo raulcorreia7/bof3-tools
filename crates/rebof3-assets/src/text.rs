@@ -1,9 +1,4 @@
 //! The `text` kind: game strings.
-//!
-//! The codec is `rebof3_emi::text::codec`; the message tables are `rebof3_formats::message::table` and the
-//! strings of other payloads `rebof3_formats::text`. [`extract_with`] walks the extracted disc (`build/disc`, or `--text-disc DIR`) and writes, for every payload that
-//! holds text, the stored bytes, one JSON row per string and a plain-text view. [`known`] places the strings of
-//! the documented tables, and the scan finds the loose ones.
 
 use rebof3_formats::message::table;
 use rebof3_formats::text::{known, source, strings};
@@ -40,7 +35,7 @@ pub struct Options {
     pub disc: PathBuf,
     /// The output directory; the files go below its [`TEXT_DIR`].
     pub out: PathBuf,
-    /// The disc image, for the archive's LBA. Without it the JSON omits the disc offset.
+    /// The disc image, for the archive's LBA.
     pub image: Option<PathBuf>,
     /// Write each payload's stored bytes as `<slot>.bin`.
     pub raw: bool,
@@ -93,8 +88,7 @@ struct IndexRow {
     text: String,
 }
 
-/// Writes the strings of every payload of the extracted disc `disc` below `<out>/text`: the stored bytes, the
-/// JSON and a plain-text view for each payload that holds text. `write` false plans the run.
+/// Writes the strings of every payload of the extracted disc `disc` below `<out>/text`: the stored bytes, the JSON and a plain-text view for each payload that holds text.
 pub fn extract(disc: &Path, out: &Path, write: bool) -> Result<Report> {
     extract_with(&Options::both(disc, out, write))
 }
@@ -303,10 +297,6 @@ fn text_file(
 }
 
 /// Whether a payload's scanned strings are text, rather than bytes that happen to decode as some.
-///
-/// A resource table is a string table by construction. A code image is kept when it holds a run of
-/// at least four short labels, which is what a menu table looks like, or a loose record with two
-/// words; a lone mixed-case run in a sprite or an area overlay is not text.
 fn scan_holds_text(format: Format, scan: &[strings::Item]) -> bool {
     match format {
         Format::SharedResourceTable => !scan.is_empty(),
@@ -441,7 +431,6 @@ fn row(
         load_arg: Some(entry.ram_ptr),
         format: format.name(),
         kind: Kind::Text,
-        // The text codec produced the JSON, whatever the payload's own format state is.
         state: "codec",
         role,
         output: Some(output),

@@ -1,8 +1,4 @@
 //! The import direction: the open formats back to the game's own bytes.
-//!
-//! Each import reads what its export wrote and returns the stored bytes of the
-//! entry. The palette and texture imports live with their formats
-//! (`rebof3_formats::clut::import`, `rebof3_formats::vram::import`). The owner's disc round-trips byte for byte (`tests/round_trip.rs`).
 
 use crate::error::Result;
 
@@ -16,9 +12,7 @@ pub fn character_sprites(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     Ok(rebof3_formats::sprite_palettes::import(json, payload)?)
 }
 
-/// An EMI container with the entries named in `replace` swapped for new payloads. Every other entry keeps its
-/// stored payload, type and load address, and the container keeps its version. With no replacement the result is
-/// the container's bytes.
+/// An EMI container with the entries named in `replace` swapped for new payloads.
 pub fn emi(container: &[u8], replace: &[(usize, &[u8])]) -> Result<Vec<u8>> {
     Ok(rebof3_emi::pack::rebuild(container, replace)?)
 }

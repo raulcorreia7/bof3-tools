@@ -1,10 +1,4 @@
-//! The asset kinds `rebof3-assets` sorts the disc into.
-//!
-//! A kind is a directory of the output tree and a value of the `kind` column of
-//! `assets.jsonl`. An EMI entry's kind follows from its
-//! [`Format`], so the census in
-//! `wiki: formats/conversion#conversion-map` and this table name the
-//! same things.
+//! The asset kinds `rebof3-assets` sorts the disc into. An EMI entry's kind follows from its [`Format`], so the census in `wiki: formats/conversion#conversion-map` and this table name the same things.
 
 use rebof3_formats::Format;
 
@@ -116,8 +110,7 @@ impl Kind {
     }
 }
 
-/// The roles of an output that are the disc's own bytes: the stored payload (`raw`), a VAB bank as header followed
-/// by body (`vab`), and a VAG sample as the body stores it (`vag`). Every other role is a conversion.
+/// The roles of an output that are the disc's own bytes: the stored payload (`raw`), a VAB bank as header followed by body (`vab`), and a VAG sample as the body stores it (`vag`).
 const ORIGINAL_ROLES: [&str; 3] = ["raw", "vab", "vag"];
 
 /// The container a run writes for rendered audio items.
@@ -154,10 +147,6 @@ impl AudioFormat {
 }
 
 /// Which form of an asset a run writes.
-///
-/// `Raw` writes the original bytes as stored on the disc, byte for byte; `Modern` writes the conversion to an open
-/// format, which can be lossy; `Both` (the default) writes both. An asset with no conversion has nothing to add in
-/// `Modern`, so its original bytes are its export there too.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Mode {
     #[default]
@@ -176,8 +165,7 @@ impl Mode {
         }
     }
 
-    /// Whether an output with this `role` is written in this mode. `converts` says whether the asset it belongs to
-    /// has a conversion at all.
+    /// Whether an output with this `role` is written in this mode.
     pub fn writes(self, role: &str, converts: bool) -> bool {
         let original = ORIGINAL_ROLES.contains(&role);
         match self {

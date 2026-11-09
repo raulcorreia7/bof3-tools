@@ -1,5 +1,4 @@
-//! The character sprites' palette tables, both ways, on the owner's disc. The retail check skips when no disc image is
-//! present (set `BOF3_DISC_IMAGE`).
+//! The character sprites' palette tables, both ways, on the owner's disc. The retail check skips when no disc image is present (set `BOF3_DISC_IMAGE`).
 
 mod support;
 

@@ -1,6 +1,4 @@
-//! The text kind's files: the stored payload, one JSON row per string and a plain-text view,
-//! beside a run-wide index. The synthetic archive exercises the table, a string table and the
-//! payloads the scan drops; the retail disc is covered by the hands-on run in the task report.
+//! The text kind's files: the stored payload, one JSON row per string and a plain-text view, beside a run-wide index.
 
 mod support;
 
