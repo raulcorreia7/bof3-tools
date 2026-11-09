@@ -343,7 +343,9 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 fn reader_note(reader: Reader) -> String {
     match reader {
         Reader::Field => "Party bank: Party_LoadMemberSprite places it and loads palette 0.".into(),
-        Reader::Battle => "Battle bank: its reader is not traced; drawn with the field placement.".into(),
+        Reader::Battle => "Battle bank: Battle_LoadPartySprites streams it and Party_BuildBattlers places it through \
+                           Party_LoadMemberSprite, palette 0; the battle slot moves it in VRAM, not its colours."
+            .into(),
         Reader::Unknown => "No traced loader reads this archive; drawn with the field placement.".into(),
     }
 }
