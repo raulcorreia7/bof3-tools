@@ -17,7 +17,7 @@ pub static LZ77: Description = Description {
     state: State::Specified,
     spec_state: "partial",
     codec_state: "decode-only (in the game's own decoder)",
-    evidence: "src/slus/func_80164064.c decodes 65/65; no encoder in the repo",
+    evidence: "src/engine/slus/LZ77_DecodeStep.c decodes 65/65; no encoder in the repo",
     extension: "lz77",
     selector: Selector::Type(TYPE_LZ77),
     round_trip: RoundTrip::None,

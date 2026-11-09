@@ -33,8 +33,8 @@
 //! ```
 //!
 //! Each of the four record regions ends with a zero word: the walks in
-//! `func_80157F98` (both loops), `func_801580A4`, `func_80158B24`,
-//! `func_8015507C` and `func_80155B40` stop on it. Every region's records tile
+//! `Area_RunBundleOpcodes` (both loops), `Area_CyclePalette`, `Area_IndexCells`,
+//! `Area_SetCellPalette` and `Area_DrawCellLayer` stop on it. Every region's records tile
 //! exactly onto the next region's start, which is why [`MapBundle::encode`]
 //! derives the offsets from the sections rather than storing them.
 //!
@@ -192,8 +192,8 @@ impl ListRecord {
 
 /// One `+0x24` record cell: a head of map coordinates and its record chain.
 /// The runner writes this cell's id into the `D_80141880` grid after the
-/// isometric transform (`func_80158B24`), and the two walkers advance through
-/// the chain by each record's size byte (`func_8015507C`, `func_80155B40`).
+/// isometric transform (`Area_IndexCells`), and the two walkers advance through
+/// the chain by each record's size byte (`Area_SetCellPalette`, `Area_DrawCellLayer`).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapCell {
     /// Head byte 0: map row.
@@ -206,10 +206,10 @@ pub struct MapCell {
 
 /// One `+0x28` object: a `u16` tag then the body's words, whose count the
 /// reader takes from the head (`func_801576FC` walks one object's body,
-/// `func_80157F98`'s second loop walks the objects).
+/// `Area_RunBundleOpcodes`'s second loop walks the objects).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MapObject {
-    /// The tag `func_801576FC` passes to `func_80155E7C`.
+    /// The tag `func_801576FC` passes to `Area_TestCondition`.
     pub tag: u16,
     /// The body words after the head.
     pub words: Vec<u32>,

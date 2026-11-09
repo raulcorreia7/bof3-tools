@@ -2,8 +2,8 @@
 //! draw rules that name both.
 //!
 //! The palette arena is a 16 KB band of RAM. The engine copies it to a working copy and
-//! uploads that copy with one `LoadImage` of `rect(0, 480, 256, 32)` (exe `func_8014E22C`,
-//! `src/slus/func_8014E22C.c`). A type-0 palette loaded at RAM `ram` therefore
+//! uploads that copy with one `LoadImage` of `rect(0, 480, 256, 32)` (exe `GFX_UploadPalette`,
+//! `src/engine/slus/GFX_UploadPalette.c`). A type-0 palette loaded at RAM `ram` therefore
 //! sits at arena word `(ram - ARENA_BASE) / 2`, which is VRAM column `% 256` and row
 //! `480 + / 256`. A type-3 entry is a texture sheet placed by its load argument
 //! ([`sheet`]).
