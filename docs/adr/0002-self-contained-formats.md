@@ -1,6 +1,6 @@
 # ADR 0002: self-contained formats
 
-- Status: proposed
+- Status: accepted, partly implemented (see Implementation status)
 - Date: 2026-11-09
 - Requested by: raulcorreia7 (owner): "breakdown formats in an independent way, self contained"
 - Applies to: `rebof3-emi`, `rebof3-assets`, `rebof3-formats` (new), `bof3`, `bof3-edit`
@@ -44,11 +44,12 @@ Dependency rules:
 
 1. A format module depends on **primitives** only: the EMI container (`Entry`, `Archive`), LZ77,
    the record readers, the game text codec, `psx-formats`, and the VRAM model with its load replay.
-   It never imports another format module. A test reads the sources and fails on a
-   `crate::<other format>` path.
-2. The EMI container (`rebof3-emi`) knows entries and nothing else: the table, the payload bytes,
-   packing, manifests, LZ77 and the round trip of the container itself. It has no error variant
-   for a format and no import of one.
+   It never imports another format module. `tests/independence.rs` reads the sources and fails on
+   a `crate::<other format>` path.
+2. The EMI container (`rebof3-emi`) knows entries and the primitives: the table, the payload
+   bytes, packing, manifests, LZ77, the record readers, the text codec, the VRAM model and the
+   round trip of the container itself. It imports no format module. Its error keeps the variants
+   for the character table, which the sprite lane still edits (see below).
 3. A **registry** (`registry.rs` in `rebof3-formats`) lists every `Description` in one table. It
    answers "which format is this entry" (`classify`), "what is it called, how well is it known, what
    extension does it take" and "does its codec rebuild the bytes". The coverage table, the
@@ -74,10 +75,10 @@ for the audio library), LZ77 and I/O.
 ```text
 psx-formats (bof3-player)   TIM, VAB, SEP, CLUT, VRAM words, PNG, WAV, SF2, MIDI
         ^
-rebof3-emi                  container, pack, manifest, verify, LZ77, record readers, text codec
+rebof3-emi                  container, pack, manifest, verify, LZ77, record readers, text codec,
+        ^                   VRAM model (texture) and load replay
+rebof3-formats              registry + one module per format + shared glTF and identity helpers
         ^
-rebof3-formats              registry + one module per format + the VRAM model and replay
-        ^                   (primitives under prim/, formats beside them)
 rebof3-assets               extract-all, disc walk, kinds, report (calls the registry)
         ^
 bof3, bof3-edit             command line; editor views (a table from format to views)
@@ -134,3 +135,25 @@ then the formats that nothing else in the container uses, then the ones others d
   retail tests pin the common ones; a moved error keeps its `Display` text.
 - Risk: the classifier is edited by the branch that adds the sprite-frames format. Its edit lands
   as a new row in `sprite_bank.rs` instead of a new arm in six functions.
+
+## Implementation status
+
+Moved into `rebof3-formats`, one commit each: the registry with `classify` and the coverage table;
+`script`, `scene` and `map` (with the terrain and layout conversion and glTF export);
+`game_tables` and `encounter` with their JSON conversion; the VAG and MIDI conversion into `vab`
+and `sep`; and the per-format `derive` function, which replaces the `match` in
+`rebof3-assets::decode::derive`. `message`, `cells`, `window` and `resources` are description-only
+rows. The registry replaces the six `match`es in `Format` and the coverage table's codec calls.
+
+Left, for a follow-up:
+
+- The palette and texture conversion (`decode::palette_json`, the texture PNGs, the row joins,
+  `import::palette` and `import::texture`) still lives in `rebof3-assets`; it belongs to `clut` and `vram`.
+- The text modules (`emi/text/discover.rs`, `assets/text*`) and the SoundFont conversion, which
+  needs `bof3player::spu` and so would add a dependency to the formats crate.
+- `kind.rs::of_format`, the `if format ==` branches in `extract.rs` and the editor's
+  `tabs()`/`prepare()` matches are not yet table-driven (rule 4).
+- `sprite_bank`, `characters`, `character_bank`, `sprites.rs` and `view/sprite.rs` are left
+  untouched on purpose (the sprite-frames lane edits them), apart from one import line in
+  `characters.rs` and one in `view/sprite.rs`. `GameTableShort` stays in the container error for
+  `characters.rs`.
