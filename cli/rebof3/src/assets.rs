@@ -23,6 +23,8 @@ use rebof3_formats::map::terrain;
 use rebof3_formats::vab::soundfont;
 use rebof3_formats::vram::TextureImport;
 
+mod period;
+
 /// Exit codes: 0 success, 1 some payloads failed to write, 2 an error.
 const EXIT_OK: i32 = 0;
 const EXIT_FAILURES: i32 = 1;
@@ -167,10 +169,14 @@ Usage: bof3 assets export <KIND> ...
 
 Kinds:
   texture         PNG view, or an indexed PNG in one palette row
+  tim             a texture as a TIM file, with its CLUT when you give one
   palette         a CLUT bank as JSON
   terrain         a map bundle as glTF or OBJ
   vag             one sample of a VAB bank as WAVE
+  vab             a bank's header and body as one VAB file
   sequence        one sequence of a package as MIDI
+  seq             one sequence of a package as a SEQ file
+  sep             a sequence package as a SEP file
   message         a message bank as JSON
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
@@ -192,9 +198,13 @@ Usage: bof3 assets import <KIND> ...
 
 Kinds:
   texture         a PNG view or indexed PNG back into a payload
+  tim             a TIM file back into a payload and its palette
   palette         palette JSON back into color words
   terrain         a glTF or OBJ mesh back into a map bundle
   vag             a WAVE file back into a sample
+  vab             a VAB file back into its header and body
+  seq             SEQ files back into a sequence package
+  sep             a SEP file back into a sequence package
   table           one game table back into ETC/GAME.EMI entry 0
   encounters      encounter JSON back into its block
   layout          map layout JSON back into a bundle
@@ -568,6 +578,10 @@ Example:
 fn export_help(kind: &str) -> &'static str {
     match kind {
         "texture" => EXPORT_TEXTURE_HELP,
+        "tim" => period::EXPORT_TIM_HELP,
+        "vab" => period::EXPORT_VAB_HELP,
+        "seq" => period::EXPORT_SEQ_HELP,
+        "sep" => period::EXPORT_SEP_HELP,
         "palette" => EXPORT_PALETTE_HELP,
         "terrain" => EXPORT_TERRAIN_HELP,
         "vag" => EXPORT_VAG_HELP,
@@ -584,6 +598,10 @@ fn export_help(kind: &str) -> &'static str {
 fn import_help(kind: &str) -> &'static str {
     match kind {
         "texture" => IMPORT_TEXTURE_HELP,
+        "tim" => period::IMPORT_TIM_HELP,
+        "vab" => period::IMPORT_VAB_HELP,
+        "seq" => period::IMPORT_SEQ_HELP,
+        "sep" => period::IMPORT_SEP_HELP,
         "palette" => IMPORT_PALETTE_HELP,
         "terrain" => IMPORT_TERRAIN_HELP,
         "vag" => IMPORT_VAG_HELP,
@@ -792,6 +810,10 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     };
     match (direction, kind.as_str()) {
         (Direction::Export, "texture") => return export_texture(rest),
+        (Direction::Export, "tim") => return period::export_tim(rest),
+        (Direction::Import, "tim") => return period::import_tim(rest),
+        (Direction::Import, "vab") => return period::import_vab(rest),
+        (Direction::Import, "seq") => return period::import_seq(rest),
         (Direction::Export, "terrain") => return terrain_command(rest),
         (Direction::Export, "sprite-sheet") => return export_sprite_sheet(rest),
         (Direction::Import, "sprite-sheet") => return import_sprite_sheet(rest),
@@ -805,7 +827,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(
-                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters, character-bank and sprite-sheet"
+                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, strings, characters, character-bank and sprite-sheet"
             ),
             Direction::Import => {
                 format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")

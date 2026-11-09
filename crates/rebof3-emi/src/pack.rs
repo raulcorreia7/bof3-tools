@@ -136,10 +136,17 @@ pub fn pack(output: impl AsRef<Path>, inputs: &[PackEntry], archive_version: u32
 /// Every entry keeps its type and load address, and the container keeps its version. With no replacement the
 /// result is the container as its entries pack.
 pub fn rebuild(container: &[u8], replace: &[(usize, &[u8])]) -> Result<Vec<u8>> {
+    rebuild_placed(container, replace, &[])
+}
+
+/// [`rebuild`] with a new load address for each entry named in `placed`: the one field of the table a
+/// texture or palette move changes. An entry not named keeps its load address.
+pub fn rebuild_placed(container: &[u8], replace: &[(usize, &[u8])], placed: &[(usize, u32)]) -> Result<Vec<u8>> {
     let archive = Archive::parse(container)?;
     let count = archive.entries().len();
-    if let Some((index, _)) = replace.iter().find(|(index, _)| *index >= count) {
-        return Err(Error::EntryOutOfRange { index: *index, count });
+    let named = replace.iter().map(|(index, _)| *index).chain(placed.iter().map(|(index, _)| *index));
+    if let Some(index) = named.into_iter().find(|index| *index >= count) {
+        return Err(Error::EntryOutOfRange { index, count });
     }
     let mut payloads = Vec::with_capacity(count);
     for (index, entry) in archive.entries().iter().enumerate() {
@@ -147,7 +154,8 @@ pub fn rebuild(container: &[u8], replace: &[(usize, &[u8])]) -> Result<Vec<u8>> 
             Some((_, bytes)) => *bytes,
             None => archive.payload(container, index)?,
         };
-        payloads.push(Payload { bytes, file_type: entry.file_type, ram_ptr: entry.ram_ptr });
+        let ram_ptr = placed.iter().find(|(at, _)| *at == index).map_or(entry.ram_ptr, |(_, ram)| *ram);
+        payloads.push(Payload { bytes, file_type: entry.file_type, ram_ptr });
     }
     pack_payloads(archive.version(), &payloads)
 }
