@@ -63,6 +63,9 @@ const LINE: f32 = 1.0;
 const CROSS: f32 = 6.0;
 /// The width of the animation list.
 const LIST_WIDTH: f32 = 330.0;
+/// Ticks a step with delay byte 0 lasts: the step function decrements the byte before it tests
+/// for zero, so 0 wraps through 255.
+const ZERO_DELAY_TICKS: u32 = 256;
 
 /// A palette the frame is drawn with.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -531,7 +534,7 @@ fn playback_rule(playback: Playback) -> &'static str {
 /// The position in the stream, in ticks and milliseconds.
 fn readout(animation: &Animation, player: Player) -> String {
     let ms = |ticks: f64| (ticks * TICK_MICROS / 1000.0).round();
-    let left = if player.delay() == 0 { 256 } else { u32::from(player.delay()) };
+    let left = if player.delay() == 0 { ZERO_DELAY_TICKS } else { u32::from(player.delay()) };
     format!(
         "tick {} ({} ms)   step {} of {}   frame {} of {}   {left} ticks left ({} ms){}",
         player.ticks(),
