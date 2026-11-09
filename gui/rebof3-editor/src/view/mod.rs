@@ -184,7 +184,7 @@ struct FormatViews {
 }
 
 /// The views of each format; a format without a row has only Info, Hex and what its payload offers.
-static VIEWS: [FormatViews; 13] = [
+static VIEWS: &[FormatViews] = &[
     FormatViews {
         format: Format::VramUpload,
         tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
