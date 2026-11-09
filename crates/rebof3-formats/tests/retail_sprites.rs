@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use rebof3_emi::replay::Vram;
 use rebof3_emi::{Archive, lz77};
-use rebof3_formats::sprite::{self, FIELD_PALETTE, Placement, SpriteSizes, Stage, compose, frame_bounds};
+use rebof3_formats::sprite::{self, FIELD_PALETTE, Placement, Reader, SpriteSizes, Stage, compose, frame_bounds};
 use rebof3_formats::{Format, classify};
 
 /// The executable that holds `g_SpriteSizes`.
@@ -63,10 +63,20 @@ fn every_retail_sprite_bank_round_trips_and_stitches() {
     let (mut entries, mut decoded, mut sections, mut failures) = (0, 0, 0, Vec::new());
     let (mut sheets, mut animations, mut placed, mut frames, mut stitched) = (0, 0, 0, 0, 0);
     let (mut outside, mut unresolved, mut imported, mut repacked) = (0, 0, 0, 0);
+    // Per reader: entries, sections and frames drawn with the palette the reader loads.
+    let mut proven = std::collections::BTreeMap::<&str, (usize, usize, usize)>::new();
     for (place, bytes) in banks(&root) {
         entries += 1;
         let Ok(bank) = sprite::decode(&bytes) else { continue };
         decoded += 1;
+        let reader = Reader::of(place.split('#').next().unwrap_or(&place));
+        if reader.palette().is_some() {
+            let counts = proven.entry(if reader == Reader::Battle { "battle" } else { "field" }).or_default();
+            counts.0 += 1;
+            counts.1 += bank.sections.len();
+            counts.2 +=
+                bank.sections.iter().flat_map(|section| &section.animations).map(|a| a.frames.len()).sum::<usize>();
+        }
         match sprite::encode(&bank) {
             Ok(encoded) if encoded == bytes => {}
             Ok(_) => failures.push(format!("{place}: encodes to other bytes")),
@@ -123,6 +133,9 @@ fn every_retail_sprite_bank_round_trips_and_stitches() {
          {outside} cell texels past their sheet, {unresolved} pixels past the palette; {imported} of {sections} \
          sheets import to the stored section; {repacked} of {sheets} sheets pack again into their stored bytes"
     );
+    eprintln!("proven palette (entries, sections, frames): {proven:?}");
     assert!(failures.is_empty(), "{} failures: {:?}", failures.len(), failures.iter().take(8).collect::<Vec<_>>());
     assert!(decoded > 0 && imported == sections, "{decoded} banks, {imported} of {sections} sheets");
+    assert_eq!(proven.get("battle"), Some(&(38, 114, 18310)), "battle banks drawn with the palette their reader loads");
+    assert_eq!(proven.get("field"), Some(&(19, 57, 14892)), "field banks drawn with the palette their reader loads");
 }

@@ -5,6 +5,7 @@
 mod cells;
 mod compose;
 mod decoded;
+mod formation;
 mod hex;
 mod info;
 mod layout;
@@ -46,6 +47,7 @@ pub enum Tab {
     Vram,
     Script,
     Layout,
+    Formation,
 }
 
 impl Tab {
@@ -65,6 +67,7 @@ impl Tab {
             Tab::Vram => "VRAM",
             Tab::Script => "Script",
             Tab::Layout => "Layout",
+            Tab::Formation => "Formation",
         }
     }
 }
@@ -131,6 +134,7 @@ pub struct Views {
     pub vram: vram::State,
     pub script: script::State,
     pub layout: layout::State,
+    pub formation: formation::State,
 }
 
 impl Views {
@@ -180,7 +184,7 @@ struct FormatViews {
 }
 
 /// The views of each format; a format without a row has only Info, Hex and what its payload offers.
-static VIEWS: [FormatViews; 13] = [
+static VIEWS: &[FormatViews] = &[
     FormatViews {
         format: Format::VramUpload,
         tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
@@ -214,6 +218,11 @@ static VIEWS: [FormatViews; 13] = [
     FormatViews { format: Format::AreaScriptBank, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::BattleScriptBank, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::MagicTable, tabs: &[Tab::Script], prepare: None },
+    FormatViews {
+        format: Format::AreaEncounterTable,
+        tabs: &[Tab::Formation],
+        prepare: Some(Reset { tab: Some(Tab::Formation), run: formation::prepare }),
+    },
 ];
 
 /// The tabs `format` adds.
@@ -306,6 +315,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Vram => vram::show(editor, &entry, cx),
         Tab::Script => script::show(editor, &entry, cx),
         Tab::Layout => layout::show(editor, &entry, cx),
+        Tab::Formation => formation::show(editor, &entry, cx),
     };
     div()
         .flex()

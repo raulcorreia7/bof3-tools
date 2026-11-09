@@ -198,6 +198,9 @@ pub struct Site {
     pub tpage: u16,
     /// The `clut` word the function writes.
     pub clut: u16,
+    /// The archive whose upload the draw reads, when the overlay names it: the one its own loader
+    /// streams and follows with the copy of the site's CLUT row. `None` accepts any upload.
+    pub page_writer: Option<&'static str>,
 }
 
 /// Builds a [`Site`] table entry.
@@ -209,7 +212,26 @@ const fn literal(
     tpage: u16,
     clut: u16,
 ) -> Site {
-    Site { archive, overlay, function, source, tpage, clut }
+    Site { archive, overlay, function, source, tpage, clut, page_writer: None }
+}
+
+/// Builds a [`Site`] whose page is the upload of `page_writer`.
+const fn streamed(
+    archive: &'static str,
+    overlay: usize,
+    function: u32,
+    source: &'static str,
+    (tpage, clut): (u16, u16),
+    page_writer: &'static str,
+) -> Site {
+    Site { archive, overlay, function, source, tpage, clut, page_writer: Some(page_writer) }
+}
+
+impl Site {
+    /// Whether the upload of `archive` (a disc path) may serve the site's page.
+    pub fn reads_page_of(&self, archive: &str) -> bool {
+        self.page_writer.is_none_or(|owner| archive.ends_with(&format!("/{owner}")) || archive == owner)
+    }
 }
 
 /// The world-map HUD sprite: `Area_DrawHudSprite`, one body that eleven area overlays include.
@@ -219,8 +241,8 @@ const HUD_SPRITE: &str = "src/overlays/area/Area_DrawHudSprite.h:8-11";
 /// from the decompilation's current sources. Sites outside this table are in
 /// `wiki: formats/assets#texture-evidence`.
 ///
-/// The table does not grow: a rule that reads the page and CLUT from data the game reads, or a
-/// capture of the game's own draw calls, replaces it.
+/// A row enters the table only with its page and CLUT literal in the cited source. A rule that reads
+/// the page and CLUT from data the game reads, or a capture of the game's own draw calls, replaces it.
 pub const SITES: &[Site] = &[
     literal(
         "WORLD00/AREA024.EMI",
@@ -277,6 +299,22 @@ pub const SITES: &[Site] = &[
         0x001D,
         0x7887,
     ),
+    // The battle panel quads: `GetTPage(0, 0, 0x380, 0x100)`, a 4bpp page at (896, 256), and
+    // `setClut(16, STAGE_PALETTE_Y + 26)`. The same overlay's `Battle_LoadDraArchive` streams
+    // `BATL_DRA`, which uploads the page and loads arena row 26, and `Battle_FinishDraLoad` copies
+    // rows 26 and 27. Other archives that write the page (`FIRST`, the `BMAGIC` effects) are not
+    // proven to be what the panel reads, so only `BATL_DRA`'s upload joins.
+    streamed(
+        "BATTLE/BATTLE.EMI",
+        15,
+        0x800A_E9C4,
+        "src/overlays/battle/battle/15/func_800AE9C4.c:23-26,56-57; Battle_LoadDraArchive.c, Battle_FinishDraLoad.c",
+        (0x001E, 0x7E81),
+        "BATTLE/BATL_DRA.EMI",
+    ),
+    // The battle-end panel: `GetTPage(1, 0, 0x340, 0x100)`, an 8bpp page at (832, 256), and
+    // `GetClut(0, 0x1FA)`, arena row 26; `BATL_OVR` uploads both. From retail assembly.
+    literal("BATTLE/BATL_OVR.EMI", 0, 0x801E_F3B4, "asm/emi/battle/batl_ovr/00/func_801EF3B4.s:15-36", 0x009D, 0x7E80),
     // MAGIC218's effect page and CLUT, from retail assembly.
     literal(
         "BMAGIC/MAGIC218.EMI",
@@ -331,6 +369,9 @@ pub fn joins<'a>(archive: &str, sheets: &[Sheet], banks: &[&'a ResidentBank]) ->
                 return None;
             };
             let clut = Clut::from_word(site.clut);
+            if !site.reads_page_of(archive) {
+                return None;
+            }
             let texture = only(sheets.iter().filter(|sheet| sheet.covers(tpage.x, tpage.y)))?;
             let palette = holder(archive, banks, clut, depth)?;
             Some(Join { texture: texture.slot, palette, clut, depth, rule: Rule::Site(site) })
@@ -521,5 +562,20 @@ mod tests {
         let different =
             [bank_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), bank_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8)];
         assert!(joins(own, &sheets, &different.iter().collect::<Vec<_>>()).is_empty());
+    }
+
+    #[test]
+    fn a_streamed_site_reads_only_its_archives_upload() {
+        let panel = SITES.iter().find(|site| site.function == 0x800A_E9C4).expect("the battle panel site");
+        assert!(panel.reads_page_of("BIN/BATTLE/BATL_DRA.EMI"));
+        assert!(!panel.reads_page_of("BIN/ETC/FIRST.EMI"));
+        assert!(!panel.reads_page_of("BIN/BMAGIC/MAGIC218.EMI"));
+        let archive = "BIN/BATTLE/BATTLE.EMI";
+        let sheets = [sheet(4, 896, 256)];
+        let banks = [bank(archive, 6, 0x8003_6C00, 256)];
+        assert!(
+            joins(archive, &sheets, &banks.iter().collect::<Vec<_>>()).is_empty(),
+            "BATTLE's own sheet is not BATL_DRA's"
+        );
     }
 }
