@@ -205,7 +205,7 @@ bof3 assets: unexpected argument "b"; run `bof3 assets export palette --help`
 
 $ bof3 assets export bogus a
 [exit 2]
-bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, script, strings, characters, character-bank and sprite-sheet
+bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-bank and sprite-sheet
 
 $ bof3 assets export
 [exit 2]

@@ -3,6 +3,7 @@
 //! same way.
 
 mod cells;
+mod compose;
 mod decoded;
 mod hex;
 mod info;
@@ -79,6 +80,8 @@ pub enum Field {
     TextFilter,
     /// The string that starts at this offset.
     Text(usize),
+    /// Message `n` of the shown message bank, as the compose view edits it.
+    Message(usize),
     /// The tables view's filter.
     TableFilter,
     /// A name or number cell of a table.
@@ -98,7 +101,7 @@ pub enum Field {
 impl Field {
     /// Whether Shift+Enter breaks a line in the field.
     pub fn is_multiline(self) -> bool {
-        matches!(self, Field::Text(_))
+        matches!(self, Field::Text(_) | Field::Message(_))
     }
 }
 
@@ -119,6 +122,7 @@ pub struct Views {
     pub palette: palette::State,
     pub tables: tables::State,
     pub text: text::State,
+    pub compose: compose::State,
     pub sound: sound::State,
     pub decoded: decoded::State,
     pub map: map::State,
@@ -176,7 +180,7 @@ struct FormatViews {
 }
 
 /// The views of each format; a format without a row has only Info, Hex and what its payload offers.
-static VIEWS: [FormatViews; 12] = [
+static VIEWS: [FormatViews; 13] = [
     FormatViews {
         format: Format::VramUpload,
         tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
@@ -200,6 +204,11 @@ static VIEWS: [FormatViews; 12] = [
         format: Format::CharacterBlob,
         tabs: &[Tab::Sprite],
         prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
+    },
+    FormatViews {
+        format: Format::AreaMessageBank,
+        tabs: &[],
+        prepare: Some(Reset { tab: Some(Tab::Text), run: compose::prepare }),
     },
     FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
     FormatViews { format: Format::AreaScriptBank, tabs: &[Tab::Script], prepare: None },
@@ -351,6 +360,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
             None
         }
         Field::Text(start) => text::string_changed(editor, start, text),
+        Field::Message(index) => compose::message_changed(editor, index, text),
         Field::TableFilter => {
             editor.views.tables.filter = text.to_string();
             None
