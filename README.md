@@ -77,7 +77,7 @@ payloads.
 | Palette | palette banks                 | edit any color's 5-bit channels and semi-transparency bit          |
 | Tables  | `ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, area encounter blocks, actor definitions, cue tables, VAB headers | spreadsheets of items, equipment, shops, abilities, level growth, party members, encounters, enemies and their AI blocks, actor definitions, sound cues, and a sound bank's programs and tones; drops, equipment, skills and encounter slots show the name they point at |
 | Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
-| Sound   | VAB banks, sequence packages  | play samples and sequences (with the archive's own bank and your edits); export WAVE, SoundFont and MIDI; replace a sample from WAVE; edit a sequence's resolution, tempo and time signature; import a sequence from MIDI |
+| Sound   | VAB banks, sequence packages  | play samples, tones at a chosen note and sequences through the audio library's SPU, in stereo (with the archive's own bank and your edits); export a raw sample as WAVE, SoundFont and MIDI; replace a sample from WAVE; edit a sequence's resolution, tempo and time signature; import a sequence from MIDI |
 | Map     | area map bundles              | the map from above, coloured by tile bank and height; edit a cell's corner heights |
 | Sprite bank | character sprite banks, raw or LZ77 | each section's node table and palettes; edit any palette color |
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |

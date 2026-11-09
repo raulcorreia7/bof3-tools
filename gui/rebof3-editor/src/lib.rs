@@ -4,5 +4,6 @@
 
 #[doc(hidden)]
 pub mod fixture;
+pub mod preview;
 pub mod project;
 pub mod schema;
