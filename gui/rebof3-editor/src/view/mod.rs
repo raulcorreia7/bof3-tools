@@ -9,11 +9,13 @@ mod info;
 mod map;
 mod message;
 mod palette;
+mod scene;
 mod sound;
 mod sprite;
 mod tables;
 mod text;
 mod texture;
+mod vram;
 
 use gpui::{AnyElement, Context, Div, ElementId, Keystroke, Stateful, div, prelude::*, px};
 use rebof3_emi::classify::Format;
@@ -37,6 +39,7 @@ pub enum Tab {
     Map,
     Sprite,
     Cells,
+    Vram,
 }
 
 impl Tab {
@@ -53,6 +56,7 @@ impl Tab {
             Tab::Map => "Map",
             Tab::Sprite => "Sprite bank",
             Tab::Cells => "Cell grid",
+            Tab::Vram => "VRAM",
         }
     }
 }
@@ -109,6 +113,7 @@ pub struct Views {
     pub map: map::State,
     pub sprite: sprite::State,
     pub cells: cells::State,
+    pub vram: vram::State,
 }
 
 impl Views {
@@ -121,12 +126,14 @@ impl Views {
 /// Resets the state of a view whose entry changed, before the window draws it.
 pub fn prepare(editor: &mut Editor) {
     let Some(entry) = editor.current() else { return };
-    if entry.format() == Format::VramUpload {
-        let mut texture = std::mem::take(&mut editor.views.texture);
-        if let Some(entry) = editor.current() {
-            texture.prepare(&entry);
-        }
-        editor.views.texture = texture;
+    if editor.tab == Tab::Vram && tabs(&entry).contains(&Tab::Vram) {
+        vram::prepare(editor);
+    }
+    let Some(entry) = editor.current() else { return };
+    match entry.format() {
+        Format::VramUpload => texture::prepare(editor),
+        Format::AreaMapBundle if editor.tab == Tab::Map => map::prepare(editor),
+        _ => {}
     }
 }
 
@@ -171,8 +178,8 @@ impl Entry<'_> {
 pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
     let mut tabs = vec![Tab::Info, Tab::Hex];
     match entry.format() {
-        Format::VramUpload => tabs.push(Tab::Texture),
-        Format::ClutBank => tabs.push(Tab::Palette),
+        Format::VramUpload => tabs.extend([Tab::Texture, Tab::Vram]),
+        Format::ClutBank => tabs.extend([Tab::Palette, Tab::Vram]),
         Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
         Format::AreaMapBundle => tabs.push(Tab::Map),
         Format::Lz77Blob | Format::CharacterBlob => tabs.push(Tab::Sprite),
@@ -219,6 +226,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Map => map::show(editor, &entry, cx),
         Tab::Sprite => sprite::show(editor, &entry, cx),
         Tab::Cells => cells::show(editor, &entry, cx),
+        Tab::Vram => vram::show(editor, &entry, cx),
     };
     div()
         .flex()
@@ -394,5 +402,34 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// An area map draws textured from its own scene's VRAM. Point `BOF3_DISC_DIR` at an extracted
+    /// disc; without it the test skips.
+    #[gpui::test]
+    fn a_retail_area_map_draws_textured(cx: &mut TestAppContext) {
+        let Some(disc) = std::env::var_os("BOF3_DISC_DIR").map(std::path::PathBuf::from) else {
+            return eprintln!("skipping: set BOF3_DISC_DIR");
+        };
+        let folder = std::env::temp_dir().join(format!("bof3-edit-map-{}", std::process::id()));
+        let project = folder.clone();
+        let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc), Some(project), cx));
+        editor.update(cx, |editor, _| {
+            editor.select_archive(&ArchivePath("BIN/WORLD00/AREA001.EMI".into()));
+            let index = editor
+                .archive
+                .as_ref()
+                .expect("the area loads")
+                .formats
+                .iter()
+                .position(|format| *format == Format::AreaMapBundle);
+            editor.select_entry(index.expect("the area has a map bundle"));
+            editor.tab = Tab::Map;
+        });
+        cx.update(|window, cx| window.draw(cx).clear());
+        let summary = editor.update(cx, |editor, _| editor.views.map.textured_summary());
+        let summary = summary.expect("the map is textured");
+        assert!(summary.contains("Field: AREA001") && summary.contains(", 0 whose page"), "{summary}");
+        let _ = std::fs::remove_dir_all(&folder);
     }
 }

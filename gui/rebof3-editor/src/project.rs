@@ -68,6 +68,8 @@ pub struct Project {
     /// The step that collects the changes while a gesture lasts.
     open: Option<Step>,
     cache: BTreeMap<ArchivePath, Arc<Loaded>>,
+    /// Counts every change to the edits, so a view can tell when what it derived is stale.
+    revision: u64,
 }
 
 impl Project {
@@ -96,6 +98,7 @@ impl Project {
             redo: Vec::new(),
             open: None,
             cache: BTreeMap::new(),
+            revision: 0,
         };
         project.load_edits();
         Ok(project)
@@ -138,6 +141,11 @@ impl Project {
 
     pub fn archive_is_edited(&self, path: &ArchivePath) -> bool {
         self.edits.keys().any(|(archive, _)| archive == path)
+    }
+
+    /// A number that changes whenever an edit is made, undone or dropped.
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn edit_count(&self) -> usize {
@@ -247,6 +255,7 @@ impl Project {
     }
 
     fn replace(&mut self, key: &Key, next: Option<Vec<u8>>) -> Option<Vec<u8>> {
+        self.revision += 1;
         match next {
             Some(bytes) => self.edits.insert(key.clone(), bytes),
             None => self.edits.remove(key),

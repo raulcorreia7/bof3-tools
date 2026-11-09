@@ -143,7 +143,7 @@ The other kinds round trip through their own commands. Results over the retail d
 | EMI archive, `emi extract -J` then `emi pack -J` | 880 of 880 archives                           | lossless |
 | EMI archive, `emi pack` without `-J`             | entry types and load addresses are lost       | lossy    |
 | texture, 16 bpp view                             | every view reads back to the stored words     | lossless |
-| texture, indexed PNG                             | all 890 joined rows                           | lossless |
+| texture, indexed PNG                             | all 882 joined rows                           | lossless |
 | palette                                          | every palette reads back to its words         | lossless |
 | sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |
 | sound bank with `--mode raw`                     | 1,020 of 1,020 banks                          | lossless |
