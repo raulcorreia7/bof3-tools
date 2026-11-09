@@ -4,7 +4,7 @@ use core::fmt;
 
 use crate::cue;
 #[cfg(feature = "std")]
-use crate::{area::scene, lz77};
+use crate::lz77;
 
 /// Everything a parser, codec or archive operation in this crate can report.
 #[derive(Debug)]
@@ -29,34 +29,6 @@ pub enum Error {
         record: usize,
         reason: &'static str,
     },
-    /// A scene table is not a count followed by that many 8-byte records.
-    #[cfg(feature = "std")]
-    SceneTableShape {
-        bytes: usize,
-        count: u32,
-    },
-    /// A map bundle payload is shorter than its own header describes.
-    #[cfg(feature = "std")]
-    MapBundleTooShort(usize),
-    /// A fixed game table runs past the end of its payload.
-    #[cfg(feature = "std")]
-    GameTableShort {
-        table: &'static str,
-        bytes: usize,
-        needed: usize,
-    },
-    /// An encounter block is shorter than its 1,160 bytes.
-    #[cfg(feature = "std")]
-    EncounterBlockShort {
-        bytes: usize,
-    },
-    /// A map bundle's sections do not satisfy the identities its readers assume.
-    #[cfg(feature = "std")]
-    MapBundleShape(&'static str),
-    /// A script bank's directory or a section's table words do not parse as
-    /// the `0x800D3800` layout (`wiki: formats/area`).
-    #[cfg(feature = "std")]
-    ScriptBankShape(&'static str),
     /// A type-1 payload is shorter than its header.
     #[cfg(feature = "std")]
     Lz77Truncated,
@@ -86,20 +58,9 @@ pub enum Error {
     /// A game text cannot be encoded: a character or tag the encoding does not have, or an operand that does not fit.
     #[cfg(feature = "std")]
     Text(String),
-    /// The characters table cannot be read or written: a count, a name, or the rest of a record that does not fit.
-    #[cfg(feature = "std")]
-    CharacterTable(String),
-    /// A sprite bank's palettes cannot be read or written: a section that is not in the palette layout, or a palette
-    /// that does not match the bank it is written to.
-    #[cfg(feature = "std")]
-    CharacterBank(String),
     /// A transfer-queue LZSS stream does not decode: it ends early or reads a ring byte it never wrote.
     #[cfg(feature = "std")]
     Lzss(String),
-    /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
-    /// reader assumes.
-    #[cfg(feature = "std")]
-    SpriteBank(String),
 }
 
 impl fmt::Display for Error {
@@ -119,29 +80,6 @@ impl fmt::Display for Error {
                 write!(f, "cue table holds {records} records; one bank chunk holds {}", cue::CHUNK_RECORDS)
             }
             Self::CueRecord { record, reason } => write!(f, "cue record {record}: {reason}"),
-            #[cfg(feature = "std")]
-            Self::SceneTableShape { bytes, count } => write!(
-                f,
-                "scene table is {bytes} bytes declaring {count} records; the shapes are a count \
-                 of at most {} read as one byte and 4 + 8*count bytes",
-                scene::MAX_RECORDS
-            ),
-            #[cfg(feature = "std")]
-            Self::EncounterBlockShort { bytes } => {
-                write!(f, "encounter block is {bytes} bytes; it needs 1160")
-            }
-            #[cfg(feature = "std")]
-            Self::GameTableShort { table, bytes, needed } => {
-                write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
-            }
-            #[cfg(feature = "std")]
-            Self::MapBundleTooShort(bytes) => {
-                write!(f, "map bundle is {bytes} bytes; its header and sections need more")
-            }
-            #[cfg(feature = "std")]
-            Self::MapBundleShape(reason) => write!(f, "map bundle: {reason}"),
-            #[cfg(feature = "std")]
-            Self::ScriptBankShape(reason) => write!(f, "script bank: {reason}"),
             #[cfg(feature = "std")]
             Self::Lz77Truncated => write!(f, "payload is shorter than the {}-byte type-1 header", lz77::HEADER),
             #[cfg(feature = "std")]
@@ -163,13 +101,7 @@ impl fmt::Display for Error {
             #[cfg(feature = "std")]
             Self::Text(message) => write!(f, "{message}"),
             #[cfg(feature = "std")]
-            Self::CharacterTable(message) => write!(f, "{message}"),
-            #[cfg(feature = "std")]
-            Self::CharacterBank(message) => write!(f, "{message}"),
-            #[cfg(feature = "std")]
             Self::Lzss(message) => write!(f, "LZSS stream: {message}"),
-            #[cfg(feature = "std")]
-            Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
         }
     }
 }

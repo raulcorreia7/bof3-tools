@@ -3,11 +3,11 @@
 
 use std::rc::Rc;
 
-use rebof3_emi::classify::{Format, classify};
-use rebof3_emi::map::MapBundle;
 use rebof3_emi::replay::scenes::{self, Scene};
 use rebof3_emi::replay::{self, Region, Vram};
 use rebof3_emi::texture::scene::{Join, scene_joins};
+use rebof3_formats::map::MapBundle;
+use rebof3_formats::{Format, classify};
 
 use crate::project::{ArchivePath, Project};
 

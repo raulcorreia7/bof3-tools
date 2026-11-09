@@ -2,7 +2,7 @@
 //! slices, and every kind with a codec comes back to its own bytes.
 //!
 //! The test skips when the disc image is not there. Point `BOF3_DISC_IMAGE` at
-//! its cue sheet, or place the image in the checkout's `inputs/external`.
+//! its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -17,9 +17,9 @@ use std::thread;
 use psx_cd::Image;
 use psx_cd::checksum::sha256_hex;
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{Kind, Mode, Selection};
 use rebof3_assets::report::Report;
+use rebof3_formats::vram::TextureImport;
 
 /// The extracted tree and its catalog, extracted once for the whole file.
 struct Extracted {
@@ -105,7 +105,6 @@ fn beside(path: &Path, name: &str) -> Option<PathBuf> {
 fn the_catalog_hashes_match_the_disc_slices() {
     let _finished = Finished;
     let Some(extracted) = extracted() else {
-        eprintln!("skipping the catalog hash check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let Some(image) = support::retail_image() else {
@@ -147,7 +146,6 @@ fn the_catalog_hashes_match_the_disc_slices() {
 fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
     let _finished = Finished;
     let Some(extracted) = extracted() else {
-        eprintln!("skipping the round trip check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let tree = &extracted.tree;
@@ -169,7 +167,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(view) = beside(&path, &format!("{slot}.png")) else { continue };
         let png = fs::read(view).unwrap();
-        let same = match import::texture(&png) {
+        let same = match rebof3_formats::vram::import(&png) {
             Ok(TextureImport::Words(words)) => words == payload,
             Ok(TextureImport::Indexed(row)) => row.payload == payload,
             Err(_) => false,
@@ -186,7 +184,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(json) = beside(&path, &format!("{slot}.json")) else { continue };
         let document = fs::read(json).unwrap();
-        let same = import::palette(&document).map(|back| back == words).unwrap_or(false);
+        let same = rebof3_formats::clut::import(&document).map(|back| back == words).unwrap_or(false);
         record("palette", same);
     }
 
@@ -199,7 +197,8 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(layout) = beside(&path, &format!("{slot}.layout.json")) else { continue };
         let document = fs::read(layout).unwrap();
-        let same = import::map_layout(&document, &payload).map(|back| back == payload).unwrap_or(false);
+        let same =
+            rebof3_formats::map::layout::import(&document, &payload).map(|back| back == payload).unwrap_or(false);
         record("area-map", same);
     }
 
@@ -218,9 +217,9 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let Some(json) = beside(&path, &format!("{slot}.json")) else { continue };
         let document = fs::read(json).unwrap();
         let same = if kind == "area-encounters" {
-            import::encounters(&document, &payload).map(|back| back == payload).unwrap_or(false)
+            rebof3_formats::encounter::open::import(&document, &payload).map(|back| back == payload).unwrap_or(false)
         } else {
-            rebof3_assets::text::bank::import(&document).map(|back| back == payload).unwrap_or(false)
+            rebof3_formats::message::bank::import(&document).map(|back| back == payload).unwrap_or(false)
         };
         record(kind, same);
     }
@@ -237,9 +236,8 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
             continue;
         }
         let payload = fs::read(&path).unwrap();
-        let same = rebof3_emi::area::scene::SceneTable::decode(&payload)
-            .map(|table| table.encode() == payload)
-            .unwrap_or(false);
+        let same =
+            rebof3_formats::scene::SceneTable::decode(&payload).map(|table| table.encode() == payload).unwrap_or(false);
         record("area-actor-defs", same);
     }
 
@@ -305,10 +303,10 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
 fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) -> (bool, bool) {
     let stored = fs::read(header_path).unwrap();
     let soundfont = fs::read(soundfont_path).unwrap();
-    let rebuilt = rebof3_assets::soundfont::bank(&soundfont);
+    let rebuilt = rebof3_formats::vab::soundfont::import(&soundfont);
     let header_equal = rebuilt.as_ref().is_ok_and(|(header, _)| *header == stored);
     let same = rebuilt
-        .and_then(|(header, body)| rebof3_assets::decode::soundfont(&header, &body, slot))
+        .and_then(|(header, body)| rebof3_formats::vab::soundfont::export(&header, &body, slot))
         .ok()
         .and_then(|again| {
             let names_cleared = |bytes: &[u8]| {
@@ -329,7 +327,6 @@ fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) 
 #[test]
 fn raw_mode_writes_the_disc_bytes_of_every_kind() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping the raw mode check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let directory = support::scratch_dir("originals-raw");

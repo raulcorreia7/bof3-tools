@@ -4,9 +4,11 @@
 //! headers give (`include/game/item.h`, `ability.h`, `enemy.h` and `character.h`), so a column edit
 //! changes exactly the bytes it names and every byte no column names keeps its stored value.
 
-use rebof3_emi::classify::Format;
-use rebof3_emi::encounter::{self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES};
-use rebof3_emi::game_tables::{self as tables, Table};
+use rebof3_formats::Format;
+use rebof3_formats::encounter::{
+    self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES,
+};
+use rebof3_formats::game_tables::{self as tables, Table};
 
 /// The archive that holds the fixed game tables in entry 0.
 pub const GAME: &str = "BIN/ETC/GAME.EMI";
@@ -340,7 +342,7 @@ fn shop_columns() -> Vec<Column> {
 }
 
 /// The payload offset of the first party record in `ETC/START.EMI` entry 8.
-const PARTY_START: usize = rebof3_emi::characters::PAYLOAD_OFFSET;
+const PARTY_START: usize = rebof3_formats::characters::PAYLOAD_OFFSET;
 /// `Character`: the record offsets of its stat blocks.
 const PARTY_STATS: usize = 0x1c;
 const PARTY_BASE: usize = 0x3c;
@@ -349,7 +351,7 @@ const PARTY_BASE: usize = 0x3c;
 fn party_sheet() -> Sheet {
     use Field::*;
     let mut columns = vec![
-        col("name", 0x00, Name(rebof3_emi::characters::NAME_BYTES)),
+        col("name", 0x00, Name(rebof3_formats::characters::NAME_BYTES)),
         col("character id", 0x05, U8),
         col("level", 0x06, U8),
         col("exp", 0x08, U32),
@@ -375,8 +377,8 @@ fn party_sheet() -> Sheet {
         name: "party",
         place: Place::Entry { archive: START, entry: START_PARTY_ENTRY },
         start: PARTY_START,
-        count: Count::Fixed(rebof3_emi::characters::CHARACTERS),
-        record: rebof3_emi::characters::RECORD_BYTES,
+        count: Count::Fixed(rebof3_formats::characters::CHARACTERS),
+        record: rebof3_formats::characters::RECORD_BYTES,
         columns,
     }
 }
@@ -519,9 +521,9 @@ fn actor_def_sheet() -> Sheet {
     Sheet {
         name: "actor definitions",
         place: Place::Format(Format::AreaActorDefsTable),
-        start: rebof3_emi::scene::COUNT_BYTES,
+        start: rebof3_formats::scene::COUNT_BYTES,
         count: Count::Word(0),
-        record: rebof3_emi::scene::RECORD_BYTES,
+        record: rebof3_formats::scene::RECORD_BYTES,
         columns: vec![
             col("id", 0, U16),
             col("clut select", 2, U16),

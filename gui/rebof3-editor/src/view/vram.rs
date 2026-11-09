@@ -16,9 +16,9 @@ use gpui::{
 use psx_formats::gfx::png;
 use psx_formats::gfx::texture::Clut;
 use psx_formats::gfx::vram::{VRAM_HEIGHT, VRAM_WIDTH};
-use rebof3_assets::decode::color_rgba;
 use rebof3_emi::replay::scenes::{self, Kind as SceneKind, Scene};
 use rebof3_emi::replay::{Kind, Region, Vram};
+use rebof3_formats::clut::color_rgba;
 
 use super::Entry;
 use super::scene::{self, Replayed};
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn a_retail_scene_replays_with_the_projects_edits() {
         use crate::project::{ArchivePath, Project};
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-vram-{}", std::process::id()));
         let mut project = Project::open(disc.as_ref(), &folder).expect("project opens");
         let area = "BIN/WORLD00/AREA024.EMI";

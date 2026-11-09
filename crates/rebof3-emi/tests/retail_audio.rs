@@ -5,7 +5,7 @@
 //! headers (4,904,832 B), 1,020 bodies (79,157,504 B) and 119 packages
 //! (1,836,303 B). Like `tests/retail_repack.rs`, the gate skips when it cannot find
 //! the retail archives; `support::retail_root` owns the lookup and honours
-//! `BOF3_EMI_ROOT`.
+//! `BOF3_DISC_DIR` (the archives are `BIN/` below it).
 
 mod support;
 
@@ -38,7 +38,6 @@ fn explained(container: &Path, index: usize) -> Option<usize> {
 #[test]
 fn retail_audio_round_trips_byte_exactly() {
     let Some(root) = support::retail_root() else {
-        eprintln!("skipping audio round-trip gate: no retail archives below the checkout");
         return;
     };
 

@@ -6,7 +6,7 @@ use std::fmt;
 pub enum Error {
     Io(std::io::Error),
     Disc(psx_cd::Error),
-    Formats(rebof3_emi::Error),
+    Formats(rebof3_formats::Error),
     /// A VAB bank the reader or the SoundFont writer rejects.
     Bank(psx_formats::Error),
     /// A command line the tool cannot act on.
@@ -65,6 +65,12 @@ impl From<psx_formats::Error> for Error {
 
 impl From<rebof3_emi::Error> for Error {
     fn from(error: rebof3_emi::Error) -> Self {
+        Self::Formats(error.into())
+    }
+}
+
+impl From<rebof3_formats::Error> for Error {
+    fn from(error: rebof3_formats::Error) -> Self {
         Self::Formats(error)
     }
 }

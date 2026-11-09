@@ -4,7 +4,7 @@
 //! The gate covers every type-0 entry whose load argument lands in the CLUT band
 //! (`wiki: formats/graphics#palette`), whichever archive family it comes
 //! from. Like `tests/retail_repack.rs`, the gate skips when it cannot find the retail
-//! archives; `support::retail_root` owns the lookup and honours `BOF3_EMI_ROOT`.
+//! archives; `support::retail_root` owns the lookup and honours `BOF3_DISC_DIR` (the archives are `BIN/` below it).
 
 mod support;
 
@@ -73,10 +73,6 @@ fn be_u32(bytes: &[u8]) -> u32 {
 #[test]
 fn retail_palettes_round_trip_byte_exactly() {
     let Some(root) = support::retail_root() else {
-        eprintln!(
-            "skipping CLUT gate: no retail archives below the checkout \
-             (set BOF3_EMI_ROOT to a directory of .EMI containers)"
-        );
         return;
     };
 

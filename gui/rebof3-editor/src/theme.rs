@@ -2,7 +2,7 @@
 //! entry format wears in the lists. Each color is a 24-bit `0xRRGGBB` value.
 
 use gpui::{Div, Hsla, div, prelude::*, px, rgb};
-use rebof3_emi::classify::Format;
+use rebof3_formats::Format;
 
 /// The accent: selection, focus and the active tab.
 pub const ACCENT: u32 = 0xe88e42;

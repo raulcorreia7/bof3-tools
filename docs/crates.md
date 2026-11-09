@@ -1,12 +1,13 @@
 # Library crates
 
-The libraries behind the `bof3` command: three crates in this workspace and the public
+The libraries behind the `bof3` command: four crates in this workspace and the public
 [bof3-player](https://github.com/raulcorreia7/bof3-player) repository, which supplies the audio,
 disc and bundled-names libraries.
 
 | Crate           | What it is                                                                |
 | --------------- | ------------------------------------------------------------------------- |
-| `rebof3-emi`    | EMI container, game records and area formats, LZ77, cue tables, coverage. |
+| `rebof3-emi`    | EMI container, game records and area formats, LZ77, cue tables.           |
+| `rebof3-formats`| One module per entry format (codec, open files, description), the registry and the coverage table. |
 | `rebof3-assets` | The all-assets extractor: classify every file and EMI slot, write a tree. |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 
@@ -17,13 +18,28 @@ PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) are in
 
 ## rebof3-emi
 
-The EMI container and the game formats stored in it: packing, `emi.json` manifests, LZ77, area
-bundles, type-8 cue tables, classification and coverage. Without the `std` feature the crate is
+The EMI container and the primitives the format modules share: packing, `emi.json` manifests, LZ77,
+the record readers, the text codec, LZSS, the VRAM model with its load replay and the container
+round trip (`verify`). Without the `std` feature the crate is
 `no_std + alloc` and keeps the container table and the cue table, which the audio library reads. The
 extractor validates the header, the table bounds, the payload bounds and the entry index before it
 writes. The packer reproduces the retail fill bytes
 ([padding](https://raulcorreia7.github.io/bof3-wiki/formats/emi.html#padding)). The packing
 contract is in [the command line](cli.md#manifest-packing-contract).
+
+## rebof3-formats
+
+One module per entry format, with the registry that selects and describes them. Each format
+module owns its `Description` (name, selector, extension, evidence, round-trip check); the
+registry lists them, so the classifier, the coverage table, the extractor and the editor read one
+table instead of matching on formats. The rules a module follows are in
+[ADR 0002](adr/0002-self-contained-formats.md). The coverage table runs every format's round trip
+over the retail archives and pins the totals in `tests/retail_coverage.rs`.
+
+Beside the formats it holds three shared modules that are not formats: `joins` (a texture's palette
+rows, read over a whole archive), `text` (the string scan, the strings of a payload and the sources
+of a string) and `gltf`. The SoundFont conversion is in `vab::soundfont`, which is why the crate
+depends on `bof3player` for the SPU envelope steps.
 
 ## rebof3-assets
 

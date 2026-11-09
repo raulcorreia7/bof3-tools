@@ -1,19 +1,19 @@
 //! Export then import, byte for byte, over the texture kind of the retail disc.
 //!
 //! The test skips when no disc image is present. Point `BOF3_DISC_IMAGE` at its
-//! cue sheet, or place the image in the checkout's `inputs/external`.
+//! cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rebof3_assets::decode;
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::import::{self, TextureImport};
+use rebof3_assets::import;
 use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
-use rebof3_emi::game_tables::{PAYLOAD_START, TABLES};
+use rebof3_formats::game_tables::{PAYLOAD_START, TABLES};
+use rebof3_formats::vram::TextureImport;
 
 /// Every file under `directory`, empty when the directory is missing.
 fn files_under(directory: &Path, found: &mut Vec<PathBuf>) {
@@ -39,7 +39,6 @@ fn holds_run(bytes: &[u8], needle: &[u16]) -> bool {
 #[test]
 fn retail_textures_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping texture round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_textures_round_trip_byte_exactly");
@@ -70,7 +69,7 @@ fn retail_textures_round_trip_byte_exactly() {
             None => (stem, false),
         };
         let stored = fs::read(path.with_file_name(format!("{slot}.img"))).unwrap();
-        match (import::texture(&fs::read(path).unwrap()), is_row) {
+        match (rebof3_formats::vram::import(&fs::read(path).unwrap()), is_row) {
             (Ok(TextureImport::Words(payload)), false) => {
                 views += 1;
                 if payload != stored {
@@ -109,14 +108,14 @@ fn retail_textures_round_trip_byte_exactly() {
         palettes += 1;
         let json = fs::read(json_path).unwrap();
         let stored = fs::read(json_path.with_extension("clut")).unwrap();
-        if import::palette(&json).ok().as_deref() != Some(stored.as_slice()) {
+        if rebof3_formats::clut::import(&json).ok().as_deref() != Some(stored.as_slice()) {
             failures.push(format!(
                 "{}: the JSON does not return its {} stored bytes",
                 json_path.display(),
                 stored.len()
             ));
         }
-        if decode::palette_json(&stored).ok().as_deref() != Some(json.as_slice()) {
+        if rebof3_formats::clut::export(&stored).ok().as_deref() != Some(json.as_slice()) {
             failures.push(format!("{}: the export does not reproduce the JSON", json_path.display()));
         }
     }
@@ -134,7 +133,6 @@ fn retail_textures_round_trip_byte_exactly() {
 #[test]
 fn retail_terrains_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping terrain round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_terrains_round_trip_byte_exactly");
@@ -156,7 +154,9 @@ fn retail_terrains_round_trip_byte_exactly() {
         terrains += 1;
         let stored = fs::read(glb.with_extension("map")).unwrap();
         for mesh in [glb.clone(), glb.with_extension("obj")] {
-            if import::terrain(&fs::read(&mesh).unwrap(), &stored).ok().as_deref() != Some(stored.as_slice()) {
+            if rebof3_formats::map::terrain::import(&fs::read(&mesh).unwrap(), &stored).ok().as_deref()
+                != Some(stored.as_slice())
+            {
                 failures.push(format!(
                     "{}: the mesh does not return its {} stored bytes",
                     mesh.display(),
@@ -175,7 +175,6 @@ fn retail_terrains_round_trip_byte_exactly() {
 #[test]
 fn retail_vags_round_trip_through_adpcm() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping VAG round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_vags_round_trip_through_adpcm");
@@ -224,12 +223,12 @@ fn retail_vags_round_trip_through_adpcm() {
             if decoded_again.get(..pcm.len()) != Some(pcm.as_slice()) {
                 failures.push(format!("{} VAG {index}: the encode changes its samples", header_path.display()));
             }
-            let wav = decode::pcm_wav(&pcm).unwrap();
-            if decode::vab_vag_wav(&header, &body, number).ok().as_deref() != Some(wav.as_slice()) {
+            let wav = rebof3_formats::vab::vag::pcm_wav(&pcm).unwrap();
+            if rebof3_formats::vab::vag::vab_vag_wav(&header, &body, number).ok().as_deref() != Some(wav.as_slice()) {
                 failures
                     .push(format!("{} VAG {index}: the bank export differs from its samples", header_path.display()));
             }
-            if import::vag(&wav).unwrap() != encoded {
+            if rebof3_formats::vab::vag::import(&wav).unwrap() != encoded {
                 failures.push(format!("{} VAG {index}: the WAVE path differs from the samples", header_path.display()));
             }
             identical += usize::from(encoded == stored);
@@ -243,7 +242,6 @@ fn retail_vags_round_trip_through_adpcm() {
 #[test]
 fn retail_tables_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping table round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_tables_round_trip_byte_exactly");
@@ -278,7 +276,12 @@ fn retail_tables_round_trip_byte_exactly() {
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
         let start = table.archive_offset - PAYLOAD_START;
         let stored = &payload[start..start + table.count * table.record];
-        assert_eq!(import::game_table_in_payload(table.name, &json, &payload).unwrap(), stored, "{}", table.name);
+        assert_eq!(
+            rebof3_formats::game_tables::open::import_in_payload(table.name, &json, &payload).unwrap(),
+            stored,
+            "{}",
+            table.name
+        );
     }
     eprintln!("game table round trip: {} tables return their stored bytes from their JSON", TABLES.len());
 }
@@ -286,7 +289,6 @@ fn retail_tables_round_trip_byte_exactly() {
 #[test]
 fn retail_encounters_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping encounter round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_encounters_round_trip_byte_exactly");
@@ -317,7 +319,7 @@ fn retail_encounters_round_trip_byte_exactly() {
             .expect("every encounter block has its JSON");
         let stored = fs::read(dir.join(block.output.as_deref().unwrap())).unwrap();
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
-        if import::encounters(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
+        if rebof3_formats::encounter::open::import(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
             failures.push(format!("{}: the JSON does not return its {} stored bytes", block.source, stored.len()));
         }
     }
@@ -330,7 +332,6 @@ fn retail_encounters_round_trip_byte_exactly() {
 #[test]
 fn retail_map_layouts_round_trip_byte_exactly() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping map layout round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_map_layouts_round_trip_byte_exactly");
@@ -361,7 +362,7 @@ fn retail_map_layouts_round_trip_byte_exactly() {
             .expect("every map bundle has its layout JSON");
         let stored = fs::read(dir.join(bundle.output.as_deref().unwrap())).unwrap();
         let json = fs::read(dir.join(layout_row.output.as_deref().unwrap())).unwrap();
-        if import::map_layout(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
+        if rebof3_formats::map::layout::import(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
             failures.push(format!("{}: the layout does not return its {} stored bytes", bundle.source, stored.len()));
         }
     }
@@ -374,7 +375,6 @@ fn retail_map_layouts_round_trip_byte_exactly() {
 #[test]
 fn retail_emi_containers_rebuild_byte_exactly() {
     let Some(image_path) = support::retail_image() else {
-        eprintln!("skipping EMI rebuild: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let mut image = psx_cd::Image::open(&image_path).unwrap();
@@ -423,7 +423,6 @@ fn retail_emi_containers_rebuild_byte_exactly() {
 #[test]
 fn retail_sequences_round_trip_through_midi() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping sequence round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_sequences_round_trip_through_midi");

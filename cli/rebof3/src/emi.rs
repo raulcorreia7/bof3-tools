@@ -2,9 +2,9 @@
 use psx_formats::clut;
 use psx_formats::vram::{Descriptor, Plane, UPLOAD_TYPE, decode};
 use rebof3_emi::{
-    Archive, PackEntry, PackFolderOptions, coverage, ensure_parent, entry_name, guess_type, manifest_entries, pack,
-    pack_folder,
+    Archive, PackEntry, PackFolderOptions, ensure_parent, entry_name, guess_type, manifest_entries, pack, pack_folder,
 };
+use rebof3_formats::coverage;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};

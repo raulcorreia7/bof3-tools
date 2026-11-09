@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use rebof3_assets::decode::derive;
-use rebof3_emi::classify::Format;
+use rebof3_formats::Format;
 use serde_json::Value;
 
 use super::Entry;

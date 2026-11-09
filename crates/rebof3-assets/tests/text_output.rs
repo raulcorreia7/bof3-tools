@@ -8,9 +8,11 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rebof3_assets::text::codec::{self, Encoding};
-use rebof3_assets::text::{self, bank, strings};
+use rebof3_assets::text;
 use rebof3_emi::pack::{self, Payload};
+use rebof3_emi::text::codec::{self, Encoding};
+use rebof3_formats::message::bank;
+use rebof3_formats::text::strings;
 
 /// Every file under `directory`, relative to it and with forward slashes.
 fn files_under(directory: &Path) -> BTreeSet<String> {

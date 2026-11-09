@@ -8,14 +8,13 @@
 //! | [`emi`], `pack`, `manifest` | container, repacking, `emi.json` | `wiki: formats/emi` |
 //! | `lz77` | type-1 payload codec | `wiki: formats/lz77` |
 //! | `lzss` | the transfer queue's packed images (`GFX_DecodeLzss`) | |
-//! | `sprite` | sprite banks: frame sheets, palettes, animations, records | `wiki: formats/character` |
+//! | `record`, `text` | the record readers and the game's text codec | `wiki: data/text` |
 //! | [`cue`] | type-8 cue tables | `wiki: formats/audio#emi-type-8-cue-records` |
-//! | `area` | script banks, scene tables, map bundles | `wiki: formats/area` |
 //! | `entry` | decoders applied to one entry on disk | |
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
-//! | `classify`, `coverage` | which format each entry is, and what the codecs rebuild | `wiki: formats/conversion#conversion-map` |
 //!
-//! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`. The
+//! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`; the game's
+//! formats (sprite banks, maps, scripts, tables) live in `rebof3-formats`. The
 //! crate is `no_std + alloc` without the `std` feature, which keeps [`emi`] (the container table
 //! read from bytes) and [`cue`].
 
@@ -25,26 +24,14 @@
 extern crate alloc;
 
 #[cfg(feature = "std")]
-pub mod area;
 #[cfg(feature = "std")]
-pub mod character_bank;
-#[cfg(feature = "std")]
-pub mod characters;
-#[cfg(feature = "std")]
-pub mod classify;
-#[cfg(feature = "std")]
-pub mod coverage;
 pub mod cue;
 pub mod emi;
-#[cfg(feature = "std")]
-pub mod encounter;
 #[cfg(feature = "std")]
 pub mod entry;
 mod error;
 #[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures;
-#[cfg(feature = "std")]
-pub mod game_tables;
 #[cfg(feature = "std")]
 pub mod lz77;
 #[cfg(feature = "std")]
@@ -54,21 +41,20 @@ pub mod manifest;
 #[cfg(feature = "std")]
 pub mod pack;
 #[cfg(feature = "std")]
-mod record;
+pub mod record;
 #[cfg(feature = "std")]
 pub mod replay;
 #[cfg(feature = "std")]
-pub mod sprite;
 #[cfg(feature = "std")]
 pub mod text;
 #[cfg(feature = "std")]
 pub mod texture;
+#[cfg(feature = "std")]
+pub mod verify;
 
 pub use crate::emi::{Archive, Entry, TYPE_CUE, TYPE_LZ77};
 #[cfg(feature = "std")]
-pub use crate::emi::{TYPE_VRAM, ensure_parent, entry_name, read_entry, type_extension};
-#[cfg(feature = "std")]
-pub use area::{map, scene, script};
+pub use crate::emi::{TYPE_VRAM, archives_under, ensure_parent, entry_name, read_entry, type_extension};
 pub use error::{Error, Result};
 #[cfg(feature = "std")]
 pub use manifest::manifest_entries;

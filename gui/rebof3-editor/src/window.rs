@@ -5,7 +5,7 @@ use gpui::{
     AnyElement, ClickEvent, Context, Div, FontWeight, IntoElement, Render, Window, anchored, deferred, div, prelude::*,
     px, uniform_list,
 };
-use rebof3_emi::classify::Format;
+use rebof3_formats::Format;
 
 use crate::app::{BrowserRow, Editor, Field, Menu};
 use crate::fonts;

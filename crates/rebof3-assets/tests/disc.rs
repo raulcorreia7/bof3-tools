@@ -1,8 +1,7 @@
 //! The patched disc image on the owner's disc: the sealing method, and a disc patched with its own files. The
 //! synthetic cases are in `psx-cd/tests/patch.rs`.
 //!
-//! The tests skip when no disc image is present. Point `BOF3_DISC_IMAGE` at its cue sheet, or place the image in the
-//! checkout's `inputs/external`.
+//! The tests skip when no disc image is present. Point `BOF3_DISC_IMAGE` at its cue sheet, or place the image in the (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
@@ -23,7 +22,6 @@ fn data_track_file(cue_path: &Path) -> PathBuf {
 #[test]
 fn every_form1_sector_of_the_retail_data_track_is_sealed() {
     let Some(cue_path) = support::retail_image() else {
-        eprintln!("skipping sector seal check: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let track = data_track_file(&cue_path);
@@ -62,7 +60,6 @@ fn every_form1_sector_of_the_retail_data_track_is_sealed() {
 #[test]
 fn the_retail_disc_patched_with_its_own_files_is_byte_identical() {
     let Some(cue_path) = support::retail_image() else {
-        eprintln!("skipping disc identity: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let mut image = Image::open(&cue_path).expect("the disc opens");

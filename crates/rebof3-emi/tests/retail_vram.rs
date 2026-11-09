@@ -1,9 +1,7 @@
 //! Whole-archive type-3 gate: decode, re-encode and place every VRAM upload.
 //!
-//! The test skips when it cannot find the retail archives. Point `BOF3_EMI_ROOT`
-//! at a directory of `.EMI` containers (searched recursively) to run it
-//! anywhere; otherwise it walks up from the crate directory looking for the
-//! checkout's `raw/disc/BIN`.
+//! The test skips when it cannot find the retail archives. Point `BOF3_DISC_DIR`
+//! at an extracted disc to run it; `BOF3_REQUIRE_RETAIL=1` makes a skip a failure.
 //!
 //! `bof3 emi vram -o <page.png> <archive.EMI>` dumps one archive's page set as
 //! a raw 16-bit PNG for a visual check.
@@ -17,7 +15,7 @@ use rebof3_emi::Archive;
 
 mod support;
 
-use support::{RETAIL_SUFFIX, collect_archives, first_mismatch, retail_root};
+use support::{collect_archives, first_mismatch, retail_root};
 
 /// What the archive gate checked and what it found.
 #[derive(Default)]
@@ -32,10 +30,6 @@ struct Report {
 #[test]
 fn retail_vram_uploads_round_trip() {
     let Some(root) = retail_root() else {
-        eprintln!(
-            "skipping type-3 gate: no retail archives at <ancestor>/{RETAIL_SUFFIX} \
-             (set BOF3_EMI_ROOT to a directory of .EMI containers)"
-        );
         return;
     };
 
