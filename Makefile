@@ -1,9 +1,17 @@
 .DEFAULT_GOAL := help
 .PHONY: help build check test format lint clean
+
+# Release binaries are linked into bin/. CARGO_TARGET_DIR moves the cargo output, not bin/.
+BIN_DIR := bin
+RELEASE_DIR := $(abspath $(or $(CARGO_TARGET_DIR),target))/release
+BINS := bof3 bof3-edit
+
 help:
-	@printf '%s\n' 'build  Build the release workspace.' 'check  Check formatting, lint and tests.' 'test   Run workspace tests.'
+	@printf '%s\n' 'build  Build the release workspace and link bof3 and bof3-edit into bin/.' 'check  Check formatting, lint and tests.' 'test   Run workspace tests.' 'clean  Remove cargo output and bin/ links.'
 build:
 	cargo build --release --workspace --locked
+	@mkdir -p $(BIN_DIR)
+	@for b in $(BINS); do ln -sf "$(RELEASE_DIR)/$$b" "$(BIN_DIR)/$$b"; done
 test:
 	cargo test --workspace --locked
 format:
@@ -19,3 +27,5 @@ check:
 
 clean:
 	cargo clean
+	@for b in $(BINS); do rm -f "$(BIN_DIR)/$$b"; done
+	@rmdir $(BIN_DIR) 2>/dev/null || true
