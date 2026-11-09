@@ -219,7 +219,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let Some(json) = beside(&path, &format!("{slot}.json")) else { continue };
         let document = fs::read(json).unwrap();
         let same = if kind == "area-encounters" {
-            import::encounters(&document, &payload).map(|back| back == payload).unwrap_or(false)
+            rebof3_formats::encounter::open::import(&document, &payload).map(|back| back == payload).unwrap_or(false)
         } else {
             rebof3_assets::text::bank::import(&document).map(|back| back == payload).unwrap_or(false)
         };

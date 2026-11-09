@@ -23,6 +23,7 @@ pub mod coverage;
 pub mod cue;
 pub mod encounter;
 pub mod error;
+pub mod game_tables;
 pub mod gltf;
 pub mod identity;
 pub mod map;

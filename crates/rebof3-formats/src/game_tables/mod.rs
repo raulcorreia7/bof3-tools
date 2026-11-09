@@ -6,13 +6,16 @@
 //! data"). The runtime
 //! item base `0x801C8964` is the entry's load address `0x80195800` plus the items' payload offset.
 //!
-//! A name is 12 inline bytes in the name encoding ([`crate::text::codec`]). Its text leaves out the zeros that pad
+//! A name is 12 inline bytes in the name encoding ([`rebof3_emi::text::codec`]). Its text leaves out the zeros that pad
 //! the field, so the stored bytes come back exactly. The other fields keep the documented offsets. Fields the
 //! decompilation has not named are left out.
 
-use crate::record::{bytes, u16_at};
-use crate::text::codec::{self, Encoding};
-use crate::{Error, Result};
+use rebof3_emi::record::{bytes, u16_at};
+pub use rebof3_emi::text::codec::{name_field, name_text};
+
+use crate::error::{Error, Result};
+
+pub mod open;
 
 /// Archive offset where the entry's payload starts.
 pub const PAYLOAD_START: usize = 0x800;
@@ -62,25 +65,6 @@ impl Table {
     }
 }
 
-/// The text of a name field: its bytes in the name encoding, without the zeros that pad the field. A name keeps
-/// its colour codes and every other byte it holds; [`name_field`] writes them back.
-pub fn name_text(field: &[u8]) -> String {
-    let end = field.iter().rposition(|byte| *byte != 0).map_or(0, |last| last + 1);
-    codec::decode(Encoding::Name, &field[..end])
-}
-
-/// The bytes of a name field `width` bytes wide whose text is `text`: the encoded text, then zeros. It is the
-/// inverse of [`name_text`] for every field, so a name read and written back keeps its stored bytes.
-pub fn name_field(text: &str, width: usize) -> Result<Vec<u8>> {
-    let mut bytes = codec::encode(Encoding::Name, text)?;
-    if bytes.len() > width {
-        return Err(Error::Text(format!("{text:?} is longer than {width} bytes")));
-    }
-    bytes.resize(width, 0);
-    Ok(bytes)
-}
-
-#[cfg(feature = "std")]
 fn serialize_name<S: serde::Serializer>(
     name: &[u8; NAME_BYTES],
     serializer: S,
@@ -88,7 +72,6 @@ fn serialize_name<S: serde::Serializer>(
     serializer.serialize_str(&name_text(name))
 }
 
-#[cfg(feature = "std")]
 fn deserialize_name<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> std::result::Result<[u8; NAME_BYTES], D::Error> {
@@ -98,10 +81,9 @@ fn deserialize_name<'de, D: serde::Deserializer<'de>>(
 }
 
 /// One item: a consumable or a vital item of the item table.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Item {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
     /// Flag bits: `target_both`, `target_selectable`, `target_enemy_default`, `target_all`, `story_item`,
     /// `show_name`, `show_animation`, `usable_menu`.
@@ -110,18 +92,16 @@ pub struct Item {
 }
 
 /// One vital item. Vital items are story-critical and cannot be sold.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct VitalItem {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
 }
 
 /// One weapon. `equipability` marks the characters that can equip it.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Weapon {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
     pub equipability: u8,
     pub element: u8,
@@ -131,10 +111,9 @@ pub struct Weapon {
 }
 
 /// One armor piece. `equip_type` is `2` for a shield, `3` for a helmet and `4` for body armor.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Armor {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
     pub equipability: u8,
     pub equip_type: u8,
@@ -144,10 +123,9 @@ pub struct Armor {
 }
 
 /// One accessory.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Accessory {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
     pub equipability: u8,
     pub weight: u8,
@@ -156,26 +134,23 @@ pub struct Accessory {
 
 /// One item a shop sells: the item type (`0` item, `1` weapon, `2` armor, `3` accessory, `4` vital item,
 /// `0xFF` empty) and the index in that type's table.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ShopSlot {
     pub item_type: u8,
     pub item_index: u8,
 }
 
 /// One shop: the number of stocked items and the slots that name them.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Shop {
     pub count: u8,
     pub slots: [ShopSlot; SHOP_SLOTS],
 }
 
 /// One ability (a skill or a spell). An ability type of `3` marks a skill.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Ability {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
     /// Targeting and display bits; bit 5 is `default_target_enemy`.
     pub flags: u8,
@@ -190,8 +165,7 @@ pub struct Ability {
 }
 
 /// One level of one character's growth. Each character has 99 records, one per level.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Growth {
     pub exp: u16,
     pub hp: u8,
@@ -207,8 +181,7 @@ pub struct Growth {
 }
 
 /// Every table of `ETC/GAME.EMI` entry 0.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct GameTables {
     pub items: Vec<Item>,
     pub vital_items: Vec<VitalItem>,

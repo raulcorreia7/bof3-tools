@@ -6,9 +6,29 @@
 //! and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`; the picker is
 //! `emi/etc/game/00@0x801C6A7C`.
 
-use crate::game_tables::{name_field, name_text};
-use crate::record::{bytes, u16_at};
-use crate::{Error, Result};
+use rebof3_emi::record::{bytes, u16_at};
+use rebof3_emi::text::codec::{name_field, name_text};
+
+use crate::error::{Error, Result};
+use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
+
+pub mod open;
+
+/// The load address of the block.
+const LOAD_ADDRESS: u32 = 0x800e_4000;
+
+/// The block as a format-registry row.
+pub static TABLE: Description = Description {
+    format: Format::AreaEncounterTable,
+    name: "area encounters and enemy records (0x800E4000)",
+    state: State::Specified,
+    spec_state: "documented",
+    codec_state: "none",
+    evidence: "wiki: formats/area (`0x800E4000`); include/game/enemy.h models it",
+    extension: EMI_EXTENSION,
+    selector: Selector::Load(&[LOAD_ADDRESS]),
+    round_trip: RoundTrip::None,
+};
 
 /// Bytes in the block.
 pub const BLOCK_BYTES: usize = 0x488;
@@ -25,16 +45,14 @@ pub const ENEMY_BASE: usize = ENCOUNTERS * ENCOUNTER_BYTES;
 pub const NAME_BYTES: usize = 8;
 
 /// One encounter: the enemy indexes it draws and its appearance rate. `0xFF` is an empty slot.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Encounter {
     pub enemies: [u8; ENCOUNTER_ENEMIES],
     pub appearance_rate: u8,
 }
 
 /// One item an enemy steals or drops: its index in the item type's table and the type.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ItemRef {
     pub index: u8,
     pub item_type: u8,
@@ -42,8 +60,7 @@ pub struct ItemRef {
 
 /// One action block of an enemy: a condition byte, seven AI parameters and eight ability indexes. A
 /// condition of `0x63` marks an unused block.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct ActionBlock {
     pub condition: u8,
     pub ai_params: [u8; 7],
@@ -51,10 +68,9 @@ pub struct ActionBlock {
 }
 
 /// One enemy record. The fields the decompilation has not named are left out.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Enemy {
-    #[cfg_attr(feature = "std", serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name"))]
+    #[serde(serialize_with = "serialize_name", deserialize_with = "deserialize_name")]
     pub name: [u8; NAME_BYTES],
     /// The unique enemy id; some enemies have more than one (`wiki: data/records#area-data`,
     /// "Enemy IDs").
@@ -83,14 +99,12 @@ pub struct Enemy {
 }
 
 /// One encounter block: the encounters of an area and the enemies they draw.
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct EncounterBlock {
     pub encounters: Vec<Encounter>,
     pub enemies: Vec<Enemy>,
 }
 
-#[cfg(feature = "std")]
 fn serialize_name<S: serde::Serializer>(
     name: &[u8; NAME_BYTES],
     serializer: S,
@@ -153,7 +167,6 @@ fn enemy(record: &[u8]) -> Enemy {
 }
 
 /// Reads an enemy's name from its JSON text, which must fit in [`NAME_BYTES`] bytes.
-#[cfg(feature = "std")]
 fn deserialize_name<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> std::result::Result<[u8; NAME_BYTES], D::Error> {

@@ -5,11 +5,12 @@ use std::fs;
 use std::path::Path;
 
 /// The modules of `src/` that hold one format each.
-const FORMATS: [&str; 13] = [
+const FORMATS: [&str; 14] = [
     "cells",
     "clut",
     "cue",
     "encounter",
+    "game_tables",
     "map",
     "message",
     "resources",

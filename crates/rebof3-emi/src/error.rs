@@ -29,18 +29,6 @@ pub enum Error {
         record: usize,
         reason: &'static str,
     },
-    /// A fixed game table runs past the end of its payload.
-    #[cfg(feature = "std")]
-    GameTableShort {
-        table: &'static str,
-        bytes: usize,
-        needed: usize,
-    },
-    /// An encounter block is shorter than its 1,160 bytes.
-    #[cfg(feature = "std")]
-    EncounterBlockShort {
-        bytes: usize,
-    },
     /// A type-1 payload is shorter than its header.
     #[cfg(feature = "std")]
     Lz77Truncated,
@@ -61,6 +49,13 @@ pub enum Error {
     Lz77DistanceUnderflow {
         distance: usize,
         produced: usize,
+    },
+    /// A fixed table runs past the end of its payload.
+    #[cfg(feature = "std")]
+    GameTableShort {
+        table: &'static str,
+        bytes: usize,
+        needed: usize,
     },
     /// A manifest input is unusable: an absolute or parent-relative name, an
     /// entry that is missing or not a regular file, or a name whose resolved
@@ -97,14 +92,6 @@ impl fmt::Display for Error {
             }
             Self::CueRecord { record, reason } => write!(f, "cue record {record}: {reason}"),
             #[cfg(feature = "std")]
-            Self::EncounterBlockShort { bytes } => {
-                write!(f, "encounter block is {bytes} bytes; it needs 1160")
-            }
-            #[cfg(feature = "std")]
-            Self::GameTableShort { table, bytes, needed } => {
-                write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
-            }
-            #[cfg(feature = "std")]
             Self::Lz77Truncated => write!(f, "payload is shorter than the {}-byte type-1 header", lz77::HEADER),
             #[cfg(feature = "std")]
             Self::Lz77BadMarker(marker) => {
@@ -119,6 +106,10 @@ impl fmt::Display for Error {
             #[cfg(feature = "std")]
             Self::Lz77DistanceUnderflow { distance, produced } => {
                 write!(f, "distance {distance} needs {produced} produced bytes")
+            }
+            #[cfg(feature = "std")]
+            Self::GameTableShort { table, bytes, needed } => {
+                write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
             }
             #[cfg(feature = "std")]
             Self::ManifestInput(message) => write!(f, "{message}"),

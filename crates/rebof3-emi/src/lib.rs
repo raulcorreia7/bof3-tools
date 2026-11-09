@@ -27,14 +27,10 @@ pub mod characters;
 pub mod cue;
 pub mod emi;
 #[cfg(feature = "std")]
-pub mod encounter;
-#[cfg(feature = "std")]
 pub mod entry;
 mod error;
 #[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures;
-#[cfg(feature = "std")]
-pub mod game_tables;
 #[cfg(feature = "std")]
 pub mod lz77;
 #[cfg(feature = "std")]
@@ -42,7 +38,7 @@ pub mod manifest;
 #[cfg(feature = "std")]
 pub mod pack;
 #[cfg(feature = "std")]
-mod record;
+pub mod record;
 #[cfg(feature = "std")]
 pub mod replay;
 #[cfg(feature = "std")]

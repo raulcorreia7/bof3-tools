@@ -10,14 +10,12 @@ use std::path::Path;
 
 use psx_cd::Image;
 use rebof3_emi::Archive;
-use rebof3_emi::game_tables::TABLES;
 use rebof3_emi::text::discover;
+use rebof3_formats::game_tables::TABLES;
 use rebof3_formats::{Format, classify};
 
 use crate::error::Result;
-use crate::import;
 use crate::kind::Kind;
-use crate::tables;
 use crate::text::{bank, strings};
 
 /// The disc path of the fixed game tables, whose eight tables are the data-table entries.
@@ -107,8 +105,8 @@ pub fn run(image: &Path) -> Result<Report> {
 fn format_round_trips(format: Format, payload: &[u8]) -> bool {
     match format {
         Format::AreaMessageBank => bank_round_trips(payload),
-        Format::AreaEncounterTable => tables::encounters(payload)
-            .and_then(|json| import::encounters(&json, payload))
+        Format::AreaEncounterTable => rebof3_formats::encounter::open::export(payload)
+            .and_then(|json| rebof3_formats::encounter::open::import(&json, payload))
             .is_ok_and(|rebuilt| rebuilt == payload),
         _ => false,
     }
@@ -168,13 +166,14 @@ fn characters(report: &mut Report, payload: &[u8]) {
 
 /// Each fixed table of the game tables entry: its stored bytes, and whether its JSON reads back to them.
 fn game_tables(report: &mut Report, payload: &[u8]) -> Result<()> {
-    let files = tables::files(payload)?;
+    let files = rebof3_formats::game_tables::open::files(payload)?;
     for table in TABLES {
-        let start = table.archive_offset - rebof3_emi::game_tables::PAYLOAD_START;
+        let start = table.archive_offset - rebof3_formats::game_tables::PAYLOAD_START;
         let stored = &payload[start..start + table.count * table.record];
         let json = files.iter().find(|(name, _)| *name == table.name).map(|(_, json)| json.as_slice());
         let both = json.is_some_and(|json| {
-            import::game_table_in_payload(table.name, json, payload).is_ok_and(|rebuilt| rebuilt == stored)
+            rebof3_formats::game_tables::open::import_in_payload(table.name, json, payload)
+                .is_ok_and(|rebuilt| rebuilt == stored)
         });
         report.kinds.entry(Kind::DataTable).or_default().count(stored.len() as u64, both);
     }

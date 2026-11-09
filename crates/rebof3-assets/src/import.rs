@@ -8,40 +8,9 @@
 use psx_formats::adpcm;
 use psx_formats::gfx::texture::{self, Depth};
 use psx_formats::gfx::{clut, png, vram};
-use rebof3_emi::encounter::{self, EncounterBlock};
-use rebof3_emi::game_tables::{self, PAYLOAD_START, TABLES, Table};
 
 use crate::decode::VAG_RATE;
 use crate::error::{Error, Result};
-
-/// One fixed table of `ETC/GAME.EMI` entry 0, from its JSON records (`<name>.json`, an array of the records).
-/// `base` holds the table's stored bytes. Each named field is written over its base record, so the bytes no
-/// field names keep their stored values, and a name keeps its stored bytes while its text is unchanged.
-pub fn game_table(table: &str, json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
-    let descriptor = *TABLES
-        .iter()
-        .find(|descriptor| descriptor.name == table)
-        .ok_or_else(|| Error::Import(format!("there is no table named {table:?}")))?;
-    if base.len() != descriptor.count * descriptor.record {
-        return Err(Error::Import(format!(
-            "{table} is {} records of {} bytes; its stored bytes are {}",
-            descriptor.count,
-            descriptor.record,
-            base.len()
-        )));
-    }
-    match table {
-        "items" => rebuild(descriptor, json, base, game_tables::put_item),
-        "vital-items" => rebuild(descriptor, json, base, game_tables::put_vital_item),
-        "weapons" => rebuild(descriptor, json, base, game_tables::put_weapon),
-        "armor" => rebuild(descriptor, json, base, game_tables::put_armor),
-        "accessories" => rebuild(descriptor, json, base, game_tables::put_accessory),
-        "shops" => rebuild(descriptor, json, base, game_tables::put_shop),
-        "abilities" => rebuild(descriptor, json, base, game_tables::put_ability),
-        "level-growth" => rebuild(descriptor, json, base, game_tables::put_growth),
-        _ => Err(Error::Import(format!("{table} has no writer"))),
-    }
-}
 
 /// The characters of `ETC/START.EMI` entry 8 from the JSON of `tables::characters`, written over the stored payload.
 pub fn characters(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
@@ -51,70 +20,6 @@ pub fn characters(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
 /// The palettes of one sprite bank from the JSON of `sprites::character_bank`, written over the decoded bank.
 pub fn character_bank(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     Ok(rebof3_emi::character_bank::import(json, payload)?)
-}
-
-/// One fixed table of `ETC/GAME.EMI` entry 0, from its JSON records and the stored payload of that entry.
-pub fn game_table_in_payload(table: &str, json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let descriptor = TABLES
-        .iter()
-        .find(|descriptor| descriptor.name == table)
-        .ok_or_else(|| Error::Import(format!("there is no table named {table:?}")))?;
-    let start = descriptor.archive_offset - PAYLOAD_START;
-    let end = start + descriptor.count * descriptor.record;
-    let base = payload.get(start..end).ok_or_else(|| Error::Import(format!("the payload ends before {table}")))?;
-    game_table(table, json, base)
-}
-
-/// The encounter block of an area (`area-encounters`), from its JSON and its stored bytes. `base` is the stored
-/// block: the bytes no field names keep their stored values.
-pub fn encounters(json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
-    let block: EncounterBlock =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("encounter JSON: {error}")))?;
-    if base.len() != encounter::BLOCK_BYTES
-        || block.encounters.len() != encounter::ENCOUNTERS
-        || block.enemies.len() != encounter::ENEMIES
-    {
-        return Err(Error::Import(format!(
-            "an encounter block is {} bytes, {} encounters and {} enemies",
-            encounter::BLOCK_BYTES,
-            encounter::ENCOUNTERS,
-            encounter::ENEMIES
-        )));
-    }
-    let mut bytes = base.to_vec();
-    for (index, value) in block.encounters.iter().enumerate() {
-        let at = index * encounter::ENCOUNTER_BYTES;
-        encounter::put_encounter(&mut bytes[at..at + encounter::ENCOUNTER_BYTES], value).map_err(Error::Import)?;
-    }
-    for (index, value) in block.enemies.iter().enumerate() {
-        let at = encounter::ENEMY_BASE + index * encounter::ENEMY_BYTES;
-        encounter::put_enemy(&mut bytes[at..at + encounter::ENEMY_BYTES], value).map_err(Error::Import)?;
-    }
-    Ok(bytes)
-}
-
-/// Parses a table's JSON records and writes each one over its base record.
-fn rebuild<T: serde::de::DeserializeOwned>(
-    table: Table,
-    json: &[u8],
-    base: &[u8],
-    put: fn(&mut [u8], &T) -> std::result::Result<(), String>,
-) -> Result<Vec<u8>> {
-    let records: Vec<T> =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("{} JSON: {error}", table.name)))?;
-    if records.len() != table.count {
-        return Err(Error::Import(format!(
-            "{} has {} records; the table has {}",
-            table.name,
-            records.len(),
-            table.count
-        )));
-    }
-    let mut bytes = base.to_vec();
-    for (record, value) in bytes.chunks_exact_mut(table.record).zip(&records) {
-        put(record, value).map_err(|reason| Error::Import(format!("{} record: {reason}", table.name)))?;
-    }
-    Ok(bytes)
 }
 
 /// A sequence package (`.seq`) from Standard MIDI Files, one sequence per part and in order. Each part is a MIDI

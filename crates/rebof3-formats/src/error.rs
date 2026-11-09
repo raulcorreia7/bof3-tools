@@ -21,6 +21,20 @@ pub enum Error {
     /// A script bank's directory or a section's table words do not parse as the `0x800D3800`
     /// layout (`wiki: formats/area`).
     ScriptBankShape(&'static str),
+    /// A fixed game table runs past the end of its payload.
+    GameTableShort {
+        /// The table's name.
+        table: &'static str,
+        /// The payload size.
+        bytes: usize,
+        /// The size the table needs.
+        needed: usize,
+    },
+    /// An encounter block is shorter than its 1,160 bytes.
+    EncounterBlockShort {
+        /// The block size.
+        bytes: usize,
+    },
     /// An open-format file that an import cannot read back to the stored bytes.
     Import(String),
 }
@@ -40,6 +54,12 @@ impl fmt::Display for Error {
             }
             Self::MapBundleShape(reason) => write!(f, "map bundle: {reason}"),
             Self::ScriptBankShape(reason) => write!(f, "script bank: {reason}"),
+            Self::EncounterBlockShort { bytes } => {
+                write!(f, "encounter block is {bytes} bytes; it needs 1160")
+            }
+            Self::GameTableShort { table, bytes, needed } => {
+                write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
+            }
             Self::Import(message) => f.write_str(message),
         }
     }

@@ -6,7 +6,7 @@
 
 use core::fmt::Write as _;
 
-use crate::game_tables::{name_field, name_text};
+use crate::text::codec::{name_field, name_text};
 use crate::{Error, Result};
 
 /// Playable characters, one base-stat record each.

@@ -25,7 +25,6 @@ use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Selection};
 use crate::report::{DERIVED_TABLE, RENDERED_ITEM, Report, Row};
 use crate::sound;
-use crate::tables;
 use rebof3_formats::map::{layout, terrain};
 
 /// Name of the table written next to the asset tree.
@@ -415,7 +414,7 @@ fn emi_rows(
                 }
             }
             if format == Format::AreaEncounterTable {
-                match tables::encounters(payload) {
+                match rebof3_formats::encounter::open::export(payload) {
                     Ok(data) => outputs.push(Output {
                         role: "json",
                         path: name("", "json"),
@@ -508,14 +507,14 @@ fn game_table_rows(
     options: &Options,
     report: &mut Report,
 ) -> Result<()> {
-    let files = match tables::files(payload) {
+    let files = match rebof3_formats::game_tables::open::files(payload) {
         Ok(files) => files,
         Err(error) => {
             report.failures.push(format!("{} entry 0 tables: {error}", job.source));
             return Ok(());
         }
     };
-    let stored = match tables::stored(payload) {
+    let stored = match rebof3_formats::game_tables::open::stored(payload) {
         Ok(stored) => stored,
         Err(error) => {
             report.failures.push(format!("{} entry 0 tables: {error}", job.source));

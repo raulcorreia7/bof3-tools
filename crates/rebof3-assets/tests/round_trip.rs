@@ -13,7 +13,7 @@ use rebof3_assets::extract::{self, Options};
 use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
-use rebof3_emi::game_tables::{PAYLOAD_START, TABLES};
+use rebof3_formats::game_tables::{PAYLOAD_START, TABLES};
 
 /// Every file under `directory`, empty when the directory is missing.
 fn files_under(directory: &Path, found: &mut Vec<PathBuf>) {
@@ -280,7 +280,12 @@ fn retail_tables_round_trip_byte_exactly() {
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
         let start = table.archive_offset - PAYLOAD_START;
         let stored = &payload[start..start + table.count * table.record];
-        assert_eq!(import::game_table_in_payload(table.name, &json, &payload).unwrap(), stored, "{}", table.name);
+        assert_eq!(
+            rebof3_formats::game_tables::open::import_in_payload(table.name, &json, &payload).unwrap(),
+            stored,
+            "{}",
+            table.name
+        );
     }
     eprintln!("game table round trip: {} tables return their stored bytes from their JSON", TABLES.len());
 }
@@ -319,7 +324,7 @@ fn retail_encounters_round_trip_byte_exactly() {
             .expect("every encounter block has its JSON");
         let stored = fs::read(dir.join(block.output.as_deref().unwrap())).unwrap();
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
-        if import::encounters(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
+        if rebof3_formats::encounter::open::import(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
             failures.push(format!("{}: the JSON does not return its {} stored bytes", block.source, stored.len()));
         }
     }

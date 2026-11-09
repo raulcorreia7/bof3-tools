@@ -241,3 +241,21 @@ fn push_tag(encoding: Encoding, tag: &Tag, out: &mut Vec<u8>) -> Result<()> {
 fn byte_of(hex: &str, body: &str) -> Result<u8> {
     u8::from_str_radix(hex, 16).map_err(|_| Error::Text(format!("{{{body}:{hex}}} does not fit one byte")))
 }
+
+/// The text of a name field: its bytes in the name encoding, without the zeros that pad the field. A name keeps
+/// its colour codes and every other byte it holds; [`name_field`] writes them back.
+pub fn name_text(field: &[u8]) -> String {
+    let end = field.iter().rposition(|byte| *byte != 0).map_or(0, |last| last + 1);
+    decode(Encoding::Name, &field[..end])
+}
+
+/// The bytes of a name field `width` bytes wide whose text is `text`: the encoded text, then zeros. It is the
+/// inverse of [`name_text`] for every field, so a name read and written back keeps its stored bytes.
+pub fn name_field(text: &str, width: usize) -> Result<Vec<u8>> {
+    let mut bytes = encode(Encoding::Name, text)?;
+    if bytes.len() > width {
+        return Err(Error::Text(format!("{text:?} is longer than {width} bytes")));
+    }
+    bytes.resize(width, 0);
+    Ok(bytes)
+}

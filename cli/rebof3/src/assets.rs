@@ -18,7 +18,6 @@ use rebof3_assets::extract::{self, Options, SUMMARY_FILE, TABLE_FILE};
 use rebof3_assets::import::{self, TextureImport};
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
 use rebof3_assets::soundfont;
-use rebof3_assets::tables;
 use rebof3_assets::text::{self, DEFAULT_DISC};
 use rebof3_assets::{Error, Result};
 use rebof3_formats::map::terrain;
@@ -1091,7 +1090,7 @@ fn encounters_command(args: &[String]) -> Result<i32> {
     let payload = single(args.files, "encounters needs an area encounter block file")?;
     let out = with_extension_of(args.output, &payload, "json");
     create_parent(&out)?;
-    fs::write(&out, tables::encounters(&read_file(&payload)?)?)?;
+    fs::write(&out, rebof3_formats::encounter::open::export(&read_file(&payload)?)?)?;
     println!("wrote {}", out.display());
     Ok(EXIT_OK)
 }
@@ -1102,7 +1101,7 @@ fn tables_command(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let payload = single(args.files, "tables needs the stored bytes of GAME.EMI entry 0")?;
     let out = args.output.unwrap_or_else(|| PathBuf::from("game-tables"));
-    let files = tables::files(&read_file(&payload)?)?;
+    let files = rebof3_formats::game_tables::open::files(&read_file(&payload)?)?;
     fs::create_dir_all(&out)?;
     for (name, data) in &files {
         fs::write(out.join(format!("{name}.json")), data)?;

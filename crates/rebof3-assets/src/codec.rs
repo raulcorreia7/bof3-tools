@@ -224,7 +224,11 @@ pub static CODECS: &[Codec] = &[
         import: Some(Op {
             named: true,
             ..Op::new("import table needs a table name and its JSON file", "bin", |job| {
-                import::game_table_in_payload(job.name.unwrap_or_default(), job.input, companion(job))
+                Ok(rebof3_formats::game_tables::open::import_in_payload(
+                    job.name.unwrap_or_default(),
+                    job.input,
+                    companion(job),
+                )?)
             })
             .with_companion("--payload", "import table needs --payload, the stored entry 0 of ETC/GAME.EMI")
         }),
@@ -234,7 +238,7 @@ pub static CODECS: &[Codec] = &[
         export: None,
         import: Some(
             Op::new("import encounters needs the block's JSON file", "bin", |job| {
-                import::encounters(job.input, companion(job))
+                Ok(rebof3_formats::encounter::open::import(job.input, companion(job))?)
             })
             .with_companion("--base", "import encounters needs --base, the stored block"),
         ),

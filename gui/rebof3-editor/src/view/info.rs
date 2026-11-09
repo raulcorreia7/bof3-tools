@@ -6,12 +6,12 @@ use psx_formats::sep::Package;
 use psx_formats::vab::Bank;
 use rebof3_assets::decode::{palette_bank, texture_words};
 use rebof3_emi::cue::CueTable;
-use rebof3_emi::encounter::EncounterBlock;
 use rebof3_emi::entry::vab_body_index;
-use rebof3_emi::game_tables::name_text;
 use rebof3_emi::text::discover;
 use rebof3_emi::{character_bank, lz77};
 use rebof3_formats::Format;
+use rebof3_formats::encounter::EncounterBlock;
+use rebof3_formats::game_tables::name_text;
 use rebof3_formats::map::MapBundle;
 use rebof3_formats::scene::SceneTable;
 use rebof3_formats::script::ScriptBank;
@@ -284,7 +284,7 @@ pub fn encounters(payload: &[u8]) -> Result<Vec<Row>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::encounter::{BLOCK_BYTES, ENCOUNTER_BYTES, ENEMY_BASE};
+    use rebof3_formats::encounter::{BLOCK_BYTES, ENCOUNTER_BYTES, ENEMY_BASE};
 
     #[test]
     fn a_resource_table_lists_the_groups_after_its_base_words() {
