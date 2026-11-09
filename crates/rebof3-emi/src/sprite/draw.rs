@@ -160,6 +160,51 @@ impl Placement {
     }
 }
 
+/// The code that reads a bank, by the family of the archive that streams it.
+///
+/// `EMI_GetArchiveId` (`exe/slus_004_22@0x8016728C`) streams family 0 from `EMI_SLOT_PL`
+/// (`BIN/PLCHAR/PLnnn.EMI`) and families 1 and 2 from `EMI_SLOT_BPLD` and `EMI_SLOT_BPLU`
+/// (`BIN/BPLCHAR/BPLDnnn.EMI`, `BPLUnnn.EMI`), the ones `func_801E7948` (`emi/battle/battle/03@0x801E7948`)
+/// asks for.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Reader {
+    /// A party bank: `func_801C1254` places it and loads palette [`FIELD_PALETTE`], called from
+    /// `Party_JoinMember` and `Party_BuildBattlers` (`emi/etc/game/00`).
+    Field,
+    /// A battle bank: its reader is not traced, so its placement and palette are not proven.
+    Battle,
+    /// No traced loader streams the archive.
+    Unknown,
+}
+
+impl Reader {
+    /// The family of the archive at `path` (`BIN/…/NAME.EMI`).
+    pub fn of(path: &str) -> Self {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        let stem = name.split_once('.').map_or(name, |(stem, _)| stem);
+        let numbered = |prefix: &str| {
+            stem.strip_prefix(prefix).is_some_and(|rest| rest.starts_with(|first: char| first.is_ascii_digit()))
+        };
+        if numbered(PARTY_FIELD) {
+            Reader::Field
+        } else if numbered(PARTY_BATTLE_DOWN) || numbered(PARTY_BATTLE_UP) {
+            Reader::Battle
+        } else {
+            Reader::Unknown
+        }
+    }
+
+    /// The palette the reader loads, when it is traced.
+    pub fn palette(self) -> Option<usize> {
+        (self == Reader::Field).then_some(FIELD_PALETTE)
+    }
+}
+
+/// The archive name prefixes of the party families `EMI_GetArchiveId` streams.
+const PARTY_FIELD: &str = "PL";
+const PARTY_BATTLE_DOWN: &str = "BPLD";
+const PARTY_BATTLE_UP: &str = "BPLU";
+
 impl Default for Placement {
     fn default() -> Self {
         Self::field(0)
@@ -462,5 +507,16 @@ mod tests {
         let sizes = SpriteSizes::from_executable(&exe).expect("reads");
         assert_eq!(sizes.size(Cell { size: 0x80, x: 0, y: 0, u: 0, v: 0 }), (24, 16));
         assert!(SpriteSizes::from_executable(b"not an exe").is_err());
+    }
+
+    #[test]
+    fn the_archive_family_names_the_reader() {
+        assert_eq!(Reader::of("BIN/PLCHAR/PL012.EMI"), Reader::Field);
+        assert_eq!(Reader::of("BIN/BPLCHAR/BPLD012.EMI"), Reader::Battle);
+        assert_eq!(Reader::of("BIN/BPLCHAR/BPLU27A.EMI"), Reader::Battle);
+        assert_eq!(Reader::of("BIN/ETC/START.EMI"), Reader::Unknown);
+        assert_eq!(Reader::of("BIN/ETC/PLATE.EMI"), Reader::Unknown, "a name that only starts like a family");
+        assert_eq!(Reader::Field.palette(), Some(FIELD_PALETTE));
+        assert_eq!(Reader::Battle.palette(), None);
     }
 }

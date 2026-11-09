@@ -35,8 +35,8 @@ mod sheet;
 
 pub use animation::{Animation, CELL_BYTES, Cell, FLIP, Frame, JUMP, Playback, Player, SHAPE_MASK, Step};
 pub use draw::{
-    Bounds, Composite, FIELD_PAGE, FIELD_PALETTE, FIELD_PALETTE_STAGE, FIELD_SLOT_ROWS, Pixel, Placement, SHAPES,
-    SPRITE_SIZES, SpriteSizes, Stage, TRANSPARENT, Texel, animation_bounds, cell_rect, compose, frame_bounds,
+    Bounds, Composite, FIELD_PAGE, FIELD_PALETTE, FIELD_PALETTE_STAGE, FIELD_SLOT_ROWS, Pixel, Placement, Reader,
+    SHAPES, SPRITE_SIZES, SpriteSizes, Stage, TRANSPARENT, Texel, animation_bounds, cell_rect, compose, frame_bounds,
 };
 pub use image::{Encoding, Image, PACKED_MAX, TEXELS_PER_WORD};
 pub use sheet::{
