@@ -157,6 +157,42 @@ pub fn from_payload(payload: &[u8], mtl_name: &str) -> Result<Terrain> {
 /// corners as the OBJ. Each quad is two triangles that face up: corners 0, 2, 3 and 0, 3, 1. Returns
 /// `None` when the mesh has no cell.
 pub fn glb_of_mesh(mesh: &Mesh, name: &str) -> Option<Vec<u8>> {
+    glb_with(mesh, name, None, &[])
+}
+
+/// The terrain of a bundle as a binary glTF, as [`glb_of_mesh`] writes it, with a vertex colour per
+/// corner and `nodes` after the mesh. A cell's colour is its descriptor's grey level
+/// (`func_80155560`: `(word >> 16) & 0xF8`) over 255, the byte the GPU multiplies each texel by with
+/// `0x80` as neutral; a cell with no tile is white. The importer reads the mesh alone, so the colours
+/// and the nodes do not change what it writes.
+pub fn glb_of_bundle(bundle: &MapBundle, name: &str, nodes: &[gltf::Node]) -> Option<Vec<u8>> {
+    let colours: Vec<[f32; 4]> = (0..bundle.cells.len())
+        .flat_map(|cell| {
+            let grey = descriptor(bundle, cell)
+                .map_or(1.0, |word| f32::from(((word >> GREY_SHIFT) & GREY_MASK) as u8) / 255.0);
+            [[grey, grey, grey, 1.0]; 4]
+        })
+        .collect();
+    glb_with(&mesh_of_bundle(bundle), name, Some(&colours), nodes)
+}
+
+/// The `cells` node of a bundle's glTF: the byte code of every cell, row by row, as
+/// `Area_GetCellCode` (`exe/slus_004_22@0x80166CB0`) reads them.
+pub fn cells_node(bundle: &MapBundle) -> gltf::Node {
+    let cells = bundle.cells.len();
+    gltf::Node {
+        name: "cells".into(),
+        extras: serde_json::json!({
+            "columns": bundle.width,
+            "rows": bundle.height,
+            "codes": &bundle.codes[..cells.min(bundle.codes.len())],
+            "reader": "Area_GetCellCode (exe/slus_004_22@0x80166CB0)",
+        }),
+        ..gltf::Node::default()
+    }
+}
+
+fn glb_with(mesh: &Mesh, name: &str, colours: Option<&[[f32; 4]]>, nodes: &[gltf::Node]) -> Option<Vec<u8>> {
     let positions: Vec<[f32; 3]> = mesh.positions.iter().map(|[x, y, z]| [*x as f32, *y as f32, *z as f32]).collect();
     let uvs: Vec<[f32; 2]> =
         mesh.uvs.iter().map(|[u, v]| [f32::from(*u) / COORDINATE_SPAN, f32::from(*v) / COORDINATE_SPAN]).collect();
@@ -177,7 +213,7 @@ pub fn glb_of_mesh(mesh: &Mesh, name: &str) -> Option<Vec<u8>> {
     primitives.retain(|primitive| !primitive.indices.is_empty());
     let materials: Vec<String> = (0..SELECTORS).map(|selector| format!("bank{selector}")).collect();
     let names: Vec<&str> = materials.iter().map(String::as_str).collect();
-    gltf::glb(name, &positions, &uvs, &primitives, &names)
+    gltf::glb_with(name, &positions, &uvs, colours, &primitives, &names, nodes)
 }
 
 /// The tile-bank selector and the four texture-coordinate corners of a cell, in corner order.
@@ -240,6 +276,10 @@ fn corner_order(descriptor: u32, uvs: [[u8; 2]; 4]) -> [[u8; 2]; 4] {
     }
     uvs
 }
+
+/// The grey level of a descriptor word (`func_80155560`).
+const GREY_SHIFT: u32 = 16;
+const GREY_MASK: u32 = 0xF8;
 
 /// Pixels per side of a cell in a [`TopDown`] view: one 16x16 block of texels.
 pub const CELL_PIXELS: usize = BLOCK_TEXELS as usize;
@@ -445,5 +485,18 @@ mod top_down_tests {
         let view = top_down(&bundle(0x1080_0000), &vram());
         assert_eq!((view.textured, view.unwritten), (0, 1));
         assert_eq!(&view.png()[1..4], b"PNG");
+    }
+
+    #[test]
+    fn a_coloured_glb_with_nodes_imports_back_to_the_same_bytes() {
+        let payload = bundle(0x0060_0000).encode();
+        let bundle = MapBundle::decode(&payload).unwrap();
+        let actor = gltf::Node { name: "actor 0".into(), translation: Some([0.5, 0.0, 0.5]), ..gltf::Node::default() };
+        let group = gltf::Node { name: "actors".into(), children: vec![actor], ..gltf::Node::default() };
+        let glb = glb_of_bundle(&bundle, "map", &[cells_node(&bundle), group]).expect("a glb");
+        assert_eq!(import(&glb, &payload).unwrap(), payload, "the colours and nodes leave the import alone");
+        let names: Vec<String> = gltf::read_nodes(&glb).unwrap().into_iter().map(|(name, _)| name).collect();
+        assert_eq!(names, ["map", "cells", "actors", "actor 0"]);
+        assert_eq!(gltf::read_nodes(&glb).unwrap()[3].1, Some([0.5, 0.0, 0.5]));
     }
 }

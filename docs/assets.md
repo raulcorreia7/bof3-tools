@@ -119,7 +119,10 @@ every byte the open form does not name.
   the table encoding, and a backslash is written as `\x5C`. A growth stat must be a nibble (0 to 15).
   Splice the output into entry 0 at the table's offset and use `import emi --entry 0=FILE`.
 - **Maps.** `terrain` and `export terrain` write glTF or OBJ; `import terrain MESH --payload BUNDLE` and
-  `import layout JSON --payload BUNDLE` rebuild the bundle. `import encounters JSON --base BLOCK`
+  `import layout JSON --payload BUNDLE` rebuild the bundle. The glTF's mesh has one quad per cell:
+  `x` is the column, `z` the row and `y` the corner byte times 16. Its `COLOR_0` is each cell's grey
+  level over 255, where the GPU takes `0x80` as neutral, and a `cells` node holds every cell's byte
+  code in its `extras`. The import reads the mesh's corner heights alone. `import encounters JSON --base BLOCK`
   rebuilds an encounter block.
 - **Text and characters.** `export message`, `export strings`, `export characters` and
   `export character-bank` pair with the `import` verbs of the same name. `character-bank` imports palette

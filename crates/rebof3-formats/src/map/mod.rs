@@ -84,12 +84,12 @@ fn open(site: &Site<'_>) -> Extras {
         extras.files.push(Extra { role, tag: tag.to_string(), extension, evidence: EVIDENCE.to_string(), data });
     };
     let mut skipped = None;
-    match terrain::mesh_from_payload(payload) {
-        Ok(mesh) => {
-            let text = terrain::of_mesh(&mesh, &format!("{slot}.mtl"));
+    match MapBundle::decode(payload) {
+        Ok(bundle) => {
+            let text = terrain::of_bundle(&bundle, &format!("{slot}.mtl"));
             push("obj", "", "obj", text.obj.into_bytes());
             push("mtl", "", "mtl", text.mtl.into_bytes());
-            if let Some(glb) = terrain::glb_of_mesh(&mesh, &slot.to_string()) {
+            if let Some(glb) = terrain::glb_of_bundle(&bundle, &slot.to_string(), &[terrain::cells_node(&bundle)]) {
                 push("glb", "", "glb", glb);
             }
         }
