@@ -21,6 +21,7 @@ pub static PACKAGE: Description = Description {
     selector: Selector::Type(sep::TYPE),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
+    open: None,
     kind: "audio-sequence",
 };
 

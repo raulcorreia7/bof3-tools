@@ -18,5 +18,6 @@ pub static AUX: Description = Description {
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::None,
     derive: None,
+    open: None,
     kind: "area-module",
 };

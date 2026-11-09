@@ -37,6 +37,7 @@ pub static ACTOR_DEFS: Description = Description {
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    open: None,
     kind: "area-actor-defs",
 };
 

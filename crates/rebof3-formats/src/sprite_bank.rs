@@ -22,6 +22,7 @@ pub static LZ77_BLOB: Description = Description {
     selector: Selector::Type(TYPE_LZ77),
     round_trip: RoundTrip::None,
     derive: Some(derive),
+    open: None,
     kind: "character-bank",
 };
 
@@ -37,6 +38,7 @@ pub static RAW_BLOB: Description = Description {
     selector: Selector::Load(&RAW_ADDRESSES),
     round_trip: RoundTrip::None,
     derive: None,
+    open: None,
     kind: "character-bank",
 };
 

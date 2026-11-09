@@ -26,21 +26,15 @@ use crate::kind::{AudioFormat, Kind, Selection};
 use crate::report::{DERIVED_TABLE, RENDERED_ITEM, Report, Row};
 use crate::sound;
 use rebof3_formats::joins::joined_rows_in;
-use rebof3_formats::map::{layout, terrain};
-use rebof3_formats::vram::indexed_rows;
+use rebof3_formats::registry::Site;
 
 /// Name of the table written next to the asset tree.
 pub const TABLE_FILE: &str = "assets.jsonl";
-/// The layout the terrain is read from, cited in the catalog's evidence column.
-const MAP_EVIDENCE: &str = "wiki: formats/area#0x80104000-map-bundle (tile and cell layout)";
-const VAB_EVIDENCE: &str = "wiki: formats/audio#bank-layout (header and body share a load argument)";
 /// The archive whose entry 0 holds the fixed game tables (`wiki: data/records#gameemi-fixed-tables`,
 /// "Equipment and shop data").
 const GAME_TABLES_SOURCE: &str = "BIN/ETC/GAME.EMI";
 const TABLE_EVIDENCE: &str = "wiki: data/records#gameemi-fixed-tables (fixed table locations and record layouts); \
      C records: include/game/item.h, include/game/ability.h, include/game/character.h";
-const ENCOUNTER_EVIDENCE: &str = "wiki: data/records#area-data (enemy records); wiki: formats/area#0x800e4000-encounters-and-enemy-records (encounter block); \
-     C records: include/game/enemy.h";
 /// Name of the summary written next to the asset tree.
 pub const SUMMARY_FILE: &str = "summary.txt";
 /// The container extension that marks an EMI archive on the disc.
@@ -392,100 +386,23 @@ fn emi_rows(
                 })),
                 Err(error) => note = format!("derived output skipped: {error}"),
             }
-            if let Some(joined) = rows.get(&slot).filter(|_| format == Format::VramUpload) {
-                match indexed_rows(entry.ram_ptr, payload, joined) {
-                    Ok(files) => {
-                        for file in files {
-                            outputs.push(Output {
-                                role: "png",
-                                path: name(&file.tag, "png"),
-                                data: Cow::Owned(file.data),
-                                evidence: file.evidence.clone(),
-                            });
-                            if let Some(tim) = file.tim {
-                                outputs.push(Output {
-                                    role: "tim",
-                                    path: name(&file.tag, "tim"),
-                                    data: Cow::Owned(tim),
-                                    evidence: file.evidence,
-                                });
-                            }
-                        }
-                    }
-                    Err(error) => note = format!("palette rows skipped: {error}"),
-                }
-            }
-            if format == Format::AreaEncounterTable {
-                match rebof3_formats::encounter::open::export(payload) {
-                    Ok(data) => outputs.push(Output {
-                        role: "json",
-                        path: name("", "json"),
-                        data: Cow::Owned(data),
-                        evidence: ENCOUNTER_EVIDENCE.to_string(),
-                    }),
-                    Err(error) => note = format!("encounters skipped: {error}"),
-                }
-            }
-            if format == Format::AreaMapBundle {
-                match terrain::mesh_from_payload(payload) {
-                    Ok(mesh) => {
-                        let text = terrain::of_mesh(&mesh, &format!("{slot}.mtl"));
-                        for (role, extension, data) in [("obj", "obj", text.obj), ("mtl", "mtl", text.mtl)] {
-                            outputs.push(Output {
-                                role,
-                                path: name("", extension),
-                                data: Cow::Owned(data.into_bytes()),
-                                evidence: MAP_EVIDENCE.to_string(),
-                            });
-                        }
-                        if let Some(glb) = terrain::glb_of_mesh(&mesh, &slot.to_string()) {
-                            outputs.push(Output {
-                                role: "glb",
-                                path: name("", "glb"),
-                                data: Cow::Owned(glb),
-                                evidence: MAP_EVIDENCE.to_string(),
-                            });
-                        }
-                    }
-                    Err(error) => note = format!("terrain skipped: {error}"),
-                }
-                match layout::export(payload) {
-                    Ok(data) => outputs.push(Output {
-                        role: "json",
-                        path: name(".layout", "json"),
-                        data: Cow::Owned(data),
-                        evidence: MAP_EVIDENCE.to_string(),
-                    }),
-                    Err(error) => note = format!("layout skipped: {error}"),
-                }
-            }
-            if format == Format::VabHeader {
-                let body = archive.entries().iter().enumerate().find_map(|(other, candidate)| {
-                    (candidate.ram_ptr == entry.ram_ptr && classify(candidate, payloads[other]) == Format::VabBody)
-                        .then_some(payloads[other])
-                });
-                match body {
-                    Some(body) => {
-                        // The standard VAB file is the header followed by the body.
-                        let mut whole = payload.to_vec();
-                        whole.extend_from_slice(body);
-                        outputs.push(Output {
-                            role: "vab",
-                            path: name("", "vab"),
-                            data: Cow::Owned(whole),
-                            evidence: VAB_EVIDENCE.to_string(),
-                        });
-                        match rebof3_formats::vab::soundfont::export(payload, body, &format!("{stem}/{slot}")) {
-                            Ok(data) => outputs.push(Output {
-                                role: "sf2",
-                                path: name("", "sf2"),
-                                data: Cow::Owned(data),
-                                evidence: VAB_EVIDENCE.to_string(),
-                            }),
-                            Err(error) => note = format!("soundfont skipped: {error}"),
-                        }
-                    }
-                    None => note = "soundfont skipped: no body shares the header's load argument".to_string(),
+            if let Some(open) = format.describe().open {
+                let site = Site {
+                    stem,
+                    slot,
+                    entries: archive.entries(),
+                    payloads: &payloads,
+                    rows: rows.get(&slot).map_or(&[], Vec::as_slice),
+                };
+                let opened = open(&site);
+                outputs.extend(opened.files.into_iter().map(|file| Output {
+                    role: file.role,
+                    path: name(&file.tag, file.extension),
+                    data: Cow::Owned(file.data),
+                    evidence: file.evidence,
+                }));
+                if let Some(skipped) = opened.skipped {
+                    note = skipped;
                 }
             }
         }

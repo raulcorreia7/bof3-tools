@@ -8,7 +8,7 @@ use rebof3_emi::Entry;
 
 use crate::error::{Error, Result};
 use crate::identity::difference;
-use crate::registry::{Derived, Description, Format, RoundTrip, Selector, State};
+use crate::registry::{Derived, Description, Extra, Extras, Format, RoundTrip, Selector, Site, State};
 
 /// The upload as a format-registry row.
 pub static UPLOAD: Description = Description {
@@ -22,6 +22,7 @@ pub static UPLOAD: Description = Description {
     selector: Selector::Type(vram::UPLOAD_TYPE),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    open: Some(open),
     kind: "texture",
 };
 
@@ -30,6 +31,35 @@ fn round_trip(entry: &Entry, payload: &[u8]) -> Result<(), String> {
     let rectangles =
         vram::decode(payload, Descriptor::from_load_argument(entry.ram_ptr)).map_err(|error| error.to_string())?;
     difference(&vram::encode(&rectangles), payload)
+}
+
+/// The upload as one indexed PNG per palette row it is drawn with, and the TIM of the same row.
+fn open(site: &Site<'_>) -> Extras {
+    let mut extras = Extras::default();
+    match indexed_rows(site.entry().ram_ptr, site.payload(), site.rows) {
+        Ok(files) => {
+            for file in files {
+                extras.files.push(Extra {
+                    role: "png",
+                    tag: file.tag.clone(),
+                    extension: "png",
+                    evidence: file.evidence.clone(),
+                    data: file.data,
+                });
+                if let Some(tim) = file.tim {
+                    extras.files.push(Extra {
+                        role: "tim",
+                        tag: file.tag,
+                        extension: "tim",
+                        evidence: file.evidence,
+                        data: tim,
+                    });
+                }
+            }
+        }
+        Err(error) => extras.skipped = Some(format!("palette rows skipped: {error}")),
+    }
+    extras
 }
 
 /// The 16 bpp PNG view of the upload.

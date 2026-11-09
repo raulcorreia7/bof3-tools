@@ -29,6 +29,7 @@ pub static CODE: Description = Description {
     selector: Selector::Load(&CODE_ADDRESSES),
     round_trip: RoundTrip::None,
     derive: None,
+    open: None,
     kind: "code",
 };
 
@@ -44,6 +45,7 @@ pub static RESERVE: Description = Description {
     selector: Selector::Fallback,
     round_trip: RoundTrip::None,
     derive: None,
+    open: None,
     kind: "reserve",
 };
 
@@ -59,5 +61,6 @@ pub static UNCLASSIFIED: Description = Description {
     selector: Selector::Fallback,
     round_trip: RoundTrip::None,
     derive: None,
+    open: None,
     kind: "unknown",
 };

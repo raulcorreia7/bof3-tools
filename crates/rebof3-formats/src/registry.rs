@@ -14,6 +14,7 @@ use std::ops::RangeInclusive;
 
 use rebof3_emi::Entry;
 
+use crate::vram::RowUse;
 use crate::{
     cells, clut, cue, encounter, map, message, residue, resources, scene, script, sep, sprite_bank, vab, vram, window,
 };
@@ -125,6 +126,58 @@ pub struct Derived {
 /// The files a format adds to the stored bytes of an entry, from its load argument and payload.
 pub type Derive = fn(load_arg: u32, payload: &[u8]) -> crate::error::Result<Vec<Derived>>;
 
+/// Where an entry sits in its archive: what a format may read beside its own payload to open it.
+pub struct Site<'a> {
+    /// The archive's path without the container extension, for titles.
+    pub stem: &'a str,
+    /// The entry's slot.
+    pub slot: usize,
+    /// Every entry of the archive.
+    pub entries: &'a [Entry],
+    /// Every payload of the archive, in slot order.
+    pub payloads: &'a [&'a [u8]],
+    /// The palette rows the entry's texture is drawn with.
+    pub rows: &'a [RowUse],
+}
+
+impl Site<'_> {
+    /// The entry itself.
+    pub fn entry(&self) -> &Entry {
+        &self.entries[self.slot]
+    }
+
+    /// The entry's payload.
+    pub fn payload(&self) -> &[u8] {
+        self.payloads[self.slot]
+    }
+}
+
+/// A file a format opens beside the stored bytes of an entry.
+pub struct Extra {
+    /// What the file is for: `png`, `json`, `obj`, `glb`.
+    pub role: &'static str,
+    /// Text between the slot and the extension: `.layout`, `.clut-160-483`, or empty.
+    pub tag: String,
+    /// The file extension, without the dot.
+    pub extension: &'static str,
+    /// The source lines behind the file.
+    pub evidence: String,
+    /// The file's bytes.
+    pub data: Vec<u8>,
+}
+
+/// The files a format opened, and why it skipped the last part it did not open.
+#[derive(Default)]
+pub struct Extras {
+    /// The files, in order.
+    pub files: Vec<Extra>,
+    /// The reason the last skipped part was skipped, for the row's note.
+    pub skipped: Option<String>,
+}
+
+/// The files a format opens beside an entry, with the archive around it.
+pub type Open = fn(&Site<'_>) -> Extras;
+
 /// What one format module knows about one format it reads.
 #[derive(Clone, Debug)]
 pub struct Description {
@@ -148,6 +201,8 @@ pub struct Description {
     pub round_trip: RoundTrip,
     /// The open files the format adds to the stored bytes, when it has any.
     pub derive: Option<Derive>,
+    /// The files the format opens beside the stored bytes when it extracts an archive.
+    pub open: Option<Open>,
     /// The asset kind the format's files are written under: the name of `rebof3_assets::Kind`.
     pub kind: &'static str,
 }

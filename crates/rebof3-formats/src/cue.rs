@@ -21,6 +21,7 @@ pub static TABLE: Description = Description {
     selector: Selector::Type(TYPE_CUE),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    open: None,
     kind: "audio-cues",
 };
 

@@ -46,7 +46,7 @@ use rebof3_emi::Entry;
 
 use crate::error::{Error, Result};
 use crate::identity::difference;
-use crate::registry::{Description, Format, RoundTrip, Selector, State};
+use crate::registry::{Description, Extra, Extras, Format, RoundTrip, Selector, Site, State};
 
 pub mod layout;
 pub mod terrain;
@@ -67,8 +67,39 @@ pub static BUNDLE: Description = Description {
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
+    open: Some(open),
     kind: "area-map",
 };
+
+/// The layout the terrain is read from, cited in the catalog's evidence column.
+const EVIDENCE: &str = "wiki: formats/area#0x80104000-map-bundle (tile and cell layout)";
+
+/// The terrain as OBJ, MTL and glTF binary, and the layout as JSON.
+fn open(site: &Site<'_>) -> Extras {
+    let (payload, slot) = (site.payload(), site.slot);
+    let mut extras = Extras::default();
+    let mut push = |role: &'static str, tag: &str, extension: &'static str, data: Vec<u8>| {
+        extras.files.push(Extra { role, tag: tag.to_string(), extension, evidence: EVIDENCE.to_string(), data });
+    };
+    let mut skipped = None;
+    match terrain::mesh_from_payload(payload) {
+        Ok(mesh) => {
+            let text = terrain::of_mesh(&mesh, &format!("{slot}.mtl"));
+            push("obj", "", "obj", text.obj.into_bytes());
+            push("mtl", "", "mtl", text.mtl.into_bytes());
+            if let Some(glb) = terrain::glb_of_mesh(&mesh, &slot.to_string()) {
+                push("glb", "", "glb", glb);
+            }
+        }
+        Err(error) => skipped = Some(format!("terrain skipped: {error}")),
+    }
+    match layout::export(payload) {
+        Ok(data) => push("json", ".layout", "json", data),
+        Err(error) => skipped = Some(format!("layout skipped: {error}")),
+    }
+    extras.skipped = skipped;
+    extras
+}
 
 /// Decodes the bundle and encodes it again; `Err` names the first difference.
 fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {

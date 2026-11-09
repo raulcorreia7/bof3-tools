@@ -25,6 +25,7 @@ pub static BANK: Description = Description {
     selector: Selector::LoadWindow(BAND),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    open: None,
     kind: "palette",
 };
 

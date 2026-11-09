@@ -62,6 +62,7 @@ pub static AREA: Description = Description {
     selector: Selector::Load(&[AREA_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
+    open: None,
     kind: "area-script",
 };
 
@@ -77,6 +78,7 @@ pub static BATTLE: Description = Description {
     selector: Selector::Load(&[BATTLE_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
+    open: None,
     kind: "battle-script",
 };
 
@@ -92,6 +94,7 @@ pub static MAGIC: Description = Description {
     selector: Selector::Load(&[MAGIC_ADDRESS]),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
+    open: None,
     kind: "bmagic-table",
 };
 

@@ -10,7 +10,7 @@ use rebof3_emi::record::{bytes, u16_at};
 use rebof3_emi::text::codec::{name_field, name_text};
 
 use crate::error::{Error, Result};
-use crate::registry::{Description, EMI_EXTENSION, Format, RoundTrip, Selector, State};
+use crate::registry::{Description, EMI_EXTENSION, Extra, Extras, Format, RoundTrip, Selector, Site, State};
 
 pub mod open;
 
@@ -29,8 +29,30 @@ pub static TABLE: Description = Description {
     selector: Selector::Load(&[LOAD_ADDRESS]),
     round_trip: RoundTrip::None,
     derive: None,
+    open: Some(open_files),
     kind: "area-encounters",
 };
+
+/// The sources behind the encounter JSON.
+const EVIDENCE: &str = "wiki: data/records#area-data (enemy records); wiki: formats/area#0x800e4000-encounters-and-enemy-records (encounter block); \
+     C records: include/game/enemy.h";
+
+/// The block as JSON.
+fn open_files(site: &Site<'_>) -> Extras {
+    match open::export(site.payload()) {
+        Ok(data) => Extras {
+            files: vec![Extra {
+                role: "json",
+                tag: String::new(),
+                extension: "json",
+                evidence: EVIDENCE.to_string(),
+                data,
+            }],
+            skipped: None,
+        },
+        Err(error) => Extras { files: Vec::new(), skipped: Some(format!("encounters skipped: {error}")) },
+    }
+}
 
 /// Bytes in the block.
 pub const BLOCK_BYTES: usize = 0x488;
