@@ -10,6 +10,7 @@ It is a Cargo workspace with one CLI, `bof3`. Read [README.md](README.md) first,
 | ------------------------ | ---------------------------------------------------------------- | ------------------------------------------ |
 | `cli/rebof3/`            | The `bof3` binary: `disc`, `emi` and `assets` subcommands         | [docs/cli.md](docs/cli.md)                 |
 | `crates/rebof3-emi/`     | The EMI archive reader and writer                                | [docs/crates.md](docs/crates.md#rebof3-emi) |
+| `crates/rebof3-formats/` | The format registry, `classify` and the coverage table          | [docs/crates.md](docs/crates.md#rebof3-formats) |
 | `crates/rebof3-assets/`  | Asset conversion and the extract-all output                      | [docs/assets.md](docs/assets.md)           |
 | `gui/rebof3-editor/`     | The `bof3-edit` asset editor: browse, view and edit EMI entries  | [README.md](README.md#asset-editor)        |
 | `Cargo.toml`             | Workspace members and the pinned `bof3player` crates         | [docs/crates.md](docs/crates.md)      |
@@ -23,7 +24,10 @@ Run from this folder before every report. CI runs the same checks:
 make check
 ```
 
-`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests.
+`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. Retail tests skip
+when `BOF3_DISC_DIR` (extracted disc) or `BOF3_DISC_IMAGE` (cue sheet) is unset, so a green
+`make check` alone proves nothing about retail data. Run `make check-retail` with both set: it sets
+`BOF3_REQUIRE_RETAIL=1` and any skip fails.
 
 ## Rules
 

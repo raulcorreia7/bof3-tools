@@ -18,6 +18,11 @@ mod view;
 mod widgets;
 mod window;
 
+/// The retail-input helper the integration tests also use.
+#[cfg(test)]
+#[path = "../tests/support/mod.rs"]
+mod retail_support;
+
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::process::ExitCode;

@@ -41,7 +41,7 @@ pub struct Row {
     pub file_type: Option<u16>,
     /// EMI load argument.
     pub load_arg: Option<u32>,
-    /// The census format name (`rebof3_emi::classify::Format::name`).
+    /// The census format name (`rebof3_formats::Format::name`).
     pub format: &'static str,
     pub kind: Kind,
     /// The census state: codec, specified, unknown, code, reserve, or file.

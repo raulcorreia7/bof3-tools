@@ -6,7 +6,7 @@
 
 use gpui::{AnyElement, Context, div, prelude::*, px};
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_emi::text::discover::{self, Found, Kind};
+use rebof3_formats::text::discover::{self, Found, Kind};
 
 use super::{Entry, Field, input, message};
 use crate::app::Editor;
@@ -152,7 +152,7 @@ mod tests {
     /// order. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_string_prints_all_its_glyphs() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-preview-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

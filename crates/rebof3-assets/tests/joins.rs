@@ -1,7 +1,7 @@
 //! The palette joins over the retail archives: 202 textures and 882 rows.
 //!
-//! The test skips when no retail archive directory is present. Set `BOF3_EMI_ROOT` to a
-//! directory of `.EMI` containers, or place them at the checkout's `raw/disc/BIN`. The counts
+//! The test skips when no retail archive directory is present. Set `BOF3_DISC_DIR` to an
+//! extracted disc. The counts
 //! are the world-map terrain rule plus the literal sites (`rebof3_emi::texture::SITES`).
 //!
 //! Every joined row is written to the test artifacts as its palette-applied PNG and its TIM, so
@@ -10,37 +10,17 @@
 mod support;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use psx_formats::gfx::texture::{Clut, Depth};
-use rebof3_assets::decode::{indexed_rows, joined_rows, texture_view_png};
 use rebof3_emi::Archive;
 use rebof3_emi::texture::ResidentBank;
-
-/// The path of the retail archives, relative to the checkout root.
-const RETAIL_SUFFIX: &str = "raw/disc/BIN";
+use rebof3_formats::joins::joined_rows;
+use rebof3_formats::vram::{indexed_rows, texture_view_png};
 
 /// The proven palette joins: 202 textures and 882 rows.
 const TEXTURES: usize = 202;
 const ROWS: usize = 882;
-
-/// The retail archive root: `BOF3_EMI_ROOT` when set, otherwise the checkout's
-/// `raw/disc/BIN` found by walking up from the crate directory.
-fn retail_root() -> Option<PathBuf> {
-    if let Some(root) = std::env::var_os("BOF3_EMI_ROOT") {
-        let root = PathBuf::from(root);
-        return root.is_dir().then_some(root);
-    }
-    let mut directory = Some(Path::new(env!("CARGO_MANIFEST_DIR")));
-    while let Some(current) = directory {
-        let root = current.join(RETAIL_SUFFIX);
-        if root.is_dir() {
-            return Some(root);
-        }
-        directory = current.parent();
-    }
-    None
-}
 
 /// The archive's payloads, or the slots that failed to read.
 fn payloads(archive: &Archive, bytes: &[u8]) -> Vec<Vec<u8>> {
@@ -54,7 +34,7 @@ fn write_artifacts(
     source: &str,
     archive: &Archive,
     payloads: &[Vec<u8>],
-    rows: &std::collections::HashMap<usize, Vec<rebof3_assets::decode::RowUse>>,
+    rows: &std::collections::HashMap<usize, Vec<rebof3_formats::vram::RowUse>>,
     summary: &mut Vec<serde_json::Value>,
 ) {
     // The output folder is flat, so the archive's folder joins its file name.
@@ -93,14 +73,10 @@ fn write_artifacts(
 
 #[test]
 fn retail_textures_join_their_proven_palette_rows() {
-    let Some(root) = retail_root() else {
-        eprintln!(
-            "skipping the palette joins: no retail archives at <ancestor>/{RETAIL_SUFFIX} \
-             (set BOF3_EMI_ROOT to a directory of .EMI containers)"
-        );
+    let Some(root) = support::retail_root() else {
         return;
     };
-    let mut archives = rebof3_emi::coverage::archives_under(&root);
+    let mut archives = rebof3_formats::coverage::archives_under(&root);
     archives.sort();
     assert!(!archives.is_empty(), "no .EMI containers under {}", root.display());
 
@@ -164,8 +140,7 @@ fn retail_textures_join_their_proven_palette_rows() {
 /// row is ambiguous for a disc-wide resident set, so the join refuses it.
 #[test]
 fn retail_battle_rows_show_cross_archive_bank_conflicts() {
-    let Some(root) = retail_root() else {
-        eprintln!("skipping the battle resident banks: no retail archives");
+    let Some(root) = support::retail_root() else {
         return;
     };
     let names = [

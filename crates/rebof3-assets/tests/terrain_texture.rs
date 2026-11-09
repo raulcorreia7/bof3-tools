@@ -4,15 +4,17 @@
 //! Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the test
 //! skips. Nothing it reads is written out.
 
+mod support;
+
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use rebof3_assets::terrain::top_down;
 use rebof3_emi::Archive;
-use rebof3_emi::area::map::MapBundle;
-use rebof3_emi::classify::{Format, classify};
 use rebof3_emi::replay::{self, Vram, scenes};
+use rebof3_formats::map::MapBundle;
+use rebof3_formats::map::terrain::top_down;
+use rebof3_formats::{Format, classify};
 
 fn collect(root: &Path, folder: &Path, out: &mut Vec<String>) {
     let Ok(entries) = fs::read_dir(folder) else { return };
@@ -34,9 +36,7 @@ fn read(root: &Path, path: &str) -> Option<(Vec<u8>, Archive)> {
 
 #[test]
 fn retail_area_maps_draw_from_their_replayed_vram() {
-    let Some(root) = std::env::var_os("BOF3_DISC_DIR").map(PathBuf::from).filter(|root| root.join("BIN").is_dir())
-    else {
-        eprintln!("skipped: set BOF3_DISC_DIR to an extracted disc");
+    let Some(root) = support::retail_disc() else {
         return;
     };
     let mut paths = Vec::new();

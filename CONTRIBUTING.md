@@ -30,6 +30,18 @@ The tests use synthetic fixtures built in code. Cases that need the retail disc 
 absent, so you can work on every crate without one. To run them, dump your own US disc
 (Redump-verified CUE sheet and BIN tracks) and keep it outside Git.
 
+Two variables name the retail data, for every crate:
+
+| Variable | Value |
+| -------- | ----- |
+| `BOF3_DISC_DIR` | the extracted disc, the folder that holds `BIN/` (`bof3 disc extract`) |
+| `BOF3_DISC_IMAGE` | the disc's `.cue` sheet |
+
+A retail test skips with a message when its variable is unset, and fails with the path when the
+variable is set but wrong (no `BIN/` folder, missing cue sheet). A skip looks green, so a gate that
+must prove the retail results runs `make check-retail`: it sets `BOF3_REQUIRE_RETAIL=1`, which turns
+every skip into a failure, and runs the workspace tests.
+
 Do not commit game data, disc images, extracted assets or game text.
 
 ## Submit a change

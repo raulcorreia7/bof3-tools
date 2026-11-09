@@ -4,17 +4,19 @@
 use gpui::{AnyElement, Div, div, prelude::*, px};
 use psx_formats::sep::Package;
 use psx_formats::vab::Bank;
-use rebof3_assets::decode::{palette_bank, texture_words};
-use rebof3_emi::area::map::MapBundle;
-use rebof3_emi::area::scene::SceneTable;
-use rebof3_emi::area::script::ScriptBank;
-use rebof3_emi::classify::Format;
 use rebof3_emi::cue::CueTable;
-use rebof3_emi::encounter::EncounterBlock;
 use rebof3_emi::entry::vab_body_index;
-use rebof3_emi::game_tables::name_text;
-use rebof3_emi::text::discover;
-use rebof3_emi::{character_bank, lz77};
+use rebof3_emi::lz77;
+use rebof3_formats::Format;
+use rebof3_formats::character_bank;
+use rebof3_formats::clut::palette_bank;
+use rebof3_formats::encounter::EncounterBlock;
+use rebof3_formats::game_tables::name_text;
+use rebof3_formats::map::MapBundle;
+use rebof3_formats::scene::SceneTable;
+use rebof3_formats::script::ScriptBank;
+use rebof3_formats::text::discover;
+use rebof3_formats::vram::texture_words;
 
 use super::Entry;
 use super::map::summary as map_summary;
@@ -284,7 +286,7 @@ pub fn encounters(payload: &[u8]) -> Result<Vec<Row>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::encounter::{BLOCK_BYTES, ENCOUNTER_BYTES, ENEMY_BASE};
+    use rebof3_formats::encounter::{BLOCK_BYTES, ENCOUNTER_BYTES, ENEMY_BASE};
 
     #[test]
     fn a_resource_table_lists_the_groups_after_its_base_words() {
@@ -339,7 +341,7 @@ mod tests {
     /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_entry_shows_its_fields() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-info-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

@@ -7,7 +7,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{AnyElement, Bounds, Context, Div, Pixels, div, prelude::*, px};
-use rebof3_assets::decode::color_rgba;
+use rebof3_formats::clut::color_rgba;
 
 use super::Entry;
 use crate::app::Editor;
@@ -192,7 +192,7 @@ fn set_color(editor: &mut Editor, index: usize, change: &dyn Fn(u16) -> u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::classify::Format;
+    use rebof3_formats::Format;
 
     #[test]
     fn a_channel_change_keeps_the_other_channels() {
@@ -215,7 +215,7 @@ mod tests {
     /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_color_edit_rewrites_only_its_word() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-palette-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

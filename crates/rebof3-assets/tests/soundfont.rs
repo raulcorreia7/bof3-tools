@@ -3,18 +3,17 @@
 //! The ADPCM of a sample is lossy, so the first import is not the stored bank. The gate is the second round trip:
 //! importing what an export of an imported bank gives reproduces that bank byte for byte, and its SoundFont
 //! holds the same zones and frames. The disc test skips when no disc image is present. Point `BOF3_DISC_IMAGE`
-//! at its cue sheet, or place the image in the checkout's `inputs/external`.
+//! at its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
 
 mod support;
 
 use std::fs;
 
 use psx_formats::sf2::{self, SoundFont};
-use rebof3_assets::decode;
 use rebof3_assets::extract::{self, Options};
 use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
-use rebof3_assets::soundfont;
+use rebof3_formats::vab::soundfont;
 
 /// The SoundFont with its sample names cleared. A name is `VAG` and the bank's VAG number, which the import
 /// numbers in first-use order, so names are compared apart from the rest.
@@ -28,7 +27,6 @@ fn without_names(mut font: SoundFont) -> SoundFont {
 #[test]
 fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
     let Some(image) = support::retail_image() else {
-        eprintln!("skipping SoundFont round trip: no disc image (set BOF3_DISC_IMAGE)");
         return;
     };
     let dir = support::scratch_dir("soundfont-retail_banks_take_a_second_round_trip_to_the_same_bank");
@@ -57,10 +55,10 @@ fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
         let body = fs::read(dir.join(body_row.output.as_deref().unwrap())).unwrap();
         let name = header_row.output.clone().unwrap_or_default();
 
-        let sf2_first = decode::soundfont(&header, &body, &name).unwrap();
-        let (header_first, body_first) = soundfont::bank(&sf2_first).unwrap();
-        let sf2_second = decode::soundfont(&header_first, &body_first, &name).unwrap();
-        let (header_second, body_second) = soundfont::bank(&sf2_second).unwrap();
+        let sf2_first = soundfont::export(&header, &body, &name).unwrap();
+        let (header_first, body_first) = soundfont::import(&sf2_first).unwrap();
+        let sf2_second = soundfont::export(&header_first, &body_first, &name).unwrap();
+        let (header_second, body_second) = soundfont::import(&sf2_second).unwrap();
         assert!(
             (&header_second, &body_second) == (&header_first, &body_first),
             "{name}: the second import is not the first"

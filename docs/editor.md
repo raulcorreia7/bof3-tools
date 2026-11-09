@@ -1,6 +1,6 @@
 # Asset editor coverage
 
-What `bof3-edit` offers for each EMI entry format that `rebof3_emi::classify` knows. The row is
+What `bof3-edit` offers for each EMI entry format that `rebof3_formats::classify` knows. The row is
 finished when it has a view, an edit where the format allows one, a byte-exact save, and a test that
 proves the round trip, or a stated reason why one of them is missing. The views are listed in the
 [README](../README.md#asset-editor).
@@ -12,7 +12,7 @@ it back. An entry no view changes keeps its stored bytes.
 ## Formats
 
 The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip without
-`BOF3_DISC_DIR`.
+`BOF3_DISC_DIR` (and fail under `BOF3_REQUIRE_RETAIL=1`).
 
 | Format | Entries | View | Edit | Round-trip test | Gap or reason |
 | ------ | ------: | ---- | ---- | --------------- | ------------- |

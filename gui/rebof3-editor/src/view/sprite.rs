@@ -1,4 +1,4 @@
-//! A sprite bank as the game shows it (`rebof3_emi::sprite`, `wiki: formats/character`): each section's
+//! A sprite bank as the game shows it (`rebof3_formats::sprite`, `wiki: formats/character`): each section's
 //! animations played at the game's tick, every frame stitched through the VRAM model, the frame sheet
 //! the cells cut from, and the palettes.
 //!
@@ -24,7 +24,7 @@ use gpui::{
 use rebof3_assets::decode::color_rgba;
 use rebof3_assets::sprites::{self, SpriteSizes};
 use rebof3_emi::replay::Vram;
-use rebof3_emi::sprite::{
+use rebof3_formats::sprite::{
     self as format, Animation, Bank, Bounds, COLOURS, Frame, Image, Palette, Placement, Playback, Player, Reader,
     Section, Stage, TICK_MICROS, animation_bounds, cell_rect, compose, duration_ms, frame_bounds, ticks_of,
 };
@@ -981,7 +981,7 @@ fn import_into(editor: &mut Editor, json: &[u8], png: &[u8], sizes: &SpriteSizes
 mod tests {
     use gpui::TestAppContext;
     use rebof3_emi::lz77;
-    use rebof3_emi::sprite::{Cell, Encoding, SHAPES, Step};
+    use rebof3_formats::sprite::{Cell, Encoding, SHAPES, Step};
 
     use super::*;
     use crate::project::ArchivePath;
@@ -1082,8 +1082,8 @@ mod tests {
     /// disc; without it the test skips.
     #[gpui::test]
     fn a_retail_party_bank_plays(cx: &mut TestAppContext) {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR").map(PathBuf::from) else {
-            return eprintln!("skipping: set BOF3_DISC_DIR");
+        let Some(disc) = crate::retail_support::retail_disc() else {
+            return;
         };
         let folder = std::env::temp_dir().join(format!("bof3-edit-sprite-{}", std::process::id()));
         let project = folder.clone();
@@ -1091,7 +1091,7 @@ mod tests {
         editor.update(cx, |editor, _| {
             editor.select_archive(&ArchivePath("BIN/PLCHAR/PL012.EMI".into()));
             let formats = &editor.archive.as_ref().expect("the archive loads").formats;
-            let index = formats.iter().position(|format| matches!(format, rebof3_emi::classify::Format::Lz77Blob));
+            let index = formats.iter().position(|format| matches!(format, rebof3_formats::Format::Lz77Blob));
             editor.select_entry(index.expect("the archive has a sprite bank"));
             editor.tab = Tab::Sprite;
         });
@@ -1116,7 +1116,7 @@ mod tests {
     /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_bank_takes_a_colour_edit() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-sprite-colour-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

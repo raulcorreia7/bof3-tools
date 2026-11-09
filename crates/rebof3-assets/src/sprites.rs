@@ -1,7 +1,7 @@
 //! Sprite banks: their palettes as JSON, and each section as a PNG sprite sheet with Aseprite JSON.
 //!
-//! The format lives in `rebof3_emi::sprite` (frame sheets, animations, records and the draw) and
-//! `rebof3_emi::character_bank` (the palette JSON). This module is what the `bof3` command and the
+//! The format lives in `rebof3_formats::sprite` (frame sheets, animations, records and the draw) and
+//! `rebof3_formats::character_bank` (the palette JSON). This module is what the `bof3` command and the
 //! editor share: it takes an entry payload as the disc stores it, raw or LZ77, and gives it back in the
 //! same form, so the two agree on every byte.
 //!
@@ -13,16 +13,17 @@
 //!
 //! The layout is in `wiki: formats/character`.
 
-use rebof3_emi::{lz77, sprite};
+use rebof3_emi::lz77;
+use rebof3_formats::sprite;
 
 use crate::Result;
 
-pub use rebof3_emi::character_bank::{Bank, parse};
-pub use rebof3_emi::sprite::{Sheet, SpriteSizes};
+pub use rebof3_formats::character_bank::{Bank, parse};
+pub use rebof3_formats::sprite::{Sheet, SpriteSizes};
 
 /// The JSON of the palettes of one sprite bank. `payload` is the decoded bank: a whole container, or one section.
 pub fn character_bank(payload: &[u8]) -> Result<Vec<u8>> {
-    Ok(rebof3_emi::character_bank::export(payload)?)
+    Ok(rebof3_formats::character_bank::export(payload)?)
 }
 
 /// How an entry stores its bank.
@@ -76,7 +77,7 @@ pub fn sprite_sheet(payload: &[u8], section: usize, palette: usize, sizes: &Spri
 }
 
 /// The stored payload with a sprite sheet read back into the section it names; see
-/// `rebof3_emi::sprite::import` for what changes.
+/// `rebof3_formats::sprite::import` for what changes.
 pub fn import_sprite_sheet(json: &[u8], png: &[u8], payload: &[u8], sizes: &SpriteSizes) -> Result<Vec<u8>> {
     let bank = sprite::decode(&unpack(payload)?.1)?;
     let imported = sprite::encode(&sprite::import(&bank, sizes, json, png)?)?;
@@ -86,7 +87,7 @@ pub fn import_sprite_sheet(json: &[u8], png: &[u8], payload: &[u8], sizes: &Spri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::sprite::{Animation, Cell, Encoding, Frame, Image, SHAPES, Step};
+    use rebof3_formats::sprite::{Animation, Cell, Encoding, Frame, Image, SHAPES, Step};
 
     /// A bare section: one sheet, one palette, one animation of one frame, one record, and padding.
     fn section() -> Vec<u8> {

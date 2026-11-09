@@ -1,21 +1,22 @@
 //! Round trips over a whole extracted disc: every edit path the editor offers must write back exactly the
 //! bytes it read. Point `BOF3_DISC_DIR` at an extracted disc (the folder that holds `BIN/`); without it the
-//! tests skip.
+//! tests skip, and `BOF3_REQUIRE_RETAIL=1` makes a skip a failure.
+
+mod support;
 
 use std::path::PathBuf;
 
 use psx_formats::gfx::vram;
-use rebof3_assets::decode::texture_words;
 use rebof3_editor::project::{ArchivePath, Project};
 use rebof3_editor::schema::{self, Field};
-use rebof3_emi::area::map::MapBundle;
-use rebof3_emi::classify::Format;
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_emi::text::discover::{self, Kind};
+use rebof3_formats::Format;
+use rebof3_formats::map::MapBundle;
+use rebof3_formats::text::discover::{self, Kind};
+use rebof3_formats::vram::texture_words;
 
 fn disc() -> Option<PathBuf> {
-    let path = PathBuf::from(std::env::var_os("BOF3_DISC_DIR")?);
-    path.join("BIN").is_dir().then_some(path)
+    support::retail_disc()
 }
 
 fn scratch(name: &str) -> PathBuf {
@@ -26,14 +27,14 @@ fn scratch(name: &str) -> PathBuf {
 
 #[test]
 fn a_project_folder_inside_the_disc_is_refused() {
-    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(disc) = disc() else { return };
 
     assert!(Project::open(&disc, &disc.join("edits")).is_err());
 }
 
 #[test]
 fn an_edit_saves_reloads_and_exports_verified() {
-    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(disc) = disc() else { return };
     let folder = scratch("export");
     let game = ArchivePath("BIN/ETC/GAME.EMI".into());
 
@@ -58,7 +59,7 @@ fn an_edit_saves_reloads_and_exports_verified() {
 
 #[test]
 fn every_entry_round_trips_through_its_editor() {
-    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(disc) = disc() else { return };
     let folder = scratch("round-trip");
     let mut project = Project::open(&disc, &folder).expect("project opens");
 
@@ -118,7 +119,7 @@ fn every_entry_round_trips_through_its_editor() {
 
 #[test]
 fn every_sheet_fits_its_entries_and_rewrites_their_bytes() {
-    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(disc) = disc() else { return };
     let folder = scratch("sheets");
     let mut project = Project::open(&disc, &folder).expect("project opens");
 
@@ -162,7 +163,7 @@ fn every_sheet_fits_its_entries_and_rewrites_their_bytes() {
 
 #[test]
 fn sequences_play_from_the_project_archive() {
-    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(disc) = disc() else { return };
     let folder = scratch("sequences");
     let mut project = Project::open(&disc, &folder).expect("project opens");
 
@@ -195,7 +196,7 @@ fn samples_and_tones_play_through_the_spu() {
     use psx_formats::vab::Bank;
     use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 
-    let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+    let Some(disc) = disc() else { return };
     let folder = scratch("tones");
     let mut project = Project::open(&disc, &folder).expect("project opens");
     let path = ArchivePath("BIN/BATTLE/BATL_SE.EMI".into());

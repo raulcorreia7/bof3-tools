@@ -9,12 +9,13 @@ use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use psx_formats::VAB_SAMPLE_RATE;
 use psx_formats::sep::{Package, Sequence};
 use psx_formats::vab::{Bank, Tone};
-use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
-use rebof3_assets::import;
 use rebof3_assets::sound::sequence_pcm;
 use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
-use rebof3_emi::classify::Format;
 use rebof3_emi::entry::vab_body_index;
+use rebof3_formats::Format;
+use rebof3_formats::sep::midi::export as sequence_midi;
+use rebof3_formats::vab::soundfont::export as soundfont;
+use rebof3_formats::vab::vag::pcm_wav;
 
 use super::{Entry, Field, input};
 use crate::app::Editor;
@@ -430,7 +431,7 @@ fn import_sample(editor: &mut Editor, header: usize, body: usize, index: u32, cx
     let archive = entry.archive.path.clone();
     editor.open_file("WAVE file to import (mono, 16-bit, 44100 Hz)", cx, move |editor, wav| {
         let replaced = editor.rewrite_entries(&archive, &[header, body], |payloads| {
-            let vag = import::vag(&wav).map_err(|error| error.to_string())?;
+            let vag = rebof3_formats::vab::vag::import(&wav).map_err(|error| error.to_string())?;
             let (header, body) = with_sample(payloads[0], payloads[1], index, &vag)?;
             Ok(vec![header, body])
         });
@@ -682,7 +683,7 @@ mod tests {
     /// stored. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_sample_imports_back_in_place() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-samples-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 
@@ -713,7 +714,7 @@ mod tests {
     /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]
     fn every_retail_sequence_imports_back_from_its_midi() {
-        let Some(disc) = std::env::var_os("BOF3_DISC_DIR") else { return eprintln!("skipping: set BOF3_DISC_DIR") };
+        let Some(disc) = crate::retail_support::retail_disc() else { return };
         let folder = std::env::temp_dir().join(format!("bof3-edit-midi-{}", std::process::id()));
         let mut project = crate::project::Project::open(disc.as_ref(), &folder).expect("project opens");
 

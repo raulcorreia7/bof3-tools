@@ -12,17 +12,16 @@ use crate::disc::find_disc_image;
 use clap::Parser;
 use rebof3_assets::codec::{self, Direction, Index, Job};
 use rebof3_assets::coverage;
-use rebof3_assets::decode;
 use rebof3_assets::disc;
 use rebof3_assets::extract::{self, Options, SUMMARY_FILE, TABLE_FILE};
-use rebof3_assets::import::{self, TextureImport};
+use rebof3_assets::import;
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
-use rebof3_assets::soundfont;
 use rebof3_assets::sprites;
-use rebof3_assets::tables;
-use rebof3_assets::terrain;
 use rebof3_assets::text::{self, DEFAULT_DISC};
 use rebof3_assets::{Error, Result};
+use rebof3_formats::map::terrain;
+use rebof3_formats::vab::soundfont;
+use rebof3_formats::vram::TextureImport;
 
 /// Exit codes: 0 success, 1 some payloads failed to write, 2 an error.
 const EXIT_OK: i32 = 0;
@@ -899,7 +898,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
         load_arg.ok_or_else(|| Error::Usage("export texture needs --load-arg, the entry's load address".into()))?;
     let bytes = read_file(&payload_path)?;
     let (png, what) = match depth {
-        None => (decode::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
+        None => (rebof3_formats::vram::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
         Some(bits) => {
             let Some(bank) = args.palette else {
                 return Err(Error::Usage("--depth needs --palette, the bank that holds the row".into()));
@@ -913,7 +912,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
             let row = words
                 .get(offset..offset + count)
                 .ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
-            let png = decode::texture_row_png(load_arg, &bytes, bits, row)?;
+            let png = rebof3_formats::vram::texture_row_png(load_arg, &bytes, bits, row)?;
             (png, format!("{bits}-bit indexed row at word {offset}"))
         }
     };
@@ -1006,7 +1005,7 @@ fn import_texture(args: &[String]) -> Result<i32> {
     let input = single(args.files, "import texture needs a PNG file")?;
     let out = with_extension_of(args.output, &input, "img");
     create_parent(&out)?;
-    match import::texture(&read_file(&input)?)? {
+    match rebof3_formats::vram::import(&read_file(&input)?)? {
         TextureImport::Words(payload) => {
             fs::write(&out, payload)?;
             println!("wrote {} (16 bpp view)", out.display());
@@ -1054,7 +1053,7 @@ fn import_sequence(args: &[String]) -> Result<i32> {
         .map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) })
         .collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
-    write_output(&args.output.unwrap_or(default), &import::sequence(&borrowed)?)?;
+    write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::midi::import(&borrowed)?)?;
     Ok(EXIT_OK)
 }
 
@@ -1138,7 +1137,7 @@ struct OneFile {
 fn import_soundfont(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let input = single(args.files, "import soundfont needs a SoundFont 2 file")?;
-    let (header, body) = soundfont::bank(&read_file(&input)?)?;
+    let (header, body) = soundfont::import(&read_file(&input)?)?;
     let prefix = args.output.unwrap_or_else(|| input.with_extension(""));
     write_output(&PathBuf::from(format!("{}.vh", prefix.display())), &header)?;
     write_output(&PathBuf::from(format!("{}.vb", prefix.display())), &body)?;
@@ -1155,7 +1154,7 @@ fn soundfont_command(args: &[String]) -> Result<i32> {
     let out = with_extension_of(args.output, header, "sf2");
     create_parent(&out)?;
     let title = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
-    let data = decode::soundfont(&read_file(header)?, &read_file(body)?, &title)?;
+    let data = soundfont::export(&read_file(header)?, &read_file(body)?, &title)?;
     fs::write(&out, data)?;
     println!("wrote {}", out.display());
     Ok(EXIT_OK)
@@ -1192,7 +1191,7 @@ fn encounters_command(args: &[String]) -> Result<i32> {
     let payload = single(args.files, "encounters needs an area encounter block file")?;
     let out = with_extension_of(args.output, &payload, "json");
     create_parent(&out)?;
-    fs::write(&out, tables::encounters(&read_file(&payload)?)?)?;
+    fs::write(&out, rebof3_formats::encounter::open::export(&read_file(&payload)?)?)?;
     println!("wrote {}", out.display());
     Ok(EXIT_OK)
 }
@@ -1203,7 +1202,7 @@ fn tables_command(args: &[String]) -> Result<i32> {
     let args: OneFile = parse(args)?;
     let payload = single(args.files, "tables needs the stored bytes of GAME.EMI entry 0")?;
     let out = args.output.unwrap_or_else(|| PathBuf::from("game-tables"));
-    let files = tables::files(&read_file(&payload)?)?;
+    let files = rebof3_formats::game_tables::open::files(&read_file(&payload)?)?;
     fs::create_dir_all(&out)?;
     for (name, data) in &files {
         fs::write(out.join(format!("{name}.json")), data)?;

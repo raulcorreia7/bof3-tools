@@ -16,7 +16,6 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use rebof3_assets::decode;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -369,17 +368,17 @@ fn run_export(job: &ExportJob) -> Result<(), String> {
     let bytes = fs::read(&job.source).map_err(|error| error.to_string())?;
     let data = match &job.what {
         Export::Terrain => {
-            let mesh = rebof3_assets::terrain::mesh_from_payload(&bytes).map_err(|e| e.to_string())?;
+            let mesh = rebof3_formats::map::terrain::mesh_from_payload(&bytes).map_err(|e| e.to_string())?;
             let name = job.target.file_stem().unwrap_or_default().to_string_lossy();
-            rebof3_assets::terrain::glb_of_mesh(&mesh, &name).ok_or("no cell to draw")?
+            rebof3_formats::map::terrain::glb_of_mesh(&mesh, &name).ok_or("no cell to draw")?
         }
-        Export::Message => rebof3_assets::text::bank::export(&bytes).map_err(|e| e.to_string())?,
+        Export::Message => rebof3_formats::message::bank::export(&bytes).map_err(|e| e.to_string())?,
         Export::Soundfont(body) => {
             let body = fs::read(body).map_err(|error| error.to_string())?;
             let title = job.target.file_stem().unwrap_or_default().to_string_lossy();
-            decode::soundfont(&bytes, &body, &title).map_err(|e| e.to_string())?
+            rebof3_formats::vab::soundfont::export(&bytes, &body, &title).map_err(|e| e.to_string())?
         }
-        Export::Sequence(index) => decode::sequence_midi(&bytes, *index).map_err(|e| e.to_string())?,
+        Export::Sequence(index) => rebof3_formats::sep::midi::export(&bytes, *index).map_err(|e| e.to_string())?,
     };
     if let Some(parent) = job.target.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;

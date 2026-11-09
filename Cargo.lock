@@ -4839,6 +4839,7 @@ dependencies = [
  "psx-formats",
  "rebof3-assets",
  "rebof3-emi",
+ "rebof3-formats",
  "serde_json",
  "sha2 0.11.1",
 ]
@@ -4851,6 +4852,7 @@ dependencies = [
  "psx-cd",
  "psx-formats",
  "rebof3-emi",
+ "rebof3-formats",
  "serde",
  "serde_json",
 ]
@@ -4865,6 +4867,7 @@ dependencies = [
  "psx-formats",
  "rebof3-assets",
  "rebof3-emi",
+ "rebof3-formats",
  "rubato",
  "serde",
  "serde_json",
@@ -4875,6 +4878,17 @@ name = "rebof3-emi"
 version = "0.2.0"
 dependencies = [
  "emi",
+ "psx-formats",
+ "rebof3-emi",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rebof3-formats"
+version = "0.2.0"
+dependencies = [
+ "bof3player",
  "psx-formats",
  "rebof3-emi",
  "serde",

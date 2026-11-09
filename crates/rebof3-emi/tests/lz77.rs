@@ -16,10 +16,6 @@ const EXPECTED_PAYLOADS: usize = 65;
 #[test]
 fn type_1_payloads_decode_and_reencode() {
     let Some(root) = retail_root() else {
-        eprintln!(
-            "skipping type-1 codec gate: no retail EMI archives at <ancestor>/raw/disc/BIN \
-             (set BOF3_EMI_ROOT to a directory of .EMI containers)"
-        );
         return;
     };
     let payloads = type_1_payloads(&root);
