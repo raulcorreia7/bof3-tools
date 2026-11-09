@@ -16,8 +16,8 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 
 | Format | Entries | View | Edit | Round-trip test | Gap or reason |
 | ------ | ------: | ---- | ---- | --------------- | ------------- |
-| VRAM texture upload (type 3) | 593 | Texture: 4, 8 or 16 bpp with a joined or chosen palette | paint texels | retail: words back to the payload, 593/593 | none |
-| CLUT bank | 620 | Palette, Decoded | colour channels and STP bit | retail: an edit rewrites only its colour word, 620/620 banks | none |
+| VRAM texture upload (type 3) | 593 | Texture: 4, 8 or 16 bpp with a row a rule joins in the scene that loads it, a ranked suggestion, or a chosen row; VRAM: the scene's whole frame buffer, each region labelled by its entry, any region decoded at any depth with any CLUT row of the scene, exported as PNG | paint texels | retail: words back to the payload, 593/593; every upload of an archive a default scene loads shows in VRAM, except FIRST entry 4 | 202 of 593 are joined; the rest show a suggestion, never applied. FIRST entry 12 covers all of entry 4. `ENDKANJI` and `SCENA17` (4 uploads) have no default scene: their loaders are not read |
+| CLUT bank | 620 | Palette, Decoded; VRAM: where the scene's palette upload puts it | colour channels and STP bit | retail: an edit rewrites only its colour word, 620/620 banks | none |
 | VAB header (type 6) | 1,020 | Sound: samples, programs and tones; Tables: bank, programs, tones | master volume and pan, every program and tone field | retail: every sheet rewrites its bytes | none; the counts and sizes that lay out the header are not editable |
 | VAB body (type 7) | 1,020 | Sound: play a sample as the audio library auditions it; play a tone alone or its program at a chosen note, held one pass of the sample (1 to 20 s) then released; all through the library's sound driver and SPU, in stereo at 44.1 kHz; export the raw sample as WAVE, and SoundFont | replace a sample from a mono 16-bit 44.1 kHz WAVE file; the header's size table and bank size follow, in one undo step | retail: every sample put back in place keeps the header and body, 8,330/8,330; every sample and tone of `BATL_SE.EMI` plays in stereo at 44.1 kHz | none; ADPCM is lossy, so a WAVE export imported back is close, not exact |
 | SEP sequence package (type 10) | 119 | Sound: play with the archive's bank through the library's sound driver, in stereo, export MIDI | each sequence's resolution, tempo and time signature; import a sequence from MIDI | retail: playback; every sequence's MIDI imports back to its bytes, 476/476 | none |
@@ -29,7 +29,7 @@ The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip 
 | Battle script bank | 42 | Info, Decoded: the area bank's format | Hex only | retail: decode and encode, 42/42 | as the area script bank |
 | Area actor definitions | 200 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |
 | Area encounters and enemies | 200 | Tables: encounters, enemies, enemy AI | every sheet cell | retail: every sheet rewrites its bytes | none |
-| Area map bundle | 200 | Map: cells by tile bank and height | corner heights | retail: decode and encode, 200/200 | none; textures need the tile page, not traced |
+| Area map bundle | 200 | Map: cells textured from the area's replayed VRAM, or by tile bank and height | corner heights | retail: decode and encode, 200/200; all 688,118 cells with a tile find their page and CLUT row | none; drawn flat, without the vertex colour or semi-transparency |
 | Area auxiliary module window | 9 | Info: module id and body size | Hex only | n/a | area049's window is code, changed in the decompilation; the other eight hold data whose layout is not traced |
 | Shared resource table | 44 | Text, Info: id groups | strings in place | retail: strings | none |
 | Type-8 cue table | 904 | Tables, Decoded | every sheet cell | retail: every sheet rewrites its bytes | none |

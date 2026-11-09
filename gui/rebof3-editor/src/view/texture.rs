@@ -1,9 +1,11 @@
 //! A texture upload as a paintable image.
 //!
 //! The upload's VRAM words read at 4, 8 or 16 bits per texel. A 4- or 8-bit texture is drawn with a
-//! palette row: one the draw sites join to it (`rebof3_assets::decode::joined_rows`), a row of a
-//! palette bank in the same archive, or a grey ramp. Painting writes texel indices (or 16-bit colors)
-//! back into the words and the words back into the upload's rectangles.
+//! palette row: one a rule joins to it in the scene that loads it (`rebof3_emi::texture::scene`),
+//! a suggested row of that scene (`rebof3_emi::texture::suggest`), a row of a palette bank in the
+//! same archive, or a grey ramp. A suggestion is listed, never chosen for the user. Painting writes
+//! texel indices (or 16-bit colors) back into the words and the words back into the upload's
+//! rectangles.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -12,10 +14,13 @@ use gpui::{
     AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, anchored, canvas,
     deferred, div, fill, point, prelude::*, px, rgba, size,
 };
-use psx_formats::gfx::texture::{Depth, texel_indices, texel_words};
+use psx_formats::gfx::texture::{Clut, Depth, texel_indices, texel_words};
 use psx_formats::gfx::vram;
-use rebof3_assets::decode::{RowUse, TextureWords, color_rgba, joined_rows, texture_words};
+use rebof3_assets::decode::{TextureWords, color_rgba, joined_rows, texture_words};
 use rebof3_emi::classify::Format;
+use rebof3_emi::replay::Writer;
+use rebof3_emi::replay::scenes;
+use rebof3_emi::texture::suggest;
 
 use super::palette::{SWATCH, SWATCH_GAP, words as words_of};
 use super::{Entry, Menu, editing_menu};
@@ -34,16 +39,17 @@ const BLUE_SHIFT: u32 = 10;
 const TRANSPARENT: u8 = 0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Bits {
+pub(super) enum Bits {
     Four,
     Eight,
     Sixteen,
 }
 
 impl Bits {
-    const ALL: [(Bits, &'static str); 3] = [(Bits::Four, "4-bit"), (Bits::Eight, "8-bit"), (Bits::Sixteen, "16-bit")];
+    pub(super) const ALL: [(Bits, &'static str); 3] =
+        [(Bits::Four, "4-bit"), (Bits::Eight, "8-bit"), (Bits::Sixteen, "16-bit")];
 
-    fn depth(self) -> Option<Depth> {
+    pub(super) fn depth(self) -> Option<Depth> {
         match self {
             Bits::Four => Some(Depth::Four),
             Bits::Eight => Some(Depth::Eight),
@@ -52,11 +58,28 @@ impl Bits {
     }
 }
 
+/// The suggested rows the chooser lists.
+const SUGGESTIONS: usize = 5;
+
+/// A palette row read from the texture's scene: where it is and which entry wrote it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Row {
+    pub clut: Clut,
+    pub depth: Depth,
+    pub words: Vec<u16>,
+    /// The entry that wrote the row.
+    pub palette: String,
+    /// Why the row is listed: the joining rule, or the suggestion's score.
+    pub evidence: String,
+}
+
 /// Where the colors of a 4- or 8-bit texture come from.
 #[derive(Clone, Debug, PartialEq)]
 enum Source {
-    /// A palette row a draw site joins to the texture.
+    /// A palette row a rule joins to the texture.
     Joined(usize),
+    /// A row the suggestion ranks, which no rule names.
+    Suggested(usize),
     /// Row `row` of the palette bank in entry `bank`.
     Bank {
         bank: usize,
@@ -72,7 +95,10 @@ pub struct State {
     zoom: u32,
     /// The palette index (4/8 bit) or color word (16 bit) the pencil paints.
     ink: u16,
-    joined: Vec<RowUse>,
+    joined: Vec<Row>,
+    suggested: Vec<Row>,
+    /// The suggested depth and its score, when no rule joins the texture.
+    depth_hint: Option<(Bits, f64)>,
     /// The texel under the pointer and its value.
     hover: Option<(usize, usize, u16)>,
     zoom_slider: Rc<Cell<Bounds<Pixels>>>,
@@ -88,6 +114,8 @@ impl Default for State {
             zoom: ZOOM_DEFAULT,
             ink: 0,
             joined: Vec::new(),
+            suggested: Vec::new(),
+            depth_hint: None,
             hover: None,
             zoom_slider: Rc::default(),
             image: Rc::default(),
@@ -95,31 +123,97 @@ impl Default for State {
     }
 }
 
-impl State {
-    /// Picks the depth and colors the first time an entry is shown: a joined row when there is one.
-    pub fn prepare(&mut self, entry: &Entry<'_>) {
-        let key = (entry.archive.path.0.clone(), entry.index);
-        if self.key.as_ref() == Some(&key) {
-            return;
-        }
-        let payloads: Vec<&[u8]> = (0..entry.archive.entries().len()).map(|index| entry.sibling(index)).collect();
-        let rows = joined_rows(&entry.archive.path.0, entry.archive.entries(), &payloads);
-        self.joined = rows.get(&entry.index).cloned().unwrap_or_default();
-        self.zoom = ZOOM_DEFAULT;
-        self.ink = 0;
-        self.hover = None;
-        match self.joined.first() {
-            Some(row) => {
-                self.bits = if row.depth == Depth::Four { Bits::Four } else { Bits::Eight };
-                self.source = Source::Joined(0);
-            }
-            None => {
-                self.bits = Bits::Sixteen;
-                self.source = Source::Grey;
-            }
-        }
-        self.key = Some(key);
+/// Picks the depth and colors the first time an upload is shown: a joined row when the scene that
+/// loads it has one. Otherwise the texture stays at 16 bits and the suggestion is only listed.
+pub fn prepare(editor: &mut Editor) {
+    let Some(entry) = editor.current() else { return };
+    let key = (entry.archive.path.0.clone(), entry.index);
+    if editor.views.texture.key.as_ref() == Some(&key) {
+        return;
     }
+    let (archive, index) = key.clone();
+    let replayed = match (scenes::home(&archive), editor.project.as_mut()) {
+        (Some(scene), Some(project)) => Some(super::scene::replay(project, &scene)),
+        _ => None,
+    };
+    let Some(entry) = editor.current() else { return };
+    let mut joined = Vec::new();
+    let mut suggested = Vec::new();
+    let mut depth_hint = None;
+    match &replayed {
+        Some(replayed) => {
+            let me = Writer::entry(archive.as_str(), index);
+            for join in replayed.joins.iter().filter(|join| join.texture == me) {
+                joined.push(Row {
+                    clut: join.clut,
+                    depth: join.depth,
+                    words: replayed.vram.clut_words(join.clut, join.depth),
+                    palette: join.palette.to_string(),
+                    evidence: format!("{}; scene {}", join.rule.evidence(), replayed.scene.name),
+                });
+            }
+            if joined.is_empty()
+                && let Ok(words) = texture_words(entry.load_arg(), entry.payload())
+            {
+                let hint = suggest::suggest(&replayed.vram, &words.words, words.width, words.height, &archive);
+                depth_hint = hint.depths.first().map(|score| {
+                    let bits = match score.depth {
+                        Some(Depth::Four) => Bits::Four,
+                        Some(Depth::Eight) => Bits::Eight,
+                        None => Bits::Sixteen,
+                    };
+                    (bits, score.score)
+                });
+                suggested = hint
+                    .cluts
+                    .iter()
+                    .take(SUGGESTIONS)
+                    .map(|candidate| Row {
+                        clut: candidate.clut,
+                        depth: candidate.depth,
+                        words: replayed.vram.clut_words(candidate.clut, candidate.depth),
+                        palette: candidate.palette.to_string(),
+                        evidence: format!(
+                            "suggestion, score {:.2}, scene {}; no rule names this row",
+                            candidate.score, replayed.scene.name
+                        ),
+                    })
+                    .collect();
+            }
+        }
+        None => {
+            // No default scene loads the archive: the archive-only rule.
+            let payloads: Vec<&[u8]> = (0..entry.archive.entries().len()).map(|at| entry.sibling(at)).collect();
+            let rows = joined_rows(&archive, entry.archive.entries(), &payloads);
+            for row in rows.get(&index).cloned().unwrap_or_default() {
+                joined.push(Row {
+                    clut: row.clut,
+                    depth: row.depth,
+                    words: row.words,
+                    palette: format!("{} #{}", row.palette_archive, row.palette),
+                    evidence: row.evidence,
+                });
+            }
+        }
+    }
+    let state = &mut editor.views.texture;
+    state.zoom = ZOOM_DEFAULT;
+    state.ink = 0;
+    state.hover = None;
+    match joined.first() {
+        Some(row) => {
+            state.bits = if row.depth == Depth::Four { Bits::Four } else { Bits::Eight };
+            state.source = Source::Joined(0);
+        }
+        None => {
+            state.bits = Bits::Sixteen;
+            state.source = Source::Grey;
+        }
+    }
+    state.joined = joined;
+    state.suggested = suggested;
+    state.depth_hint = depth_hint;
+    state.key = Some(key);
 }
 
 /// The colors a texture is drawn with.
@@ -127,6 +221,7 @@ fn palette(entry: &Entry<'_>, state: &State, depth: Depth) -> Vec<u16> {
     let colors = depth.colors();
     match &state.source {
         Source::Joined(at) => state.joined.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
+        Source::Suggested(at) => state.suggested.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Bank { bank, row } => {
             words_of(entry.sibling(*bank)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
         }
@@ -349,16 +444,28 @@ fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut C
     depth_row = depth_row.child(separator(true)).child("Zoom").child(zoom).child(mono(format!("{}×", state.zoom)));
 
     let mut column = div().flex().flex_col().flex_none().gap(px(GAP)).child(depth_row);
+    if let Some(hint) = suggestion(state) {
+        let mut line = div().flex().flex_wrap().items_center().gap(px(GAP)).child(muted(hint));
+        if let Some(row) = state.suggested.first() {
+            let bits = if row.depth == Depth::Four { Bits::Four } else { Bits::Eight };
+            line = line.child(button("use-suggestion", "Use", true).on_click(cx.listener(move |editor, _, _, cx| {
+                editor.views.texture.bits = bits;
+                editor.views.texture.source = Source::Suggested(0);
+                cx.notify();
+            })));
+        }
+        column = column.child(line);
+    }
     let Some(depth) = state.bits.depth() else {
         return column.child(muted(format!("Ink: color word {:#06X} (right-click a texel to pick)", state.ink)));
     };
 
-    let chooser = button("colors", format!("{} ▾", describe(&state.source, &state.joined)), true).on_click(
-        cx.listener(|editor, _, _, cx| {
+    let chooser = button("colors", format!("{} ▾", describe(&state.source, state)), true).on_click(cx.listener(
+        |editor, _, _, cx| {
             editor.menu = Some(WindowMenu::View(Menu::Colors));
             cx.notify();
-        }),
-    );
+        },
+    ));
     let mut chooser_column = div().flex().flex_col().child(chooser);
     if editing_menu(editor, Menu::Colors) {
         chooser_column =
@@ -386,8 +493,10 @@ fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Ed
     let state = &editor.views.texture;
     let mut choices: Vec<(Source, String, Option<String>)> = Vec::new();
     for (at, row) in state.joined.iter().enumerate() {
-        let label = format!("joined: bank {} clut {},{}", row.palette, row.clut.x, row.clut.y);
-        choices.push((Source::Joined(at), label, Some(row.evidence.clone())));
+        choices.push((Source::Joined(at), label(row, "joined"), Some(row.evidence.clone())));
+    }
+    for (at, row) in state.suggested.iter().enumerate().filter(|(_, row)| row.depth == depth) {
+        choices.push((Source::Suggested(at), label(row, "suggested"), Some(row.evidence.clone())));
     }
     for (bank, format) in entry.archive.formats.iter().enumerate() {
         if *format != Format::ClutBank {
@@ -419,11 +528,25 @@ fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Ed
     panel
 }
 
-fn describe(source: &Source, joined: &[RowUse]) -> String {
+/// The suggestion line for a texture no rule joins, or `None` when one does.
+fn suggestion(state: &State) -> Option<String> {
+    let (bits, score) = state.depth_hint?;
+    let depth = Bits::ALL.iter().find(|(choice, _)| *choice == bits).map_or("?", |(_, label)| label);
+    let row = state.suggested.first().map_or(String::new(), |row| {
+        format!(", then clut {},{} from {} at {}-bit", row.clut.x, row.clut.y, row.palette, row.depth.bits())
+    });
+    Some(format!("No rule joins this texture. Suggested, not applied: {depth} (score {score:.2}){row}."))
+}
+
+/// A scene row's name in the chooser.
+fn label(row: &Row, what: &str) -> String {
+    format!("{what}: {}-bit clut {},{} from {}", row.depth.bits(), row.clut.x, row.clut.y, row.palette)
+}
+
+fn describe(source: &Source, state: &State) -> String {
     match source {
-        Source::Joined(at) => joined.get(*at).map_or("joined row".into(), |row| {
-            format!("joined: bank {} clut {},{}", row.palette, row.clut.x, row.clut.y)
-        }),
+        Source::Joined(at) => state.joined.get(*at).map_or("joined row".into(), |row| label(row, "joined")),
+        Source::Suggested(at) => state.suggested.get(*at).map_or("suggested row".into(), |row| label(row, "suggested")),
         Source::Bank { bank, row } => format!("bank {bank} row {row}"),
         Source::Grey => "grey ramp".into(),
     }

@@ -1,28 +1,36 @@
 //! An area map bundle seen from above: one square per cell. A cell's hue is its tile bank and its
 //! brightness the mean of its four corner heights; a cell with no tile is left out.
 //!
+//! The textured mode draws each cell's tile instead, read from the VRAM of the area's own scene
+//! (`rebof3_emi::replay::scenes::field`, the project's edits included) through the tile descriptor
+//! (`rebof3_assets::terrain::top_down`).
+//!
 //! A picked cell's corner heights are editable. The edit decodes the bundle, changes the one cell and
 //! encodes it again ([`MapBundle::encode`]), so every header offset follows and an unchanged bundle
 //! writes back byte for byte.
 
 use std::cell::Cell as Shared;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui::{
-    AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, canvas, div,
-    prelude::*, px,
+    AnyElement, Bounds, Context, Div, Image, ImageFormat, MouseButton, MouseDownEvent, MouseMoveEvent, ObjectFit,
+    Pixels, Point, canvas, div, img, prelude::*, px,
 };
-use rebof3_assets::terrain::mesh_of_bundle;
+use rebof3_assets::terrain::{self, mesh_of_bundle};
 use rebof3_emi::area::map::{CELL_BYTES, MapBundle};
+use rebof3_emi::replay::scenes;
 
 use super::texture::paint_pixels;
 use super::{Entry, Field, input};
 use crate::app::Editor;
 use crate::theme::{BACKGROUND, MUTED, color};
-use crate::widgets::{GAP, GAP_SMALL, mono, muted, separator, strong};
+use crate::widgets::{GAP, GAP_SMALL, button, mono, muted, separator, strong, tab};
 
-/// Screen pixels per map cell.
+/// Screen pixels per map cell, drawn flat.
 const CELL_PIXELS: f32 = 10.0;
+/// Screen pixels per map cell, textured: one per texel.
+const TEXTURED_PIXELS: f32 = terrain::CELL_PIXELS as f32;
 /// Width of a corner height field, in pixels.
 const CORNER_WIDTH: f32 = 56.0;
 /// Width of the picked cell's panel, in pixels.
@@ -45,6 +53,55 @@ pub struct State {
     /// The cell under the pointer.
     hover: Option<usize>,
     image: Rc<Shared<Bounds<Pixels>>>,
+    /// Draw the cells flat, by tile bank and height, instead of textured.
+    flat: bool,
+    /// The textured view of the shown entry, when its area's scene replays.
+    textured: Option<Rc<Textured>>,
+}
+
+/// A map bundle drawn with its tiles, and what it was drawn from.
+pub struct Textured {
+    /// The archive, entry and project revision the view read.
+    key: (String, usize, u64),
+    /// The view as a PNG, which the window draws as one image and the export writes.
+    image: Arc<Image>,
+    summary: String,
+}
+
+impl State {
+    /// What the textured view read, once it is drawn.
+    #[cfg(test)]
+    pub fn textured_summary(&self) -> Option<String> {
+        self.textured.as_ref().map(|textured| textured.summary.clone())
+    }
+}
+
+/// Draws the shown map bundle with its tiles, once per entry and project revision.
+pub fn prepare(editor: &mut Editor) {
+    let Some(entry) = editor.current() else { return };
+    let Some(project) = editor.project.as_ref() else { return };
+    let key = (entry.archive.path.0.clone(), entry.index, project.revision());
+    if editor.views.map.textured.as_ref().is_some_and(|textured| textured.key == key) {
+        return;
+    }
+    let Some(scene) = scenes::home(&key.0) else {
+        editor.views.map.textured = None;
+        return;
+    };
+    let Some(project) = editor.project.as_mut() else { return };
+    let replayed = super::scene::replay(project, &scene);
+    let Some(entry) = editor.current() else { return };
+    let Ok(bundle) = MapBundle::decode(entry.payload()) else {
+        editor.views.map.textured = None;
+        return;
+    };
+    let view = terrain::top_down(&bundle, &replayed.vram);
+    let summary = format!(
+        "Textured from the VRAM of {}: {} cells drawn, {} whose page or CLUT row the scene does not hold.",
+        replayed.scene.name, view.textured, view.unwritten
+    );
+    let image = Arc::new(Image::from_bytes(ImageFormat::Png, view.png()));
+    editor.views.map.textured = Some(Rc::new(Textured { key, image, summary }));
 }
 
 /// The mean corner height of each cell.
@@ -107,15 +164,29 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let state = &editor.views.map;
     let width = usize::from(bundle.width);
     let height = usize::from(bundle.height);
-    let pixels = cell_colors(&bundle);
+    let textured = textured(editor, entry);
+    let cell = cell_pixels(editor, entry);
 
     let measure = Rc::clone(&state.image);
-    let image = canvas(
-        move |area, _, _| measure.set(area),
-        move |area, (), window, _| paint_pixels(window, area, &pixels, width, CELL_PIXELS),
-    )
-    .w(px(width as f32 * CELL_PIXELS))
-    .h(px(height as f32 * CELL_PIXELS))
+    let image = match textured.clone() {
+        // One texel per screen pixel, drawn as one image: a quad per texel would be too many.
+        Some(textured) => div()
+            .relative()
+            .child(img(Arc::clone(&textured.image)).size_full().object_fit(ObjectFit::Fill))
+            .child(canvas(move |area, _, _| measure.set(area), |_, (), _, _| {}).absolute().size_full()),
+        None => {
+            let pixels = cell_colors(&bundle);
+            div().child(
+                canvas(
+                    move |area, _, _| measure.set(area),
+                    move |area, (), window, _| paint_pixels(window, area, &pixels, width, CELL_PIXELS),
+                )
+                .size_full(),
+            )
+        }
+    }
+    .w(px(width as f32 * cell))
+    .h(px(height as f32 * cell))
     .flex_none();
 
     let hover = match state.hover {
@@ -152,10 +223,60 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .min_h_0()
         .gap(px(GAP))
         .child(muted(summary(&bundle)))
+        .child(modes(editor, entry, cx))
         .child(separator(false))
         .child(mono(hover).text_color(color(MUTED)))
         .child(body)
         .into_any_element()
+}
+
+/// The textured view of the shown entry, unless the flat mode is chosen or the view is stale.
+fn textured(editor: &Editor, entry: &Entry<'_>) -> Option<Rc<Textured>> {
+    let state = &editor.views.map;
+    let textured = state.textured.as_ref().filter(|_| !state.flat)?;
+    let (archive, index, revision) = &textured.key;
+    (*archive == entry.archive.path.0 && *index == entry.index && *revision == entry.project.revision())
+        .then(|| Rc::clone(textured))
+}
+
+/// Screen pixels per cell in the mode drawn.
+fn cell_pixels(editor: &Editor, entry: &Entry<'_>) -> f32 {
+    if textured(editor, entry).is_some() { TEXTURED_PIXELS } else { CELL_PIXELS }
+}
+
+/// The mode tabs, what the textured view read, and its PNG export.
+fn modes(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Div {
+    let available = editor.views.map.textured.is_some();
+    let shown = textured(editor, entry);
+    let mut row = div()
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .gap(px(GAP_SMALL))
+        .child(tab("map-textured", "Textured", shown.is_some()).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.map.flat = false;
+            cx.notify();
+        })))
+        .child(tab("map-flat", "Banks and heights", shown.is_none()).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.map.flat = true;
+            cx.notify();
+        })));
+    match shown {
+        Some(textured) => {
+            let name = format!("{}-{}.png", entry.archive.path.0.replace('/', "_"), entry.index);
+            let image = Arc::clone(&textured.image);
+            row = row.child(separator(true)).child(muted(textured.summary.clone())).child(
+                button("map-export", "Export PNG", true).on_click(
+                    cx.listener(move |editor, _, _, cx| editor.save_file(name.clone(), Ok(image.bytes.clone()), cx)),
+                ),
+            );
+        }
+        None if !available => {
+            row = row.child(muted("No scene loads this archive, so its tiles cannot be read from VRAM."));
+        }
+        None => {}
+    }
+    row
 }
 
 /// What the hover line says about `cell`.
@@ -207,12 +328,13 @@ fn picked_at(editor: &Editor, position: Point<Pixels>) -> Option<(String, usize,
 fn cell_at(editor: &Editor, position: Point<Pixels>) -> Option<usize> {
     let entry = editor.current()?;
     let (width, height) = (entry.payload().first().copied()?, entry.payload().get(1).copied()?);
+    let cell = cell_pixels(editor, &entry);
     let area = editor.views.map.image.get();
     let (x, y) = (position.x - area.origin.x, position.y - area.origin.y);
     if x < Pixels::ZERO || y < Pixels::ZERO {
         return None;
     }
-    let (column, row) = ((x / px(CELL_PIXELS)) as usize, (y / px(CELL_PIXELS)) as usize);
+    let (column, row) = ((x / px(cell)) as usize, (y / px(cell)) as usize);
     (column < usize::from(width) && row < usize::from(height)).then_some(row * usize::from(width) + column)
 }
 

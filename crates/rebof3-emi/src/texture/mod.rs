@@ -15,16 +15,22 @@
 //! - [`terrain_joins`] applies the world-map tile-descriptor rule: bit 31 selects the depth,
 //!   bits 24-27 the CLUT index and bits 28-29 the texture-page bank. It joins the same way.
 //!
+//! [`scene`] resolves the same rules in a replayed VRAM ([`crate::replay`]), where load order
+//! decides which upload and which bank a page and a row hold. [`suggest`] ranks a depth and rows
+//! for a texture no rule joins; a suggestion is never a join.
+//!
 //! Banks are looked up over the resident set of palette banks ([`ResidentBank`]) the caller
 //! loaded, so a bank one archive carries can serve another archive's texture (the battle icon
 //! rows). The texture's own archive wins when it holds the row; otherwise identical banks
 //! collapse and disagreeing banks make the row ambiguous. The rule never guesses: more than one
 //! sheet or more than one distinct bank leaves the texture unjoined.
 //!
-//! The encoded words assume graph type 0, the runtime the US disc selects
+//! The encoded words are the graph-type-0 encoding, the runtime the US disc selects
 //! (`GetGraphType()` reads `D_8018B15C`; `SetVideoMode(MODE_NTSC)` and `_reset(3)` leave it
-//! zero). A site that writes the graph-type-1/2 encoding is decoded with the same 4bpp/8bpp
-//! page fields the research join used, and the depth comes from the word's color mode.
+//! zero). A site that switches on the graph type is listed with its graph-type-0 word only.
+
+pub mod scene;
+pub mod suggest;
 
 use psx_formats::gfx::texture::{Clut, Color, Depth, Tpage};
 use psx_formats::gfx::vram::{self, Descriptor};
@@ -206,66 +212,77 @@ const fn literal(
     Site { archive, overlay, function, source, tpage, clut }
 }
 
-/// Draw sites with a literal page and CLUT in the same function, and no runtime condition.
-/// Sites outside this table are in `wiki: formats/assets#texture-evidence`.
+/// The world-map HUD sprite: `Area_DrawHudSprite`, one body that eleven area overlays include.
+const HUD_SPRITE: &str = "src/overlays/area/Area_DrawHudSprite.h:8-11";
+
+/// Draw sites with a literal page and CLUT in the same function, and no runtime condition, read
+/// from the decompilation's current sources. Sites outside this table are in
+/// `wiki: formats/assets#texture-evidence`.
 ///
-/// The nine area-sprite sites write both page encodings; both words are listed because the
-/// graph-type-1/2 word decodes to a 4bpp page over the second sheet, as the research join
-/// recorded. AREA030's effect and icon sites name the graph-type-0 words.
+/// The table does not grow: a rule that reads the page and CLUT from data the game reads, or a
+/// capture of the game's own draw calls, replaces it.
 pub const SITES: &[Site] = &[
-    literal("WORLD00/AREA024.EMI", 14, 0x801F_2DF8, "src/world00/area024/14/sprite_draw.c:423-424", 0x003B, 0x78CA),
-    // The nine area sprite pages: one 8bpp and one 4bpp sheet, the same CLUT row.
-    literal("WORLD00/AREA016.EMI", 13, 0x801F_39D8, "src/world00/area016/13/func_801F39D8.c:9-24", 0x009C, 0x7B80),
-    literal("WORLD00/AREA016.EMI", 13, 0x801F_39D8, "src/world00/area016/13/func_801F39D8.c:9-24", 0x022C, 0x7B80),
-    literal("WORLD01/AREA045.EMI", 13, 0x801F_39D8, "src/world01/area045/13/func_801F39D8.c:7-22", 0x009C, 0x7B80),
-    literal("WORLD01/AREA045.EMI", 13, 0x801F_39D8, "src/world01/area045/13/func_801F39D8.c:7-22", 0x022C, 0x7B80),
-    literal("WORLD01/AREA065.EMI", 13, 0x801F_3A10, "src/world01/area065/13/func_801F3A10.c:7-22", 0x009C, 0x7B80),
-    literal("WORLD01/AREA065.EMI", 13, 0x801F_3A10, "src/world01/area065/13/func_801F3A10.c:7-22", 0x022C, 0x7B80),
-    literal("WORLD02/AREA087.EMI", 13, 0x801F_3A0C, "src/world02/area087/13/func_801F3A0C.c:9-23", 0x009C, 0x7B80),
-    literal("WORLD02/AREA087.EMI", 13, 0x801F_3A0C, "src/world02/area087/13/func_801F3A0C.c:9-23", 0x022C, 0x7B80),
-    literal("WORLD02/AREA088.EMI", 13, 0x801F_453C, "src/world02/area088/13/func_801F453C.c:9-23", 0x009C, 0x7B80),
-    literal("WORLD02/AREA088.EMI", 13, 0x801F_453C, "src/world02/area088/13/func_801F453C.c:9-23", 0x022C, 0x7B80),
-    literal("WORLD03/AREA115.EMI", 13, 0x801F_39DC, "src/world03/area115/13/func_801F39DC.c:9-23", 0x009C, 0x7B80),
-    literal("WORLD03/AREA115.EMI", 13, 0x801F_39DC, "src/world03/area115/13/func_801F39DC.c:9-23", 0x022C, 0x7B80),
-    literal("WORLD03/AREA121.EMI", 14, 0x801F_39F0, "src/world03/area121/14/func_801F39F0.c:9-23", 0x009C, 0x7B80),
-    literal("WORLD03/AREA121.EMI", 14, 0x801F_39F0, "src/world03/area121/14/func_801F39F0.c:9-23", 0x022C, 0x7B80),
-    literal("WORLD03/AREA151.EMI", 13, 0x801F_3948, "src/world03/area151/13/func_801F3948.c:8-22", 0x009C, 0x7B80),
-    literal("WORLD03/AREA151.EMI", 13, 0x801F_3948, "src/world03/area151/13/func_801F3948.c:8-22", 0x022C, 0x7B80),
-    literal("WORLD04/AREA152.EMI", 13, 0x801F_389C, "src/world04/area152/13/func_801F389C.c:10-24", 0x009C, 0x7B80),
-    literal("WORLD04/AREA152.EMI", 13, 0x801F_389C, "src/world04/area152/13/func_801F389C.c:10-24", 0x022C, 0x7B80),
-    // AREA016's effect quad and AREA030's effect quads and menu icons.
+    literal(
+        "WORLD00/AREA024.EMI",
+        14,
+        0x801F_2DF8,
+        "src/overlays/area/area024/14/sprite_draw.c:423-424",
+        0x003B,
+        0x78CA,
+    ),
+    // The world-map HUD sprites: an 8bpp page at (768, 256) with CLUT (0, 494), one copy per
+    // overlay.
+    literal("WORLD00/AREA016.EMI", 13, 0x801F_39D8, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD00/AREA033.EMI", 13, 0x801F_390C, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD01/AREA045.EMI", 13, 0x801F_39D8, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD01/AREA065.EMI", 13, 0x801F_3A10, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD02/AREA087.EMI", 13, 0x801F_3A0C, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD02/AREA088.EMI", 13, 0x801F_453C, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD02/AREA104.EMI", 14, 0x801F_3A9C, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD03/AREA115.EMI", 13, 0x801F_39DC, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD03/AREA121.EMI", 14, 0x801F_39F0, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD03/AREA151.EMI", 13, 0x801F_3948, HUD_SPRITE, 0x009C, 0x7B80),
+    literal("WORLD04/AREA152.EMI", 13, 0x801F_389C, HUD_SPRITE, 0x009C, 0x7B80),
+    // AREA016's cloud cell, AREA030's backdrop quads, fish arrow and menu icons.
     literal(
         "WORLD00/AREA016.EMI",
         13,
         0x801F_4768,
-        "src/world00/area016/13/func_801F4768.c:129,132-133",
+        "src/overlays/area/area016/13/func_801F4768.c:82-83",
         0x005B,
         0x78CB,
     ),
+    literal("WORLD00/AREA030.EMI", 5, 0x800F_5E44, "src/overlays/area/area030/05/C.c:326-339", 0x0095, 0x7A80),
     literal(
         "WORLD00/AREA030.EMI",
-        5,
-        0x800F_5E44,
-        "src/world00/area030/05/C.c:330-342; src/world00/area030/04/func_801D2C34.c:15-23",
-        0x0095,
+        4,
+        0x801D_2C34,
+        "src/overlays/area/area030/04/Fishing_DrawFishArrow.c:15-16",
+        0x0099,
         0x7A40,
     ),
-    literal("WORLD00/AREA030.EMI", 5, 0x800F_5E44, "src/world00/area030/05/C.c:330-342", 0x0095, 0x7A80),
     literal(
         "WORLD00/AREA030.EMI",
         4,
         0x801D_799C,
-        "src/world00/area030/04/func_801D799C.c:15-21; src/world00/area030/04/data.c:270",
+        "src/overlays/area/area030/04/func_801D799C.c:14-17; src/overlays/area/area030/04/data.c:271",
         0x001D,
         0x7887,
     ),
-    literal("WORLD00/AREA030.EMI", 4, 0x801D_8248, "src/world00/area030/04/func_801D8248.c:13-20", 0x002D, 0x7887),
+    literal(
+        "WORLD00/AREA030.EMI",
+        4,
+        0x801D_8248,
+        "src/overlays/area/area030/04/func_801D8248.c:13-16",
+        0x001D,
+        0x7887,
+    ),
     // MAGIC218's effect page and CLUT, from retail assembly.
     literal(
         "BMAGIC/MAGIC218.EMI",
         3,
         0x801E_F250,
-        "asm/emi/bmagic/magic218/03/func_801EF250.s:148-208",
+        "asm/emi/bmagic/magic218/03/func_801EF250.s:195-213",
         0x00BD,
         0x7E80,
     ),
