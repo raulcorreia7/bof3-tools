@@ -23,18 +23,11 @@ use psx_formats::gfx::png::{self, Picture};
 use serde::{Deserialize, Serialize};
 
 use super::{Animation, Bank, Bounds, COLOURS, Placement, Section, SpriteSizes, Stage, animation_bounds, compose};
+use crate::animation::{TICK_MICROS, WRAPPED_TICKS, duration_ms};
 use crate::error::{Error, Result};
 use rebof3_emi::replay::Vram;
 
-/// `SYS_Main` (`exe/slus_004_22@0x8014AAC8`) runs one game frame per `VSync(2)`, and a step function
-/// runs once a frame, so one tick is two NTSC fields of `1001 / 60000` seconds.
-const FIELDS_PER_TICK: f64 = 2.0;
-const MICROS_PER_FIELD: f64 = 1_000_000.0 * 1001.0 / 60_000.0;
-/// One tick in microseconds.
-pub const TICK_MICROS: f64 = FIELDS_PER_TICK * MICROS_PER_FIELD;
 const MICROS_PER_MILLI: f64 = 1000.0;
-/// The ticks a delay byte of 0 lasts: the step function counts the byte down before it tests it.
-const WRAPPED_TICKS: u32 = 256;
 /// The colours of an 8-bit PNG palette.
 const PNG_COLOURS: usize = 256;
 const PNG_BITS: u8 = 8;
@@ -52,16 +45,6 @@ const TAG_COLOUR: &str = "#000000ff";
 const LAYER: &str = "sprite";
 const OPAQUE: u8 = 255;
 const BLEND: &str = "normal";
-
-/// The ticks a step with `delay` shows its frame.
-pub fn ticks_of(delay: u8) -> u32 {
-    if delay == 0 { WRAPPED_TICKS } else { u32::from(delay) }
-}
-
-/// A step's time in whole milliseconds.
-pub fn duration_ms(delay: u8) -> u32 {
-    (f64::from(ticks_of(delay)) * TICK_MICROS / MICROS_PER_MILLI).round() as u32
-}
 
 /// The delay byte of a duration, when one gives it.
 fn delay_of(ms: u32) -> Option<u8> {

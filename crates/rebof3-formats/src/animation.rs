@@ -33,6 +33,15 @@ use crate::error::{Error, Result};
 
 /// A delay byte at or above this makes the step a jump (`entry[0] >= 0x80` in `func_8014D978`).
 pub const JUMP: u8 = 0x80;
+/// `SYS_Main` (`exe/slus_004_22@0x8014AAC8`) runs one game frame per `VSync(2)`, and a step function
+/// runs once a frame, so one tick is two NTSC fields of `1001 / 60000` seconds.
+const FIELDS_PER_TICK: f64 = 2.0;
+const MICROS_PER_FIELD: f64 = 1_000_000.0 * 1001.0 / 60_000.0;
+/// One tick in microseconds.
+pub const TICK_MICROS: f64 = FIELDS_PER_TICK * MICROS_PER_FIELD;
+const MICROS_PER_MILLI: f64 = 1000.0;
+/// The ticks a delay byte of 0 lasts: the step function counts the byte down before it tests it.
+pub const WRAPPED_TICKS: u32 = 256;
 /// Bytes of the two counts that open an animation.
 const COUNTS_BYTES: usize = 2;
 /// Bytes of one step and of one frame offset.
@@ -44,6 +53,16 @@ pub const CELL_BYTES: usize = 5;
 pub const SHAPE_MASK: u8 = 0x0F;
 /// The bit of a cell's size byte that flips it (`mode = cell->size >> 7`).
 pub const FLIP: u8 = 0x80;
+
+/// The ticks a step with `delay` shows its frame.
+pub fn ticks_of(delay: u8) -> u32 {
+    if delay == 0 { WRAPPED_TICKS } else { u32::from(delay) }
+}
+
+/// A step's time in whole milliseconds.
+pub fn duration_ms(delay: u8) -> u32 {
+    (f64::from(ticks_of(delay)) * TICK_MICROS / MICROS_PER_MILLI).round() as u32
+}
 
 /// One step of the stream: show `frame` for `delay` ticks, or a jump.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
