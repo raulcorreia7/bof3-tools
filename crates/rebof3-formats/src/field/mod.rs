@@ -25,6 +25,11 @@ pub const ZONE_ROWS: usize = 666;
 /// `g_FacingSteps` (`exe/slus_004_22@0x80181B94`): the cell step of each of the eight facings, as
 /// 16.16 `x` and `y` words.
 pub const FACING_STEPS: u32 = 0x8018_1B94;
+/// Where `ETC/GAME.EMI`'s code image loads.
+pub const GAME_CODE: u32 = 0x8019_5800;
+/// `D_801C839C` (`emi/etc/game/00@0x801C839C`): per facing, the actor script `func_8015BAC4`
+/// (`exe/slus_004_22@0x8015BAC4`) starts and, at the odd byte (`D_801C839D`), the flip it latches.
+pub const FACING_SCRIPTS: u32 = 0x801C_839C;
 /// Areas in `g_AreaLoads` and `g_EncounterZones`.
 pub const AREAS: usize = 200;
 /// Facings a step table row exists for.
@@ -120,6 +125,20 @@ impl<'a> Executable<'a> {
             })
             .collect())
     }
+}
+
+/// The script and flip of each facing, `[script, flip]`, from the game code image (the payload that
+/// loads at [`GAME_CODE`]).
+pub fn facing_scripts(code: &[u8]) -> Result<[[u8; 2]; FACINGS]> {
+    let at = (FACING_SCRIPTS - GAME_CODE) as usize;
+    let bytes = code
+        .get(at..at + 2 * FACINGS)
+        .ok_or_else(|| Error::Field("the game code image does not reach D_801C839C".into()))?;
+    let mut scripts = [[0; 2]; FACINGS];
+    for (script, pair) in scripts.iter_mut().zip(bytes.as_chunks::<2>().0) {
+        *script = *pair;
+    }
+    Ok(scripts)
 }
 
 /// One `EncounterZone` row: a cell rectangle and what the field reads when the party enters it

@@ -10,14 +10,12 @@ use std::path::PathBuf;
 
 use rebof3_emi::replay::scenes::area_id;
 use rebof3_formats::field::setup::{KINDS, walk};
-use rebof3_formats::field::{AREAS, Executable, PROGRAM_ADDRESS};
+use rebof3_formats::field::{AREAS, Executable, GAME_CODE, PROGRAM_ADDRESS, facing_scripts};
 
 use support::{collect_archives, retail_disc};
 
-/// `s_ScriptOpcodeLengths` (`emi/etc/game/00@0x801C8444`) inside `ETC/GAME.EMI`'s code image, which
-/// loads at `0x80195800`.
+/// `s_ScriptOpcodeLengths` (`emi/etc/game/00@0x801C8444`) inside `ETC/GAME.EMI`'s code image.
 const LENGTHS_ADDRESS: u32 = 0x801C_8444;
-const GAME_CODE: u32 = 0x8019_5800;
 /// The scene table's load address and the size of its records.
 const SCENE_TABLE: u32 = 0x800E_3800;
 const SCENE_RECORD: usize = 8;
@@ -50,6 +48,12 @@ fn every_setup_stream_walks_and_names_its_scene_rows() {
     let lengths: Vec<usize> = KINDS.iter().map(|layout| layout.length).collect();
     let stored: Vec<usize> = code[at..at + KINDS.len()].iter().map(|&length| usize::from(length)).collect();
     assert_eq!(lengths, stored, "the record lengths are s_ScriptOpcodeLengths");
+    let scripts = facing_scripts(&code).expect("D_801C839C");
+    assert_eq!(
+        scripts,
+        [[4, 0], [3, 0], [2, 0], [1, 0], [0, 0], [1, 1], [2, 1], [3, 1]],
+        "one script per facing, mirrored"
+    );
 
     let mut kinds: BTreeMap<u8, usize> = BTreeMap::new();
     let (mut walked, mut unmatched, mut zones) = (0, 0, 0);

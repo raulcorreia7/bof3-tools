@@ -209,6 +209,18 @@ pub fn with_facing(program: &[u8], record: &Record, facing: u8) -> Result<Vec<u8
     Ok(program)
 }
 
+/// The program with `record` naming scene id `scene`, which selects the actor's sprite page, CLUT
+/// row and script section (`Area_FindSceneRecord`). The caller checks that the area's scene table
+/// holds the id.
+pub fn with_scene(program: &[u8], record: &Record, scene: u16) -> Result<Vec<u8>> {
+    if !record.layout().scene {
+        return Err(Error::Field(format!("a kind {:X} record names no scene", record.kind)));
+    }
+    let mut program = program.to_vec();
+    program[record.at + 1..record.at + 3].copy_from_slice(&scene.to_be_bytes());
+    Ok(program)
+}
+
 struct Walker<'a> {
     program: &'a [u8],
     records: Vec<Record>,
@@ -369,6 +381,11 @@ mod tests {
         assert_eq!(turned[0], 0x05);
         assert!(with_facing(&program, record, 8).is_err());
         assert!(with_position(&program, record, 600, 0).is_err());
+        let renamed = with_scene(&program, record, 0x0102).unwrap();
+        assert_eq!(record.placement(&renamed).unwrap().scene, Some(0x0102));
+        assert_eq!(with_scene(&program, record, 7).unwrap(), program, "an unchanged id writes the same bytes");
+        let kind_e = &walk(&program, 0).unwrap().records[2];
+        assert!(with_scene(&program, kind_e, 1).is_err());
     }
 
     #[test]
