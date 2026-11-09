@@ -120,6 +120,17 @@ every byte the open form does not name.
 - **Text and characters.** `export message`, `export strings`, `export characters` and
   `export character-bank` pair with the `import` verbs of the same name. `character-bank` imports palette
   tables only.
+- **Sprite sheets.** `export sprite-sheet PAYLOAD --exe SLUS_004.22 --section N --palette N -o OUT.png`
+  writes one section of a sprite bank as an 8-bit indexed PNG and `OUT.json` in Aseprite's array form:
+  one row per animation a record plays, one cell per frame stitched through the VRAM model, one frame
+  per step with the step's time in milliseconds (a tick is two NTSC fields, 33.4 ms), and one tag per
+  animation. `meta.bof3` holds the section, palette, actor position, loop points and evidence. The cell
+  sizes come from `g_SpriteSizes` in the executable. `import sprite-sheet OUT.json --payload PAYLOAD
+  --exe SLUS_004.22` reads the PNG named in the JSON from the same folder and writes the payload back,
+  raw or LZ77 as stored. A texel, colour or duration comes back only when it changed, so an unchanged
+  sheet gives the stored payload byte for byte; two different changes to one shared texel, paint
+  outside every cell, and an edit that outgrows the section's padding are refused. The editor's Sprite
+  bank view writes and reads the same files.
 - **Archives and discs.** `import emi CONTAINER --entry INDEX=FILE` keeps every entry's type and load
   address; a changed payload moves the entries after it. `import disc CUE --file PATH=FILE -o DIR` writes
   a patched copy of the disc; a replacement file cannot grow past its last sector.
@@ -148,6 +159,7 @@ The other kinds round trip through their own commands. Results over the retail d
 | sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |
 | sound bank with `--mode raw`                     | 1,020 of 1,020 banks                          | lossless |
 | VAG sample through WAVE                          | no sample comes back byte for byte            | lossy    |
+| sprite bank section through a sprite sheet       | 273 of 273 sections                           | lossless |
 
 `assets import vag` drops the end-marker block and the loop flags. The retail cases need the disc and
 skip without it.
