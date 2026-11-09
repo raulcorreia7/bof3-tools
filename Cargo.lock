@@ -4859,6 +4859,7 @@ dependencies = [
 name = "rebof3-editor"
 version = "0.1.0"
 dependencies = [
+ "bof3player",
  "cpal",
  "gpui",
  "psx-formats",

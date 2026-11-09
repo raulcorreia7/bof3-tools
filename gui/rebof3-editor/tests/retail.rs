@@ -193,7 +193,7 @@ fn sequences_play_from_the_project_archive() {
 #[test]
 fn samples_and_tones_play_through_the_spu() {
     use psx_formats::vab::Bank;
-    use rebof3_assets::sound::{Keys, Note, note_pcm, sample_pcm};
+    use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 
     let Some(disc) = disc() else { return eprintln!("skipping: set BOF3_DISC_DIR") };
     let folder = scratch("tones");

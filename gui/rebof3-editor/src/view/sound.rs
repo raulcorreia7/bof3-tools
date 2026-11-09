@@ -1,7 +1,7 @@
 //! Sound banks and sequences: play a VAB's samples and its tones at a chosen note, list its programs
 //! and tones, export WAVE, SoundFont and MIDI files, replace a sample from a WAVE file, edit a
 //! sequence's header and import a sequence from MIDI. Every preview renders through the audio
-//! library's sound driver and SPU (`rebof3_assets::sound`), in stereo at the library's rate.
+//! library's sound driver and SPU (`rebof3_editor::preview`), in stereo at the library's rate.
 
 use std::collections::HashMap;
 
@@ -11,7 +11,8 @@ use psx_formats::sep::{Package, Sequence};
 use psx_formats::vab::{Bank, Tone};
 use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
 use rebof3_assets::import;
-use rebof3_assets::sound::{Keys, Note, note_pcm, sample_pcm, sequence_pcm};
+use rebof3_assets::sound::sequence_pcm;
+use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 use rebof3_emi::classify::Format;
 use rebof3_emi::entry::vab_body_index;
 
@@ -323,7 +324,7 @@ fn shown_bank(editor: &Editor) -> Result<(Entry<'_>, usize, Vec<u8>, Vec<u8>), S
 /// Plays sample `index` of the shown bank as the audio library auditions it.
 fn play_sample(editor: &mut Editor, index: u32) -> Result<(), String> {
     let (_, _, header, body) = shown_bank(editor)?;
-    let pcm = sample_pcm(&header, &body, index).map_err(|error| error.to_string())?;
+    let pcm = sample_pcm(&header, &body, index)?;
     editor.views.sound.player.play(&pcm)
 }
 
@@ -361,8 +362,7 @@ fn play_note(editor: &mut Editor, block: u8, slot: u8, program: bool) -> Result<
         } else {
             Keys::Tone { block, slot }
         };
-        note_pcm(&header, &body, &Note { keys, note, hold: hold(&bank, tone, note) })
-            .map_err(|error| error.to_string())?
+        note_pcm(&header, &body, &Note { keys, note, hold: hold(&bank, tone, note) })?
     };
     editor.views.sound.player.play(&pcm)
 }
