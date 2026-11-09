@@ -10,6 +10,7 @@ mod map;
 mod message;
 mod palette;
 mod scene;
+mod script;
 mod sound;
 mod sprite;
 mod tables;
@@ -19,6 +20,7 @@ mod vram;
 
 use gpui::{AnyElement, Context, Div, ElementId, Keystroke, Stateful, div, prelude::*, px};
 use rebof3_formats::Format;
+use rebof3_formats::script::program::{CellAt, StepAt};
 
 use crate::app::{Editor, Field as WindowField};
 use crate::edit::LineEdit;
@@ -40,6 +42,7 @@ pub enum Tab {
     Sprite,
     Cells,
     Vram,
+    Script,
 }
 
 impl Tab {
@@ -57,6 +60,7 @@ impl Tab {
             Tab::Sprite => "Sprite bank",
             Tab::Cells => "Cell grid",
             Tab::Vram => "VRAM",
+            Tab::Script => "Script",
         }
     }
 }
@@ -82,6 +86,10 @@ pub enum Field {
     SequenceHeader { index: usize, part: sound::Part },
     /// The note the sound view plays tone `slot` of program block `block` at.
     ToneNote { block: u8, slot: u8 },
+    /// An operand of a script bank's step.
+    ScriptStep { at: StepAt, part: script::StepPart },
+    /// A field of a cell of a script bank's frame.
+    ScriptCell { at: CellAt, part: script::CellPart },
 }
 
 impl Field {
@@ -114,6 +122,7 @@ pub struct Views {
     pub sprite: sprite::State,
     pub cells: cells::State,
     pub vram: vram::State,
+    pub script: script::State,
 }
 
 impl Views {
@@ -159,7 +168,7 @@ struct FormatViews {
 }
 
 /// The views of each format; a format without a row has only Info, Hex and what its payload offers.
-static VIEWS: [FormatViews; 9] = [
+static VIEWS: [FormatViews; 12] = [
     FormatViews {
         format: Format::VramUpload,
         tabs: &[Tab::Texture, Tab::Vram],
@@ -185,6 +194,9 @@ static VIEWS: [FormatViews; 9] = [
         prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
     },
     FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
+    FormatViews { format: Format::AreaScriptBank, tabs: &[Tab::Script], prepare: None },
+    FormatViews { format: Format::BattleScriptBank, tabs: &[Tab::Script], prepare: None },
+    FormatViews { format: Format::MagicTable, tabs: &[Tab::Script], prepare: None },
 ];
 
 /// The tabs `format` adds.
@@ -274,6 +286,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Sprite => sprite::show(editor, &entry, cx),
         Tab::Cells => cells::show(editor, &entry, cx),
         Tab::Vram => vram::show(editor, &entry, cx),
+        Tab::Script => script::show(editor, &entry, cx),
     };
     div()
         .flex()
@@ -336,6 +349,8 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
         Field::MapCorner(corner) => map::corner_changed(editor, corner, text),
         Field::SequenceHeader { index, part } => sound::header_changed(editor, index, part, text),
         Field::ToneNote { block, slot } => sound::note_changed(editor, block, slot, text),
+        Field::ScriptStep { at, part } => script::step_changed(editor, at, part, text),
+        Field::ScriptCell { at, part } => script::cell_changed(editor, at, part, text),
     }
 }
 
