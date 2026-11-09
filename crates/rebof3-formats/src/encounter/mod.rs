@@ -63,6 +63,8 @@ pub const ENCOUNTER_ENEMIES: usize = 8;
 /// Enemy records, and the bytes of each.
 pub const ENEMIES: usize = 8;
 pub const ENEMY_BYTES: usize = 0x88;
+/// The enemy index of an empty encounter slot.
+pub const EMPTY_SLOT: u8 = 0xFF;
 /// The payload offset of the first enemy record.
 pub const ENEMY_BASE: usize = ENCOUNTERS * ENCOUNTER_BYTES;
 /// Bytes in an enemy's name.

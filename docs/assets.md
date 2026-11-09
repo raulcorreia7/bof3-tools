@@ -124,6 +124,16 @@ every byte the open form does not name.
 - **Text and characters.** `export message`, `export strings`, `export characters` and
   `export character-bank` pair with the `import` verbs of the same name. `character-bank` imports palette
   tables only.
+- **Message markup and translation.** A message exports as text with its control codes as `{TAG}` or
+  `{TAG:hh}` (`rebof3_emi::text::codec`; `hh` is the operand byte in hex): `{END}` ends the message,
+  `{NEWLINE}` and `{PAGE}` break the line and the page, `{COLOR:hh}` and `{NOCOLOR}` colour the glyphs,
+  `{BOX:hh}` places the window, `{CHOICE:hh}` opens the answers (each ends in `{END}`), and
+  `{INSERT:hh}`, `{GOTO}`, `{VAR:hh}` and `{LINK:hh}` read text at run time. A byte the codec does not name
+  is `{RAW:hh}`. Unchanged text encodes to the stored bytes. `export message-po PAYLOAD` writes a PO catalogue
+  for translators: one entry per message, `msgctxt` `message[N]`, `msgid` the markup, an empty `msgstr`.
+  `import message-po PO --payload PAYLOAD` puts each non-empty `msgstr` in place of its message and keeps the
+  rest, so an untouched catalogue rebuilds the bank byte for byte. A bank larger than `0xA000` bytes, the
+  space from its load address `0x80010000` to the resource table at `0x8001A000`, is refused.
 - **Script banks.** `export script PAYLOAD` writes an area, battle or magic-effect script bank as text,
   one op per line; `import script TEXT --payload PAYLOAD` reads it back. A record is the animation
   stream `Actor_SeekScript` (`exe/slus_004_22@0x8014D910`) plays: `show frame F ticks T` stages a
@@ -199,9 +209,9 @@ The other kinds round trip through their own commands. Results over the retail d
 | EMI archive, `emi extract -J` then `emi pack -J` | 880 of 880 archives                           | lossless |
 | EMI archive, `emi pack` without `-J`             | entry types and load addresses are lost       | lossy    |
 | texture, 16 bpp view                             | every view reads back to the stored words     | lossless |
-| texture, indexed PNG                             | all 882 joined rows                           | lossless |
+| texture, indexed PNG                             | all 883 joined rows                           | lossless |
 | palette                                          | every palette reads back to its words         | lossless |
-| texture through TIM                              | all 202 joined textures (882 rows); 593 uploads | lossless |
+| texture through TIM                              | all 203 joined textures (883 rows); 593 uploads | lossless |
 | sound bank through one VAB file or VH and VB     | 1,020 of 1,020 banks                          | lossless |
 | sequences through SEP and SEQ                    | 119 packages, 476 sequences                   | lossless |
 | sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |

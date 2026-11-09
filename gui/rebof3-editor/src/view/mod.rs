@@ -3,7 +3,9 @@
 //! same way.
 
 mod cells;
+mod compose;
 mod decoded;
+mod formation;
 mod hex;
 mod info;
 mod layout;
@@ -45,6 +47,7 @@ pub enum Tab {
     Vram,
     Script,
     Layout,
+    Formation,
 }
 
 impl Tab {
@@ -64,6 +67,7 @@ impl Tab {
             Tab::Vram => "VRAM",
             Tab::Script => "Script",
             Tab::Layout => "Layout",
+            Tab::Formation => "Formation",
         }
     }
 }
@@ -79,6 +83,8 @@ pub enum Field {
     TextFilter,
     /// The string that starts at this offset.
     Text(usize),
+    /// Message `n` of the shown message bank, as the compose view edits it.
+    Message(usize),
     /// The tables view's filter.
     TableFilter,
     /// A name or number cell of a table.
@@ -98,7 +104,7 @@ pub enum Field {
 impl Field {
     /// Whether Shift+Enter breaks a line in the field.
     pub fn is_multiline(self) -> bool {
-        matches!(self, Field::Text(_))
+        matches!(self, Field::Text(_) | Field::Message(_))
     }
 }
 
@@ -119,6 +125,7 @@ pub struct Views {
     pub palette: palette::State,
     pub tables: tables::State,
     pub text: text::State,
+    pub compose: compose::State,
     pub sound: sound::State,
     pub decoded: decoded::State,
     pub map: map::State,
@@ -127,6 +134,7 @@ pub struct Views {
     pub vram: vram::State,
     pub script: script::State,
     pub layout: layout::State,
+    pub formation: formation::State,
 }
 
 impl Views {
@@ -176,7 +184,7 @@ struct FormatViews {
 }
 
 /// The views of each format; a format without a row has only Info, Hex and what its payload offers.
-static VIEWS: [FormatViews; 12] = [
+static VIEWS: &[FormatViews] = &[
     FormatViews {
         format: Format::VramUpload,
         tabs: &[Tab::Texture, Tab::Vram, Tab::Layout],
@@ -201,10 +209,20 @@ static VIEWS: [FormatViews; 12] = [
         tabs: &[Tab::Sprite],
         prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
     },
+    FormatViews {
+        format: Format::AreaMessageBank,
+        tabs: &[],
+        prepare: Some(Reset { tab: Some(Tab::Text), run: compose::prepare }),
+    },
     FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
     FormatViews { format: Format::AreaScriptBank, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::BattleScriptBank, tabs: &[Tab::Script], prepare: None },
     FormatViews { format: Format::MagicTable, tabs: &[Tab::Script], prepare: None },
+    FormatViews {
+        format: Format::AreaEncounterTable,
+        tabs: &[Tab::Formation],
+        prepare: Some(Reset { tab: Some(Tab::Formation), run: formation::prepare }),
+    },
 ];
 
 /// The tabs `format` adds.
@@ -297,6 +315,7 @@ pub fn show(editor: &Editor, cx: &mut Context<Editor>) -> AnyElement {
         Tab::Vram => vram::show(editor, &entry, cx),
         Tab::Script => script::show(editor, &entry, cx),
         Tab::Layout => layout::show(editor, &entry, cx),
+        Tab::Formation => formation::show(editor, &entry, cx),
     };
     div()
         .flex()
@@ -351,6 +370,7 @@ pub fn field_changed(editor: &mut Editor, field: Field, text: &str) -> Option<St
             None
         }
         Field::Text(start) => text::string_changed(editor, start, text),
+        Field::Message(index) => compose::message_changed(editor, index, text),
         Field::TableFilter => {
             editor.views.tables.filter = text.to_string();
             None

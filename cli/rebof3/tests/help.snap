@@ -479,6 +479,7 @@ Kinds:
   seq             one sequence of a package as a SEQ file
   sep             a sequence package as a SEP file
   message         a message bank as JSON
+  message-po      a message bank as a PO catalogue for translators
   script          a script bank's animation streams as text, one op per line
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
@@ -515,6 +516,7 @@ Kinds:
   disc            a patched copy of the whole disc
   soundfont       a SoundFont 2 file back into a VAB bank
   message         message JSON back into a bank
+  message-po      a translated PO catalogue back into a bank (needs --payload)
   script          script text back into its bank
   strings         strings JSON back into its payload
   characters      character JSON back into ETC/START.EMI entry 8
