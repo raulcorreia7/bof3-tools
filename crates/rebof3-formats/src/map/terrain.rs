@@ -186,9 +186,15 @@ pub fn glb_of_mesh(mesh: &Mesh, name: &str) -> Option<Vec<u8>> {
 /// descriptor words. Mode `0` names a 16x16 block from the descriptor's low byte. Otherwise bit 11
 /// picks the rectangle bank (index `descriptor & 0xFF`) or the quad bank (index `descriptor & 0x7FF`).
 fn tile(bundle: &MapBundle, cell: usize) -> (usize, [[u8; 2]; 4]) {
-    let Some(descriptor) = descriptor(bundle, cell) else {
-        return (0, [[0; 2]; 4]);
-    };
+    match descriptor(bundle, cell) {
+        Some(descriptor) => tile_of(bundle, descriptor),
+        None => (0, [[0; 2]; 4]),
+    }
+}
+
+/// The tile-bank selector and the four texture-coordinate corners of a descriptor word, in corner
+/// order (`func_80155560`).
+pub(super) fn tile_of(bundle: &MapBundle, descriptor: u32) -> (usize, [[u8; 2]; 4]) {
     let selector = ((descriptor >> SELECTOR_SHIFT) & 3) as usize;
     let mode = (descriptor >> MODE_SHIFT) & 0xf;
     let uvs = if mode == 0 {
@@ -208,7 +214,7 @@ fn tile(bundle: &MapBundle, cell: usize) -> (usize, [[u8; 2]; 4]) {
 
 /// The tile descriptor of a cell: `None` for an empty cell (grid value `0`) or a grid value past the
 /// descriptor table.
-fn descriptor(bundle: &MapBundle, cell: usize) -> Option<u32> {
+pub(super) fn descriptor(bundle: &MapBundle, cell: usize) -> Option<u32> {
     let value = usize::from(bundle.grid.get(cell).copied().unwrap_or(0));
     bundle.records.get(value).filter(|_| value != 0).copied()
 }
