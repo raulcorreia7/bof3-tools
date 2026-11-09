@@ -142,7 +142,8 @@ pub fn prepare(editor: &mut Editor) {
     if editor.tab == Tab::Vram && tabs(&entry).contains(&Tab::Vram) {
         vram::prepare(editor);
     }
-    if editor.tab == Tab::Layout && tabs(&editor.current().unwrap_or_else(|| unreachable!())).contains(&Tab::Layout) {
+    let Some(entry) = editor.current() else { return };
+    if editor.tab == Tab::Layout && tabs(&entry).contains(&Tab::Layout) {
         layout::prepare(editor);
     }
     let Some(entry) = editor.current() else { return };
