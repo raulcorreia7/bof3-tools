@@ -80,7 +80,7 @@ payloads.
 | Text    | message banks, any strings    | rewrite a string in place (it must fit its old bytes); preview it as message windows with pages, lines and colours |
 | Sound   | VAB banks, sequence packages  | play samples, tones at a chosen note and sequences through the audio library's SPU, in stereo (with the archive's own bank and your edits); export a raw sample as WAVE, SoundFont and MIDI; replace a sample from WAVE; edit a sequence's resolution, tempo and time signature; import a sequence from MIDI |
 | Map     | area map bundles              | the map from above, textured from its area's replayed VRAM or coloured by tile bank and height; export the textured map as PNG; edit a cell's corner heights |
-| Sprite bank | character sprite banks, raw or LZ77 | each section's node table and palettes; edit any palette color |
+| Sprite bank | character sprite banks, raw or LZ77 | play each section's animations at the game's tick (loop, once, reverse; step by tick or step) with the frame stitched through VRAM and its cells outlined; the frame sheet; edit any palette colour; export and import a PNG sprite sheet with Aseprite JSON |
 | Cell grid | area 4-bit cell grids       | the grid over the map's width and height; paint any cell's value   |
 | Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |
 

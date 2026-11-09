@@ -7,6 +7,8 @@
 //! | --- | --- | --- |
 //! | [`emi`], `pack`, `manifest` | container, repacking, `emi.json` | `wiki: formats/emi` |
 //! | `lz77` | type-1 payload codec | `wiki: formats/lz77` |
+//! | `lzss` | the transfer queue's packed images (`GFX_DecodeLzss`) | |
+//! | `sprite` | sprite banks: frame sheets, palettes, animations, records | `wiki: formats/character` |
 //! | [`cue`] | type-8 cue tables | `wiki: formats/audio#emi-type-8-cue-records` |
 //! | `entry` | decoders applied to one entry on disk | |
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
@@ -34,6 +36,8 @@ pub mod fixtures;
 #[cfg(feature = "std")]
 pub mod lz77;
 #[cfg(feature = "std")]
+pub mod lzss;
+#[cfg(feature = "std")]
 pub mod manifest;
 #[cfg(feature = "std")]
 pub mod pack;
@@ -41,6 +45,8 @@ pub mod pack;
 pub mod record;
 #[cfg(feature = "std")]
 pub mod replay;
+#[cfg(feature = "std")]
+pub mod sprite;
 #[cfg(feature = "std")]
 pub mod text;
 #[cfg(feature = "std")]

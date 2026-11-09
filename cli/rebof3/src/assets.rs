@@ -16,6 +16,7 @@ use rebof3_assets::disc;
 use rebof3_assets::extract::{self, Options, SUMMARY_FILE, TABLE_FILE};
 use rebof3_assets::import;
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
+use rebof3_assets::sprites;
 use rebof3_assets::text::{self, DEFAULT_DISC};
 use rebof3_assets::{Error, Result};
 use rebof3_formats::map::terrain;
@@ -174,6 +175,7 @@ Kinds:
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
   character-bank  a sprite bank's palette tables as JSON
+  sprite-sheet    a sprite bank section as a PNG sheet and Aseprite JSON
 
 Every kind has focused help: bof3 assets export <KIND> --help.
 Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette BANK,
@@ -204,6 +206,7 @@ Kinds:
   strings         strings JSON back into its payload
   characters      character JSON back into ETC/START.EMI entry 8
   character-bank  palette JSON back into a sprite bank
+  sprite-sheet    a PNG sheet and Aseprite JSON back into a sprite bank
 
 Every kind has focused help: bof3 assets import <KIND> --help.
 Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
@@ -533,6 +536,35 @@ Example:
   bof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
 ";
 
+const EXPORT_SPRITE_SHEET_HELP: &str = "\
+bof3 assets export sprite-sheet: write a sprite bank section as a PNG sheet and Aseprite JSON.
+
+Usage: bof3 assets export sprite-sheet PAYLOAD --exe SLUS_004.22 [--section N] [--palette N] [-o OUT]
+
+  PAYLOAD             stored sprite bank payload, raw or LZ77
+      --exe PATH      the executable, which holds the cell sizes (required)
+      --section N     the container section (default: 0)
+      --palette N     the section palette to draw with (default: 0, the one the field stages)
+  -o, --output OUT    PNG to write; the JSON goes next to it (default: PAYLOAD.png)
+
+Example:
+  bof3 assets export sprite-sheet PL012-3.lz77 --exe SLUS_004.22 --section 1 -o ryu.png
+";
+
+const IMPORT_SPRITE_SHEET_HELP: &str = "\
+bof3 assets import sprite-sheet: read a PNG sheet and Aseprite JSON back into a sprite bank.
+
+Usage: bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe SLUS_004.22 [-o OUT]
+
+  JSON                Aseprite JSON from export sprite-sheet; the PNG it names sits next to it
+      --payload PATH  the stored payload it was exported from (required)
+      --exe PATH      the executable, which holds the cell sizes (required)
+  -o, --output OUT    payload to write, stored like PAYLOAD (default: JSON.bin)
+
+Example:
+  bof3 assets import sprite-sheet ryu.json --payload PL012-3.lz77 --exe SLUS_004.22 -o PL012-3.new.lz77
+";
+
 fn export_help(kind: &str) -> &'static str {
     match kind {
         "texture" => EXPORT_TEXTURE_HELP,
@@ -544,6 +576,7 @@ fn export_help(kind: &str) -> &'static str {
         "strings" => EXPORT_STRINGS_HELP,
         "characters" => EXPORT_CHARACTERS_HELP,
         "character-bank" => EXPORT_CHARACTER_BANK_HELP,
+        "sprite-sheet" => EXPORT_SPRITE_SHEET_HELP,
         _ => EXPORT_HELP,
     }
 }
@@ -565,6 +598,7 @@ fn import_help(kind: &str) -> &'static str {
         "strings" => IMPORT_STRINGS_HELP,
         "characters" => IMPORT_CHARACTERS_HELP,
         "character-bank" => IMPORT_CHARACTER_BANK_HELP,
+        "sprite-sheet" => IMPORT_SPRITE_SHEET_HELP,
         _ => IMPORT_HELP,
     }
 }
@@ -759,6 +793,8 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     match (direction, kind.as_str()) {
         (Direction::Export, "texture") => return export_texture(rest),
         (Direction::Export, "terrain") => return terrain_command(rest),
+        (Direction::Export, "sprite-sheet") => return export_sprite_sheet(rest),
+        (Direction::Import, "sprite-sheet") => return import_sprite_sheet(rest),
         (Direction::Import, "texture") => return import_texture(rest),
         (Direction::Import, "emi") => return import_emi(rest),
         (Direction::Import, "sequence") => return import_sequence(rest),
@@ -769,7 +805,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(
-                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters and character-bank"
+                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters, character-bank and sprite-sheet"
             ),
             Direction::Import => {
                 format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")
@@ -885,6 +921,71 @@ fn export_texture(args: &[String]) -> Result<i32> {
     fs::write(&out, png)?;
     println!("wrote {} ({what})", out.display());
     Ok(EXIT_OK)
+}
+
+/// `bof3 assets export sprite-sheet PAYLOAD --exe EXE [--section N] [--palette N] [-o OUT]`: writes one
+/// section of a stored sprite bank as an indexed PNG and, next to it, the Aseprite JSON that names it.
+#[derive(Parser)]
+struct ExportSpriteSheet {
+    files: Vec<PathBuf>,
+    #[arg(long)]
+    exe: Option<PathBuf>,
+    #[arg(long)]
+    section: Option<String>,
+    #[arg(long)]
+    palette: Option<String>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
+fn export_sprite_sheet(args: &[String]) -> Result<i32> {
+    let args: ExportSpriteSheet = parse(args)?;
+    let payload_path = single(args.files, "export sprite-sheet needs a sprite bank payload")?;
+    let sizes = sprite_sizes(args.exe.as_deref(), "export sprite-sheet")?;
+    let section = optional_number(args.section.as_deref(), "--section")?.unwrap_or(0) as usize;
+    let palette = optional_number(args.palette.as_deref(), "--palette")?.unwrap_or(0) as usize;
+
+    let png_path = with_extension_of(args.output, &payload_path, "png");
+    let image = png_path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+    let sheet = sprites::sprite_sheet(&read_file(&payload_path)?, section, palette, &sizes, &image)?;
+    write_output(&png_path, &sheet.png)?;
+    write_output(&png_path.with_extension("json"), &sheet.json)?;
+    Ok(EXIT_OK)
+}
+
+/// `bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe EXE [-o OUT]`: reads a sheet that
+/// `export sprite-sheet` wrote back into the stored payload, raw or LZ77 as the payload was.
+#[derive(Parser)]
+struct ImportSpriteSheet {
+    files: Vec<PathBuf>,
+    #[arg(long)]
+    payload: Option<PathBuf>,
+    #[arg(long)]
+    exe: Option<PathBuf>,
+    #[arg(short = 'o', long = "output", alias = "out")]
+    output: Option<PathBuf>,
+}
+
+fn import_sprite_sheet(args: &[String]) -> Result<i32> {
+    let args: ImportSpriteSheet = parse(args)?;
+    let json_path = single(args.files, "import sprite-sheet needs the sheet's JSON file")?;
+    let payload = args
+        .payload
+        .ok_or_else(|| Error::Usage("import sprite-sheet needs --payload, the payload it was exported from".into()))?;
+    let sizes = sprite_sizes(args.exe.as_deref(), "import sprite-sheet")?;
+
+    let json = read_file(&json_path)?;
+    let image = sprites::image_name(&json)?;
+    let png = read_file(json_path.with_file_name(image))?;
+    let bytes = sprites::import_sprite_sheet(&json, &png, &read_file(&payload)?, &sizes)?;
+    write_output(&with_extension_of(args.output, &json_path, "bin"), &bytes)?;
+    Ok(EXIT_OK)
+}
+
+/// The cell sizes from the executable `--exe` names.
+fn sprite_sizes(exe: Option<&Path>, verb: &str) -> Result<sprites::SpriteSizes> {
+    let exe = exe.ok_or_else(|| Error::Usage(format!("{verb} needs --exe, the executable SLUS_004.22")))?;
+    sprites::sprite_sizes(&read_file(exe)?)
 }
 
 /// `bof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back

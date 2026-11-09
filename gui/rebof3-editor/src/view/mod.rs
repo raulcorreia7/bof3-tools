@@ -174,8 +174,16 @@ static VIEWS: [FormatViews; 9] = [
         tabs: &[Tab::Map],
         prepare: Some(Reset { tab: Some(Tab::Map), run: map::prepare }),
     },
-    FormatViews { format: Format::Lz77Blob, tabs: &[Tab::Sprite], prepare: None },
-    FormatViews { format: Format::CharacterBlob, tabs: &[Tab::Sprite], prepare: None },
+    FormatViews {
+        format: Format::Lz77Blob,
+        tabs: &[Tab::Sprite],
+        prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
+    },
+    FormatViews {
+        format: Format::CharacterBlob,
+        tabs: &[Tab::Sprite],
+        prepare: Some(Reset { tab: Some(Tab::Sprite), run: sprite::prepare }),
+    },
     FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
 ];
 

@@ -72,6 +72,13 @@ pub enum Error {
     /// that does not match the bank it is written to.
     #[cfg(feature = "std")]
     CharacterBank(String),
+    /// A transfer-queue LZSS stream does not decode: it ends early or reads a ring byte it never wrote.
+    #[cfg(feature = "std")]
+    Lzss(String),
+    /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
+    /// reader assumes.
+    #[cfg(feature = "std")]
+    SpriteBank(String),
 }
 
 impl fmt::Display for Error {
@@ -119,6 +126,10 @@ impl fmt::Display for Error {
             Self::CharacterTable(message) => write!(f, "{message}"),
             #[cfg(feature = "std")]
             Self::CharacterBank(message) => write!(f, "{message}"),
+            #[cfg(feature = "std")]
+            Self::Lzss(message) => write!(f, "LZSS stream: {message}"),
+            #[cfg(feature = "std")]
+            Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
         }
     }
 }
