@@ -172,6 +172,7 @@ Kinds:
   vag             one sample of a VAB bank as WAVE
   sequence        one sequence of a package as MIDI
   message         a message bank as JSON
+  script          a script bank's animation streams as text, one op per line
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
   character-bank  a sprite bank's palette tables as JSON
@@ -203,6 +204,7 @@ Kinds:
   disc            a patched copy of the whole disc
   soundfont       a SoundFont 2 file back into a VAB bank
   message         message JSON back into a bank
+  script          script text back into its bank
   strings         strings JSON back into its payload
   characters      character JSON back into ETC/START.EMI entry 8
   character-bank  palette JSON back into a sprite bank
@@ -297,6 +299,18 @@ Usage: bof3 assets export message PAYLOAD [-o OUT]
 
 Example:
   bof3 assets export message bank.bin -o bank.json
+";
+
+const EXPORT_SCRIPT_HELP: &str = "\
+bof3 assets export script: write a script bank as text, one op per line.
+
+Usage: bof3 assets export script PAYLOAD [-o OUT]
+
+  PAYLOAD             script bank payload (0x800D3800, 0x800F0800 or 0x800C3800)
+  -o, --output OUT    text to write (default: PAYLOAD.txt)
+
+Example:
+  bof3 assets export script AREA001-2.emi0 -o AREA001-2.txt
 ";
 
 const EXPORT_STRINGS_HELP: &str = "\
@@ -497,6 +511,20 @@ Example:
   bof3 assets import message bank.json -o bank.bin
 ";
 
+const IMPORT_SCRIPT_HELP: &str = "\
+bof3 assets import script: read script text back into its bank.
+
+Usage: bof3 assets import script TEXT --payload PAYLOAD [-o OUT]
+
+  TEXT                text from export script
+      --payload PATH  the bank the text came from (required); the result may not
+                      be larger than it
+  -o, --output OUT    bank to write (default: TEXT.bin)
+
+Example:
+  bof3 assets import script AREA001-2.txt --payload AREA001-2.emi0 -o AREA001-2.new.emi0
+";
+
 const IMPORT_STRINGS_HELP: &str = "\
 bof3 assets import strings: read strings JSON back into its payload.
 
@@ -573,6 +601,7 @@ fn export_help(kind: &str) -> &'static str {
         "vag" => EXPORT_VAG_HELP,
         "sequence" => EXPORT_SEQUENCE_HELP,
         "message" => EXPORT_MESSAGE_HELP,
+        "script" => EXPORT_SCRIPT_HELP,
         "strings" => EXPORT_STRINGS_HELP,
         "characters" => EXPORT_CHARACTERS_HELP,
         "character-bank" => EXPORT_CHARACTER_BANK_HELP,
@@ -595,6 +624,7 @@ fn import_help(kind: &str) -> &'static str {
         "disc" => IMPORT_DISC_HELP,
         "soundfont" => IMPORT_SOUNDFONT_HELP,
         "message" => IMPORT_MESSAGE_HELP,
+        "script" => IMPORT_SCRIPT_HELP,
         "strings" => IMPORT_STRINGS_HELP,
         "characters" => IMPORT_CHARACTERS_HELP,
         "character-bank" => IMPORT_CHARACTER_BANK_HELP,
@@ -805,7 +835,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(
-                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters, character-bank and sprite-sheet"
+                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, script, strings, characters, character-bank and sprite-sheet"
             ),
             Direction::Import => {
                 format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")

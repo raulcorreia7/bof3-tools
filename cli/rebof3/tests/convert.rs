@@ -13,6 +13,20 @@ fn palette() -> Vec<u8> {
     words
 }
 
+/// A one-section script bank: a stream of two frames that loops on its second step, and two bytes of
+/// padding.
+fn script_bank() -> Vec<u8> {
+    let stream = [
+        2, 3, // frames, steps
+        4, 0, 6, 1, 0x80, 1, // show 0 for 4, show 1 for 6, jump to step 1
+        4, 0, 10, 0, // the frame table
+        1, 5, 0xF8, 0xF0, 0, 0, // frame 0: one cell
+        1, 0x85, 0xF8, 0xF0, 16, 0, // frame 1: one flipped cell
+        0, 0, // padding
+    ];
+    [vec![4, 0, 0, 0, 2, 0], stream.to_vec()].concat()
+}
+
 fn run(dir: &Path, args: &[&str], out: &mut String) {
     let run = Command::new(env!("CARGO_BIN_EXE_bof3")).args(args).current_dir(dir).output().expect("bof3 runs");
     writeln!(out, "$ bof3 {}", args.join(" ")).unwrap();
@@ -39,6 +53,13 @@ fn render() -> String {
     run(&dir, &["assets", "export", "palette", "a", "b"], &mut out);
     run(&dir, &["assets", "export", "bogus", "a"], &mut out);
     run(&dir, &["assets", "export"], &mut out);
+    std::fs::write(dir.join("bank.emi0"), script_bank()).unwrap();
+    run(&dir, &["assets", "export", "script", "bank.emi0"], &mut out);
+    out.push_str(&std::fs::read_to_string(dir.join("bank.txt")).unwrap());
+    out.push('\n');
+    run(&dir, &["assets", "import", "script", "bank.txt", "--payload", "bank.emi0", "-o", "back.emi0"], &mut out);
+    assert_eq!(std::fs::read(dir.join("back.emi0")).unwrap(), script_bank());
+    run(&dir, &["assets", "import", "script", "bank.txt"], &mut out);
     run(&dir, &["assets", "import", "strings", "stub.bin"], &mut out);
     run(&dir, &["assets", "import", "encounters", "stub.bin"], &mut out);
     run(&dir, &["assets", "export", "vag", "stub.bin", "stub.bin"], &mut out);

@@ -205,11 +205,43 @@ bof3 assets: unexpected argument "b"; run `bof3 assets export palette --help`
 
 $ bof3 assets export bogus a
 [exit 2]
-bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, strings, characters, character-bank and sprite-sheet
+bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, palette, terrain, vag, sequence, message, script, strings, characters, character-bank and sprite-sheet
 
 $ bof3 assets export
 [exit 2]
 bof3 assets: export needs a kind, for example texture; run `bof3 assets export --help`
+
+$ bof3 assets export script bank.emi0
+[exit 0]
+wrote bank.txt
+
+; A script bank: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)
+; points an actor at a record and Actor_SeekScript (exe/slus_004_22@0x8014D910) plays it.
+; show: stage a frame for its ticks (func_8014DB98; a tick is 33.4 ms, 0 lasts 256).
+; jump: continue at a step (func_8014D978, func_8014DAEC). Labels name the steps jumps reach.
+bof3-script 1
+
+section 0
+slots 0
+
+record 0
+    show frame 0 ticks 4    ; step 0, 133 ms
+s1:
+    show frame 1 ticks 6    ; step 1, 200 ms
+    jump s1    ; step 2
+frame 0
+    cell shape 5 x -8 y -16 u 0 v 0
+frame 1
+    cell shape 5 flip x -8 y -16 u 16 v 0
+pad 00 00
+
+$ bof3 assets import script bank.txt --payload bank.emi0 -o back.emi0
+[exit 0]
+wrote back.emi0
+
+$ bof3 assets import script bank.txt
+[exit 2]
+bof3 assets: import script needs --payload, the bank it was exported from; run `bof3 assets import script --help`
 
 $ bof3 assets import strings stub.bin
 [exit 2]

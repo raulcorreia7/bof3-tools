@@ -174,6 +174,18 @@ pub static CODECS: &[Codec] = &[
         })),
     },
     Codec {
+        kind: "script",
+        export: Some(Op::new("export script needs a script bank payload", "txt", |job| {
+            Ok(rebof3_formats::script::text::export(job.input)?)
+        })),
+        import: Some(
+            Op::new("import script needs a text file from export script", "bin", |job| {
+                Ok(rebof3_formats::script::text::import(job.input, companion(job))?)
+            })
+            .with_companion("--payload", "import script needs --payload, the bank it was exported from"),
+        ),
+    },
+    Codec {
         kind: "strings",
         export: Some(Op {
             load_arg: true,
