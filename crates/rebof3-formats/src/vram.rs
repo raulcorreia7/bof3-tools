@@ -36,6 +36,20 @@ fn round_trip(entry: &Entry, payload: &[u8]) -> Result<(), String> {
 /// The upload as one indexed PNG per palette row it is drawn with, and the TIM of the same row.
 fn open(site: &Site<'_>) -> Extras {
     let mut extras = Extras::default();
+    if site.rows.is_empty() {
+        // No rule joins the texture to a palette row, so the TIM carries no CLUT: guessing one would
+        // put a placement in the header that the game never states.
+        match texture_tim_direct(site.entry().ram_ptr, site.payload()) {
+            Ok(data) => extras.files.push(Extra {
+                role: "tim",
+                tag: String::new(),
+                extension: "tim",
+                evidence: "the upload's VRAM words as a 15-bit TIM; no palette row is joined".to_string(),
+                data,
+            }),
+            Err(error) => extras.skipped = Some(format!("tim skipped: {error}")),
+        }
+    }
     match indexed_rows(site.entry().ram_ptr, site.payload(), site.rows) {
         Ok(files) => {
             for file in files {
@@ -202,6 +216,161 @@ pub fn texture_tim_of(
     Ok(tim.write())
 }
 
+/// The TIM of a texture with no CLUT: the upload's VRAM words as a 15-bit image at the place its load
+/// argument gives (Sony *File Formats*, chapter 3, "TIM": the pixel mode field `2` has no CLUT block).
+///
+/// This is the file for a texture no rule joins to a palette row: the header names no CLUT, because the
+/// game states none. The words are the words the disc stores, so [`import_tim`] returns the payload.
+pub fn texture_tim_direct(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
+    let descriptor = vram::Descriptor::from_load_argument(load_arg);
+    let grid = vram::word_grid(payload, descriptor)?;
+    let place = Placement::of(descriptor);
+    let tim = tim::File {
+        mode: tim::Mode::Fifteen,
+        clut: None,
+        image: tim::Block {
+            x: place.x(),
+            y: place.y(),
+            width: u16::try_from(grid.width).unwrap_or(u16::MAX),
+            height: u16::try_from(grid.height).unwrap_or(u16::MAX),
+            words: grid.words,
+        },
+    };
+    Ok(tim.write())
+}
+
+/// Where a type-3 upload lands: the three fields of its load argument (`wiki: formats/graphics`). The
+/// upload is whole 32-by-32-word rectangles on a 32-word, 32-row grid, `chunks_per_row` of them to a row.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Placement {
+    /// The first rectangle's column, in 32-word units (6 bits; VRAM holds 32).
+    pub column: u8,
+    /// The first rectangle's row, in 32-row units (5 bits; VRAM holds 16).
+    pub row: u8,
+    /// Rectangles per row.
+    pub chunks_per_row: u8,
+}
+
+/// The bits of a load argument the placement owns: column, row and rectangles per row.
+const PLACEMENT_BITS: u32 = 0x3f1f_3f00;
+
+impl Placement {
+    /// The placement a load argument names.
+    pub fn of(descriptor: vram::Descriptor) -> Self {
+        Self { column: descriptor.column, row: descriptor.row, chunks_per_row: descriptor.chunks_per_row }
+    }
+
+    /// The placement a load argument names.
+    pub fn of_load_argument(load_arg: u32) -> Self {
+        Self::of(vram::Descriptor::from_load_argument(load_arg))
+    }
+
+    /// The left edge in VRAM words.
+    pub fn x(self) -> u16 {
+        u16::from(self.column) * vram::RECTANGLE_SIDE as u16
+    }
+
+    /// The top edge in VRAM rows.
+    pub fn y(self) -> u16 {
+        u16::from(self.row) * vram::RECTANGLE_SIDE as u16
+    }
+
+    /// `base` with this placement in the bits it owns; every other bit of `base` stays.
+    pub fn load_argument(self, base: u32) -> u32 {
+        base & !PLACEMENT_BITS
+            | u32::from(self.column) << 24
+            | u32::from(self.row) << 16
+            | u32::from(self.chunks_per_row) << 8
+    }
+
+    /// The same upload with its top-left rectangle at VRAM `column` and `row` (32-word and 32-row units),
+    /// or `None` when `rectangles` of it would leave the frame buffer.
+    pub fn moved(self, column: u8, row: u8, rectangles: usize) -> Option<Self> {
+        let per_row = usize::from(self.chunks_per_row).max(1);
+        let rows = rectangles.div_ceil(per_row);
+        let fits = usize::from(column) + per_row <= vram::VRAM_WIDTH / vram::RECTANGLE_SIDE
+            && usize::from(row) + rows <= vram::VRAM_HEIGHT / vram::RECTANGLE_SIDE;
+        fits.then_some(Self { column, row, ..self })
+    }
+}
+
+/// The CLUT block of a TIM: its place in VRAM and its color words.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimClut {
+    /// The left edge in VRAM words.
+    pub x: u16,
+    /// The top edge in VRAM rows.
+    pub y: u16,
+    /// Words per CLUT row (16 for 4 bpp, 256 for 8 bpp).
+    pub width: u16,
+    /// CLUT rows.
+    pub height: u16,
+    /// `width * height` color words, row-major.
+    pub words: Vec<u16>,
+}
+
+/// A TIM read as a type-3 texture: the payload its image makes and the placement its header states.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimTexture {
+    /// The type-3 payload.
+    pub payload: Vec<u8>,
+    /// The texel depth, or `None` for a 15-bit image.
+    pub depth: Option<Depth>,
+    /// The upload's place, from the image block's VRAM coordinates and width.
+    pub placement: Placement,
+    /// The image block's height in rows.
+    pub height: u16,
+    /// The CLUT block, when the file has one.
+    pub clut: Option<TimClut>,
+}
+
+/// Reads a TIM file as a texture upload (Sony *File Formats*, chapter 3, "TIM").
+///
+/// The image block's words are the upload's words, so a TIM that [`texture_tim`] or [`texture_tim_direct`]
+/// wrote returns the payload byte for byte. The game uploads whole 32-by-32-word rectangles on a 32-word,
+/// 32-row grid; a TIM whose image is not that shape is refused with its size, because padding it would put
+/// words in the texture that the TIM does not hold. An image that leaves the 1024-by-512 frame buffer is
+/// kept, as the disc keeps it: the loader skips those rectangles.
+pub fn import_tim(bytes: &[u8]) -> Result<TimTexture> {
+    let file = tim::File::read(bytes)?;
+    let image = &file.image;
+    let side = vram::RECTANGLE_SIDE;
+    let (x, y) = (usize::from(image.x), usize::from(image.y));
+    let (width, height) = (usize::from(image.width), usize::from(image.height));
+    let shaped = [x, y, width, height].iter().all(|value| value % side == 0) && width != 0 && height != 0;
+    if !shaped {
+        return Err(Error::Import(format!(
+            "the TIM image is {width} by {height} words at ({x}, {y}); a texture upload is whole {side} by {side}              word rectangles on a {side}-word grid, so size and place the image to multiples of {side}"
+        )));
+    }
+    // The loader skips the rectangles of a retail upload that leave the frame buffer, so the TIM keeps
+    // them: only what the load argument cannot name is refused.
+    if x / side > 0x3f || y / side > 0x1f {
+        return Err(Error::Import(format!(
+            "the TIM image at ({x}, {y}) is past the place a load argument can name (column 63, row 31)"
+        )));
+    }
+    let chunks_per_row = u8::try_from(width / side)
+        .ok()
+        .filter(|per_row| *per_row <= 0x3f)
+        .ok_or_else(|| Error::Import(format!("{width} words per row is more than a load argument can name")))?;
+    let placement = Placement { column: (x / side) as u8, row: (y / side) as u8, chunks_per_row };
+    let payload = vram::payload_from_grid(width, height, &image.words)?;
+    let depth = match file.mode {
+        tim::Mode::Four => Some(Depth::Four),
+        tim::Mode::Eight => Some(Depth::Eight),
+        tim::Mode::Fifteen => None,
+    };
+    let clut = file.clut.map(|block| TimClut {
+        x: block.x,
+        y: block.y,
+        width: block.width,
+        height: block.height,
+        words: block.words,
+    });
+    Ok(TimTexture { payload, depth, placement, height: image.height, clut })
+}
+
 /// The texture of an upload read at each palette row in `rows`: its texel indices at the row's depth.
 pub fn indexed_images(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> Result<Vec<IndexedImage>> {
     if rows.is_empty() {
@@ -326,4 +495,73 @@ pub fn import(bytes: &[u8]) -> Result<TextureImport> {
             TextureImport::Indexed(IndexedTexture { payload, palette, depth })
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A two-rectangle sheet at column 22, row 8, one rectangle to a row, with distinct words.
+    const LOAD: u32 = (22 << 24) | (8 << 16) | (1 << 8);
+
+    fn sheet() -> Vec<u8> {
+        (0..2 * 1024u16).flat_map(|word| word.wrapping_mul(7).to_le_bytes()).collect()
+    }
+
+    fn row(depth: u32) -> Vec<u16> {
+        (0..(1u16 << depth)).map(|word| 0x8000 | word).collect()
+    }
+
+    #[test]
+    fn a_joined_texture_goes_through_a_tim_and_back() {
+        let tim = texture_tim_of(LOAD, &sheet(), 4, &row(4), 160, 483).unwrap();
+        let file = tim::File::read(&tim).unwrap();
+        assert_eq!(file.mode, tim::Mode::Four);
+        assert_eq!((file.image.x, file.image.y, file.image.width, file.image.height), (704, 256, 32, 64));
+        let clut = file.clut.as_ref().expect("a CLUT block");
+        assert_eq!((clut.x, clut.y, clut.width, clut.height), (160, 483, 16, 1));
+
+        let back = import_tim(&tim).unwrap();
+        assert_eq!(back.payload, sheet());
+        assert_eq!(back.depth, Some(Depth::Four));
+        assert_eq!(back.placement.load_argument(LOAD), LOAD);
+        assert_eq!(back.clut.expect("the CLUT").words, row(4));
+    }
+
+    #[test]
+    fn an_unjoined_texture_has_no_clut() {
+        let tim = texture_tim_direct(LOAD, &sheet()).unwrap();
+        let file = tim::File::read(&tim).unwrap();
+        assert_eq!((file.mode, file.clut), (tim::Mode::Fifteen, None));
+        let back = import_tim(&tim).unwrap();
+        assert_eq!((back.payload, back.depth, back.clut), (sheet(), None, None));
+    }
+
+    #[test]
+    fn a_moved_image_changes_only_the_placement_bits() {
+        let base = LOAD | 0x00c0_00ff;
+        let mut file = tim::File::read(&texture_tim_direct(base, &sheet()).unwrap()).unwrap();
+        file.image.x = 64;
+        file.image.y = 32;
+        let back = import_tim(&file.write()).unwrap();
+        assert_eq!(back.placement.load_argument(base), 0x0201_0100 | 0x00c0_00ff);
+    }
+
+    #[test]
+    fn an_image_off_the_upload_grid_is_refused() {
+        let mut file = tim::File::read(&texture_tim_direct(LOAD, &sheet()).unwrap()).unwrap();
+        file.image.x += 1;
+        assert!(import_tim(&file.write()).unwrap_err().to_string().contains("multiples of 32"));
+        let mut small = tim::File::read(&texture_tim_direct(LOAD, &sheet()).unwrap()).unwrap();
+        small.image = tim::Block { width: 16, height: 16, words: vec![0; 256], ..small.image };
+        assert!(import_tim(&small.write()).is_err());
+    }
+
+    #[test]
+    fn a_move_stays_in_the_frame_buffer() {
+        let place = Placement::of_load_argument(LOAD);
+        assert_eq!(place.moved(30, 14, 2).map(|moved| (moved.column, moved.row)), Some((30, 14)));
+        assert_eq!(place.moved(32, 14, 2), None, "column 32 is past the right edge");
+        assert_eq!(place.moved(30, 15, 2), None, "two rows from row 15 leave the bottom");
+    }
 }

@@ -468,10 +468,14 @@ Usage: bof3 assets export <KIND> ...
 
 Kinds:
   texture         PNG view, or an indexed PNG in one palette row
+  tim             a texture as a TIM file, with its CLUT when you give one
   palette         a CLUT bank as JSON
   terrain         a map bundle as glTF or OBJ
   vag             one sample of a VAB bank as WAVE
+  vab             a bank's header and body as one VAB file
   sequence        one sequence of a package as MIDI
+  seq             one sequence of a package as a SEQ file
+  sep             a sequence package as a SEP file
   message         a message bank as JSON
   strings         the strings of another payload as JSON
   characters      the eight playable characters as JSON
@@ -493,9 +497,13 @@ Usage: bof3 assets import <KIND> ...
 
 Kinds:
   texture         a PNG view or indexed PNG back into a payload
+  tim             a TIM file back into a payload and its palette
   palette         palette JSON back into color words
   terrain         a glTF or OBJ mesh back into a map bundle
   vag             a WAVE file back into a sample
+  vab             a VAB file back into its header and body
+  seq             SEQ files back into a sequence package
+  sep             a SEP file back into a sequence package
   table           one game table back into ETC/GAME.EMI entry 0
   encounters      encounter JSON back into its block
   layout          map layout JSON back into a bundle

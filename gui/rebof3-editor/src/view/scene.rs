@@ -40,15 +40,20 @@ pub fn replay(project: &mut Project, scene: &Scene) -> Rc<Replayed> {
         let _ = project.load(&ArchivePath(path.to_string()));
     }
     let project = &*project;
+    // A replay reads the table with the project's placements, so a moved entry lands where it was moved.
+    let tables: std::collections::BTreeMap<&str, Vec<rebof3_emi::Entry>> = scene
+        .archives()
+        .filter_map(|path| Some((path, project.entries_of(project.loaded(&ArchivePath(path.to_string()))?))))
+        .collect();
     let vram = Vram::replay(&scene.steps, &mut |path| {
         let loaded = project.loaded(&ArchivePath(path.to_string()))?;
         let payloads = (0..loaded.entries().len()).map(|index| project.payload(loaded, index)).collect();
-        Some(replay::Archive { entries: loaded.entries(), payloads })
+        Some(replay::Archive { entries: tables.get(path)?, payloads })
     });
     let mut descriptors = Vec::new();
     for path in scene.archives() {
         let Some(loaded) = project.loaded(&ArchivePath(path.to_string())) else { continue };
-        for (index, entry) in loaded.entries().iter().enumerate() {
+        for (index, entry) in project.entries_of(loaded).iter().enumerate() {
             let payload = project.payload(loaded, index);
             if classify(entry, payload) == Format::AreaMapBundle
                 && let Ok(bundle) = MapBundle::decode(payload)

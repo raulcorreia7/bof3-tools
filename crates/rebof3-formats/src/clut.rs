@@ -90,3 +90,38 @@ pub fn import(json: &[u8]) -> Result<Vec<u8>> {
         .ok_or_else(|| Error::Import("each palette color needs a 16-bit word".into()))?;
     Ok(clut::Palette::from_words(words)?.encode())
 }
+
+/// `bank` with `words` written over its color words from word `offset`: the palette a TIM's CLUT block
+/// returns to. Every other byte of the bank stays, so a block that holds the bank's own words gives the
+/// bank back.
+pub fn splice(bank: &[u8], offset: usize, words: &[u16]) -> Result<Vec<u8>> {
+    let end = offset.checked_add(words.len()).filter(|end| end * 2 <= bank.len()).ok_or_else(|| {
+        Error::Import(format!(
+            "{} color words at word {offset} run past the bank's {} words",
+            words.len(),
+            bank.len() / 2
+        ))
+    })?;
+    let mut out = bank.to_vec();
+    for (slot, word) in out[offset * 2..end * 2].as_chunks_mut::<2>().0.iter_mut().zip(words) {
+        *slot = word.to_le_bytes();
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_row_replaces_only_its_words() {
+        let bank: Vec<u8> = (0..32u16).flat_map(|word| word.to_le_bytes()).collect();
+        let row: Vec<u16> = (100..116).collect();
+        let spliced = splice(&bank, 16, &row).unwrap();
+        assert_eq!(&spliced[..32], &bank[..32]);
+        assert_eq!(u16::from_le_bytes([spliced[32], spliced[33]]), 100);
+        let same: Vec<u16> = (16..32).collect();
+        assert_eq!(splice(&bank, 16, &same).unwrap(), bank);
+        assert!(splice(&bank, 24, &row).is_err());
+    }
+}

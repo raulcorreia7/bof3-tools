@@ -62,6 +62,18 @@ fn default_scene(archive: &str) -> Scene {
     scenes::home(archive).unwrap_or_else(scenes::frontend)
 }
 
+impl State {
+    /// The scene replay shown, once `prepare` has run.
+    pub(super) fn replayed(&self) -> Option<Rc<Replayed>> {
+        self.replayed.clone()
+    }
+
+    /// The zoom of the scene views, once `prepare` has run.
+    pub(super) fn zoom(&self) -> Option<u32> {
+        (self.zoom != 0).then_some(self.zoom)
+    }
+}
+
 /// Replays the shown scene when it or the project changed.
 pub fn prepare(editor: &mut Editor) {
     let Some(archive) = editor.archive.as_ref().map(|archive| archive.path.0.clone()) else { return };
@@ -255,7 +267,7 @@ fn click(editor: &mut Editor, position: Point<Pixels>) {
 }
 
 /// The scene kind tabs, the step through the kind's scenes, zoom and export.
-fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Context<Editor>) -> Div {
+pub(super) fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Context<Editor>) -> Div {
     let state = &editor.views.vram;
     let current = &replayed.scene;
     let mut kinds: Vec<SceneKind> = state.catalog.iter().map(|scene| scene.kind).collect();
