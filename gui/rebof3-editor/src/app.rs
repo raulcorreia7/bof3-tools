@@ -10,6 +10,7 @@ use gpui::{
     Context, FocusHandle, KeyDownEvent, Keystroke, PathPromptOptions, PromptLevel, UniformListScrollHandle, Window,
 };
 
+use crate::catalog::{self, Catalog, Mode};
 use crate::edit::{LineEdit, Outcome};
 use crate::project::{ArchivePath, Loaded, Project};
 use crate::schema;
@@ -63,8 +64,15 @@ pub struct Editor {
     pub menu: Option<Menu>,
     /// The folders of the archive browser that are open.
     pub open_folders: HashSet<String>,
+    /// Which tree the left panel shows.
+    pub mode: Mode,
+    /// The game catalog of the open project.
+    pub catalog: Option<Catalog>,
+    /// The keys of the catalog lines that are open.
+    pub catalog_open: HashSet<String>,
     pub focus: FocusHandle,
     pub archive_scroll: UniformListScrollHandle,
+    pub catalog_scroll: UniformListScrollHandle,
     pub entry_scroll: UniformListScrollHandle,
 }
 
@@ -85,8 +93,12 @@ impl Editor {
             editing: None,
             menu: None,
             open_folders: HashSet::new(),
+            mode: Mode::Game,
+            catalog: None,
+            catalog_open: HashSet::new(),
             focus: cx.focus_handle(),
             archive_scroll: UniformListScrollHandle::new(),
+            catalog_scroll: UniformListScrollHandle::new(),
             entry_scroll: UniformListScrollHandle::new(),
         };
         if disc.is_some() {
@@ -120,6 +132,15 @@ impl Editor {
                 );
                 // The tables' reference columns read item and ability names from the game tables.
                 let _ = project.load(&ArchivePath(schema::GAME.into()));
+                self.mode = Mode::read(&project.folder);
+                self.catalog = match catalog::scan(&project.disc, &project.archives) {
+                    Ok(scanned) => Some(Catalog::build(&scanned)),
+                    Err(error) => {
+                        self.status = format!("The game catalog is not available: {error}");
+                        None
+                    }
+                };
+                self.catalog_open.clear();
                 self.project = Some(project);
                 self.archive = None;
                 self.entry = None;
@@ -131,6 +152,7 @@ impl Editor {
     pub fn close(&mut self) {
         self.stop_editing();
         self.project = None;
+        self.catalog = None;
         self.archive = None;
         self.entry = None;
     }
@@ -349,6 +371,36 @@ impl Editor {
             }
         }
         rows
+    }
+
+    /// The lines of the game catalog under the panel's filter.
+    pub fn catalog_lines(&self) -> Vec<catalog::Line> {
+        self.catalog.as_ref().map_or_else(Vec::new, |catalog| catalog.lines(&self.filter, &self.catalog_open))
+    }
+
+    /// Opens or shuts a catalog line.
+    pub fn toggle_catalog(&mut self, key: &str) {
+        if !self.catalog_open.remove(key) {
+            self.catalog_open.insert(key.to_string());
+        }
+    }
+
+    /// Switches the panel between the disc tree and the game catalog, and remembers the choice.
+    pub fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        if let Some(project) = self.project.as_ref() {
+            mode.write(&project.folder);
+        }
+    }
+
+    /// Selects the entry a catalog line names, or only its archive when the line is an archive.
+    pub fn select_catalog(&mut self, archive: &ArchivePath, entry: Option<usize>) {
+        if self.archive.as_ref().map(|loaded| &loaded.path) != Some(archive) {
+            self.select_archive(archive);
+        }
+        if let Some(entry) = entry.filter(|_| self.archive.is_some()) {
+            self.select_entry(entry);
+        }
     }
 
     pub fn toggle_folder(&mut self, name: &str) {
@@ -603,6 +655,29 @@ mod tests {
 
         type_keys(&editor, "8", cx);
         assert_eq!(first_byte(&editor, cx), STORED[0], "the closed field writes nothing");
+    }
+
+    #[gpui::test]
+    fn the_game_panel_opens_an_entry_and_remembers_its_mode(cx: &mut TestAppContext) {
+        let (_disc, editor, cx) = editing("catalog-panel", cx);
+        editor.update(cx, |editor, _| {
+            assert_eq!(editor.mode, Mode::Game);
+            let lines = editor.catalog_lines();
+            assert!(lines.iter().all(|line| line.depth == 0), "the groups start shut");
+            let key = lines[0].key.clone();
+            editor.toggle_catalog(&key);
+            assert!(editor.catalog_lines().len() > lines.len());
+
+            editor.archive = None;
+            editor.select_catalog(&ArchivePath(ARCHIVE.into()), Some(0));
+            assert_eq!(editor.entry, Some(0));
+            editor.set_mode(Mode::Disc);
+        });
+        cx.update(|window, cx| window.draw(cx).clear());
+        editor.update(cx, |editor, _| {
+            let folder = editor.project.as_ref().expect("a project").folder.clone();
+            assert_eq!(Mode::read(&folder), Mode::Disc);
+        });
     }
 
     #[gpui::test]
