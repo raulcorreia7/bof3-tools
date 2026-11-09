@@ -1,19 +1,24 @@
-//! Sound banks and sequences: play a VAB's samples, list its programs and tones, export WAVE,
-//! SoundFont and MIDI files, replace a sample from a WAVE file, edit a sequence's header and import a
-//! sequence from MIDI.
+//! Sound banks and sequences: play a VAB's samples and its tones at a chosen note, list its programs
+//! and tones, export WAVE, SoundFont and MIDI files, replace a sample from a WAVE file, edit a
+//! sequence's header and import a sequence from MIDI. Every preview renders through the audio
+//! library's sound driver and SPU (`rebof3_editor::preview`), in stereo at the library's rate.
+
+use std::collections::HashMap;
 
 use gpui::{AnyElement, Context, Div, div, prelude::*, px};
+use psx_formats::VAB_SAMPLE_RATE;
 use psx_formats::sep::{Package, Sequence};
-use psx_formats::vab::Bank;
+use psx_formats::vab::{Bank, Tone};
 use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
 use rebof3_assets::import;
 use rebof3_assets::sound::sequence_pcm;
+use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 use rebof3_emi::classify::Format;
 use rebof3_emi::entry::vab_body_index;
 
 use super::{Entry, Field, input};
 use crate::app::Editor;
-use crate::audio::{Player, to_mono};
+use crate::audio::Player;
 use crate::fonts;
 use crate::theme::{RAISED, color};
 use crate::widgets::{GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, button, mono, muted, separator, strong};
@@ -34,6 +39,15 @@ const TEMPO_LIMIT: u32 = 0xFF_FFFF;
 const BEAT_NOTE_EXPONENT_LIMIT: u32 = 7;
 /// Microseconds in a minute, to show a tempo as beats per minute.
 const MICROSECONDS_PER_MINUTE: f64 = 60_000_000.0;
+/// Width of a tone's note field, in pixels.
+const NOTE_FIELD_WIDTH: f32 = 56.0;
+/// The shortest and the longest hold of a preview note before its key-off, in seconds.
+const NOTE_HOLD_SECONDS: f64 = 1.0;
+const NOTE_HOLD_LIMIT: f64 = 20.0;
+/// Semitones in an octave, which doubles the pitch.
+const SEMITONES_PER_OCTAVE: f64 = 12.0;
+/// The highest MIDI note.
+const NOTE_LIMIT: u8 = 127;
 
 /// A sequence header field (`wiki: formats/audio`): what the sequencer starts the sequence with.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,15 +115,25 @@ impl Part {
     }
 }
 
+/// A tone of one bank: the archive, the header entry, and the tone's program block and slot.
+type ToneKey = (String, usize, u8, u8);
+
 #[derive(Default)]
 pub struct State {
     pub player: Player,
     /// Whether a clip played at the last tick, so the window redraws when it ends.
     was_playing: bool,
     tones_open: bool,
+    /// The note each tone plays, when the user picked one; the tone's centre note otherwise.
+    notes: HashMap<ToneKey, u8>,
 }
 
 impl State {
+    /// The note tone `key` plays.
+    fn note(&self, key: &ToneKey, tone: &Tone) -> u8 {
+        self.notes.get(key).copied().unwrap_or_else(|| centre_note(tone))
+    }
+
     /// Returns true when the playing state changed since the last tick.
     pub fn tick(&mut self) -> bool {
         let playing = self.player.is_playing();
@@ -189,20 +213,18 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     for (at, vag) in bank.vags.iter().filter(|vag| !vag.is_empty()).enumerate() {
         let looped =
             if vag.has_loop { format!("{}..{}", vag.loop_start_frame, vag.loop_end_frame) } else { "-".into() };
-        let pcm = bank.decode_vag(body, vag.index).map_err(|error| error.to_string());
-        let (play_pcm, wave_pcm, wave_name) = (pcm.clone(), pcm, format!("{title}-{}.wav", vag.index));
+        let (sample, wave_name) = (vag.index, format!("{title}-{}.wav", vag.index));
 
-        let play = button(("play", vag.index), "▶ Play", true).on_click(cx.listener(move |editor, _, _, cx| {
-            if let Err(error) = play_pcm.clone().and_then(|pcm| editor.views.sound.player.play(pcm)) {
+        let play = button(("play", sample), "▶ Play", true).on_click(cx.listener(move |editor, _, _, cx| {
+            if let Err(error) = play_sample(editor, sample) {
                 editor.status = format!("Play: {error}");
             }
             cx.notify();
         }));
-        let wave = button(("wave", vag.index), "WAVE…", true).on_click(cx.listener(move |editor, _, _, cx| {
-            let bytes = wave_pcm.clone().and_then(|pcm| pcm_wav(&pcm).map_err(|error| error.to_string()));
+        let wave = button(("wave", sample), "Raw WAVE…", true).on_click(cx.listener(move |editor, _, _, cx| {
+            let bytes = raw_sample(editor, sample).and_then(|pcm| pcm_wav(&pcm).map_err(|error| error.to_string()));
             editor.save_file(wave_name.clone(), bytes, cx);
         }));
-        let sample = vag.index;
         let replace =
             button(("import-wave", sample), "Import WAVE…", true).on_click(cx.listener(move |editor, _, _, cx| {
                 import_sample(editor, header_index, body_index, sample, cx);
@@ -231,9 +253,23 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let mut tones =
         div().id("tone-list").flex().flex_col().max_h(px(TONES_HEIGHT)).overflow_y_scroll().font_family(fonts::mono());
     if state.tones_open {
-        let headings = ["program", "sample", "notes", "center", "volume", "pan", "mode"];
+        let headings = ["program", "sample", "notes", "center", "volume", "pan", "mode", "play note"];
         tones = tones.child(grid_row(headings.map(|heading| strong(heading).into_any_element()), false));
         for (at, tone) in bank.usable_tones().enumerate() {
+            let (block, slot) = (tone.storage_block, tone.tone_slot);
+            let key = tone_key(entry, header_index, tone);
+            let note = state.note(&key, tone).to_string();
+            let field = Field::ToneNote { block, slot };
+            let note = input(editor, ("tone-note", at), field, &note, "", Some(NOTE_FIELD_WIDTH), cx);
+            let answers = tone.min_note <= tone.max_note;
+            let play = |id: &'static str, label: &'static str, program: bool| {
+                button((id, at), label, answers).on_click(cx.listener(move |editor, _, _, cx| {
+                    if let Err(error) = play_note(editor, block, slot, program) {
+                        editor.status = format!("Play: {error}");
+                    }
+                    cx.notify();
+                }))
+            };
             let cells = [
                 text(tone.program),
                 text(tone.vag),
@@ -242,6 +278,9 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
                 text(tone.vol),
                 text(tone.pan),
                 text(tone.mode),
+                note.into_any_element(),
+                play("play-tone", "▶ Tone", false).into_any_element(),
+                play("play-program", "▶ Program", true).into_any_element(),
             ];
             tones = tones.child(grid_row(cells, at % 2 == 1));
         }
@@ -263,6 +302,91 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .child(tones_title)
         .child(tones)
         .into_any_element()
+}
+
+/// The note a tone plays unless the user picks another: its centre note, inside the notes it answers.
+fn centre_note(tone: &Tone) -> u8 {
+    if tone.min_note <= tone.max_note { tone.center_note.clamp(tone.min_note, tone.max_note) } else { tone.center_note }
+}
+
+fn tone_key(entry: &Entry<'_>, header: usize, tone: &Tone) -> ToneKey {
+    (entry.archive.path.0.clone(), header, tone.storage_block, tone.tone_slot)
+}
+
+/// The shown bank's header and body, edits included.
+fn shown_bank(editor: &Editor) -> Result<(Entry<'_>, usize, Vec<u8>, Vec<u8>), String> {
+    let entry = editor.current().ok_or("no entry")?;
+    let (header, body) = vab_pair(&entry).ok_or("no matching VAB header and body in this archive")?;
+    let (header_bytes, body_bytes) = (entry.sibling(header).to_vec(), entry.sibling(body).to_vec());
+    Ok((entry, header, header_bytes, body_bytes))
+}
+
+/// Plays sample `index` of the shown bank as the audio library auditions it.
+fn play_sample(editor: &mut Editor, index: u32) -> Result<(), String> {
+    let (_, _, header, body) = shown_bank(editor)?;
+    let pcm = sample_pcm(&header, &body, index)?;
+    editor.views.sound.player.play(&pcm)
+}
+
+/// One pass of sample `index` of the shown bank, decoded as stored: no pitch, envelope or loop.
+fn raw_sample(editor: &Editor, index: u32) -> Result<Vec<i16>, String> {
+    let (_, _, header, body) = shown_bank(editor)?;
+    let bank = Bank::parse(&header, &body).map_err(|error| error.to_string())?;
+    bank.decode_vag(&body, index).map_err(|error| error.to_string())
+}
+
+/// How long a preview note is held: one pass of the tone's sample at the note, at least
+/// [`NOTE_HOLD_SECONDS`] and at most [`NOTE_HOLD_LIMIT`]. The pass is reckoned in equal temperament, which
+/// is near enough for a hold.
+fn hold(bank: &Bank, tone: &Tone, note: u8) -> f64 {
+    let frames = bank.vags.get(tone.vag as usize).map_or(0, |vag| vag.frames);
+    let octaves = (f64::from(tone.center_note) - f64::from(note)) / SEMITONES_PER_OCTAVE;
+    let pass = f64::from(frames) / f64::from(VAB_SAMPLE_RATE) * octaves.exp2();
+    pass.clamp(NOTE_HOLD_SECONDS, NOTE_HOLD_LIMIT)
+}
+
+/// Plays the note picked for tone `block`/`slot` of the shown bank: the tone alone, or with `program`
+/// every tone of its program that answers the note.
+fn play_note(editor: &mut Editor, block: u8, slot: u8, program: bool) -> Result<(), String> {
+    let pcm = {
+        let (entry, header_index, header, body) = shown_bank(editor)?;
+        let bank = Bank::parse(&header, &body).map_err(|error| error.to_string())?;
+        let tone = bank
+            .tones
+            .iter()
+            .find(|tone| tone.storage_block == block && tone.tone_slot == slot)
+            .ok_or("the bank has no such tone")?;
+        let note = editor.views.sound.note(&tone_key(&entry, header_index, tone), tone);
+        let keys = if program {
+            Keys::Program(u8::try_from(tone.program).map_err(|_| "the tone names no program")?)
+        } else {
+            Keys::Tone { block, slot }
+        };
+        note_pcm(&header, &body, &Note { keys, note, hold: hold(&bank, tone, note) })?
+    };
+    editor.views.sound.player.play(&pcm)
+}
+
+/// Sets the note tone `block`/`slot` of the shown bank plays. Returns a status message when the text is
+/// not a note the tone answers.
+pub fn note_changed(editor: &mut Editor, block: u8, slot: u8, text: &str) -> Option<String> {
+    let (key, note) = {
+        let (entry, header_index, header, body) = match shown_bank(editor) {
+            Ok(shown) => shown,
+            Err(error) => return Some(error),
+        };
+        let bank = Bank::parse(&header, &body).ok()?;
+        let tone = bank.tones.iter().find(|tone| tone.storage_block == block && tone.tone_slot == slot)?;
+        let rule = format!("The tone answers notes {} to {}.", tone.min_note, tone.max_note);
+        match text.trim().parse::<u8>() {
+            Ok(note) if note <= NOTE_LIMIT && (tone.min_note..=tone.max_note).contains(&note) => {
+                (tone_key(&entry, header_index, tone), note)
+            }
+            _ => return Some(rule),
+        }
+    };
+    editor.views.sound.notes.insert(key, note);
+    None
 }
 
 /// The bank's header and body with sample `index` replaced by `vag`, a sample's stored bytes. The header's
@@ -324,7 +448,7 @@ fn play_sequence(editor: &mut Editor, sequence: u16) -> Result<(), String> {
     let path = entry.archive.path.0.clone();
     let pcm = sequence_pcm(&path, &archive, u32::from(sequence), SEQUENCE_PREVIEW_SECONDS)
         .map_err(|error| error.to_string())?;
-    editor.views.sound.player.play(to_mono(&pcm.samples, pcm.sample_rate, pcm.channels))
+    editor.views.sound.player.play(&pcm)
 }
 
 /// A tempo in microseconds per quarter note, as beats per minute.
@@ -463,6 +587,27 @@ mod tests {
     /// The bytes of one silent ADPCM block of `fill`, a stand-in for a sample's stored bytes.
     fn block(fill: u8) -> Vec<u8> {
         vec![fill; 16]
+    }
+
+    #[test]
+    fn a_tone_plays_its_centre_note_inside_the_notes_it_answers() {
+        let tone = Tone { center_note: 60, min_note: 36, max_note: 84, ..Tone::default() };
+        assert_eq!(centre_note(&tone), 60);
+        assert_eq!(centre_note(&Tone { min_note: 64, ..tone }), 64);
+        assert_eq!(centre_note(&Tone { min_note: 90, max_note: 10, ..tone }), 60, "a tone that answers no note");
+    }
+
+    #[test]
+    fn a_note_is_held_for_one_pass_of_its_sample() {
+        // Three seconds of samples: 4,725 blocks of 28.
+        let (header, body) = psx_formats::vab::encode_bank(0, &[], &[block(0).repeat(4_725)]).unwrap();
+        let bank = Bank::parse(&header, &body).unwrap();
+        let tone = Tone { vag: 1, center_note: 60, ..Tone::default() };
+        let pass = f64::from(bank.vags[1].frames) / f64::from(VAB_SAMPLE_RATE);
+        assert!((hold(&bank, &tone, 60) - pass).abs() < 1e-9, "a pass at the centre note");
+        assert!((hold(&bank, &tone, 72) - pass / 2.0).abs() < 1e-9, "half as long an octave up");
+        assert_eq!(hold(&bank, &tone, 96), NOTE_HOLD_SECONDS, "never shorter than the shortest hold");
+        assert_eq!(hold(&bank, &tone, 0), NOTE_HOLD_LIMIT, "never longer than the limit");
     }
 
     #[test]
