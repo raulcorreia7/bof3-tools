@@ -130,11 +130,58 @@ pub fn prepare(editor: &mut Editor) {
         vram::prepare(editor);
     }
     let Some(entry) = editor.current() else { return };
-    match entry.format() {
-        Format::VramUpload => texture::prepare(editor),
-        Format::AreaMapBundle if editor.tab == Tab::Map => map::prepare(editor),
-        _ => {}
+    let format = entry.format();
+    if let Some(view) = VIEWS.iter().find(|view| view.format == format)
+        && let Some(reset) = &view.prepare
+        && reset.tab.is_none_or(|tab| editor.tab == tab)
+    {
+        (reset.run)(editor);
     }
+}
+
+/// A reset a view needs before it draws.
+struct Reset {
+    /// The tab it applies to; `None` for every tab.
+    tab: Option<Tab>,
+    /// The reset itself.
+    run: fn(&mut Editor),
+}
+
+/// What the editor shows for one format: the views beside Info and Hex, and the reset a view needs
+/// before it draws. This table is the only place the editor maps a format to its views.
+struct FormatViews {
+    /// The format the row is for.
+    format: Format,
+    /// The tabs the format adds, in order.
+    tabs: &'static [Tab],
+    /// The reset to run before the window draws the format's entry.
+    prepare: Option<Reset>,
+}
+
+/// The views of each format; a format without a row has only Info, Hex and what its payload offers.
+static VIEWS: [FormatViews; 9] = [
+    FormatViews {
+        format: Format::VramUpload,
+        tabs: &[Tab::Texture, Tab::Vram],
+        prepare: Some(Reset { tab: None, run: texture::prepare }),
+    },
+    FormatViews { format: Format::ClutBank, tabs: &[Tab::Palette, Tab::Vram], prepare: None },
+    FormatViews { format: Format::VabHeader, tabs: &[Tab::Sound], prepare: None },
+    FormatViews { format: Format::VabBody, tabs: &[Tab::Sound], prepare: None },
+    FormatViews { format: Format::SepPackage, tabs: &[Tab::Sound], prepare: None },
+    FormatViews {
+        format: Format::AreaMapBundle,
+        tabs: &[Tab::Map],
+        prepare: Some(Reset { tab: Some(Tab::Map), run: map::prepare }),
+    },
+    FormatViews { format: Format::Lz77Blob, tabs: &[Tab::Sprite], prepare: None },
+    FormatViews { format: Format::CharacterBlob, tabs: &[Tab::Sprite], prepare: None },
+    FormatViews { format: Format::AreaCellGrid, tabs: &[Tab::Cells], prepare: None },
+];
+
+/// The tabs `format` adds.
+fn views_of(format: Format) -> &'static [Tab] {
+    VIEWS.iter().find(|view| view.format == format).map_or(&[], |view| view.tabs)
 }
 
 /// What a view reads: the project, the archive and the entry index.
@@ -177,15 +224,7 @@ impl Entry<'_> {
 /// The views that apply to an entry, Info and Hex first.
 pub fn tabs(entry: &Entry<'_>) -> Vec<Tab> {
     let mut tabs = vec![Tab::Info, Tab::Hex];
-    match entry.format() {
-        Format::VramUpload => tabs.extend([Tab::Texture, Tab::Vram]),
-        Format::ClutBank => tabs.extend([Tab::Palette, Tab::Vram]),
-        Format::VabHeader | Format::VabBody | Format::SepPackage => tabs.push(Tab::Sound),
-        Format::AreaMapBundle => tabs.push(Tab::Map),
-        Format::Lz77Blob | Format::CharacterBlob => tabs.push(Tab::Sprite),
-        Format::AreaCellGrid => tabs.push(Tab::Cells),
-        _ => {}
-    }
+    tabs.extend_from_slice(views_of(entry.format()));
     if tables::has_tables(entry) {
         tabs.push(Tab::Tables);
     }
