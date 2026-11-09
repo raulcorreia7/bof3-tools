@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod catalog;
 #[doc(hidden)]
 pub mod fixture;
 pub mod preview;

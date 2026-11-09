@@ -10,6 +10,29 @@ project, so saving writes `edits/<archive>/<index>.bin` and **Export** rebuilds 
 it back. A move in the Layout view is saved as `edits/<archive>/<index>.load`, the entry's load
 argument in hex. An entry no view changes keeps its stored bytes and its disc load argument.
 
+## Game catalog
+
+The left panel's **Game** tree files every entry of the disc once, the way the developers keep their
+assets. `gui/rebof3-editor/src/catalog.rs` holds the rules; each cites its decomp symbol
+(`include/sys/cd_format.h` `EMI_SLOT_*`, `EMI_FAMILY_*`) or format doc. An entry goes to the first match:
+
+1. A fixed game table (`ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8, found by the editor's table
+   sheets) goes to **Data tables**; the line names the sheets and, for the party, the characters.
+2. Its format, when the archive that holds it is not its owner: encounter tables to Enemies and bosses
+   (formations), auxiliary windows to Interface, shared resource tables to Text.
+3. Its archive's family: `PL`, `PLP`, `BPLD`, `BPLU` and the other `BPLCHAR` banks to Characters;
+   `ENEMY` and `BOSS` to Enemies and bosses; `AREA` to Areas and maps; the `BATTLE` block, `MAGIC` and
+   `KAIZAR` to Battle; `START`, `STATUS`, `SHOP`, `FIRST`, `ENDKANJI` and `GAME` to Interface; `BGM*` and
+   the area sound banks to Audio; `DEMO`, `SCENA*` and the ETC programs to Movies and other.
+4. Otherwise **Unsorted**, with the reason as the section title (`MTEST` and `RTEST` have no caller in
+   the decomp).
+
+Archives sort in the disc's order, which is the order of the slot ids, and numbered series count up.
+Area message banks stay with their area. The digits of a character bank's name (`PL012`) are read as
+`CharacterId` values (`include/game/character.h`) to name its party; the name is the only evidence, so
+the catalog does not claim more than the title. The retail test `tests/catalog.rs` pins 6,344 entries in
+880 archives, each filed once.
+
 ## Formats
 
 The counts are the US disc's 6,344 entries in 880 archives. "Retail" tests skip without
