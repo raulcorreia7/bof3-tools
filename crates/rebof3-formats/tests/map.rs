@@ -2,7 +2,7 @@
 
 mod support;
 
-use rebof3_emi::area::map::{Cell, ListRecord, MapBundle, MapCell, MapObject, TileQuad, TileRect};
+use rebof3_formats::map::{Cell, ListRecord, MapBundle, MapCell, MapObject, TileQuad, TileRect};
 
 /// A bundle of two by two cells with one tile of each kind.
 fn bundle() -> MapBundle {

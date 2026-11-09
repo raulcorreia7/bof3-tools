@@ -148,8 +148,8 @@ type Rows = std::collections::BTreeSet<(u32, u16, u16)>;
 #[test]
 fn retail_joins_and_the_suggestion_scorer() {
     use psx_formats::gfx::vram::{Descriptor, word_grid};
-    use rebof3_emi::map::MapBundle;
     use rebof3_emi::texture::{scene as joins, suggest};
+    use rebof3_formats::map::MapBundle;
     use rebof3_formats::{Format, classify};
     use std::collections::{BTreeMap, BTreeSet};
 

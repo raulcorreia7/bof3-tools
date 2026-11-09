@@ -237,9 +237,8 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
             continue;
         }
         let payload = fs::read(&path).unwrap();
-        let same = rebof3_emi::area::scene::SceneTable::decode(&payload)
-            .map(|table| table.encode() == payload)
-            .unwrap_or(false);
+        let same =
+            rebof3_formats::scene::SceneTable::decode(&payload).map(|table| table.encode() == payload).unwrap_or(false);
         record("area-actor-defs", same);
     }
 

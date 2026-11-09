@@ -8,9 +8,9 @@
 use psx_formats::adpcm;
 use psx_formats::gfx::texture::{self, Depth};
 use psx_formats::gfx::{clut, png, vram};
-use rebof3_emi::area::map::{MapBundle, MapObject};
 use rebof3_emi::encounter::{self, EncounterBlock};
 use rebof3_emi::game_tables::{self, PAYLOAD_START, TABLES, Table};
+use rebof3_formats::map::{MapBundle, MapObject};
 
 use crate::decode::VAG_RATE;
 use crate::error::{Error, Result};

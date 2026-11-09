@@ -519,9 +519,9 @@ fn actor_def_sheet() -> Sheet {
     Sheet {
         name: "actor definitions",
         place: Place::Format(Format::AreaActorDefsTable),
-        start: rebof3_emi::scene::COUNT_BYTES,
+        start: rebof3_formats::scene::COUNT_BYTES,
         count: Count::Word(0),
-        record: rebof3_emi::scene::RECORD_BYTES,
+        record: rebof3_formats::scene::RECORD_BYTES,
         columns: vec![
             col("id", 0, U16),
             col("clut select", 2, U16),

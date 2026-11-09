@@ -22,6 +22,7 @@ pub mod clut;
 pub mod coverage;
 pub mod cue;
 pub mod encounter;
+pub mod error;
 pub mod identity;
 pub mod map;
 pub mod message;
@@ -36,4 +37,5 @@ pub mod vab;
 pub mod vram;
 pub mod window;
 
+pub use error::{Error, Result};
 pub use registry::{Description, Format, RoundTrip, Selector, State, classify, extension};

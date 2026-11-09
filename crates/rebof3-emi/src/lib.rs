@@ -8,7 +8,6 @@
 //! | [`emi`], `pack`, `manifest` | container, repacking, `emi.json` | `wiki: formats/emi` |
 //! | `lz77` | type-1 payload codec | `wiki: formats/lz77` |
 //! | [`cue`] | type-8 cue tables | `wiki: formats/audio#emi-type-8-cue-records` |
-//! | `area` | script banks, scene tables, map bundles | `wiki: formats/area` |
 //! | `entry` | decoders applied to one entry on disk | |
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
 //!
@@ -21,8 +20,6 @@
 
 extern crate alloc;
 
-#[cfg(feature = "std")]
-pub mod area;
 #[cfg(feature = "std")]
 pub mod character_bank;
 #[cfg(feature = "std")]
@@ -58,8 +55,6 @@ pub mod verify;
 pub use crate::emi::{Archive, Entry, TYPE_CUE, TYPE_LZ77};
 #[cfg(feature = "std")]
 pub use crate::emi::{TYPE_VRAM, archives_under, ensure_parent, entry_name, read_entry, type_extension};
-#[cfg(feature = "std")]
-pub use area::{map, scene, script};
 pub use error::{Error, Result};
 #[cfg(feature = "std")]
 pub use manifest::manifest_entries;

@@ -9,7 +9,7 @@ mod support;
 
 use std::fs;
 
-use rebof3_emi::area::map::MapBundle;
+use rebof3_formats::map::MapBundle;
 
 use support::{collect_archives, retail_root};
 

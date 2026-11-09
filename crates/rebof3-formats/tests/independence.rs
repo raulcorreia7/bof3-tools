@@ -21,8 +21,8 @@ const FORMATS: [&str; 13] = [
     "vram",
 ];
 
-/// The modules a format may import: the registry row types and the identity check.
-const SHARED: [&str; 2] = ["registry", "identity"];
+/// The modules a format may import: the registry row types, the identity check and the error type.
+const SHARED: [&str; 3] = ["registry", "identity", "error"];
 
 #[test]
 fn a_format_module_imports_no_other_format() {

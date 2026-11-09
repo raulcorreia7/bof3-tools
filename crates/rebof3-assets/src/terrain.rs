@@ -24,10 +24,10 @@
 use std::fmt::Write;
 
 use psx_formats::gfx::png;
-use rebof3_emi::area::map::{MapBundle, SELECTORS, TileRect};
 use rebof3_emi::replay::Vram;
 use rebof3_emi::texture::scene::resolve;
 use rebof3_emi::texture::terrain_descriptor;
+use rebof3_formats::map::{MapBundle, SELECTORS, TileRect};
 
 use crate::decode::color_rgba;
 use crate::gltf::{self, Primitive};
@@ -84,7 +84,7 @@ pub struct Mesh {
 }
 
 /// The terrain of a map bundle payload.
-pub fn mesh_from_payload(payload: &[u8]) -> rebof3_emi::Result<Mesh> {
+pub fn mesh_from_payload(payload: &[u8]) -> rebof3_formats::Result<Mesh> {
     Ok(mesh_of_bundle(&MapBundle::decode(payload)?))
 }
 
@@ -149,7 +149,7 @@ pub fn of_bundle(bundle: &MapBundle, mtl_name: &str) -> Terrain {
 }
 
 /// Builds the OBJ and MTL text of a map bundle payload. `mtl_name` is the MTL file the OBJ names.
-pub fn from_payload(payload: &[u8], mtl_name: &str) -> rebof3_emi::Result<Terrain> {
+pub fn from_payload(payload: &[u8], mtl_name: &str) -> rebof3_formats::Result<Terrain> {
     Ok(of_mesh(&mesh_from_payload(payload)?, mtl_name))
 }
 
@@ -159,7 +159,7 @@ pub fn from_payload(payload: &[u8], mtl_name: &str) -> rebof3_emi::Result<Terrai
 /// (`wiki: formats/area#0x80104000-map-bundle`, "Map bundle"). The field names follow the C record
 /// (`AreaMapBundle` in
 /// `decomp/include/world/area.h`).
-pub fn layout_json(payload: &[u8]) -> rebof3_emi::Result<Vec<u8>> {
+pub fn layout_json(payload: &[u8]) -> rebof3_formats::Result<Vec<u8>> {
     let bundle = MapBundle::decode(payload)?;
     let width = usize::from(bundle.width).max(1);
     let cells = usize::from(bundle.width) * usize::from(bundle.height);
@@ -346,9 +346,9 @@ fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
 mod top_down_tests {
     use super::*;
     use rebof3_emi::Entry;
-    use rebof3_emi::area::map::Cell;
     use rebof3_emi::replay::Writer;
     use rebof3_emi::texture::{TERRAIN_CLUT_ROW, TERRAIN_PAGE_X, TERRAIN_PAGE_Y};
+    use rebof3_formats::map::Cell;
 
     /// A VRAM whose terrain page 0 holds one 32x32-word upload with the 8-bit texel `u + 16 * v`
     /// at `(u, v)`, and whose first CLUT row maps index `i` to colour `0x100 + i`.

@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use psx_formats::gfx::texture::{Clut, Depth, texel_indices};
 use psx_formats::gfx::{clut, png, tim, vram};
-use rebof3_emi::area::map::MapBundle;
 use rebof3_emi::lz77;
 use rebof3_emi::texture::{self as draw, Bank};
+use rebof3_formats::map::MapBundle;
 use rebof3_formats::{Format, classify};
 
 /// A file derived from a payload.
@@ -104,7 +104,7 @@ pub struct TextureWords {
 }
 
 /// The files a format's decoder adds to the stored bytes.
-pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_emi::Result<Vec<Derived>> {
+pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_formats::Result<Vec<Derived>> {
     Ok(match format {
         Format::VramUpload => {
             let image = vram::upload_image(payload, vram::Descriptor::from_load_argument(load_arg))?;
@@ -131,14 +131,14 @@ pub fn derive(format: Format, load_arg: u32, payload: &[u8]) -> rebof3_emi::Resu
             // `wiki: formats/area#0x800e3800-scenestep-table`.
             role: "json",
             extension: "json",
-            data: rebof3_emi::scene::SceneTable::decode(payload)?.json().into_bytes(),
+            data: rebof3_formats::scene::SceneTable::decode(payload)?.json().into_bytes(),
         }],
         Format::AreaScriptBank => vec![Derived {
             // The reader is `Actor_BeginScript` in `decomp/src/engine/slus/Actor_BeginScript.c`;
             // the layout is `wiki: formats/area#0x800d3800-area-script-bank`.
             role: "json",
             extension: "json",
-            data: rebof3_emi::area::script::ScriptBank::decode(payload)?.json().into_bytes(),
+            data: rebof3_formats::script::ScriptBank::decode(payload)?.json().into_bytes(),
         }],
         Format::Lz77Blob => vec![Derived { role: "decoded", extension: "bin", data: lz77::decode(payload)? }],
         _ => Vec::new(),
@@ -192,7 +192,7 @@ pub fn color_rgba(word: u16) -> [u8; 4] {
 }
 
 /// The palette bank a type-0 payload loaded at `load_arg` holds.
-pub fn palette_bank(load_arg: u32, payload: &[u8]) -> rebof3_emi::Result<PaletteBank> {
+pub fn palette_bank(load_arg: u32, payload: &[u8]) -> rebof3_formats::Result<PaletteBank> {
     let words = clut::Palette::decode(payload)?.words().to_vec();
     let colors = words.iter().map(|&word| color_rgba(word)).collect();
     let vram = Bank::new(0, load_arg, payload.len()).map(|bank| draw::clut_at(bank.arena_word));
@@ -200,7 +200,7 @@ pub fn palette_bank(load_arg: u32, payload: &[u8]) -> rebof3_emi::Result<Palette
 }
 
 /// The words of a texture upload: where its rectangles land in VRAM and their row-major grid.
-pub fn texture_words(load_arg: u32, payload: &[u8]) -> rebof3_emi::Result<TextureWords> {
+pub fn texture_words(load_arg: u32, payload: &[u8]) -> rebof3_formats::Result<TextureWords> {
     let descriptor = vram::Descriptor::from_load_argument(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let side = vram::RECTANGLE_SIDE as u32;
@@ -356,7 +356,7 @@ pub fn texture_tim_of(
 }
 
 /// The texture of an upload read at each palette row in `rows`: its texel indices at the row's depth.
-pub fn indexed_images(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> rebof3_emi::Result<Vec<IndexedImage>> {
+pub fn indexed_images(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> rebof3_formats::Result<Vec<IndexedImage>> {
     if rows.is_empty() {
         return Ok(Vec::new());
     }
@@ -412,7 +412,7 @@ pub fn texture_row_png(load_arg: u32, payload: &[u8], bits: u32, palette: &[u16]
 }
 
 /// One indexed PNG per palette row: the upload's texels at the row's depth, in the row's colors.
-pub fn indexed_rows(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> rebof3_emi::Result<Vec<RowFile>> {
+pub fn indexed_rows(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> rebof3_formats::Result<Vec<RowFile>> {
     Ok(indexed_images(load_arg, payload, rows)?
         .into_iter()
         .map(|image| {

@@ -18,8 +18,8 @@ use gpui::{
     Pixels, Point, canvas, div, img, prelude::*, px,
 };
 use rebof3_assets::terrain::{self, mesh_of_bundle};
-use rebof3_emi::area::map::{CELL_BYTES, MapBundle};
 use rebof3_emi::replay::scenes;
+use rebof3_formats::map::{CELL_BYTES, MapBundle};
 
 use super::texture::paint_pixels;
 use super::{Entry, Field, input};
@@ -365,7 +365,7 @@ pub fn corner_changed(editor: &mut Editor, corner: usize, text: &str) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::area::map::Cell;
+    use rebof3_formats::map::Cell;
 
     /// A 2 × 1 bundle: a low cell with a tile and a high cell without one.
     fn bundle() -> MapBundle {
