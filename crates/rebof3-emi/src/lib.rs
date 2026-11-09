@@ -11,7 +11,6 @@
 //! | `area` | script banks, scene tables, map bundles | `wiki: formats/area` |
 //! | `entry` | decoders applied to one entry on disk | |
 //! | `replay` | the VRAM a scene's archive loads leave behind | `wiki: concepts/loading#graphics-to-vram` |
-//! | `classify`, `coverage` | which format each entry is, and what the codecs rebuild | `wiki: formats/conversion#conversion-map` |
 //!
 //! The PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) live in `psx-formats`. The
 //! crate is `no_std + alloc` without the `std` feature, which keeps [`emi`] (the container table
@@ -28,10 +27,6 @@ pub mod area;
 pub mod character_bank;
 #[cfg(feature = "std")]
 pub mod characters;
-#[cfg(feature = "std")]
-pub mod classify;
-#[cfg(feature = "std")]
-pub mod coverage;
 pub mod cue;
 pub mod emi;
 #[cfg(feature = "std")]
@@ -57,10 +52,12 @@ pub mod replay;
 pub mod text;
 #[cfg(feature = "std")]
 pub mod texture;
+#[cfg(feature = "std")]
+pub mod verify;
 
 pub use crate::emi::{Archive, Entry, TYPE_CUE, TYPE_LZ77};
 #[cfg(feature = "std")]
-pub use crate::emi::{TYPE_VRAM, ensure_parent, entry_name, read_entry, type_extension};
+pub use crate::emi::{TYPE_VRAM, archives_under, ensure_parent, entry_name, read_entry, type_extension};
 #[cfg(feature = "std")]
 pub use area::{map, scene, script};
 pub use error::{Error, Result};

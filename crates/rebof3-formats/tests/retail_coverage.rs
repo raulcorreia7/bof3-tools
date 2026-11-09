@@ -7,7 +7,8 @@
 
 mod support;
 
-use rebof3_emi::coverage::{self, Format, State};
+use rebof3_formats::coverage;
+use rebof3_formats::{Format, State};
 
 /// Retail archive totals, pinned by the asset census.
 const ENTRIES: usize = 6_344;

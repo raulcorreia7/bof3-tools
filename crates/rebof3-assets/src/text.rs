@@ -19,8 +19,8 @@ use psx_cd::Image;
 use psx_cd::checksum::sha256_hex;
 use rebof3_emi::Archive;
 use rebof3_emi::Entry;
-use rebof3_emi::classify::{Format, classify};
 use rebof3_emi::text::discover;
+use rebof3_formats::{Format, classify};
 
 use crate::error::{Error, Result};
 use crate::kind::Kind;

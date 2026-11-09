@@ -14,19 +14,16 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::area::{map, scene, script};
-use crate::cue;
-use crate::emi::{Archive, Entry};
-use crate::error::{Error, Result};
-use crate::pack::{Payload, pack_payloads};
-use psx_formats::clut;
-use psx_formats::sep;
-use psx_formats::vab::{self, Bank};
-use psx_formats::vram::{self, Descriptor};
+use rebof3_emi::verify::Container;
+use rebof3_emi::{Archive, Entry, Error, Result};
 
-pub use crate::classify::{Format, State, classify};
+use crate::registry::{Format, RoundTrip, State, classify};
+use crate::vab;
+
+pub use rebof3_emi::archives_under;
+pub use rebof3_emi::verify::{container_round_trip, first_difference};
 
 /// One format's counts in the retail archives.
 #[derive(Clone, Debug, Default)]
@@ -41,16 +38,6 @@ pub struct Row {
     pub covered_bytes: u64,
     /// Entry type → count, for the coverage table's `entry_types` column.
     pub types: BTreeMap<u16, usize>,
-}
-
-/// The container round trip over every retail archive.
-#[derive(Clone, Debug, Default)]
-pub struct Container {
-    pub archives: usize,
-    pub entries: usize,
-    pub bytes: u64,
-    /// One line per archive that did not repack byte-exactly.
-    pub failures: Vec<String>,
 }
 
 /// The scoreboard: one row per format, the container result and every failure.
@@ -216,16 +203,10 @@ impl Report {
             slot.1 += u64::from(entry.size);
         }
 
-        let outcome = match format {
-            Format::VramUpload => round_trip_upload(entry, payload),
-            Format::ClutBank => round_trip_palette(payload),
-            Format::VabHeader | Format::VabBody => banks.outcome(index),
-            Format::SepPackage => round_trip_package(payload),
-            Format::CueTable => round_trip_cues(payload),
-            Format::AreaActorDefsTable => round_trip_scenes(payload),
-            Format::AreaMapBundle => round_trip_map(payload),
-            Format::AreaScriptBank | Format::BattleScriptBank | Format::MagicTable => round_trip_scripts(payload),
-            _ => return,
+        let outcome = match format.describe().round_trip {
+            RoundTrip::Payload(check) => check(entry, payload),
+            RoundTrip::Bank => banks.outcome(index),
+            RoundTrip::None => return,
         };
         match outcome {
             Ok(()) => {
@@ -234,28 +215,6 @@ impl Report {
                 row.covered_bytes += u64::from(entry.size);
             }
             Err(reason) => self.failures.push(format!("{source}#{index}: {reason}")),
-        }
-    }
-}
-
-/// Every `.EMI` container under `root`, through subdirectories, sorted.
-pub fn archives_under(root: &Path) -> Vec<PathBuf> {
-    let mut found = Vec::new();
-    collect_archives(root, &mut found);
-    found.sort();
-    found
-}
-
-fn collect_archives(root: &Path, found: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_archives(&path, found);
-        } else if path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("EMI")) {
-            found.push(path);
         }
     }
 }
@@ -279,21 +238,11 @@ pub fn check(root: &Path) -> Result<Report> {
     Ok(report)
 }
 
-/// Repacks every archive under `root` from its parsed table and compares the
-/// bytes with the retail container.
-pub fn container_round_trip(root: &Path) -> Result<Container> {
-    let mut report = Report::new();
-    for path in archives_under(root) {
-        report.check_container(&path.display().to_string(), &fs::read(&path)?);
-    }
-    Ok(report.container)
-}
-
 impl Report {
     /// Checks one container held in memory: the format and codec round trip of
     /// every entry, then the container round trip. `label` names it in failures.
     pub fn check_archive(&mut self, label: &str, bytes: &[u8]) {
-        let Some(archive) = self.check_container(label, bytes) else {
+        let Some(archive) = self.container.check(label, bytes) else {
             return;
         };
         let banks = check_banks(&archive, bytes);
@@ -304,59 +253,6 @@ impl Report {
             }
         }
     }
-
-    /// Repacks one container's payloads and compares the bytes with the retail
-    /// container. Returns the parsed table when the container opens.
-    fn check_container(&mut self, label: &str, bytes: &[u8]) -> Option<Archive> {
-        self.container.archives += 1;
-        let archive = match Archive::parse(bytes) {
-            Ok(archive) => archive,
-            Err(error) => {
-                self.container.failures.push(format!("{label}: {error}"));
-                return None;
-            }
-        };
-        self.container.entries += archive.entries().len();
-        self.container.bytes += archive.entries().iter().map(|entry| u64::from(entry.size)).sum::<u64>();
-
-        let payloads: Result<Vec<Payload>> = archive
-            .entries()
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| {
-                Ok(Payload {
-                    bytes: archive.payload(bytes, index)?,
-                    file_type: entry.file_type,
-                    ram_ptr: entry.ram_ptr,
-                })
-            })
-            .collect();
-        let packed = payloads.and_then(|payloads| pack_payloads(archive.version(), &payloads));
-        match packed {
-            Ok(packed) => {
-                if let Some(offset) = first_difference(bytes, &packed) {
-                    self.container.failures.push(format!(
-                        "{label}: differs at 0x{offset:X} (retail {} bytes, repacked {} bytes)",
-                        bytes.len(),
-                        packed.len()
-                    ));
-                }
-            }
-            Err(error) => self.container.failures.push(format!("{label}: pack failed: {error}")),
-        }
-        Some(archive)
-    }
-}
-
-/// First offset where two byte runs differ, or `None` when they are equal.
-pub fn first_difference(left: &[u8], right: &[u8]) -> Option<usize> {
-    let common = left.len().min(right.len());
-    for index in 0..common {
-        if left[index] != right[index] {
-            return Some(index);
-        }
-    }
-    (left.len() != right.len()).then_some(common)
 }
 
 /// Round trip results of an archive's VAB banks, keyed by entry index: a body
@@ -375,11 +271,11 @@ impl BankResults {
 fn check_banks(archive: &Archive, container: &[u8]) -> BankResults {
     let mut results = BankResults::default();
     for (index, entry) in archive.entries().iter().enumerate() {
-        if entry.file_type != vab::HEADER_TYPE {
+        if !vab::is_header(entry) {
             continue;
         }
         let outcome = round_trip_bank(archive, container, index);
-        if let Ok(body) = crate::entry::vab_body_index(archive.entries(), index) {
+        if let Ok(body) = rebof3_emi::entry::vab_body_index(archive.entries(), index) {
             results.outcomes.insert(body, outcome.clone());
         }
         results.outcomes.insert(index, outcome);
@@ -390,65 +286,9 @@ fn check_banks(archive: &Archive, container: &[u8]) -> BankResults {
 fn round_trip_bank(archive: &Archive, container: &[u8], index: usize) -> std::result::Result<(), String> {
     let describe = |error: &dyn ToString| error.to_string();
     let header = archive.payload(container, index).map_err(|e| describe(&e))?;
-    let body_index = crate::entry::vab_body_index(archive.entries(), index).map_err(|e| describe(&e))?;
+    let body_index = rebof3_emi::entry::vab_body_index(archive.entries(), index).map_err(|e| describe(&e))?;
     let body = archive.payload(container, body_index).map_err(|e| describe(&e))?;
-    let bank = Bank::parse(header, body).map_err(|e| describe(&e))?;
-    if bank.encode_header() != header {
-        return Err("the encoded header is not the header".into());
-    }
-    if bank.body_len() != body.len() {
-        return Err("the parsed body is not the body entry's length".into());
-    }
-    Ok(())
-}
-
-fn round_trip_upload(entry: &Entry, payload: &[u8]) -> std::result::Result<(), String> {
-    let rectangles =
-        vram::decode(payload, Descriptor::from_load_argument(entry.ram_ptr)).map_err(|error| error.to_string())?;
-    difference(&vram::encode(&rectangles), payload)
-}
-
-fn round_trip_palette(payload: &[u8]) -> std::result::Result<(), String> {
-    let palette = clut::Palette::decode(payload).map_err(|error| error.to_string())?;
-    difference(&palette.encode(), payload)
-}
-
-fn round_trip_package(payload: &[u8]) -> std::result::Result<(), String> {
-    let package = sep::Package::parse(payload).map_err(|error| error.to_string())?;
-    difference(&package.encode(), payload)
-}
-
-fn round_trip_cues(payload: &[u8]) -> std::result::Result<(), String> {
-    let table = cue::CueTable::decode(payload).map_err(|error| error.to_string())?;
-    difference(&table.encode(), payload)
-}
-
-fn round_trip_scenes(payload: &[u8]) -> std::result::Result<(), String> {
-    let table = scene::SceneTable::decode(payload).map_err(|error| error.to_string())?;
-    difference(&table.encode(), payload)
-}
-
-fn round_trip_scripts(payload: &[u8]) -> std::result::Result<(), String> {
-    let bank = script::ScriptBank::decode(payload).map_err(|error| error.to_string())?;
-    difference(&bank.encode(), payload)
-}
-
-fn round_trip_map(payload: &[u8]) -> std::result::Result<(), String> {
-    let bundle = map::MapBundle::decode(payload).map_err(|error| error.to_string())?;
-    difference(&bundle.encode(), payload)
-}
-
-/// `Err` with the first difference when a codec's output is not its input.
-fn difference(encoded: &[u8], payload: &[u8]) -> std::result::Result<(), String> {
-    match first_difference(encoded, payload) {
-        None => Ok(()),
-        Some(offset) => Err(format!(
-            "the encoded payload is not the payload ({} bytes against {}, first difference at \
-             0x{offset:X})",
-            encoded.len(),
-            payload.len()
-        )),
-    }
+    vab::round_trip(header, body)
 }
 
 fn round_trip_cell(format: Format, row: &Row) -> String {

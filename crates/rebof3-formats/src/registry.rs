@@ -1,34 +1,25 @@
-//! Entry classification: which asset format an EMI entry holds, and what this
-//! crate can do with it.
+//! The format registry: which format an EMI entry holds, and what is known about each format.
 //!
-//! Selection reads the entry header (file type plus load address) and one
-//! payload property, an all-zero body, which is the reserved-slot shape the
-//! asset census counts on its own. Names and addresses come from
-//! `wiki: formats/area`, `wiki: formats/audio`,
-//! `wiki: formats/graphics` and `wiki: data/text`.
+//! Each format module owns one [`Description`] per format it reads: the name, the evidence, the
+//! rule that selects it and the check that proves its round trip. This module lists them in one
+//! table and answers the lookups the extractor, the coverage table and the editor need, so none of
+//! those holds a `match` over formats.
+//!
+//! Selection reads the entry header (file type plus load address) and one payload property, an
+//! all-zero body, which is the reserved-slot shape the asset census counts on its own. Names and
+//! addresses come from `wiki: formats/area`, `wiki: formats/audio`, `wiki: formats/graphics` and
+//! `wiki: data/text`.
 
-use crate::emi::{Entry, TYPE_CUE, TYPE_LZ77};
-use psx_formats::vram;
-use psx_formats::{sep, vab};
+use std::ops::RangeInclusive;
 
-/// The load-address window that holds CLUT banks
-/// (`wiki: formats/graphics#palette`).
-const CLUT_BAND: std::ops::RangeInclusive<u32> = 0x8003_3800..=0x8003_6e00;
+use rebof3_emi::Entry;
 
-/// Load addresses that hold code images: the EMI code targets of
-/// `config/emi/**/target.toml`, plus the two addresses the asset census's code
-/// classifier found without a configured target.
-const CODE_ADDRESSES: [u32; 9] = [
-    0x8009_6800, // emi/battle/battle/15
-    0x800c_1800,
-    0x800f_5000, // emi/world00/area030/05, the battle code base
-    0x8019_5800, // emi/etc/game/00 (GAME.EMI) and its inline tables
-    0x801c_e400,
-    0x801d_0c00, // emi/world00/area030/04, emi/battle/battle/03, the etc/ overlays
-    0x801e_ec00, // emi/etc/commu00/00
-    0x801f_2c00, // the area program code arena
-    0x801f_6c00, // the arena's second page
-];
+use crate::{
+    cells, clut, cue, encounter, map, message, residue, resources, scene, script, sep, sprite_bank, vab, vram, window,
+};
+
+/// The entry type of a code or data image: the load address picks the format.
+pub const TYPE_DATA: u16 = 0;
 
 /// What this crate can do with a format today.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -84,6 +75,97 @@ pub enum Format {
     Unclassified,
 }
 
+/// How an entry is recognised as a format.
+#[derive(Clone, Debug)]
+pub enum Selector {
+    /// The entry's file type.
+    Type(u16),
+    /// A type-0 entry loaded at one of these addresses.
+    Load(&'static [u32]),
+    /// A type-0 entry loaded inside this address window.
+    LoadWindow(RangeInclusive<u32>),
+    /// The header never selects the format: [`classify`] returns it by a payload property or as
+    /// the fallback.
+    Fallback,
+}
+
+impl Selector {
+    /// Whether `entry` matches.
+    fn matches(&self, entry: &Entry) -> bool {
+        match self {
+            Self::Type(file_type) => entry.file_type == *file_type,
+            Self::Load(addresses) => entry.file_type == TYPE_DATA && addresses.contains(&entry.ram_ptr),
+            Self::LoadWindow(window) => entry.file_type == TYPE_DATA && window.contains(&entry.ram_ptr),
+            Self::Fallback => false,
+        }
+    }
+}
+
+/// The check that a format's codec rebuilds a payload.
+#[derive(Clone, Copy, Debug)]
+pub enum RoundTrip {
+    /// The codec reads the entry alone; `Err` names the first difference.
+    Payload(fn(&Entry, &[u8]) -> Result<(), String>),
+    /// The codec reads a header and its body together, so the archive-level check runs it.
+    Bank,
+    /// No decode and encode pair exists.
+    None,
+}
+
+/// What one format module knows about one format it reads.
+#[derive(Clone, Debug)]
+pub struct Description {
+    /// The format this row describes.
+    pub format: Format,
+    /// The row name in the scoreboard and the coverage table.
+    pub name: &'static str,
+    /// What the crate can do with the format today.
+    pub state: State,
+    /// How well the format itself is documented, for the coverage table.
+    pub spec_state: &'static str,
+    /// The codec this crate holds for the format, for the coverage table.
+    pub codec_state: &'static str,
+    /// The evidence behind the row's numbers.
+    pub evidence: &'static str,
+    /// The file extension the entry's stored bytes are written with.
+    pub extension: &'static str,
+    /// How an entry is recognised as the format.
+    pub selector: Selector,
+    /// The identity round trip of the format's codec.
+    pub round_trip: RoundTrip,
+}
+
+/// The extension of an entry whose container is the game's own: the EMI entry with its type tag.
+pub const EMI_EXTENSION: &str = "emi0";
+
+/// The number of formats.
+const FORMATS: usize = Format::ALL.len();
+
+/// Every description, in scoreboard order (the order of [`Format::ALL`]).
+static REGISTRY: [&Description; FORMATS] = [
+    &vram::UPLOAD,
+    &clut::BANK,
+    &vab::HEADER,
+    &vab::BODY,
+    &sep::PACKAGE,
+    &sprite_bank::LZ77_BLOB,
+    &sprite_bank::RAW_BLOB,
+    &message::BANK,
+    &cells::GRID,
+    &script::AREA,
+    &script::BATTLE,
+    &scene::ACTOR_DEFS,
+    &encounter::TABLE,
+    &map::BUNDLE,
+    &window::AUX,
+    &resources::SHARED,
+    &cue::TABLE,
+    &script::MAGIC,
+    &residue::CODE,
+    &residue::RESERVE,
+    &residue::UNCLASSIFIED,
+];
+
 impl Format {
     /// Every format, in scoreboard order.
     pub const ALL: [Format; 21] = [
@@ -110,216 +192,67 @@ impl Format {
         Format::Unclassified,
     ];
 
+    /// The format module's description of this format.
+    pub fn describe(self) -> &'static Description {
+        REGISTRY[self as usize]
+    }
+
     /// The row name in the scoreboard and the coverage table.
     pub fn name(self) -> &'static str {
-        match self {
-            Self::VramUpload => "VRAM texture upload (type 3)",
-            Self::ClutBank => "CLUT bank (type 0 in the palette arena band)",
-            Self::VabHeader => "VAB header (type 6)",
-            Self::VabBody => "VAB body (type 7)",
-            Self::SepPackage => "SEP sequence package (type 10)",
-            Self::Lz77Blob => "character sprite blob, LZ77 (type 1)",
-            Self::CharacterBlob => "character sprite blob, raw (type 0)",
-            Self::AreaMessageBank => "area message bank (0x80010000)",
-            Self::AreaCellGrid => "area packed 4-bit cell grid (0x80032000)",
-            Self::AreaScriptBank => "area script bank (0x800D3800)",
-            Self::BattleScriptBank => "battle script bank (0x800F0800)",
-            Self::AreaActorDefsTable => "area actor defs table (0x800E3800)",
-            Self::AreaEncounterTable => "area encounters and enemy records (0x800E4000)",
-            Self::AreaMapBundle => "area map bundle (0x80104000)",
-            Self::AreaAuxWindow => "area auxiliary module window (0x80117000)",
-            Self::SharedResourceTable => "shared resource table (0x8001A000)",
-            Self::CueTable => "type-8 cue records (type 8)",
-            Self::MagicTable => "magic-effect script bank (0x800C3800)",
-            Self::CodeImage => "code image (configured EMI code targets)",
-            Self::Reserve => "reserve (all-zero payload)",
-            Self::Unclassified => "unclassified",
-        }
+        self.describe().name
     }
 
     /// What the crate can do with the format today.
     pub fn state(self) -> State {
-        match self {
-            Self::VramUpload
-            | Self::ClutBank
-            | Self::VabHeader
-            | Self::VabBody
-            | Self::SepPackage
-            | Self::CueTable
-            | Self::AreaActorDefsTable
-            | Self::AreaScriptBank
-            | Self::BattleScriptBank
-            | Self::MagicTable
-            | Self::AreaMapBundle => State::Codec,
-            Self::Lz77Blob
-            | Self::CharacterBlob
-            | Self::AreaMessageBank
-            | Self::AreaCellGrid
-            | Self::AreaEncounterTable
-            | Self::AreaAuxWindow
-            | Self::SharedResourceTable => State::Specified,
-            Self::Unclassified => State::Unknown,
-            Self::CodeImage => State::Code,
-            Self::Reserve => State::Reserve,
-        }
+        self.describe().state
     }
 
     /// How well the format itself is documented, for the coverage table.
     pub fn spec_state(self) -> &'static str {
-        match self {
-            Self::VramUpload
-            | Self::ClutBank
-            | Self::VabHeader
-            | Self::VabBody
-            | Self::SepPackage
-            | Self::AreaMessageBank
-            | Self::AreaCellGrid
-            | Self::AreaScriptBank
-            | Self::BattleScriptBank
-            | Self::MagicTable
-            | Self::AreaActorDefsTable
-            | Self::AreaEncounterTable
-            | Self::AreaMapBundle
-            | Self::SharedResourceTable
-            | Self::CueTable => "documented",
-            Self::Lz77Blob | Self::CharacterBlob | Self::AreaAuxWindow => "partial",
-            Self::Unclassified => "none",
-            Self::CodeImage | Self::Reserve => "n/a",
-        }
+        self.describe().spec_state
     }
 
     /// The codec this crate holds for the format, for the coverage table.
     pub fn codec_state(self) -> &'static str {
-        match self {
-            Self::VramUpload
-            | Self::ClutBank
-            | Self::VabHeader
-            | Self::VabBody
-            | Self::SepPackage
-            | Self::CueTable
-            | Self::AreaActorDefsTable
-            | Self::AreaScriptBank
-            | Self::BattleScriptBank
-            | Self::MagicTable
-            | Self::AreaMapBundle => "decode+encode",
-            Self::Lz77Blob => "decode-only (in the game's own decoder)",
-            Self::CodeImage | Self::Reserve => "n/a",
-            _ => "none",
-        }
+        self.describe().codec_state
     }
 
     /// The evidence behind the row's numbers.
     pub fn evidence(self) -> &'static str {
-        match self {
-            Self::VramUpload => "wiki: formats/graphics#chunk-layout; descriptor from the load argument",
-            Self::ClutBank => "wiki: formats/graphics#palette; 575 census palettes sit in the band",
-            Self::VabHeader => "wiki: formats/audio#bank-layout; paired by load argument",
-            Self::VabBody => "wiki: formats/audio#bank-layout; carried by its header",
-            Self::SepPackage => "wiki: formats/audio; 13-byte headers tile 119/119",
-            Self::Lz77Blob => "src/slus/func_80164064.c decodes 65/65; no encoder in the repo",
-            Self::CharacterBlob => "wiki: formats/character#container: raw section offsets and sections",
-            Self::AreaMessageBank => "wiki: formats/area (`0x80010000`)",
-            Self::AreaCellGrid => "wiki: formats/area (`0x80032000`); reader func_801C6FD4",
-            Self::AreaScriptBank => "wiki: formats/area (`0x800D3800`); size-prefixed directory",
-            Self::BattleScriptBank => "wiki: formats/area: the 0x800D3800 format, 42 copies",
-            Self::AreaActorDefsTable => "wiki: formats/area (`0x800E3800`)",
-            Self::AreaEncounterTable => "wiki: formats/area (`0x800E4000`); include/game/enemy.h models it",
-            Self::AreaMapBundle => "wiki: formats/area (`0x80104000`)",
-            Self::AreaAuxWindow => "wiki: formats/area (`0x80117000`); a module id word, then code (area049) or data",
-            Self::SharedResourceTable => "wiki: data/text#references",
-            Self::CueTable => "wiki: formats/audio#emi-type-8-cue-records",
-            Self::MagicTable => "BMagic_Effect.c sets g_ScriptBank to 0x800C3800: the 0x800D3800 format, one section",
-            Self::CodeImage => "config/emi/**/target.toml load addresses; disc-census code rows",
-            Self::Reserve => "all-zero payload; the loader reserves the destination",
-            Self::Unclassified => "no selection rule matched",
-        }
+        self.describe().evidence
     }
 }
 
-/// The file extension an entry's stored bytes are written with: the real
-/// format's name where the game uses one, and the entry's type tag where the
-/// container is the game's own.
+/// The file extension an entry's stored bytes are written with: the real format's name where the
+/// game uses one, and the entry's type tag where the container is the game's own.
 ///
-/// The names are the formats' own: `img` is the game's VRAM upload, `clut`
-/// its CLUT bank, `map` its map bundle, `vh`/`vb` the two halves of a VAB and
-/// `seq` a SEP package. The rest are the EMI entry with its type tag.
+/// The names are the formats' own: `img` is the game's VRAM upload, `clut` its CLUT bank, `map` its
+/// map bundle, `vh`/`vb` the two halves of a VAB and `seq` a SEP package. The rest are the EMI entry
+/// with its type tag.
 pub fn extension(format: Format) -> &'static str {
-    match format {
-        Format::VramUpload => "img",
-        Format::ClutBank => "clut",
-        Format::VabHeader => "vh",
-        Format::VabBody => "vb",
-        Format::SepPackage => "seq",
-        Format::Lz77Blob => "lz77",
-        Format::CueTable => "emi8",
-        Format::AreaMapBundle => "map",
-        _ => "emi0",
-    }
+    format.describe().extension
 }
 
-/// Area message bank (`wiki: formats/area`, `0x80010000`).
-const AREA_MESSAGE_BANK: u32 = 0x8001_0000;
-/// Shared resource table (`wiki: data/text#references`).
-const SHARED_RESOURCE_TABLE: u32 = 0x8001_a000;
-/// Packed 4-bit cell grid (`wiki: formats/area`, `0x80032000`).
-const AREA_CELL_GRID: u32 = 0x8003_2000;
-/// Character bank load arguments: the whole container and the five section
-/// positions (`wiki: formats/character#load-arguments`).
-const CHARACTER_BLOB_ADDRESSES: [u32; 6] =
-    [0x8003_b800, 0x8003_b80c, 0x8005_680c, 0x8005_f80c, 0x8007_180c, 0x8007_a80c];
-/// Magic-effect script bank of the `BMAGIC*` archives: the area script bank format, loaded here.
-const MAGIC_TABLE: u32 = 0x800c_3800;
-/// Area script bank (`wiki: formats/area`, `0x800D3800`).
-const AREA_SCRIPT_BANK: u32 = 0x800d_3800;
-/// Scene/step table (`wiki: formats/area`, `0x800E3800`).
-const AREA_ACTOR_DEFS_TABLE: u32 = 0x800e_3800;
-/// Encounters and enemy records (`wiki: formats/area`, `0x800E4000`).
-const AREA_ENCOUNTERS: u32 = 0x800e_4000;
-/// Battle script bank: the area script bank format, loaded here.
-const BATTLE_SCRIPT_BANK: u32 = 0x800f_0800;
-/// Map bundle (`wiki: formats/area`, `0x80104000`).
-const AREA_MAP_BUNDLE: u32 = 0x8010_4000;
-/// Auxiliary module window (`wiki: formats/area`, `0x80117000`).
-const AREA_AUX_WINDOW: u32 = 0x8011_7000;
-
-/// The format one entry belongs to: its file type and load address, with an
-/// all-zero payload counted as a reservation wherever it sits.
+/// The format one entry belongs to: its file type and load address, with an all-zero payload
+/// counted as a reservation wherever it sits.
 pub fn classify(entry: &Entry, payload: &[u8]) -> Format {
-    if entry.file_type == 0 && payload.iter().all(|byte| *byte == 0) {
+    if entry.file_type == TYPE_DATA && payload.iter().all(|byte| *byte == 0) {
         return Format::Reserve;
     }
-    match entry.file_type {
-        vram::UPLOAD_TYPE => Format::VramUpload,
-        vab::HEADER_TYPE => Format::VabHeader,
-        vab::BODY_TYPE => Format::VabBody,
-        sep::TYPE => Format::SepPackage,
-        TYPE_LZ77 => Format::Lz77Blob,
-        TYPE_CUE => Format::CueTable,
-        0 => classify_data(entry.ram_ptr),
-        _ => Format::Unclassified,
-    }
+    REGISTRY
+        .iter()
+        .find(|description| description.selector.matches(entry))
+        .map_or(Format::Unclassified, |description| description.format)
 }
 
-/// The format of a type-0 payload, by its load address.
-fn classify_data(ram_ptr: u32) -> Format {
-    if CLUT_BAND.contains(&ram_ptr) {
-        return Format::ClutBank;
-    }
-    if CODE_ADDRESSES.contains(&ram_ptr) {
-        return Format::CodeImage;
-    }
-    match ram_ptr {
-        AREA_MESSAGE_BANK => Format::AreaMessageBank,
-        SHARED_RESOURCE_TABLE => Format::SharedResourceTable,
-        AREA_CELL_GRID => Format::AreaCellGrid,
-        a if CHARACTER_BLOB_ADDRESSES.contains(&a) => Format::CharacterBlob,
-        MAGIC_TABLE => Format::MagicTable,
-        AREA_SCRIPT_BANK => Format::AreaScriptBank,
-        AREA_ACTOR_DEFS_TABLE => Format::AreaActorDefsTable,
-        AREA_ENCOUNTERS => Format::AreaEncounterTable,
-        BATTLE_SCRIPT_BANK => Format::BattleScriptBank,
-        AREA_MAP_BUNDLE => Format::AreaMapBundle,
-        AREA_AUX_WINDOW => Format::AreaAuxWindow,
-        _ => Format::Unclassified,
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_registry_lists_every_format_in_order() {
+        for (format, description) in Format::ALL.iter().zip(REGISTRY) {
+            assert_eq!(*format, description.format, "{}", description.name);
+        }
     }
 }

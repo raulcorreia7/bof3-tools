@@ -4,9 +4,9 @@
 //! headers give (`include/game/item.h`, `ability.h`, `enemy.h` and `character.h`), so a column edit
 //! changes exactly the bytes it names and every byte no column names keeps its stored value.
 
-use rebof3_emi::classify::Format;
 use rebof3_emi::encounter::{self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES};
 use rebof3_emi::game_tables::{self as tables, Table};
+use rebof3_formats::Format;
 
 /// The archive that holds the fixed game tables in entry 0.
 pub const GAME: &str = "BIN/ETC/GAME.EMI";

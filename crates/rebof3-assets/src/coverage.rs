@@ -10,9 +10,9 @@ use std::path::Path;
 
 use psx_cd::Image;
 use rebof3_emi::Archive;
-use rebof3_emi::classify::{Format, classify};
 use rebof3_emi::game_tables::TABLES;
 use rebof3_emi::text::discover;
+use rebof3_formats::{Format, classify};
 
 use crate::error::Result;
 use crate::import;

@@ -17,10 +17,10 @@ use gpui::{
 use psx_formats::gfx::texture::{Clut, Depth, texel_indices, texel_words};
 use psx_formats::gfx::vram;
 use rebof3_assets::decode::{TextureWords, color_rgba, joined_rows, texture_words};
-use rebof3_emi::classify::Format;
 use rebof3_emi::replay::Writer;
 use rebof3_emi::replay::scenes;
 use rebof3_emi::texture::suggest;
+use rebof3_formats::Format;
 
 use super::palette::{SWATCH, SWATCH_GAP, words as words_of};
 use super::{Entry, Menu, editing_menu};

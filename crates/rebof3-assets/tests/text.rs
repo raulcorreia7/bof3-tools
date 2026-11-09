@@ -12,7 +12,7 @@ use rebof3_assets::disc::{self, Replacement};
 use rebof3_assets::text::bank::{self, Bank};
 use rebof3_assets::text::codec::{self, Encoding};
 use rebof3_emi::Archive;
-use rebof3_emi::classify::{Format, classify};
+use rebof3_formats::{Format, classify};
 
 /// Every message bank on the disc: its archive's disc path, its entry index and its payload.
 fn message_banks(cue: &Path) -> Vec<(String, usize, Vec<u8>)> {

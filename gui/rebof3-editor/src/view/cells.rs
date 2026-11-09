@@ -12,7 +12,7 @@ use gpui::{
     AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, canvas, div,
     prelude::*, px,
 };
-use rebof3_emi::classify::Format;
+use rebof3_formats::Format;
 
 use super::Entry;
 use super::texture::paint_pixels;

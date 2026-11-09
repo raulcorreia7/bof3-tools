@@ -9,9 +9,9 @@ use rebof3_assets::decode::texture_words;
 use rebof3_editor::project::{ArchivePath, Project};
 use rebof3_editor::schema::{self, Field};
 use rebof3_emi::area::map::MapBundle;
-use rebof3_emi::classify::Format;
 use rebof3_emi::text::codec::{self, Encoding};
 use rebof3_emi::text::discover::{self, Kind};
+use rebof3_formats::Format;
 
 fn disc() -> Option<PathBuf> {
     let path = PathBuf::from(std::env::var_os("BOF3_DISC_DIR")?);

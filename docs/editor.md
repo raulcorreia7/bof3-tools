@@ -1,6 +1,6 @@
 # Asset editor coverage
 
-What `bof3-edit` offers for each EMI entry format that `rebof3_emi::classify` knows. The row is
+What `bof3-edit` offers for each EMI entry format that `rebof3_formats::classify` knows. The row is
 finished when it has a view, an edit where the format allows one, a byte-exact save, and a test that
 proves the round trip, or a stated reason why one of them is missing. The views are listed in the
 [README](../README.md#asset-editor).

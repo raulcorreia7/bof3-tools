@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use psx_formats::gfx::texture::{Clut, Depth, texel_indices};
 use psx_formats::gfx::{clut, png, tim, vram};
 use rebof3_emi::area::map::MapBundle;
-use rebof3_emi::classify::{Format, classify};
 use rebof3_emi::lz77;
 use rebof3_emi::texture::{self as draw, Bank};
+use rebof3_formats::{Format, classify};
 
 /// A file derived from a payload.
 pub struct Derived {

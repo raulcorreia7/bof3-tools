@@ -55,7 +55,7 @@ pub fn retail_root() -> Option<PathBuf> {
 
 /// Appends every `.EMI` container under `root` to `found`, through subdirectories.
 pub fn collect_archives(root: &Path, found: &mut Vec<PathBuf>) {
-    found.extend(rebof3_emi::coverage::archives_under(root));
+    found.extend(rebof3_emi::archives_under(root));
 }
 
 /// First offset where two byte runs differ, or `None` when they are equal.

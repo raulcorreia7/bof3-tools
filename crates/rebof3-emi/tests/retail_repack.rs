@@ -3,13 +3,13 @@
 //! The test skips when it cannot find the retail archives; `support::retail_root`
 //! owns the lookup and honours `BOF3_EMI_ROOT`. Two walks run: the on-disk one
 //! (extract to files, write `emi.json`, `pack_manifest`) and the in-memory one
-//! the `coverage` verb runs (`coverage::container_round_trip`).
+//! the `coverage` verb runs (`verify::container_round_trip`).
 
 mod support;
 
 use std::fs;
 
-use rebof3_emi::{Archive, coverage, pack_manifest};
+use rebof3_emi::{Archive, archives_under, pack_manifest, verify};
 
 #[test]
 fn retail_repack_is_byte_identical() {
@@ -21,7 +21,7 @@ fn retail_repack_is_byte_identical() {
         return;
     };
 
-    let archives = coverage::archives_under(&root);
+    let archives = archives_under(&root);
     assert!(!archives.is_empty(), "no .EMI containers under {}", root.display());
     let work = support::out_dir("retail_repack-retail_repack_is_byte_identical");
     let mut failures = Vec::new();
@@ -45,7 +45,7 @@ fn retail_repack_is_byte_identical() {
         failures.join("\n")
     );
 
-    let container = coverage::container_round_trip(&root).expect("repack the retail archives");
+    let container = verify::container_round_trip(&root).expect("repack the retail archives");
     assert_eq!(container.archives, archives.len());
     assert!(
         container.failures.is_empty(),

@@ -10,8 +10,8 @@ use std::ops::Range;
 use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use rebof3_assets::decode::color_rgba;
 use rebof3_emi::character_bank::{self, Bank, COLOURS};
-use rebof3_emi::classify::Format;
 use rebof3_emi::lz77;
+use rebof3_formats::Format;
 
 use super::Entry;
 use super::palette::{SWATCH, SWATCH_GAP, Sliders, picker};

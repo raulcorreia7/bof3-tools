@@ -100,7 +100,7 @@ fn retail_textures_join_their_proven_palette_rows() {
         );
         return;
     };
-    let mut archives = rebof3_emi::coverage::archives_under(&root);
+    let mut archives = rebof3_formats::coverage::archives_under(&root);
     archives.sort();
     assert!(!archives.is_empty(), "no .EMI containers under {}", root.display());
 

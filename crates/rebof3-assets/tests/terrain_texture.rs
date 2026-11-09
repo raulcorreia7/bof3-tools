@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use rebof3_assets::terrain::top_down;
 use rebof3_emi::Archive;
 use rebof3_emi::area::map::MapBundle;
-use rebof3_emi::classify::{Format, classify};
 use rebof3_emi::replay::{self, Vram, scenes};
+use rebof3_formats::{Format, classify};
 
 fn collect(root: &Path, folder: &Path, out: &mut Vec<String>) {
     let Ok(entries) = fs::read_dir(folder) else { return };

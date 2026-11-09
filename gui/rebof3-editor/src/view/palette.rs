@@ -192,7 +192,7 @@ fn set_color(editor: &mut Editor, index: usize, change: &dyn Fn(u16) -> u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::classify::Format;
+    use rebof3_formats::Format;
 
     #[test]
     fn a_channel_change_keeps_the_other_channels() {

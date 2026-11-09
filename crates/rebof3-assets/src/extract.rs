@@ -17,8 +17,8 @@ use std::thread;
 use psx_cd::checksum::sha256_hex;
 use psx_cd::{Entry, Image, cue};
 use rebof3_emi::Archive;
-use rebof3_emi::classify::{self, Format, classify};
 use rebof3_emi::texture::{Bank, ResidentBank};
+use rebof3_formats::{self as classify, Format, classify};
 
 use crate::decode::{derive, indexed_rows, joined_rows_in, soundfont};
 use crate::error::{Error, Result};

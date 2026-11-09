@@ -1,0 +1,25 @@
+[package]
+name = "rebof3-formats"
+description = "The Breath of Fire III entry formats, one self-contained module each: decode, encode, export, import, describe"
+version = "0.2.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[dependencies]
+rebof3-emi = { workspace = true, features = ["std"] }
+psx-formats = { workspace = true, features = ["std"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+rebof3-emi = { workspace = true, features = ["std", "fixtures"] }
+psx-formats = { workspace = true, features = ["std", "fixtures"] }
+
+[lints]
+workspace = true

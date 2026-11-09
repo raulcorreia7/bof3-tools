@@ -13,8 +13,8 @@ use rebof3_assets::decode::{pcm_wav, sequence_midi, soundfont};
 use rebof3_assets::import;
 use rebof3_assets::sound::sequence_pcm;
 use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
-use rebof3_emi::classify::Format;
 use rebof3_emi::entry::vab_body_index;
+use rebof3_formats::Format;
 
 use super::{Entry, Field, input};
 use crate::app::Editor;

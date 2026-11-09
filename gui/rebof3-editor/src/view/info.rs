@@ -8,13 +8,13 @@ use rebof3_assets::decode::{palette_bank, texture_words};
 use rebof3_emi::area::map::MapBundle;
 use rebof3_emi::area::scene::SceneTable;
 use rebof3_emi::area::script::ScriptBank;
-use rebof3_emi::classify::Format;
 use rebof3_emi::cue::CueTable;
 use rebof3_emi::encounter::EncounterBlock;
 use rebof3_emi::entry::vab_body_index;
 use rebof3_emi::game_tables::name_text;
 use rebof3_emi::text::discover;
 use rebof3_emi::{character_bank, lz77};
+use rebof3_formats::Format;
 
 use super::Entry;
 use super::map::summary as map_summary;

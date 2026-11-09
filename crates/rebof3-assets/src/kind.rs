@@ -6,7 +6,7 @@
 //! `wiki: formats/conversion#conversion-map` and this table name the
 //! same things.
 
-use rebof3_emi::classify::Format;
+use rebof3_formats::Format;
 
 use crate::error::{Error, Result};
 

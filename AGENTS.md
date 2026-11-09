@@ -10,6 +10,7 @@ It is a Cargo workspace with one CLI, `bof3`. Read [README.md](README.md) first,
 | ------------------------ | ---------------------------------------------------------------- | ------------------------------------------ |
 | `cli/rebof3/`            | The `bof3` binary: `disc`, `emi` and `assets` subcommands         | [docs/cli.md](docs/cli.md)                 |
 | `crates/rebof3-emi/`     | The EMI archive reader and writer                                | [docs/crates.md](docs/crates.md#rebof3-emi) |
+| `crates/rebof3-formats/` | The format registry, `classify` and the coverage table          | [docs/crates.md](docs/crates.md#rebof3-formats) |
 | `crates/rebof3-assets/`  | Asset conversion and the extract-all output                      | [docs/assets.md](docs/assets.md)           |
 | `gui/rebof3-editor/`     | The `bof3-edit` asset editor: browse, view and edit EMI entries  | [README.md](README.md#asset-editor)        |
 | `Cargo.toml`             | Workspace members and the pinned `bof3player` crates         | [docs/crates.md](docs/crates.md)      |

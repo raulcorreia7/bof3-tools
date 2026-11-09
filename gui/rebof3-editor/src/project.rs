@@ -11,8 +11,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use rebof3_emi::classify::{Format, classify};
 use rebof3_emi::{Archive, Entry};
+use rebof3_formats::{Format, classify};
 
 /// One archive of the disc: its path relative to the disc folder, with `/` separators.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]

@@ -18,7 +18,7 @@ mod texture;
 mod vram;
 
 use gpui::{AnyElement, Context, Div, ElementId, Keystroke, Stateful, div, prelude::*, px};
-use rebof3_emi::classify::Format;
+use rebof3_formats::Format;
 
 use crate::app::{Editor, Field as WindowField};
 use crate::edit::LineEdit;
@@ -312,14 +312,14 @@ pub fn key(editor: &mut Editor, keystroke: &Keystroke) -> bool {
 mod tests {
     use gpui::TestAppContext;
     use rebof3_editor::fixture::{ARCHIVE, Disc, Entry as DiscEntry};
-    use rebof3_emi::classify::Format;
+    use rebof3_formats::Format;
 
     use super::*;
     use crate::project::ArchivePath;
     use crate::schema;
 
     /// Entry types and load arguments that the classifier reads as each format but the reserve
-    /// (`rebof3_emi::classify`).
+    /// (`rebof3_formats::classify`).
     const PLACES: [(u16, u32); 20] = [
         (3, 0x8000_0000), // VRAM texture upload
         (0, 0x8003_3800), // CLUT bank
