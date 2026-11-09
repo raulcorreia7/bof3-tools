@@ -9,10 +9,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use gpui::{
-    AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, SharedString, canvas,
-    div, fill, point, prelude::*, px, rgba, size,
-};
+use gpui::{AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, SharedString, canvas, div, fill, point, prelude::*, px, rgba, size};
 use psx_formats::gfx::png;
 use psx_formats::gfx::texture::Clut;
 use psx_formats::gfx::vram::{VRAM_HEIGHT, VRAM_WIDTH};
@@ -99,23 +96,15 @@ fn pixels(vram: &Vram) -> Vec<[u8; 4]> {
 
 /// The RGBA pixels of a region decoded at `bits` with the CLUT at `clut`, and the width in texels.
 fn decode(vram: &Vram, region: &Region, bits: Bits, clut: Option<Clut>) -> (Vec<[u8; 4]>, usize) {
-    let (x, y, width, height) =
-        (usize::from(region.x), usize::from(region.y), usize::from(region.width), usize::from(region.height));
+    let (x, y, width, height) = (usize::from(region.x), usize::from(region.y), usize::from(region.width), usize::from(region.height));
     match bits.depth() {
         None => {
-            let pixels = (y..y + height)
-                .flat_map(|row| (x..x + width).map(move |column| (column, row)))
-                .map(|(column, row)| color_rgba(vram.word(column, row)))
-                .collect();
+            let pixels = (y..y + height).flat_map(|row| (x..x + width).map(move |column| (column, row))).map(|(column, row)| color_rgba(vram.word(column, row))).collect();
             (pixels, width)
         }
         Some(depth) => {
             let colors = clut.map(|clut| vram.clut_words(clut, depth)).unwrap_or_default();
-            let pixels = vram
-                .texels(x, y, width, height, depth)
-                .into_iter()
-                .map(|index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word)))
-                .collect();
+            let pixels = vram.texels(x, y, width, height, depth).into_iter().map(|index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word))).collect();
             (pixels, width * depth.texels_per_word())
         }
     }
@@ -199,14 +188,7 @@ pub fn show(editor: &Editor, _entry: &Entry<'_>, cx: &mut Context<Editor>) -> An
             cx.notify();
         }));
 
-    let mut column = div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(scene_controls(editor, &replayed, cx))
-        .child(separator(false));
+    let mut column = div().flex().flex_col().flex_1().min_h_0().gap(px(GAP)).child(scene_controls(editor, &replayed, cx)).child(separator(false));
     if !vram.missing().is_empty() {
         column = column.child(muted(format!("Not on the disc, skipped: {}", vram.missing().join(", "))));
     }
@@ -223,12 +205,9 @@ fn paint_outline(window: &mut gpui::Window, area: Bounds<Pixels>, region: &Regio
     let (width, height) = (px(f32::from(region.width) * zoom), px(f32::from(region.height) * zoom));
     let thin = px(OUTLINE);
     let colour = rgba(line);
-    for (at, extent) in [
-        (origin, size(width, thin)),
-        (point(origin.x, origin.y + height - thin), size(width, thin)),
-        (origin, size(thin, height)),
-        (point(origin.x + width - thin, origin.y), size(thin, height)),
-    ] {
+    for (at, extent) in
+        [(origin, size(width, thin)), (point(origin.x, origin.y + height - thin), size(width, thin)), (origin, size(thin, height)), (point(origin.x + width - thin, origin.y), size(thin, height))]
+    {
         window.paint_quad(fill(Bounds::new(at, extent), colour));
     }
 }
@@ -257,8 +236,7 @@ fn click(editor: &mut Editor, position: Point<Pixels>) {
     }
     let Some(replayed) = state.replayed.as_ref() else { return };
     let inside = |region: &&Region| {
-        (usize::from(region.x)..usize::from(region.x) + usize::from(region.width)).contains(&x)
-            && (usize::from(region.y)..usize::from(region.y) + usize::from(region.height)).contains(&y)
+        (usize::from(region.x)..usize::from(region.x) + usize::from(region.width)).contains(&x) && (usize::from(region.y)..usize::from(region.y) + usize::from(region.height)).contains(&y)
     };
     state.picked = replayed.regions.iter().find(inside).cloned();
     if state.bits.is_none() {
@@ -276,14 +254,12 @@ pub(super) fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Cont
 
     let mut row = div().flex().flex_wrap().items_center().gap(px(GAP_SMALL)).child("Scene");
     for kind in kinds {
-        row = row.child(tab(("scene-kind", kind as usize), kind.label(), current.kind == kind).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                let first = editor.views.vram.catalog.iter().find(|scene| scene.kind == kind).cloned();
-                editor.views.vram.chosen = first;
-                editor.views.vram.picked = None;
-                cx.notify();
-            },
-        )));
+        row = row.child(tab(("scene-kind", kind as usize), kind.label(), current.kind == kind).on_click(cx.listener(move |editor, _, _, cx| {
+            let first = editor.views.vram.catalog.iter().find(|scene| scene.kind == kind).cloned();
+            editor.views.vram.chosen = first;
+            editor.views.vram.picked = None;
+            cx.notify();
+        })));
     }
     let step = |offset: isize| {
         move |editor: &mut Editor, _: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut Context<Editor>| {
@@ -302,50 +278,34 @@ pub(super) fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Cont
         .child(button("scene-previous", "◀", true).on_click(cx.listener(step(-1))))
         .child(strong(current.name.clone()))
         .child(button("scene-next", "▶", true).on_click(cx.listener(step(1))))
-        .child(button("scene-home", "This entry's scene", state.chosen.is_some()).on_click(cx.listener(
-            |editor, _, _, cx| {
-                editor.views.vram.chosen = None;
-                editor.views.vram.picked = None;
-                cx.notify();
-            },
-        )));
-    let zoom =
-        slider("vram-zoom", state.zoom.max(ZOOM_MIN), ZOOM_MIN..=ZOOM_MAX, &state.zoom_slider, cx, |editor, zoom| {
-            editor.views.vram.zoom = zoom;
-        });
+        .child(button("scene-home", "This entry's scene", state.chosen.is_some()).on_click(cx.listener(|editor, _, _, cx| {
+            editor.views.vram.chosen = None;
+            editor.views.vram.picked = None;
+            cx.notify();
+        })));
+    let zoom = slider("vram-zoom", state.zoom.max(ZOOM_MIN), ZOOM_MIN..=ZOOM_MAX, &state.zoom_slider, cx, |editor, zoom| {
+        editor.views.vram.zoom = zoom;
+    });
     let name = format!("{}.png", current.name.replace([':', ' ', '+'], "_"));
-    row.child(separator(true))
-        .child("Zoom")
-        .child(zoom)
-        .child(mono(format!("{}×", state.zoom.max(ZOOM_MIN))))
-        .child(separator(true))
-        .child(button("vram-export", "Export PNG", true).on_click(cx.listener(move |editor, _, _, cx| {
+    row.child(separator(true)).child("Zoom").child(zoom).child(mono(format!("{}×", state.zoom.max(ZOOM_MIN)))).child(separator(true)).child(button("vram-export", "Export PNG", true).on_click(
+        cx.listener(move |editor, _, _, cx| {
             // Encode on click: a PNG of the whole VRAM is too slow to build on every frame.
             let Some(replayed) = editor.views.vram.replayed.clone() else { return };
             editor.save_file(name.clone(), Ok(vram_png(&replayed.vram)), cx);
-        })))
+        }),
+    ))
 }
 
 /// The picked region, its depth and CLUT, and the region decoded from VRAM.
 fn decode_panel(editor: &Editor, vram: &Vram, region: &Region, cx: &mut Context<Editor>) -> Div {
     let state = &editor.views.vram;
     let bits = state.bits.unwrap_or(Bits::Four);
-    let mut controls = div()
-        .flex()
-        .flex_wrap()
-        .items_center()
-        .gap(px(GAP_SMALL))
-        .child(mono(describe(region)))
-        .child(separator(true))
-        .child("Depth");
+    let mut controls = div().flex().flex_wrap().items_center().gap(px(GAP_SMALL)).child(mono(describe(region))).child(separator(true)).child("Depth");
     for (choice, label) in Bits::ALL {
-        controls =
-            controls.child(tab(SharedString::from(format!("vram-depth-{label}")), label, bits == choice).on_click(
-                cx.listener(move |editor, _, _, cx| {
-                    editor.views.vram.bits = Some(choice);
-                    cx.notify();
-                }),
-            ));
+        controls = controls.child(tab(SharedString::from(format!("vram-depth-{label}")), label, bits == choice).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.vram.bits = Some(choice);
+            cx.notify();
+        })));
     }
     if let Some(depth) = bits.depth() {
         let clut = match state.clut {
@@ -355,32 +315,26 @@ fn decode_panel(editor: &Editor, vram: &Vram, region: &Region, cx: &mut Context<
             }
             None => "no CLUT".into(),
         };
-        controls = controls.child(separator(true)).child(mono(clut)).child(
-            button("vram-pick-clut", if state.choosing_clut { "Click a row…" } else { "Pick CLUT" }, true).on_click(
-                cx.listener(|editor, _, _, cx| {
-                    editor.views.vram.choosing_clut = !editor.views.vram.choosing_clut;
-                    cx.notify();
-                }),
-            ),
-        );
+        controls = controls.child(separator(true)).child(mono(clut)).child(button("vram-pick-clut", if state.choosing_clut { "Click a row…" } else { "Pick CLUT" }, true).on_click(cx.listener(
+            |editor, _, _, cx| {
+                editor.views.vram.choosing_clut = !editor.views.vram.choosing_clut;
+                cx.notify();
+            },
+        )));
     }
 
     let (pixels, width) = decode(vram, region, bits, state.clut);
     let height = usize::from(region.height);
     let decoded =
-        canvas(|_, _, _| {}, move |area, (), window, _| paint_pixels(window, area, &pixels, width, DECODED_ZOOM))
-            .w(px(width as f32 * DECODED_ZOOM))
-            .h(px(height as f32 * DECODED_ZOOM))
-            .flex_none();
-    div().flex().flex_col().flex_none().max_h(px(360.0)).gap(px(GAP_SMALL)).child(controls).child(
-        div()
-            .id("vram-decoded")
-            .overflow_scroll()
-            .border_1()
-            .border_color(color(BORDER))
-            .bg(color(BACKGROUND))
-            .child(decoded),
-    )
+        canvas(|_, _, _| {}, move |area, (), window, _| paint_pixels(window, area, &pixels, width, DECODED_ZOOM)).w(px(width as f32 * DECODED_ZOOM)).h(px(height as f32 * DECODED_ZOOM)).flex_none();
+    div()
+        .flex()
+        .flex_col()
+        .flex_none()
+        .max_h(px(360.0))
+        .gap(px(GAP_SMALL))
+        .child(controls)
+        .child(div().id("vram-decoded").overflow_scroll().border_1().border_color(color(BORDER)).bg(color(BACKGROUND)).child(decoded))
 }
 
 #[cfg(test)]
@@ -443,10 +397,7 @@ mod tests {
         assert!(replayed.vram.missing().is_empty());
         assert_eq!(replayed.vram.writer(704, 256), Some(&Writer::entry(area, 7)));
         let clut = Clut::new(160, 483).expect("a CLUT");
-        assert!(
-            replayed.joins.iter().any(|join| join.texture == Writer::entry(area, 7) && join.clut == clut),
-            "the AREA024 site joins entry 7 to row (160, 483)"
-        );
+        assert!(replayed.joins.iter().any(|join| join.texture == Writer::entry(area, 7) && join.clut == clut), "the AREA024 site joins entry 7 to row (160, 483)");
 
         let loaded = project.load(&ArchivePath(area.into())).expect("the area loads");
         let mut block = project.payload(&loaded, 8).to_vec();

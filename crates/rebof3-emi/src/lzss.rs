@@ -95,9 +95,7 @@ pub fn decode(stream: &[u8], count: usize) -> Result<(Vec<u8>, usize)> {
         for step in 0..length {
             let from = (position + step) % RING;
             if !ring.defined[from] {
-                return Err(Error::Lzss(format!(
-                    "a back-reference reads ring byte {from:#X} before the stream writes it"
-                )));
+                return Err(Error::Lzss(format!("a back-reference reads ring byte {from:#X} before the stream writes it")));
             }
             let byte = ring.bytes[from];
             ring.push(byte);

@@ -179,10 +179,7 @@ impl ListRecord {
 
     /// The header word and operands, as they appear in the payload.
     fn write(&self, out: &mut Vec<u8>) {
-        let head = (u32::from(self.opcode) << 24)
-            | (self.words() as u32 & 0xff) << 16
-            | u32::from(self.head[1]) << 8
-            | u32::from(self.head[0]);
+        let head = (u32::from(self.opcode) << 24) | (self.words() as u32 & 0xff) << 16 | u32::from(self.head[1]) << 8 | u32::from(self.head[0]);
         out.extend_from_slice(&head.to_le_bytes());
         for operand in &self.operands {
             out.extend_from_slice(&operand.to_le_bytes());
@@ -291,30 +288,18 @@ impl MapBundle {
         }
         let codes = bytes[layout.codes..layout.grid].to_vec();
         let grid = (0..cells).map(|index| u16_le(bytes, layout.grid + index * GRID_BYTES)).collect();
-        let records = (0..(layout.records_end - layout.grid_end) / TILE_BYTES)
-            .map(|index| u32_le(bytes, layout.grid_end + index * TILE_BYTES))
-            .collect();
+        let records = (0..(layout.records_end - layout.grid_end) / TILE_BYTES).map(|index| u32_le(bytes, layout.grid_end + index * TILE_BYTES)).collect();
 
         let mut rects: [Vec<TileRect>; SELECTORS] = Default::default();
         let mut quads: [Vec<TileQuad>; SELECTORS] = Default::default();
         for selector in 0..SELECTORS {
             let start = layout.rects[selector];
-            rects[selector] = (start..layout.quads[selector])
-                .step_by(RECT_BYTES)
-                .map(|at| TileRect { u: bytes[at + 3], v: bytes[at + 2], du: bytes[at + 1], dv: bytes[at] })
-                .collect();
+            rects[selector] = (start..layout.quads[selector]).step_by(RECT_BYTES).map(|at| TileRect { u: bytes[at + 3], v: bytes[at + 2], du: bytes[at + 1], dv: bytes[at] }).collect();
             let start = layout.quads[selector];
             let stop = layout.rects.get(selector + 1).copied().unwrap_or(layout.list_a);
             quads[selector] = (start..stop)
                 .step_by(QUAD_BYTES)
-                .map(|at| TileQuad {
-                    uvs: [
-                        [bytes[at + 3], bytes[at + 2]],
-                        [bytes[at + 1], bytes[at]],
-                        [bytes[at + 7], bytes[at + 6]],
-                        [bytes[at + 5], bytes[at + 4]],
-                    ],
-                })
+                .map(|at| TileQuad { uvs: [[bytes[at + 3], bytes[at + 2]], [bytes[at + 1], bytes[at]], [bytes[at + 7], bytes[at + 6]], [bytes[at + 5], bytes[at + 4]]] })
                 .collect();
         }
 
@@ -334,13 +319,7 @@ impl MapBundle {
             objects: read_objects(bytes, layout.objects, layout.cells_24)?,
             cells_24: read_cells(bytes, layout.cells_24, layout.end)?,
             heights: (layout.end < bytes.len()).then(|| bytes[layout.end..].to_vec()),
-            reserved: [
-                u16_le(bytes, 0x16),
-                u16_le(bytes, 0x18),
-                u16_le(bytes, 0x26),
-                u16_le(bytes, 0x2c),
-                u16_le(bytes, 0x2e),
-            ],
+            reserved: [u16_le(bytes, 0x16), u16_le(bytes, 0x18), u16_le(bytes, 0x26), u16_le(bytes, 0x2c), u16_le(bytes, 0x2e)],
         })
     }
 
@@ -449,10 +428,7 @@ impl MapBundle {
             + align4(cells)
             + align4(cells * GRID_BYTES)
             + self.records.len() * TILE_BYTES
-            + 4 * (list_words(&self.list_a)
-                + list_words(&self.list_b)
-                + self.objects.iter().map(object_words).sum::<usize>()
-                + self.cells_24.iter().map(cell_words).sum::<usize>())
+            + 4 * (list_words(&self.list_a) + list_words(&self.list_b) + self.objects.iter().map(object_words).sum::<usize>() + self.cells_24.iter().map(cell_words).sum::<usize>())
             + 4 * TILE_BYTES;
         for selector in 0..SELECTORS {
             len += self.rects[selector].len() * RECT_BYTES;
@@ -471,19 +447,13 @@ fn read_list(bytes: &[u8], start: usize, end: usize) -> Result<Vec<ListRecord>, 
     while at + 4 <= end {
         let word = u32_le(bytes, at);
         if word == 0 {
-            return (at + 4 == end)
-                .then_some(records)
-                .ok_or(Error::MapBundleShape("a list region has words after its zero terminator"));
+            return (at + 4 == end).then_some(records).ok_or(Error::MapBundleShape("a list region has words after its zero terminator"));
         }
         let records_words = (word >> 16) as usize & 0xff;
         if records_words == 0 || at + records_words * 4 > end {
             return Err(Error::MapBundleShape("a list record's size runs outside its region"));
         }
-        records.push(ListRecord {
-            opcode: (word >> 24) as u8,
-            head: [word as u8, (word >> 8) as u8],
-            operands: (1..records_words).map(|index| u32_le(bytes, at + index * 4)).collect(),
-        });
+        records.push(ListRecord { opcode: (word >> 24) as u8, head: [word as u8, (word >> 8) as u8], operands: (1..records_words).map(|index| u32_le(bytes, at + index * 4)).collect() });
         at += records_words * 4;
     }
     Err(Error::MapBundleShape("a list region has no zero terminator"))
@@ -497,9 +467,7 @@ fn read_cells(bytes: &[u8], start: usize, end: usize) -> Result<Vec<MapCell>, Er
     while at + 4 <= end {
         let word = u32_le(bytes, at);
         if word == 0 {
-            return (at + 4 == end)
-                .then_some(cells)
-                .ok_or(Error::MapBundleShape("the cell region has words after its zero terminator"));
+            return (at + 4 == end).then_some(cells).ok_or(Error::MapBundleShape("the cell region has words after its zero terminator"));
         }
         let cell_words = u16_le(bytes, at + 2) as usize;
         if cell_words < 2 || at + cell_words * 4 > end {
@@ -514,11 +482,7 @@ fn read_cells(bytes: &[u8], start: usize, end: usize) -> Result<Vec<MapCell>, Er
             if record_words == 0 || cursor + record_words * 4 > body_end {
                 return Err(Error::MapBundleShape("a cell record's size runs outside its cell"));
             }
-            records.push(ListRecord {
-                opcode: (record >> 24) as u8,
-                head: [record as u8, (record >> 8) as u8],
-                operands: (1..record_words).map(|index| u32_le(bytes, cursor + index * 4)).collect(),
-            });
+            records.push(ListRecord { opcode: (record >> 24) as u8, head: [record as u8, (record >> 8) as u8], operands: (1..record_words).map(|index| u32_le(bytes, cursor + index * 4)).collect() });
             cursor += record_words * 4;
         }
         cells.push(MapCell { y: word as u8, x: (word >> 8) as u8, records });
@@ -535,18 +499,13 @@ fn read_objects(bytes: &[u8], start: usize, end: usize) -> Result<Vec<MapObject>
     while at + 4 <= end {
         let word = u32_le(bytes, at);
         if word == 0 {
-            return (at + 4 == end)
-                .then_some(objects)
-                .ok_or(Error::MapBundleShape("the object region has words after its zero terminator"));
+            return (at + 4 == end).then_some(objects).ok_or(Error::MapBundleShape("the object region has words after its zero terminator"));
         }
         let body_words = u16_le(bytes, at + 2) as usize;
         if at + 4 + body_words * 4 > end {
             return Err(Error::MapBundleShape("an object's size runs outside the object region"));
         }
-        objects.push(MapObject {
-            tag: word as u16,
-            words: (0..body_words).map(|index| u32_le(bytes, at + 4 + index * 4)).collect(),
-        });
+        objects.push(MapObject { tag: word as u16, words: (0..body_words).map(|index| u32_le(bytes, at + 4 + index * 4)).collect() });
         at += 4 + body_words * 4;
     }
     Err(Error::MapBundleShape("the object region has no zero terminator"))
@@ -599,8 +558,7 @@ impl Layout {
         }
         let rects = [0x04, 0x08, 0x0c, 0x10].map(|at| u32::from(u16_le(bytes, at)) as usize * 4);
         let quads = [0x06, 0x0a, 0x0e, 0x12].map(|at| u32::from(u16_le(bytes, at)) as usize * 4);
-        let [list_a, list_b, cells_24, objects, end] =
-            [0x20, 0x22, 0x24, 0x28, 0x2a].map(|at| u32::from(u16_le(bytes, at)) as usize * 4);
+        let [list_a, list_b, cells_24, objects, end] = [0x20, 0x22, 0x24, 0x28, 0x2a].map(|at| u32::from(u16_le(bytes, at)) as usize * 4);
         let mut starts = Vec::with_capacity(2 * SELECTORS + 5);
         starts.push(grid_end);
         for selector in 0..SELECTORS {

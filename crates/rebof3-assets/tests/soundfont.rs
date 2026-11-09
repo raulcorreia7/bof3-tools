@@ -30,27 +30,15 @@ fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
         return;
     };
     let dir = support::scratch_dir("soundfont-retail_banks_take_a_second_round_trip_to_the_same_bank");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("audio-bank").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("audio-bank").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
     let is_bank = |row: &&Row| row.role == "raw" && row.kind == Kind::AudioBank;
     let (mut banks, mut sounds) = (0, 0);
     for header_row in report.rows.iter().filter(is_bank).filter(|row| row.file_type == Some(6)) {
-        let body_row = report
-            .rows
-            .iter()
-            .filter(is_bank)
-            .find(|row| {
-                row.file_type == Some(7) && row.source == header_row.source && row.load_arg == header_row.load_arg
-            })
-            .expect("every VAB header has its body");
+        let body_row =
+            report.rows.iter().filter(is_bank).find(|row| row.file_type == Some(7) && row.source == header_row.source && row.load_arg == header_row.load_arg).expect("every VAB header has its body");
         let header = fs::read(dir.join(header_row.output.as_deref().unwrap())).unwrap();
         let body = fs::read(dir.join(body_row.output.as_deref().unwrap())).unwrap();
         let name = header_row.output.clone().unwrap_or_default();
@@ -59,15 +47,8 @@ fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
         let (header_first, body_first) = soundfont::import(&sf2_first).unwrap();
         let sf2_second = soundfont::export(&header_first, &body_first, &name).unwrap();
         let (header_second, body_second) = soundfont::import(&sf2_second).unwrap();
-        assert!(
-            (&header_second, &body_second) == (&header_first, &body_first),
-            "{name}: the second import is not the first"
-        );
-        assert_eq!(
-            without_names(sf2::read(&sf2_second).unwrap()),
-            without_names(sf2::read(&sf2_first).unwrap()),
-            "{name}: the SoundFont changed on the second round trip"
-        );
+        assert!((&header_second, &body_second) == (&header_first, &body_first), "{name}: the second import is not the first");
+        assert_eq!(without_names(sf2::read(&sf2_second).unwrap()), without_names(sf2::read(&sf2_first).unwrap()), "{name}: the SoundFont changed on the second round trip");
         banks += 1;
         sounds += sf2::read(&sf2_first).unwrap().samples.len();
     }

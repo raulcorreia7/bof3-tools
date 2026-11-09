@@ -158,10 +158,7 @@ impl Project {
 
     /// The load argument of an entry: the project's placement, or the disc's.
     pub fn load_arg(&self, loaded: &Loaded, index: usize) -> u32 {
-        self.loads
-            .get(&(loaded.path.clone(), index))
-            .copied()
-            .unwrap_or_else(|| loaded.entries().get(index).map_or(0, |entry| entry.ram_ptr))
+        self.loads.get(&(loaded.path.clone(), index)).copied().unwrap_or_else(|| loaded.entries().get(index).map_or(0, |entry| entry.ram_ptr))
     }
 
     /// The table entries of an archive with the project's placements: what a loader replay reads.
@@ -258,10 +255,7 @@ impl Project {
     /// each entry it changed.
     fn record(&mut self, change: Change) {
         self.redo.clear();
-        let same = |earlier: &Change| {
-            earlier.key == change.key
-                && std::mem::discriminant(&earlier.before) == std::mem::discriminant(&change.before)
-        };
+        let same = |earlier: &Change| earlier.key == change.key && std::mem::discriminant(&earlier.before) == std::mem::discriminant(&change.before);
         match self.open.as_mut() {
             Some(step) if step.iter().any(same) => {}
             Some(step) => step.push(change),
@@ -354,9 +348,7 @@ impl Project {
                         }
                     }
                     Some("load") => {
-                        let load = fs::read_to_string(&path)
-                            .ok()
-                            .and_then(|text| u32::from_str_radix(text.trim().trim_start_matches("0x"), 16).ok());
+                        let load = fs::read_to_string(&path).ok().and_then(|text| u32::from_str_radix(text.trim().trim_start_matches("0x"), 16).ok());
                         if let Some(load) = load {
                             self.loads.insert((archive.clone(), index), load);
                         }
@@ -403,27 +395,17 @@ impl Project {
     /// The bytes of an archive as the project has it now: the disc's archive rebuilt with the archive's
     /// edits, or the disc's bytes when it has none.
     pub fn current_archive(&self, loaded: &Loaded) -> Result<Vec<u8>, String> {
-        let replace: Vec<(usize, &[u8])> = self
-            .edits
-            .iter()
-            .filter(|((archive, _), _)| *archive == loaded.path)
-            .map(|((_, index), bytes)| (*index, bytes.as_slice()))
-            .collect();
+        let replace: Vec<(usize, &[u8])> = self.edits.iter().filter(|((archive, _), _)| *archive == loaded.path).map(|((_, index), bytes)| (*index, bytes.as_slice())).collect();
         let placed = self.placed(&loaded.path);
         if replace.is_empty() && placed.is_empty() {
             return Ok(loaded.bytes.to_vec());
         }
-        rebof3_emi::pack::rebuild_placed(&loaded.bytes, &replace, &placed)
-            .map_err(|error| format!("{}: {error}", loaded.path.0))
+        rebof3_emi::pack::rebuild_placed(&loaded.bytes, &replace, &placed).map_err(|error| format!("{}: {error}", loaded.path.0))
     }
 
     /// The load arguments the project changes in an archive, by entry.
     fn placed(&self, path: &ArchivePath) -> Vec<(usize, u32)> {
-        self.loads
-            .iter()
-            .filter(|((archive, _), _)| archive == path)
-            .map(|((_, index), load)| (*index, *load))
-            .collect()
+        self.loads.iter().filter(|((archive, _), _)| archive == path).map(|((_, index), load)| (*index, *load)).collect()
     }
 
     /// Rebuilds every edited archive into `disc/` in the project folder, and checks that each rebuilt
@@ -439,11 +421,9 @@ impl Project {
         let mut written = Vec::new();
         for (archive, replaced) in by_archive {
             let loaded = self.load(&archive)?;
-            let replace: Vec<(usize, &[u8])> =
-                replaced.iter().map(|(index, bytes)| (*index, bytes.as_slice())).collect();
+            let replace: Vec<(usize, &[u8])> = replaced.iter().map(|(index, bytes)| (*index, bytes.as_slice())).collect();
             let placed = self.placed(&archive);
-            let rebuilt = rebof3_emi::pack::rebuild_placed(&loaded.bytes, &replace, &placed)
-                .map_err(|error| format!("{}: {error}", archive.0))?;
+            let rebuilt = rebof3_emi::pack::rebuild_placed(&loaded.bytes, &replace, &placed).map_err(|error| format!("{}: {error}", archive.0))?;
             verify(&loaded, &rebuilt, &replace, &placed).map_err(|error| format!("{}: {error}", archive.0))?;
             let file = self.folder.join("disc").join(&archive.0);
             if let Some(parent) = file.parent() {
@@ -469,8 +449,7 @@ fn verify(loaded: &Loaded, rebuilt: &[u8], replace: &[(usize, &[u8])], placed: &
         if actual != expected {
             return Err(format!("entry {index} reads back different bytes"));
         }
-        let load =
-            placed.iter().find(|(at, _)| *at == index).map_or(loaded.entries()[index].ram_ptr, |(_, load)| *load);
+        let load = placed.iter().find(|(at, _)| *at == index).map_or(loaded.entries()[index].ram_ptr, |(_, load)| *load);
         if archive.entries()[index].ram_ptr != load {
             return Err(format!("entry {index} reads back a different load argument"));
         }
@@ -500,8 +479,7 @@ mod tests {
 
     /// A disc of two type-0 entries, opened as a project with its archive loaded.
     fn open(name: &str) -> (Disc, Project, Arc<Loaded>) {
-        let entries =
-            [b"first".as_slice(), b"second".as_slice()].map(|bytes| Entry { file_type: 0, ram_ptr: 0, bytes });
+        let entries = [b"first".as_slice(), b"second".as_slice()].map(|bytes| Entry { file_type: 0, ram_ptr: 0, bytes });
         let disc = Disc::new(name, &entries);
         let mut project = Project::open(&disc.disc(), &disc.project()).expect("project opens");
         let loaded = project.load(&ArchivePath(ARCHIVE.into())).expect("archive loads");
@@ -510,13 +488,7 @@ mod tests {
 
     #[test]
     fn a_placement_undoes_saves_and_rebuilds() {
-        let disc = Disc::new(
-            "placement",
-            &[
-                Entry { file_type: 3, ram_ptr: 0x1608_0100, bytes: b"texture" },
-                Entry { file_type: 0, ram_ptr: 0x8003_3800, bytes: b"bank" },
-            ],
-        );
+        let disc = Disc::new("placement", &[Entry { file_type: 3, ram_ptr: 0x1608_0100, bytes: b"texture" }, Entry { file_type: 0, ram_ptr: 0x8003_3800, bytes: b"bank" }]);
         let mut project = Project::open(&disc.disc(), &disc.project()).expect("project opens");
         let loaded = project.load(&ArchivePath(ARCHIVE.into())).expect("archive loads");
         assert_eq!(project.load_arg(&loaded, 0), 0x1608_0100);

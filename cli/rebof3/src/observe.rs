@@ -69,8 +69,7 @@ fn run(args: Vec<OsString>) -> Result<(), String> {
     let current = env::current_dir().map_err(|error| error.to_string())?;
     let image = match options.input {
         Some(image) => image,
-        None => find_disc_image(&current)
-            .map_err(|error| format!("{error}. Put the CUE/BIN set in {IMAGE_DIR}/ or pass -i IMAGE."))?,
+        None => find_disc_image(&current).map_err(|error| format!("{error}. Put the CUE/BIN set in {IMAGE_DIR}/ or pass -i IMAGE."))?,
     };
     let root = options.root.unwrap_or(current);
     let disc_sha = rebof3_observe::disc_sha(&image).map_err(|error| error.to_string())?;
@@ -128,21 +127,11 @@ fn summary(observation: &Observation) -> String {
     let coverage = observation.coverage();
     let mut out = format!(
         "route {}: {} frames in {:.1} s; {} uploads, {} from an entry; {} textured draws\n",
-        observation.route,
-        observation.frames,
-        observation.seconds,
-        observation.uploads,
-        observation.attributed_uploads,
-        observation.textured_draws,
+        observation.route, observation.frames, observation.seconds, observation.uploads, observation.attributed_uploads, observation.textured_draws,
     );
     let named = observation.textures.iter().filter(|texture| texture.palette.is_some()).count();
     let indexed = observation.textures.iter().filter(|texture| texture.clut.is_some()).count();
-    out.push_str(&format!(
-        "{} entries observed in {} archives; {} ways drawn, {named} of {indexed} CLUT rows named\n",
-        coverage.values().sum::<usize>(),
-        coverage.len(),
-        observation.textures.len(),
-    ));
+    out.push_str(&format!("{} entries observed in {} archives; {} ways drawn, {named} of {indexed} CLUT rows named\n", coverage.values().sum::<usize>(), coverage.len(), observation.textures.len(),));
     for (archive, entries) in coverage {
         out.push_str(&format!("  {archive}  {entries}\n"));
     }
@@ -152,8 +141,7 @@ fn summary(observation: &Observation) -> String {
 /// How the observed joins compare with the draw rules, with every disagreement on its own line.
 fn rules(comparisons: &[Comparison]) -> String {
     let agree = comparisons.iter().filter(|comparison| comparison.verdict == Verdict::Agrees).count();
-    let mut out =
-        format!("rules: {} rows where a rule and a draw both name the texture, {agree} agree\n", comparisons.len());
+    let mut out = format!("rules: {} rows where a rule and a draw both name the texture, {agree} agree\n", comparisons.len());
     for comparison in comparisons.iter().filter(|comparison| comparison.verdict != Verdict::Agrees) {
         let drawn = match &comparison.verdict {
             Verdict::OtherRows(rows) => {
@@ -166,15 +154,7 @@ fn rules(comparisons: &[Comparison]) -> String {
             }
             Verdict::Agrees => String::new(),
         };
-        out.push_str(&format!(
-            "  {} #{}: rule {}-bit CLUT {},{} ({}); {drawn}\n",
-            comparison.archive,
-            comparison.slot,
-            comparison.depth.bits(),
-            comparison.clut.x,
-            comparison.clut.y,
-            comparison.rule
-        ));
+        out.push_str(&format!("  {} #{}: rule {}-bit CLUT {},{} ({}); {drawn}\n", comparison.archive, comparison.slot, comparison.depth.bits(), comparison.clut.x, comparison.clut.y, comparison.rule));
     }
     out
 }
@@ -189,10 +169,7 @@ fn parse(args: &[OsString]) -> Result<Options, String> {
             "--force" => options.force = true,
             "-r" | "--route" | "-i" | "--input" | "--root" => {
                 index += 1;
-                let value = args
-                    .get(index)
-                    .and_then(|value| value.to_str())
-                    .ok_or_else(|| format!("option {flag} needs a value; run `bof3 observe --help`"))?;
+                let value = args.get(index).and_then(|value| value.to_str()).ok_or_else(|| format!("option {flag} needs a value; run `bof3 observe --help`"))?;
                 match flag {
                     "-r" | "--route" => options.route = Some(value.to_string()),
                     "-i" | "--input" => options.input = Some(PathBuf::from(value)),

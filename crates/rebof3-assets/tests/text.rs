@@ -55,11 +55,7 @@ fn every_message_table_on_the_retail_disc_exports_and_imports_to_its_own_bytes()
         }
     }
     let distinct: std::collections::BTreeSet<&[u8]> = tables.iter().map(|(_, _, payload)| payload.as_slice()).collect();
-    eprintln!(
-        "{} message entries ({} distinct payloads) and {messages} messages: each round trips to its own bytes",
-        tables.len(),
-        distinct.len()
-    );
+    eprintln!("{} message entries ({} distinct payloads) and {messages} messages: each round trips to its own bytes", tables.len(), distinct.len());
 }
 
 #[test]

@@ -93,11 +93,7 @@ mod tests {
     fn section() -> Vec<u8> {
         let texels: Vec<u8> = (0..16 * 8).map(|index| (index % 31 + 1) as u8).collect();
         let sheet = Image::new(8, 8, Encoding::Raw, texels).expect("a sheet").encode();
-        let animation = Animation {
-            steps: vec![Step { delay: 3, frame: 0 }],
-            frames: vec![Frame { cells: vec![Cell { size: 1, x: -8, y: -4, u: 0, v: 0 }] }],
-        }
-        .encode();
+        let animation = Animation { steps: vec![Step { delay: 3, frame: 0 }], frames: vec![Frame { cells: vec![Cell { size: 1, x: -8, y: -4, u: 0, v: 0 }] }] }.encode();
         let mut out = vec![0u8; 16];
         let images = out.len();
         out.extend(4u32.to_le_bytes());

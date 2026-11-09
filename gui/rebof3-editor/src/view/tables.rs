@@ -8,9 +8,7 @@ use crate::app::{Editor, Menu as WindowMenu};
 use crate::fonts;
 use crate::schema::{self, Column, Field as Kind, Names, Table};
 use crate::theme::{EDITED, MUTED, RAISED, color};
-use crate::widgets::{
-    GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, menu_item, menu_panel, muted, separator, strong, tab,
-};
+use crate::widgets::{GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, menu_item, menu_panel, muted, separator, strong, tab};
 
 /// Width of a numeric cell, of a name cell, of a reference cell and of the row number, in pixels.
 const NUMBER_WIDTH: f32 = 56.0;
@@ -51,21 +49,12 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
     let mut bar = div().flex().flex_none().flex_wrap().items_center().gap(px(GAP_SMALL));
     for (at, sheet) in sheets.iter().enumerate() {
-        bar =
-            bar.child(tab(("sheet", at), sheet.name, at == selected).on_click(cx.listener(move |editor, _, _, cx| {
-                editor.views.tables.sheet = at;
-                cx.notify();
-            })));
+        bar = bar.child(tab(("sheet", at), sheet.name, at == selected).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.tables.sheet = at;
+            cx.notify();
+        })));
     }
-    bar = bar.child(separator(true)).child(input(
-        editor,
-        "table-filter",
-        Field::TableFilter,
-        &state.filter,
-        "Filter by name",
-        Some(FILTER_WIDTH),
-        cx,
-    ));
+    bar = bar.child(separator(true)).child(input(editor, "table-filter", Field::TableFilter, &state.filter, "Filter by name", Some(FILTER_WIDTH), cx));
 
     let sheet = &sheets[selected];
     let payload = entry.payload();
@@ -83,9 +72,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let needle = state.filter.to_lowercase();
     let mut grid = div().id("table").flex().flex_col().flex_1().min_h_0().overflow_scroll().child(header);
     for row in 0..sheet.rows(payload) {
-        if !needle.is_empty()
-            && !row_name(payload, sheet, row).is_some_and(|name| name.to_lowercase().contains(&needle))
-        {
+        if !needle.is_empty() && !row_name(payload, sheet, row).is_some_and(|name| name.to_lowercase().contains(&needle)) {
             continue;
         }
         let range = sheet.range(row);
@@ -98,30 +85,14 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             .gap(px(GAP_SMALL))
             .min_h(px(ROW_HEIGHT))
             .when(row % 2 == 1, |line| line.bg(color(RAISED)))
-            .child(
-                div()
-                    .w(px(ROW_NUMBER_WIDTH))
-                    .flex_none()
-                    .font_family(fonts::mono())
-                    .text_color(if edited { color(EDITED) } else { color(MUTED) })
-                    .child(row.to_string()),
-            );
+            .child(div().w(px(ROW_NUMBER_WIDTH)).flex_none().font_family(fonts::mono()).text_color(if edited { color(EDITED) } else { color(MUTED) }).child(row.to_string()));
         for (at, column) in sheet.columns.iter().enumerate() {
             line = line.child(cell(editor, &names, &payload[range.clone()], row, at, column, cx));
         }
         grid = grid.child(line);
     }
 
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(bar)
-        .child(separator(false))
-        .child(grid)
-        .into_any_element()
+    div().flex().flex_col().flex_1().min_h_0().gap(px(GAP)).child(bar).child(separator(false)).child(grid).into_any_element()
 }
 
 fn width(column: &Column) -> f32 {
@@ -137,15 +108,7 @@ fn row_name(payload: &[u8], sheet: &Table, row: usize) -> Option<String> {
     Some(schema::name_text(&payload[sheet.range(row)], column))
 }
 
-fn cell(
-    editor: &Editor,
-    names: &Names,
-    record: &[u8],
-    row: usize,
-    at: usize,
-    column: &Column,
-    cx: &mut Context<Editor>,
-) -> Div {
+fn cell(editor: &Editor, names: &Names, record: &[u8], row: usize, at: usize, column: &Column, cx: &mut Context<Editor>) -> Div {
     let which = Field::Cell { row, column: at };
     let menu = Menu::Cell { row, column: at };
     let opened = editing_menu(editor, menu);
@@ -161,44 +124,32 @@ fn cell(
             input(editor, ("cell", at), which, &text, "", Some(NAME_WIDTH), cx).into_any_element()
         }
         Kind::Bits(names) => {
-            let mut cell = div().flex().flex_col().child(
-                button(("cell", at), format!("{value:08b}"), true).font_family(fonts::mono()).on_click(open_menu),
-            );
+            let mut cell = div().flex().flex_col().child(button(("cell", at), format!("{value:08b}"), true).font_family(fonts::mono()).on_click(open_menu));
             if opened {
                 let mut panel = menu_panel("bits").on_mouse_down_out(close_menu(cx));
                 for (bit, name) in names.iter().enumerate() {
                     let mask = 1 << bit;
-                    panel = panel.child(checkbox(("bit", bit), name, value & mask != 0).on_click(cx.listener(
-                        move |editor, _, _, cx| {
-                            write_cell(editor, row, at, |value| value ^ mask);
-                            cx.notify();
-                        },
-                    )));
+                    panel = panel.child(checkbox(("bit", bit), name, value & mask != 0).on_click(cx.listener(move |editor, _, _, cx| {
+                        write_cell(editor, row, at, |value| value ^ mask);
+                        cx.notify();
+                    })));
                 }
                 cell = cell.child(deferred(anchored().snap_to_window().child(panel)));
             }
             cell.into_any_element()
         }
         Kind::Choice(choices) => {
-            let selected = choices
-                .iter()
-                .find(|(code, _)| u32::from(*code) == value)
-                .map_or_else(|| value.to_string(), |(_, name)| (*name).to_string());
-            let mut cell = div()
-                .flex()
-                .flex_col()
-                .child(button(("cell", at), format!("{selected} ▾"), true).w(px(NAME_WIDTH)).on_click(open_menu));
+            let selected = choices.iter().find(|(code, _)| u32::from(*code) == value).map_or_else(|| value.to_string(), |(_, name)| (*name).to_string());
+            let mut cell = div().flex().flex_col().child(button(("cell", at), format!("{selected} ▾"), true).w(px(NAME_WIDTH)).on_click(open_menu));
             if opened {
                 let mut panel = menu_panel("choices").on_mouse_down_out(close_menu(cx));
                 for &(code, name) in choices {
                     let mark = if u32::from(code) == value { "●" } else { "" };
-                    panel = panel.child(menu_item(("choice", usize::from(code)), name, mark, true).on_click(
-                        cx.listener(move |editor, _, _, cx| {
-                            write_cell(editor, row, at, |_| u32::from(code));
-                            editor.menu = None;
-                            cx.notify();
-                        }),
-                    ));
+                    panel = panel.child(menu_item(("choice", usize::from(code)), name, mark, true).on_click(cx.listener(move |editor, _, _, cx| {
+                        write_cell(editor, row, at, |_| u32::from(code));
+                        editor.menu = None;
+                        cx.notify();
+                    })));
                 }
                 cell = cell.child(deferred(anchored().snap_to_window().child(panel)));
             }

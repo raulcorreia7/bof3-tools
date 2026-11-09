@@ -42,13 +42,7 @@ fn retail_textures_round_trip_byte_exactly() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_textures_round_trip_byte_exactly");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("texture,palette").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("texture,palette").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
@@ -60,8 +54,7 @@ fn retail_textures_round_trip_byte_exactly() {
 
     let (mut views, mut indexed, mut failures) = (0, 0, Vec::new());
     for path in &files {
-        let Some(stem) = path.file_name().and_then(|name| name.to_str()).and_then(|name| name.strip_suffix(".png"))
-        else {
+        let Some(stem) = path.file_name().and_then(|name| name.to_str()).and_then(|name| name.strip_suffix(".png")) else {
             continue;
         };
         let (slot, is_row) = match stem.split_once(".clut-") {
@@ -73,11 +66,7 @@ fn retail_textures_round_trip_byte_exactly() {
             (Ok(TextureImport::Words(payload)), false) => {
                 views += 1;
                 if payload != stored {
-                    failures.push(format!(
-                        "{}: the view does not return its {} stored bytes",
-                        path.display(),
-                        stored.len()
-                    ));
+                    failures.push(format!("{}: the view does not return its {} stored bytes", path.display(), stored.len()));
                 }
             }
             (Ok(TextureImport::Indexed(texture)), true) => {
@@ -88,10 +77,7 @@ fn retail_textures_round_trip_byte_exactly() {
                 let relative = path.parent().unwrap().strip_prefix(&texture_root).unwrap();
                 let mut banks = Vec::new();
                 files_under(&palette_root.join(relative), &mut banks);
-                let found = banks
-                    .iter()
-                    .filter_map(|bank| fs::read(bank).ok())
-                    .any(|bytes| holds_run(&bytes, &texture.palette));
+                let found = banks.iter().filter_map(|bank| fs::read(bank).ok()).any(|bytes| holds_run(&bytes, &texture.palette));
                 if !found {
                     failures.push(format!("{}: its CLUT row is not in a CLUT block of its archive", path.display()));
                 }
@@ -109,11 +95,7 @@ fn retail_textures_round_trip_byte_exactly() {
         let json = fs::read(json_path).unwrap();
         let stored = fs::read(json_path.with_extension("clut")).unwrap();
         if rebof3_formats::clut::import(&json).ok().as_deref() != Some(stored.as_slice()) {
-            failures.push(format!(
-                "{}: the JSON does not return its {} stored bytes",
-                json_path.display(),
-                stored.len()
-            ));
+            failures.push(format!("{}: the JSON does not return its {} stored bytes", json_path.display(), stored.len()));
         }
         if rebof3_formats::clut::export(&stored).ok().as_deref() != Some(json.as_slice()) {
             failures.push(format!("{}: the export does not reproduce the JSON", json_path.display()));
@@ -136,13 +118,7 @@ fn retail_terrains_round_trip_byte_exactly() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_terrains_round_trip_byte_exactly");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("area-map").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("area-map").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
@@ -154,14 +130,8 @@ fn retail_terrains_round_trip_byte_exactly() {
         terrains += 1;
         let stored = fs::read(glb.with_extension("map")).unwrap();
         for mesh in [glb.clone(), glb.with_extension("obj")] {
-            if rebof3_formats::map::terrain::import(&fs::read(&mesh).unwrap(), &stored).ok().as_deref()
-                != Some(stored.as_slice())
-            {
-                failures.push(format!(
-                    "{}: the mesh does not return its {} stored bytes",
-                    mesh.display(),
-                    stored.len()
-                ));
+            if rebof3_formats::map::terrain::import(&fs::read(&mesh).unwrap(), &stored).ok().as_deref() != Some(stored.as_slice()) {
+                failures.push(format!("{}: the mesh does not return its {} stored bytes", mesh.display(), stored.len()));
             }
         }
     }
@@ -178,13 +148,7 @@ fn retail_vags_round_trip_through_adpcm() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_vags_round_trip_through_adpcm");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("audio-bank").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("audio-bank").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
@@ -192,14 +156,8 @@ fn retail_vags_round_trip_through_adpcm() {
     let is_bank = |row: &&Row| row.role == "raw" && row.kind == Kind::AudioBank;
     let (mut vags, mut identical, mut failures) = (0, 0, Vec::new());
     for header_row in report.rows.iter().filter(is_bank).filter(|row| row.file_type == Some(6)) {
-        let body_row = report
-            .rows
-            .iter()
-            .filter(is_bank)
-            .find(|row| {
-                row.file_type == Some(7) && row.source == header_row.source && row.load_arg == header_row.load_arg
-            })
-            .expect("every VAB header has its body");
+        let body_row =
+            report.rows.iter().filter(is_bank).find(|row| row.file_type == Some(7) && row.source == header_row.source && row.load_arg == header_row.load_arg).expect("every VAB header has its body");
         let header_path = dir.join(header_row.output.as_deref().unwrap());
         let header = fs::read(&header_path).unwrap();
         let body = fs::read(dir.join(body_row.output.as_deref().unwrap())).unwrap();
@@ -225,8 +183,7 @@ fn retail_vags_round_trip_through_adpcm() {
             }
             let wav = rebof3_formats::vab::vag::pcm_wav(&pcm).unwrap();
             if rebof3_formats::vab::vag::vab_vag_wav(&header, &body, number).ok().as_deref() != Some(wav.as_slice()) {
-                failures
-                    .push(format!("{} VAG {index}: the bank export differs from its samples", header_path.display()));
+                failures.push(format!("{} VAG {index}: the bank export differs from its samples", header_path.display()));
             }
             if rebof3_formats::vab::vag::import(&wav).unwrap() != encoded {
                 failures.push(format!("{} VAG {index}: the WAVE path differs from the samples", header_path.display()));
@@ -245,43 +202,21 @@ fn retail_tables_round_trip_byte_exactly() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_tables_round_trip_byte_exactly");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("data-table,code").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("data-table,code").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
     // The eight tables are in entry 0 of ETC/GAME.EMI, which the code kind writes as its stored bytes.
-    let entry = report
-        .rows
-        .iter()
-        .find(|row| {
-            row.kind == Kind::Code && row.role == "raw" && row.source == "BIN/ETC/GAME.EMI" && row.slot == Some(0)
-        })
-        .expect("ETC/GAME.EMI entry 0 is written as code");
+    let entry = report.rows.iter().find(|row| row.kind == Kind::Code && row.role == "raw" && row.source == "BIN/ETC/GAME.EMI" && row.slot == Some(0)).expect("ETC/GAME.EMI entry 0 is written as code");
     let payload = fs::read(dir.join(entry.output.as_deref().unwrap())).unwrap();
     for table in TABLES {
         let suffix = format!("/{}.json", table.name);
-        let json_row = report
-            .rows
-            .iter()
-            .find(|row| {
-                row.kind == Kind::DataTable && row.output.as_deref().is_some_and(|path| path.ends_with(&suffix))
-            })
-            .unwrap_or_else(|| panic!("{} has a JSON file", table.name));
+        let json_row =
+            report.rows.iter().find(|row| row.kind == Kind::DataTable && row.output.as_deref().is_some_and(|path| path.ends_with(&suffix))).unwrap_or_else(|| panic!("{} has a JSON file", table.name));
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
         let start = table.archive_offset - PAYLOAD_START;
         let stored = &payload[start..start + table.count * table.record];
-        assert_eq!(
-            rebof3_formats::game_tables::open::import_in_payload(table.name, &json, &payload).unwrap(),
-            stored,
-            "{}",
-            table.name
-        );
+        assert_eq!(rebof3_formats::game_tables::open::import_in_payload(table.name, &json, &payload).unwrap(), stored, "{}", table.name);
     }
     eprintln!("game table round trip: {} tables return their stored bytes from their JSON", TABLES.len());
 }
@@ -292,31 +227,16 @@ fn retail_encounters_round_trip_byte_exactly() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_encounters_round_trip_byte_exactly");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("area-encounters").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("area-encounters").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let blocks: Vec<&Row> =
-        report.rows.iter().filter(|row| row.kind == Kind::AreaEncounters && row.role == "raw").collect();
+    let blocks: Vec<&Row> = report.rows.iter().filter(|row| row.kind == Kind::AreaEncounters && row.role == "raw").collect();
     assert!(!blocks.is_empty(), "no encounter block was written");
     let mut failures = Vec::new();
     for block in &blocks {
-        let json_row = report
-            .rows
-            .iter()
-            .find(|row| {
-                row.kind == Kind::AreaEncounters
-                    && row.role == "json"
-                    && row.source == block.source
-                    && row.slot == block.slot
-            })
-            .expect("every encounter block has its JSON");
+        let json_row =
+            report.rows.iter().find(|row| row.kind == Kind::AreaEncounters && row.role == "json" && row.source == block.source && row.slot == block.slot).expect("every encounter block has its JSON");
         let stored = fs::read(dir.join(block.output.as_deref().unwrap())).unwrap();
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
         if rebof3_formats::encounter::open::import(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
@@ -335,13 +255,7 @@ fn retail_map_layouts_round_trip_byte_exactly() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_map_layouts_round_trip_byte_exactly");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("area-map").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("area-map").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
@@ -353,11 +267,7 @@ fn retail_map_layouts_round_trip_byte_exactly() {
             .rows
             .iter()
             .find(|row| {
-                row.kind == Kind::AreaMap
-                    && row.role == "json"
-                    && row.source == bundle.source
-                    && row.slot == bundle.slot
-                    && row.output.as_deref().is_some_and(|path| path.ends_with(".layout.json"))
+                row.kind == Kind::AreaMap && row.role == "json" && row.source == bundle.source && row.slot == bundle.slot && row.output.as_deref().is_some_and(|path| path.ends_with(".layout.json"))
             })
             .expect("every map bundle has its layout JSON");
         let stored = fs::read(dir.join(bundle.output.as_deref().unwrap())).unwrap();
@@ -379,12 +289,7 @@ fn retail_emi_containers_rebuild_byte_exactly() {
     };
     let mut image = psx_cd::Image::open(&image_path).unwrap();
     let entries = image.entries().unwrap();
-    let containers: Vec<&psx_cd::Entry> = entries
-        .iter()
-        .filter(|entry| {
-            !entry.is_directory && entry.path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("EMI"))
-        })
-        .collect();
+    let containers: Vec<&psx_cd::Entry> = entries.iter().filter(|entry| !entry.is_directory && entry.path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("EMI"))).collect();
     assert!(!containers.is_empty(), "no EMI container on the disc");
 
     let mut failures = Vec::new();
@@ -412,10 +317,7 @@ fn retail_emi_containers_rebuild_byte_exactly() {
     }
 
     assert!(failures.is_empty(), "{} containers do not rebuild:\n{}", failures.len(), failures.join("\n"));
-    eprintln!(
-        "EMI rebuild: {} containers rebuild byte-exactly; a replaced entry changes only itself",
-        containers.len()
-    );
+    eprintln!("EMI rebuild: {} containers rebuild byte-exactly; a replaced entry changes only itself", containers.len());
 }
 
 /// Every sequence package on the disc comes back from its MIDI files: each sequence reads back from the MIDI
@@ -426,18 +328,11 @@ fn retail_sequences_round_trip_through_midi() {
         return;
     };
     let dir = support::scratch_dir("round_trip-retail_sequences_round_trip_through_midi");
-    let options = Options {
-        image,
-        out: dir.to_path_buf(),
-        selection: Selection::parse("audio-sequence").unwrap(),
-        write: true,
-        jobs: 2,
-    };
+    let options = Options { image, out: dir.to_path_buf(), selection: Selection::parse("audio-sequence").unwrap(), write: true, jobs: 2 };
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let packages: Vec<&Row> =
-        report.rows.iter().filter(|row| row.kind == Kind::AudioSequence && row.role == "raw").collect();
+    let packages: Vec<&Row> = report.rows.iter().filter(|row| row.kind == Kind::AudioSequence && row.role == "raw").collect();
     assert!(!packages.is_empty(), "no sequence package was written");
     let (mut sequences, mut failures) = (0, Vec::new());
     for package_row in &packages {
@@ -461,23 +356,14 @@ fn retail_sequences_round_trip_through_midi() {
             };
             match psx_formats::sep::Sequence::from_midi(&midi, sequence.seq_id) {
                 Ok(back) if back == *sequence => rebuilt.push(back),
-                Ok(_) => {
-                    failures.push(format!("{} sequence {index}: the MIDI reads back differently", package_row.source))
-                }
+                Ok(_) => failures.push(format!("{} sequence {index}: the MIDI reads back differently", package_row.source)),
                 Err(error) => failures.push(format!("{} sequence {index}: {error}", package_row.source)),
             }
         }
         if (psx_formats::sep::Package { sequences: rebuilt }).encode() != stored {
-            failures.push(format!(
-                "{}: the package does not encode to its {} stored bytes",
-                package_row.source,
-                stored.len()
-            ));
+            failures.push(format!("{}: the package does not encode to its {} stored bytes", package_row.source, stored.len()));
         }
     }
     assert!(failures.is_empty(), "{} sequences do not round trip:\n{}", failures.len(), failures.join("\n"));
-    eprintln!(
-        "sequence round trip: {} packages, {sequences} sequences return their stored bytes from MIDI",
-        packages.len()
-    );
+    eprintln!("sequence round trip: {} packages, {sequences} sequences return their stored bytes from MIDI", packages.len());
 }

@@ -283,10 +283,7 @@ fn section(bytes: &[u8], base: usize, end: usize) -> Result<ScriptSection, Error
     for (start, stop) in distinct.iter().zip(&bounds) {
         records.push(bytes[base + *start..base + *stop].to_vec());
     }
-    let slots: Vec<u16> = offsets
-        .iter()
-        .map(|offset| distinct.iter().position(|candidate| *candidate == *offset as usize).unwrap() as u16)
-        .collect();
+    let slots: Vec<u16> = offsets.iter().map(|offset| distinct.iter().position(|candidate| *candidate == *offset as usize).unwrap() as u16).collect();
     Ok(ScriptSection { table_bytes: table_bytes as u16, offsets, slots, records })
 }
 
@@ -304,10 +301,7 @@ fn hex(bytes: &[u8]) -> String {
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
     let table = ScriptTable::decode(payload)?;
     let listing = text::write(&program::Program::from_table(&table)).into_bytes();
-    Ok(vec![
-        Derived { role: "json", extension: "json", data: table.json().into_bytes() },
-        Derived { role: "script", extension: "txt", data: listing },
-    ])
+    Ok(vec![Derived { role: "json", extension: "json", data: table.json().into_bytes() }, Derived { role: "script", extension: "txt", data: listing }])
 }
 
 #[cfg(test)]

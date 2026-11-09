@@ -64,25 +64,12 @@ pub fn open(image: &Path) -> Result<Library<'static>> {
 /// render on all cores. Each file goes to `emit` in catalog order as soon as it and the
 /// items before it are rendered, so the run holds a few clips at a time. The result is one line
 /// per item that could not be rendered, in catalog order.
-pub fn render(
-    library: &Library<'_>,
-    wanted: impl Fn(Kind) -> bool,
-    mode: Mode,
-    container: AudioFormat,
-    emit: impl FnMut(Clip) -> Result<()>,
-) -> Result<Vec<String>> {
+pub fn render(library: &Library<'_>, wanted: impl Fn(Kind) -> bool, mode: Mode, container: AudioFormat, emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<String>> {
     let jobs = thread::available_parallelism().map_or(1, NonZeroUsize::get);
     render_with_jobs(library, wanted, mode, container, jobs, emit)
 }
 
-pub(crate) fn render_with_jobs(
-    library: &Library<'_>,
-    wanted: impl Fn(Kind) -> bool,
-    mode: Mode,
-    container: AudioFormat,
-    jobs: usize,
-    mut emit: impl FnMut(Clip) -> Result<()>,
-) -> Result<Vec<String>> {
+pub(crate) fn render_with_jobs(library: &Library<'_>, wanted: impl Fn(Kind) -> bool, mode: Mode, container: AudioFormat, jobs: usize, mut emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<String>> {
     let work: Vec<(&Item, Kind)> = library
         .catalog()
         .items()
@@ -105,8 +92,7 @@ pub(crate) fn render_with_jobs(
                     let Some(&(item, kind)) = work.get(index) else {
                         return;
                     };
-                    let result =
-                        clip(library, item, kind, mode, container).map_err(|error| format!("{}: {error}", item.id));
+                    let result = clip(library, item, kind, mode, container).map_err(|error| format!("{}: {error}", item.id));
                     if sender.send((index, result)).is_err() {
                         return;
                     }
@@ -159,9 +145,7 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
                 pcm.truncate(end);
             }
         }
-        let (loop_start, loop_length) = window.map_or((None, None), |(start, end)| {
-            (Some((start * f64::from(rate)).round() as u64), Some(((end - start) * f64::from(rate)).round() as u64))
-        });
+        let (loop_start, loop_length) = window.map_or((None, None), |(start, end)| (Some((start * f64::from(rate)).round() as u64), Some(((end - start) * f64::from(rate)).round() as u64)));
         let tags = Tags {
             title: if item.title.is_empty() { item.name.as_str() } else { item.title.as_str() },
             artist: if music { "Breath of Fire III" } else { "" },
@@ -178,10 +162,7 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
     let stem = Path::new(&item.path).with_extension("");
     let name = item.id.replace([':', '#'], "-");
     let evidence = match item.kind {
-        ItemKind::Music => format!(
-            "bof3player catalog item {}; bank {} of {} (its .vh/.vb pair in audio-bank)",
-            item.id, item.bank, item.path
-        ),
+        ItemKind::Music => format!("bof3player catalog item {}; bank {} of {} (its .vh/.vb pair in audio-bank)", item.id, item.bank, item.path),
         ItemKind::Sample => {
             format!("bof3player catalog item {}; bank {}, sample {}", item.id, item.bank, item.sub_index)
         }
@@ -189,10 +170,7 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
     };
     // A sample's original bytes are its waveform data, as the VAB body stores them.
     let original = match item.kind {
-        ItemKind::Sample if mode.writes("vag", true) => library
-            .export_vag(item)
-            .ok()
-            .map(|bytes| Original { output: format!("{}/{}/{name}.vag", kind.name(), stem.display()), bytes }),
+        ItemKind::Sample if mode.writes("vag", true) => library.export_vag(item).ok().map(|bytes| Original { output: format!("{}/{}/{name}.vag", kind.name(), stem.display()), bytes }),
         _ => None,
     };
     Ok(Clip {
@@ -202,21 +180,13 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
         evidence,
         source: item.path.clone(),
         bytes,
-        midi: (item.kind == ItemKind::Music && mode.writes("midi", true))
-            .then(|| library.export_midi(item).map_err(audio))
-            .transpose()?,
+        midi: (item.kind == ItemKind::Music && mode.writes("midi", true)).then(|| library.export_midi(item).map_err(audio)).transpose()?,
         original,
     })
 }
 
 /// Encodes interleaved PCM in the selected container, with `title` in the tags.
-pub(crate) fn encode(
-    container: AudioFormat,
-    pcm: &[i16],
-    rate: u32,
-    channels: u32,
-    tags: &Tags<'_>,
-) -> Result<Vec<u8>> {
+pub(crate) fn encode(container: AudioFormat, pcm: &[i16], rate: u32, channels: u32, tags: &Tags<'_>) -> Result<Vec<u8>> {
     match container {
         AudioFormat::Wav => export::wav_bytes(pcm, rate, channels),
         AudioFormat::Flac => export::flac_bytes(pcm, rate, channels, tags),

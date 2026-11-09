@@ -1,10 +1,7 @@
 //! The OpenGL ES renderer draws what the software renderer draws. Without an EGL display (a CI runner
 //! with no GPU or Mesa) the comparison skips and says why.
 
-use rebof3_render::{
-    Backend, Blend, Camera, Depth, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT,
-    VRAM_WIDTH, software,
-};
+use rebof3_render::{Backend, Blend, Camera, Depth, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, software};
 
 /// A VRAM with an 8-bit page at (64, 0) whose texel at `(u, v)` is `(u + v) & 0xFF`, a 4-bit page at
 /// (128, 0) whose texel is `u & 15`, and a CLUT row 480 mapping index `i` to a colour with bit 15 on
@@ -37,14 +34,8 @@ fn scene() -> Scene {
     let glass = [[-300.0, 100.0, 100.0], [0.0, 100.0, 100.0], [-300.0, 0.0, 100.0], [0.0, 0.0, 100.0]];
     let sign = [[100.0, 120.0, 150.0], [250.0, 120.0, 150.0], [100.0, 20.0, 150.0], [250.0, 20.0, 150.0]];
     let eight = |uvs| Texture::Vram { page: [64, 0], clut: [0, 480], depth: Depth::Eight, uvs };
-    let four = Texture::Vram {
-        page: [128, 0],
-        clut: [16, 480],
-        depth: Depth::Four,
-        uvs: [[0, 0], [63, 0], [0, 63], [63, 63]],
-    };
-    let image =
-        Image { width: 2, height: 2, rgba: vec![255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 0, 255, 255, 255, 255] };
+    let four = Texture::Vram { page: [128, 0], clut: [16, 480], depth: Depth::Four, uvs: [[0, 0], [63, 0], [0, 63], [63, 63]] };
+    let image = Image { width: 2, height: 2, rgba: vec![255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 0, 255, 255, 255, 255] };
     Scene {
         vram: vram(),
         images: vec![image],
@@ -53,12 +44,7 @@ fn scene() -> Scene {
             quad(ground, eight([[0, 0], [255, 0], [0, 255], [255, 255]]), [NEUTRAL_SHADE; 4], Blend::Opaque),
             quad(wall, four, [0x60, 0x80, 0xA0, 0xFF], Blend::Opaque),
             quad(glass, eight([[10, 10], [90, 10], [10, 90], [90, 90]]), [NEUTRAL_SHADE; 4], Blend::Psx(0)),
-            quad(
-                sign,
-                Texture::Image { image: 0, uvs: [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] },
-                [255; 4],
-                Blend::Alpha,
-            ),
+            quad(sign, Texture::Image { image: 0, uvs: [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] }, [255; 4], Blend::Alpha),
         ],
     }
 }
@@ -77,12 +63,7 @@ fn gles_draws_what_software_draws() {
     assert_eq!(renderer.backend(), Backend::Gles, "{:?}", renderer.fallback);
     let soft = software::draw(&scene, &camera, width, height);
 
-    let differing = gles
-        .rgba
-        .chunks(4)
-        .zip(soft.rgba.chunks(4))
-        .filter(|(left, right)| left.iter().zip(right.iter()).any(|(a, b)| a.abs_diff(*b) > 2))
-        .count();
+    let differing = gles.rgba.chunks(4).zip(soft.rgba.chunks(4)).filter(|(left, right)| left.iter().zip(right.iter()).any(|(a, b)| a.abs_diff(*b) > 2)).count();
     if let Some(dir) = std::env::var_os("RENDER_DUMP") {
         let dir = std::path::PathBuf::from(dir);
         for (name, frame) in [("gles", &gles), ("soft", &soft)] {

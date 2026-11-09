@@ -29,10 +29,7 @@ impl Rule {
     /// One line of evidence for the join.
     pub fn evidence(&self) -> String {
         match self {
-            Rule::Site(site) => format!(
-                "{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {:#06x}",
-                site.archive, site.overlay, site.function, site.source, site.tpage, site.clut
-            ),
+            Rule::Site(site) => format!("{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {:#06x}", site.archive, site.overlay, site.function, site.source, site.tpage, site.clut),
             Rule::Terrain(descriptor) => {
                 format!("world-map tile descriptor {descriptor:#010x} (func_80155560)")
             }
@@ -71,8 +68,7 @@ pub fn resolve(vram: &Vram, page_x: u16, page_y: u16, clut: Clut, depth: Depth) 
 pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32]) -> Vec<Join> {
     let mut joins: Vec<Join> = Vec::new();
     let mut push = |join: Join| {
-        let seen =
-            joins.iter().any(|old| old.texture == join.texture && old.clut == join.clut && old.depth == join.depth);
+        let seen = joins.iter().any(|old| old.texture == join.texture && old.clut == join.clut && old.depth == join.depth);
         if !seen {
             joins.push(join);
         }

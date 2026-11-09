@@ -21,20 +21,8 @@ pub enum Encoding {
 
 /// Punctuation that draws as one byte. The high slots `0x8D` and `0x8F` are spelled with the fullwidth characters,
 /// so each slot keeps its own spelling.
-const PUNCTUATION: &[(u8, char)] = &[
-    (0x3A, ':'),
-    (0x3B, ';'),
-    (0x3C, ','),
-    (0x3D, '-'),
-    (0x3E, '.'),
-    (0x5C, '?'),
-    (0x5D, '!'),
-    (0x8B, '+'),
-    (0x8D, '\u{FF0C}'),
-    (0x8E, '\''),
-    (0x8F, '\u{FF1A}'),
-    (0xFF, ' '),
-];
+const PUNCTUATION: &[(u8, char)] =
+    &[(0x3A, ':'), (0x3B, ';'), (0x3C, ','), (0x3D, '-'), (0x3E, '.'), (0x5C, '?'), (0x5D, '!'), (0x8B, '+'), (0x8D, '\u{FF0C}'), (0x8E, '\''), (0x8F, '\u{FF1A}'), (0xFF, ' ')];
 
 /// Codes that take no operand, with their tags.
 const MESSAGE_SINGLE: &[(u8, &str)] = &[
@@ -56,19 +44,8 @@ const NAME_SINGLE: &[(u8, &str)] = &[(0x00, "END")];
 const ASCII_SINGLE: &[(u8, &str)] = &[(0x00, "END"), (0x09, "TAB"), (0x0A, "NEWLINE"), (0x0D, "CR")];
 
 /// Codes followed by one operand byte, with their tags. The operand is written as two hex digits.
-const OPERAND: &[(u8, &str)] = &[
-    (0x04, "INSERT"),
-    (0x05, "COLOR"),
-    (0x07, "VAR"),
-    (0x08, "LINK"),
-    (0x0A, "SE"),
-    (0x0C, "BOX"),
-    (0x12, "SKIP12"),
-    (0x13, "SKIP13"),
-    (0x14, "CHOICE"),
-    (0x15, "NUM"),
-    (0x16, "BOXEND"),
-];
+const OPERAND: &[(u8, &str)] =
+    &[(0x04, "INSERT"), (0x05, "COLOR"), (0x07, "VAR"), (0x08, "LINK"), (0x0A, "SE"), (0x0C, "BOX"), (0x12, "SKIP12"), (0x13, "SKIP13"), (0x14, "CHOICE"), (0x15, "NUM"), (0x16, "BOXEND")];
 
 impl Encoding {
     pub(crate) fn singles(self) -> &'static [(u8, &'static str)] {
@@ -211,9 +188,7 @@ pub fn encode(encoding: Encoding, text: &str) -> Result<Vec<u8>> {
             continue;
         }
         let glyph = chars[at];
-        let code = encoding
-            .code_of(glyph)
-            .ok_or_else(|| Error::Text(format!("character {glyph:?} at {at} is not in the {encoding:?} encoding")))?;
+        let code = encoding.code_of(glyph).ok_or_else(|| Error::Text(format!("character {glyph:?} at {at} is not in the {encoding:?} encoding")))?;
         out.push(code);
         at += 1;
     }
@@ -226,13 +201,11 @@ fn push_tag(encoding: Encoding, tag: &Tag, out: &mut Vec<u8>) -> Result<()> {
     match &tag.operand {
         Some(hex) if body == "RAW" => out.push(byte_of(hex, body)?),
         None => {
-            let code =
-                code_for(encoding.singles(), body).ok_or_else(|| Error::Text(format!("unknown tag {{{body}}}")))?;
+            let code = code_for(encoding.singles(), body).ok_or_else(|| Error::Text(format!("unknown tag {{{body}}}")))?;
             out.push(code);
         }
         Some(hex) => {
-            let code = code_for(encoding.operands(), body)
-                .ok_or_else(|| Error::Text(format!("unknown tag {{{body}:{hex}}}")))?;
+            let code = code_for(encoding.operands(), body).ok_or_else(|| Error::Text(format!("unknown tag {{{body}:{hex}}}")))?;
             out.extend_from_slice(&[code, byte_of(hex, body)?]);
         }
     }

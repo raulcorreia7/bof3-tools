@@ -26,9 +26,7 @@ pub fn problems(layout: &Layout, font: &Font) -> Vec<Problem> {
                 say(format!("line {} reaches x {right}, past the {width} pixel window", line + 1));
             }
         }
-        let visible = (0..page.lines)
-            .take_while(|&line| TEXT_ORIGIN.1 + line as i32 * LINE_STEP + GLYPH_DROP + CELL_HEIGHT as i32 <= height)
-            .count();
+        let visible = (0..page.lines).take_while(|&line| TEXT_ORIGIN.1 + line as i32 * LINE_STEP + GLYPH_DROP + CELL_HEIGHT as i32 <= height).count();
         if page.lines > visible {
             say(format!("{} lines on the page; the {height} pixel window shows {visible}", page.lines));
         }

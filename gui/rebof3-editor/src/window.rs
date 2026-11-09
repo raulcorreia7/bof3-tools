@@ -1,10 +1,7 @@
 //! Drawing the editor window: a menu bar, the archive browser on the left, the entry list next to
 //! it, the entry views in the middle and a status line at the bottom.
 
-use gpui::{
-    AnyElement, ClickEvent, Context, Div, FontWeight, IntoElement, Render, Window, anchored, deferred, div, prelude::*,
-    px, uniform_list,
-};
+use gpui::{AnyElement, ClickEvent, Context, Div, FontWeight, IntoElement, Render, Window, anchored, deferred, div, prelude::*, px, uniform_list};
 use rebof3_formats::Format;
 
 use crate::app::{BrowserRow, Editor, Field, Menu};
@@ -12,10 +9,7 @@ use crate::catalog::Mode;
 use crate::fonts;
 use crate::theme::{self, BACKGROUND, BORDER, EDITED, MUTED, PANEL, TEXT, color};
 use crate::view;
-use crate::widgets::{
-    CONTROL_HEIGHT, GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, button, field, menu_item, menu_panel, mono, muted,
-    selectable, separator, strong, tab, tip,
-};
+use crate::widgets::{CONTROL_HEIGHT, GAP, GAP_SECTION, GAP_SMALL, ROW_HEIGHT, button, field, menu_item, menu_panel, mono, muted, selectable, separator, strong, tab, tip};
 
 /// Width of the archive list and of the entry list, in pixels.
 const ARCHIVES_WIDTH: f32 = 300.0;
@@ -75,8 +69,7 @@ impl Render for Editor {
 impl Editor {
     fn menu_bar(&self, cx: &mut Context<Self>) -> Div {
         let open = self.project.is_some();
-        let (undo, redo) =
-            self.project.as_ref().map_or((false, false), |project| (project.can_undo(), project.can_redo()));
+        let (undo, redo) = self.project.as_ref().map_or((false, false), |project| (project.can_undo(), project.can_redo()));
         let edited = self.is_entry_edited();
 
         let project_menu = self.menu(Menu::Project, "Project", cx, |cx| {
@@ -95,9 +88,7 @@ impl Editor {
             ]
         });
 
-        let go_menu = self.menu(Menu::Go, "Go", cx, |cx| {
-            vec![action("tables", "Game tables (ETC/GAME.EMI)", "", open, cx, Editor::go_to_game_tables)]
-        });
+        let go_menu = self.menu(Menu::Go, "Go", cx, |cx| vec![action("tables", "Game tables (ETC/GAME.EMI)", "", open, cx, Editor::go_to_game_tables)]);
 
         div()
             .flex()
@@ -116,13 +107,7 @@ impl Editor {
     }
 
     /// A menu title, and the open menu under it.
-    fn menu(
-        &self,
-        which: Menu,
-        title: &'static str,
-        cx: &mut Context<Self>,
-        items: impl FnOnce(&mut Context<Self>) -> Vec<AnyElement>,
-    ) -> Div {
+    fn menu(&self, which: Menu, title: &'static str, cx: &mut Context<Self>, items: impl FnOnce(&mut Context<Self>) -> Vec<AnyElement>) -> Div {
         let opened = self.menu == Some(which);
         let title = div()
             .id(title)
@@ -162,12 +147,10 @@ impl Editor {
                 .items_center()
                 .gap(px(GAP))
                 .child(div().w(px(PATH_LABEL_WIDTH)).child(label))
-                .child(field(label, text, hint, edit, Some(PATH_WIDTH)).on_click(cx.listener(
-                    move |editor, _, _, cx| {
-                        editor.start_editing(which, text_owned.clone());
-                        cx.notify();
-                    },
-                )))
+                .child(field(label, text, hint, edit, Some(PATH_WIDTH)).on_click(cx.listener(move |editor, _, _, cx| {
+                    editor.start_editing(which, text_owned.clone());
+                    cx.notify();
+                })))
                 .child(button((label, 1usize), "Browse…", true).on_click(cx.listener(move |editor, _, _, cx| {
                     editor.browse(which, cx);
                 })))
@@ -187,12 +170,10 @@ impl Editor {
             .child(div().h(px(WELCOME_GAP)))
             .child(path_row("Disc folder", Field::Disc, &self.disc_field, "the folder that holds BIN/", cx))
             .child(path_row("Project folder", Field::Folder, &self.folder_field, "where edits go", cx))
-            .child(button("open", "Open", true).mt(px(GAP)).font_weight(FontWeight::BOLD).on_click(cx.listener(
-                |editor, _, _, cx| {
-                    editor.open();
-                    cx.notify();
-                },
-            )))
+            .child(button("open", "Open", true).mt(px(GAP)).font_weight(FontWeight::BOLD).on_click(cx.listener(|editor, _, _, cx| {
+                editor.open();
+                cx.notify();
+            })))
     }
 
     fn workspace(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -206,12 +187,10 @@ impl Editor {
     fn browser(&self, cx: &mut Context<Self>) -> Div {
         let edit = self.editing.as_ref().filter(|(field, _)| *field == Field::ArchiveFilter).map(|(_, edit)| edit);
         let filter_text = self.filter.clone();
-        let filter = field("archive-filter", &self.filter, "Filter archives", edit, None).on_click(cx.listener(
-            move |editor, _, _, cx| {
-                editor.start_editing(Field::ArchiveFilter, filter_text.clone());
-                cx.notify();
-            },
-        ));
+        let filter = field("archive-filter", &self.filter, "Filter archives", edit, None).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.start_editing(Field::ArchiveFilter, filter_text.clone());
+            cx.notify();
+        }));
 
         let count = self.browser_rows().len();
         let list = uniform_list(
@@ -227,13 +206,10 @@ impl Editor {
                             BrowserRow::Folder { name, open } => {
                                 let name = name.clone();
                                 let arrow = if *open { "▾" } else { "▸" };
-                                selectable(("folder", at), false)
-                                    .h(px(ROW_HEIGHT))
-                                    .child(format!("{arrow} {name}"))
-                                    .on_click(cx.listener(move |editor, _, _, cx| {
-                                        editor.toggle_folder(&name);
-                                        cx.notify();
-                                    }))
+                                selectable(("folder", at), false).h(px(ROW_HEIGHT)).child(format!("{arrow} {name}")).on_click(cx.listener(move |editor, _, _, cx| {
+                                    editor.toggle_folder(&name);
+                                    cx.notify();
+                                }))
                             }
                             BrowserRow::Archive { path, edited } => {
                                 let (_, file) = path.split();
@@ -258,12 +234,10 @@ impl Editor {
         .flex_1();
 
         let modes = div().flex().flex_none().gap(px(GAP_SMALL)).children([Mode::Game, Mode::Disc].map(|mode| {
-            tab(("mode", mode as usize), mode.label(), mode == self.mode).on_click(cx.listener(
-                move |editor, _, _, cx| {
-                    editor.set_mode(mode);
-                    cx.notify();
-                },
-            ))
+            tab(("mode", mode as usize), mode.label(), mode == self.mode).on_click(cx.listener(move |editor, _, _, cx| {
+                editor.set_mode(mode);
+                cx.notify();
+            }))
         }));
         let tree = match self.mode {
             Mode::Disc => list.into_any_element(),
@@ -347,8 +321,7 @@ impl Editor {
                         let edited = project.is_edited(&(archive.path.clone(), index));
                         let (tag, tag_color) = theme::tag(format);
                         let size = project.payload(archive, index).len();
-                        let label =
-                            format!("{index:>INDEX_COLUMNS$}  {:<NAME_COLUMNS$} {size:>SIZE_COLUMNS$}", format.name());
+                        let label = format!("{index:>INDEX_COLUMNS$}  {:<NAME_COLUMNS$} {size:>SIZE_COLUMNS$}", format.name());
                         let text_color = match (edited, format) {
                             (true, _) => color(EDITED),
                             (false, Format::Unclassified) => color(MUTED),
@@ -358,12 +331,7 @@ impl Editor {
                             .h(px(ROW_HEIGHT))
                             .gap(px(GAP))
                             .font_family(fonts::mono())
-                            .child(
-                                div()
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(color(tag_color))
-                                    .child(format!("{tag:<TAG_COLUMNS$}")),
-                            )
+                            .child(div().font_weight(FontWeight::BOLD).text_color(color(tag_color)).child(format!("{tag:<TAG_COLUMNS$}")))
                             .child(div().text_color(text_color).whitespace_nowrap().child(label))
                             .tooltip(tip(format!("type {}  load {:#010X}", toc.file_type, toc.ram_ptr)))
                             .on_click(cx.listener(move |editor, _: &ClickEvent, _, cx| {
@@ -389,16 +357,7 @@ impl Editor {
     }
 
     fn status_line(&self) -> Div {
-        let mut line = div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(GAP))
-            .h(px(CONTROL_HEIGHT))
-            .px(px(GAP))
-            .bg(color(PANEL))
-            .border_t_1()
-            .border_color(color(BORDER));
+        let mut line = div().flex().flex_none().items_center().gap(px(GAP)).h(px(CONTROL_HEIGHT)).px(px(GAP)).bg(color(PANEL)).border_t_1().border_color(color(BORDER));
         if let Some(project) = self.project.as_ref() {
             let dirty = if project.is_dirty() { "unsaved" } else { "saved" };
             line = line.child(mono(format!("{} edits ({dirty})", project.edit_count()))).child(separator(true));
@@ -414,17 +373,7 @@ fn line_has_children(entry: Option<usize>) -> bool {
 
 /// A list column at the side of the window.
 fn side_panel(width: f32) -> Div {
-    div()
-        .flex()
-        .flex_col()
-        .flex_none()
-        .w(px(width))
-        .h_full()
-        .gap(px(GAP_SMALL))
-        .p(px(GAP_SMALL))
-        .bg(color(PANEL))
-        .border_r_1()
-        .border_color(color(BORDER))
+    div().flex().flex_col().flex_none().w(px(width)).h_full().gap(px(GAP_SMALL)).p(px(GAP_SMALL)).bg(color(PANEL)).border_r_1().border_color(color(BORDER))
 }
 
 /// The menu line that closes the project, after asking about unsaved edits.
@@ -439,14 +388,7 @@ fn close_action(cx: &mut Context<Editor>) -> AnyElement {
 }
 
 /// A menu line that runs `run` and closes the menu.
-fn action(
-    id: &'static str,
-    label: &str,
-    shortcut: &str,
-    enabled: bool,
-    cx: &mut Context<Editor>,
-    run: fn(&mut Editor),
-) -> AnyElement {
+fn action(id: &'static str, label: &str, shortcut: &str, enabled: bool, cx: &mut Context<Editor>, run: fn(&mut Editor)) -> AnyElement {
     let item = menu_item(id, label, shortcut, enabled);
     if !enabled {
         return item.into_any_element();

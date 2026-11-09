@@ -1,10 +1,7 @@
 //! The software renderer: the GPU's polygon rules on the CPU, with a depth buffer.
 
 use crate::math::{self, barycentric};
-use crate::{
-    Blend, Camera, Depth, Frame, Image, NEUTRAL_SHADE, Primitive, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH,
-    draw_order,
-};
+use crate::{Blend, Camera, Depth, Frame, Image, NEUTRAL_SHADE, Primitive, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, draw_order};
 
 /// A clipped corner: its view position and texture coordinate.
 #[derive(Clone, Copy)]
@@ -19,12 +16,7 @@ pub const TRIANGLES: [[usize; 3]; 2] = [[0, 1, 2], [1, 2, 3]];
 
 /// Draws `scene` through `camera` into a `width` x `height` frame.
 pub fn draw(scene: &Scene, camera: &Camera, width: usize, height: usize) -> Frame {
-    let mut target = Target {
-        width,
-        height,
-        rgb: vec![[scene.background[0], scene.background[1], scene.background[2]]; width * height],
-        depth: vec![0.0; width * height],
-    };
+    let mut target = Target { width, height, rgb: vec![[scene.background[0], scene.background[1], scene.background[2]]; width * height], depth: vec![0.0; width * height] };
     for index in draw_order(scene, camera) {
         target.primitive(scene, camera, &scene.primitives[index]);
     }
@@ -49,8 +41,7 @@ impl Target {
             Texture::Vram { uvs, .. } => uvs.map(|[u, v]| [f32::from(u), f32::from(v)]),
             Texture::Image { uvs, .. } => uvs,
         };
-        let corners: [Corner; 4] =
-            std::array::from_fn(|corner| Corner { view: camera.view(primitive.corners[corner]), uv: uvs[corner] });
+        let corners: [Corner; 4] = std::array::from_fn(|corner| Corner { view: camera.view(primitive.corners[corner]), uv: uvs[corner] });
         for triangle in TRIANGLES {
             let clipped = clip(triangle.map(|corner| corners[corner]), camera.near);
             for fan in 1..clipped.len().saturating_sub(1) {
@@ -64,8 +55,7 @@ impl Target {
         let left = screen.iter().map(|point| point[0]).fold(f32::MAX, f32::min).floor().max(0.0) as usize;
         let top = screen.iter().map(|point| point[1]).fold(f32::MAX, f32::min).floor().max(0.0) as usize;
         let right = screen.iter().map(|point| point[0]).fold(f32::MIN, f32::max).ceil().min(self.width as f32) as usize;
-        let bottom =
-            screen.iter().map(|point| point[1]).fold(f32::MIN, f32::max).ceil().min(self.height as f32) as usize;
+        let bottom = screen.iter().map(|point| point[1]).fold(f32::MIN, f32::max).ceil().min(self.height as f32) as usize;
         for y in top..bottom {
             for x in left..right {
                 let centre = [x as f32 + 0.5, y as f32 + 0.5];
@@ -75,8 +65,7 @@ impl Target {
                 if primitive.depth_test && inverse <= self.depth[at] {
                     continue;
                 }
-                let uv: [f32; 2] =
-                    [0, 1].map(|axis| (0..3).map(|corner| weights[corner] * corners[corner].uv[axis]).sum());
+                let uv: [f32; 2] = [0, 1].map(|axis| (0..3).map(|corner| weights[corner] * corners[corner].uv[axis]).sum());
                 let Some(fragment) = shade(scene, primitive, uv) else { continue };
                 self.write(at, primitive, fragment, inverse);
             }
@@ -88,9 +77,7 @@ impl Target {
         let behind = self.rgb[at];
         let (colour, solid) = match (primitive.blend, fragment.mix) {
             (Blend::Opaque, _) | (Blend::Psx(_), false) => (fragment.rgb, true),
-            (Blend::Psx(mode), true) => {
-                (std::array::from_fn(|channel| psx_mix(mode, behind[channel], fragment.rgb[channel])), false)
-            }
+            (Blend::Psx(mode), true) => (std::array::from_fn(|channel| psx_mix(mode, behind[channel], fragment.rgb[channel])), false),
             (Blend::Alpha, _) => {
                 let alpha = u32::from(fragment.alpha);
                 let mix = |b: u8, f: u8| ((u32::from(f) * alpha + u32::from(b) * (255 - alpha)) / 255) as u8;
@@ -230,26 +217,13 @@ mod tests {
     }
 
     fn quad(texture: Texture, colour: [u8; 4], blend: Blend) -> Primitive {
-        Primitive {
-            corners: [[-1.0, -1.0, 2.0], [1.0, -1.0, 2.0], [-1.0, 1.0, 2.0], [1.0, 1.0, 2.0]],
-            texture,
-            colour,
-            blend,
-            depth_test: true,
-            id: None,
-        }
+        Primitive { corners: [[-1.0, -1.0, 2.0], [1.0, -1.0, 2.0], [-1.0, 1.0, 2.0], [1.0, 1.0, 2.0]], texture, colour, blend, depth_test: true, id: None }
     }
 
     #[test]
     fn a_vram_texel_is_read_through_its_clut_and_shaded() {
-        let texture = Texture::Vram {
-            page: [0, 0],
-            clut: [0, 500],
-            depth: Depth::Eight,
-            uvs: [[0, 0], [31, 0], [0, 31], [31, 31]],
-        };
-        let scene =
-            Scene { vram: vram(), primitives: vec![quad(texture, [0x40; 4], Blend::Opaque)], ..Scene::default() };
+        let texture = Texture::Vram { page: [0, 0], clut: [0, 500], depth: Depth::Eight, uvs: [[0, 0], [31, 0], [0, 31], [31, 31]] };
+        let scene = Scene { vram: vram(), primitives: vec![quad(texture, [0x40; 4], Blend::Opaque)], ..Scene::default() };
         let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
         // The quad spans pixels 16..48; pixel 47's texel is u = 30.5 -> 30, red channel 30 << 3 = 240,
         // halved by the 0x40 shade.
@@ -260,12 +234,7 @@ mod tests {
 
     #[test]
     fn semi_transparency_mixes_only_texels_with_bit_15() {
-        let texture = Texture::Vram {
-            page: [0, 0],
-            clut: [0, 500],
-            depth: Depth::Eight,
-            uvs: [[31, 0], [31, 0], [31, 31], [31, 31]],
-        };
+        let texture = Texture::Vram { page: [0, 0], clut: [0, 500], depth: Depth::Eight, uvs: [[31, 0], [31, 0], [31, 31], [31, 31]] };
         let mut scene = Scene { vram: vram(), background: [200, 200, 200, 255], ..Scene::default() };
         scene.primitives.push(quad(texture, [NEUTRAL_SHADE; 4], Blend::Psx(2)));
         let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
@@ -285,8 +254,7 @@ mod tests {
         let mut crossing = quad(Texture::None, [0, 0, 255, 255], Blend::Opaque);
         crossing.corners = [[-1.0, 0.0, -1.0], [1.0, 0.0, -1.0], [-1.0, 0.0, 3.0], [1.0, 0.0, 3.0]];
         crossing.corners = crossing.corners.map(|[x, _, z]| [x, 0.2, z]);
-        let frame =
-            draw(&Scene { primitives: vec![crossing], ..Scene::default() }, &Camera::looking_down_z(32.0), 64, 64);
+        let frame = draw(&Scene { primitives: vec![crossing], ..Scene::default() }, &Camera::looking_down_z(32.0), 64, 64);
         assert!(frame.rgba.chunks(4).any(|pixel| pixel[2] == 255), "the part past the near plane draws");
     }
 }

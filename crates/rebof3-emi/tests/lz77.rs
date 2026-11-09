@@ -19,27 +19,12 @@ fn type_1_payloads_decode_and_reencode() {
         return;
     };
     let payloads = type_1_payloads(&root);
-    assert_eq!(
-        payloads.len(),
-        EXPECTED_PAYLOADS,
-        "expected {EXPECTED_PAYLOADS} type-1 payloads under {}",
-        root.display()
-    );
+    assert_eq!(payloads.len(), EXPECTED_PAYLOADS, "expected {EXPECTED_PAYLOADS} type-1 payloads under {}", root.display());
 
     let report = Scoreboard::measure(&payloads);
     report.print(payloads.len());
-    assert!(
-        report.decode_failures.is_empty(),
-        "{} type-1 payloads failed to decode:\n{}",
-        report.decode_failures.len(),
-        report.decode_failures.join("\n")
-    );
-    assert!(
-        report.roundtrip_failures.is_empty(),
-        "{} encoded payloads failed semantic round-trip:\n{}",
-        report.roundtrip_failures.len(),
-        report.roundtrip_failures.join("\n")
-    );
+    assert!(report.decode_failures.is_empty(), "{} type-1 payloads failed to decode:\n{}", report.decode_failures.len(), report.decode_failures.join("\n"));
+    assert!(report.roundtrip_failures.is_empty(), "{} encoded payloads failed semantic round-trip:\n{}", report.roundtrip_failures.len(), report.roundtrip_failures.join("\n"));
     assert!(
         report.earliest >= EARLIEST_REENCODE_MISMATCH,
         "re-encode diverges at 0x{:X}, before the measured bound \
@@ -57,13 +42,7 @@ fn type_1_payloads_decode_and_reencode() {
     support::write(
         &out,
         "scoreboard.txt",
-        format!(
-            "{} payloads; {} byte-exact re-encodes; earliest first difference 0x{:X}\n\n{}\\n",
-            payloads.len(),
-            report.exact,
-            report.earliest,
-            report.divergences.join("\n")
-        ),
+        format!("{} payloads; {} byte-exact re-encodes; earliest first difference 0x{:X}\n\n{}\\n", payloads.len(), report.exact, report.earliest, report.divergences.join("\n")),
     );
 }
 #[derive(Default)]
@@ -138,9 +117,7 @@ impl Scoreboard {
         let encoded = encode(&decoded);
         match decode(&encoded) {
             Ok(roundtrip) if roundtrip == decoded => {}
-            Ok(_) => self
-                .roundtrip_failures
-                .push(format!("{}#{index}: encoded payload decodes to different bytes", path.display())),
+            Ok(_) => self.roundtrip_failures.push(format!("{}#{index}: encoded payload decodes to different bytes", path.display())),
             Err(error) => self.roundtrip_failures.push(format!("{}#{index}: encoded payload: {error}", path.display())),
         }
         if encoded.as_slice() == payload {
@@ -152,12 +129,7 @@ impl Scoreboard {
         self.earliest = self.earliest.min(at);
         let (class, detail) = classify_frames(payload, &encoded);
         self.classes.record(class);
-        self.divergences.push(format!(
-            "{}#{index}: byte 0x{at:X} of {} (encoded {}):{detail}",
-            path.display(),
-            payload.len(),
-            encoded.len()
-        ));
+        self.divergences.push(format!("{}#{index}: byte 0x{at:X} of {} (encoded {}):{detail}", path.display(), payload.len(), encoded.len()));
     }
 
     fn print(&self, total: usize) {
@@ -168,14 +140,7 @@ impl Scoreboard {
              {roundtrip}/{total}; byte-exact re-encode {}/{}; first-frame classes: \
              literal-run-length {}, match-length {}, match-distance {}, \
              literal-vs-match {}, frame/end {}; earliest first difference 0x{:X}",
-            self.exact,
-            total,
-            self.classes.literal_run_length,
-            self.classes.match_length,
-            self.classes.match_distance,
-            self.classes.literal_vs_match,
-            self.classes.frame_or_end,
-            self.earliest
+            self.exact, total, self.classes.literal_run_length, self.classes.match_length, self.classes.match_distance, self.classes.literal_vs_match, self.classes.frame_or_end, self.earliest
         );
         for divergence in &self.divergences {
             eprintln!("  {divergence}");
@@ -193,10 +158,7 @@ fn classify_frames(retail: &[u8], encoded: &[u8]) -> (FrameClass, String) {
                 (None, Some(_)) | (Some(_), None) => FrameClass::LiteralVsMatch,
                 _ => FrameClass::FrameOrEnd,
             };
-            let detail = format!(
-                " class={} output {position}: retail {retail_frame:?}, encoded {encoded_frame:?}",
-                class.name()
-            );
+            let detail = format!(" class={} output {position}: retail {retail_frame:?}, encoded {encoded_frame:?}", class.name());
             (class, detail)
         }
         None => (FrameClass::FrameOrEnd, " class=frame-or-end".to_owned()),

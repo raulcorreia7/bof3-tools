@@ -15,12 +15,7 @@ fn bundle() -> MapBundle {
         height: 2,
         colour: [0x1234, 0x5678],
         scroll_seat: 9,
-        cells: vec![
-            Cell { heights: [1, 2, 3, 4] },
-            Cell { heights: [-1, -2, -3, -4] },
-            Cell { heights: [0, 0, 0, 0] },
-            Cell { heights: [5, 6, 7, 8] },
-        ],
+        cells: vec![Cell { heights: [1, 2, 3, 4] }, Cell { heights: [-1, -2, -3, -4] }, Cell { heights: [0, 0, 0, 0] }, Cell { heights: [5, 6, 7, 8] }],
         codes: vec![1, 2, 3, 4],
         grid: vec![0, 1, 2, 3],
         records: vec![0x0000_0001, 0x0000_0002],

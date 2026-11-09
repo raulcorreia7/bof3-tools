@@ -95,13 +95,7 @@ struct Arguments {
 }
 
 fn parse(args: &[String]) -> Result<Option<Arguments>, String> {
-    let mut parsed = Arguments {
-        image: None,
-        out: None,
-        jobs: std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get),
-        quiet: false,
-        steps: Vec::new(),
-    };
+    let mut parsed = Arguments { image: None, out: None, jobs: std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get), quiet: false, steps: Vec::new() };
     let mut rest = args.iter();
     while let Some(flag) = rest.next() {
         let mut value = |name: &str| rest.next().cloned().ok_or_else(|| format!("option {name} needs a value."));
@@ -110,19 +104,12 @@ fn parse(args: &[String]) -> Result<Option<Arguments>, String> {
             "-i" | "--input" | "--image" => parsed.image = Some(PathBuf::from(value(flag)?)),
             "-o" | "--output" | "--out" => parsed.out = Some(PathBuf::from(value(flag)?)),
             "--jobs" => {
-                parsed.jobs = value(flag)?
-                    .parse::<usize>()
-                    .ok()
-                    .filter(|jobs| *jobs > 0)
-                    .ok_or("--jobs needs a positive number, for example --jobs 4.")?;
+                parsed.jobs = value(flag)?.parse::<usize>().ok().filter(|jobs| *jobs > 0).ok_or("--jobs needs a positive number, for example --jobs 4.")?;
             }
             "-q" | "--quiet" => parsed.quiet = true,
             step if STEPS.contains(&step) => parsed.steps.push(step.to_string()),
             other => {
-                return Err(format!(
-                    "unknown step or option {other:?}: choose from {}; run `bof3 assets extract-all --help`.",
-                    STEPS.join(", ")
-                ));
+                return Err(format!("unknown step or option {other:?}: choose from {}; run `bof3 assets extract-all --help`.", STEPS.join(", ")));
             }
         }
     }
@@ -137,20 +124,15 @@ pub fn run(args: &[String]) -> Result<i32, String> {
     let current = env::current_dir().map_err(|error| error.to_string())?;
     let image = match arguments.image {
         Some(image) => image,
-        None => find_disc_image(&current)
-            .map_err(|error| format!("{error}. Put the CUE/BIN set in {IMAGE_DIR}/ or pass -i IMAGE."))?,
+        None => find_disc_image(&current).map_err(|error| format!("{error}. Put the CUE/BIN set in {IMAGE_DIR}/ or pass -i IMAGE."))?,
     };
     let out = arguments.out.unwrap_or_else(|| current.join(DEFAULT_OUT));
     fs::create_dir_all(&out).map_err(|error| format!("{}: {error}. Pass -o with a writable folder.", out.display()))?;
     let context = Context { image, out, jobs: arguments.jobs };
-    let chosen: Vec<&str> = STEPS
-        .into_iter()
-        .filter(|step| arguments.steps.is_empty() || arguments.steps.iter().any(|s| s == step))
-        .collect();
+    let chosen: Vec<&str> = STEPS.into_iter().filter(|step| arguments.steps.is_empty() || arguments.steps.iter().any(|s| s == step)).collect();
 
     let (mut records, previous) = load_previous(&context.out);
-    let mut files: Vec<Value> =
-        previous.into_iter().filter(|f| !chosen.contains(&f["consumer"].as_str().unwrap_or(""))).collect();
+    let mut files: Vec<Value> = previous.into_iter().filter(|f| !chosen.contains(&f["consumer"].as_str().unwrap_or(""))).collect();
     let mut failed = false;
     for step in &chosen {
         let (record, found) = run_step(&context, step, arguments.quiet);
@@ -232,34 +214,20 @@ fn emi_step(context: &Context) -> Outcome {
     let mut archives = Vec::new();
     archives_in(&source, &mut archives);
     if archives.is_empty() {
-        return Outcome {
-            skipped: true,
-            note: format!("needs {}: run the disc step first", source.display()),
-            ..Outcome::default()
-        };
+        return Outcome { skipped: true, note: format!("needs {}: run the disc step first", source.display()), ..Outcome::default() };
     }
     let results = parallel(&archives, context.jobs, |archive| {
         let relative = archive.strip_prefix(&source).unwrap_or(archive);
-        rebof3_emi::Archive::open(archive)
-            .and_then(|opened| opened.extract_all(context.folder("emi").join(relative), true))
-            .map_err(|error| format!("{}: {error}", relative.display()))
+        rebof3_emi::Archive::open(archive).and_then(|opened| opened.extract_all(context.folder("emi").join(relative), true)).map_err(|error| format!("{}: {error}", relative.display()))
     });
-    Outcome {
-        errors: results.into_iter().filter_map(Result::err).collect(),
-        note: format!("{} archives", archives.len()),
-        skipped: false,
-    }
+    Outcome { errors: results.into_iter().filter_map(Result::err).collect(), note: format!("{} archives", archives.len()), skipped: false }
 }
 
 fn assets_step(context: &Context) -> Outcome {
     let disc = context.folder("disc");
     if !disc.is_dir() {
         return Outcome {
-            errors: vec![format!(
-                "text: no extracted disc at {}; run the disc step first: bof3 assets extract-all disc -o {}",
-                disc.display(),
-                context.out.display()
-            )],
+            errors: vec![format!("text: no extracted disc at {}; run the disc step first: bof3 assets extract-all disc -o {}", disc.display(), context.out.display())],
             ..Outcome::default()
         };
     }
@@ -312,39 +280,18 @@ fn export_jobs(context: &Context, rows: &[Value]) -> Vec<ExportJob> {
         let stem = Path::new(output).strip_prefix(kind).unwrap_or(Path::new(output)).with_extension("");
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
         match (kind, extension.as_str()) {
-            ("area-map", "bin") => jobs.push(ExportJob {
-                label: format!("terrain {output}"),
-                target: out.join("terrain").join(&stem).with_extension("glb"),
-                source: path,
-                what: Export::Terrain,
-            }),
-            ("area-message", "bin") => jobs.push(ExportJob {
-                label: format!("message {output}"),
-                target: out.join("message").join(&stem).with_extension("json"),
-                source: path,
-                what: Export::Message,
-            }),
+            ("area-map", "bin") => jobs.push(ExportJob { label: format!("terrain {output}"), target: out.join("terrain").join(&stem).with_extension("glb"), source: path, what: Export::Terrain }),
+            ("area-message", "bin") => jobs.push(ExportJob { label: format!("message {output}"), target: out.join("message").join(&stem).with_extension("json"), source: path, what: Export::Message }),
             ("audio-bank", "vh" | "vb") => {
-                let key = (
-                    row["source"].as_str().unwrap_or("").to_string(),
-                    row["load_arg"].as_str().unwrap_or("").to_string(),
-                );
+                let key = (row["source"].as_str().unwrap_or("").to_string(), row["load_arg"].as_str().unwrap_or("").to_string());
                 banks.entry(key).or_default().insert(extension, path);
             }
             ("audio-sequence", "seq") => {
-                let count = fs::read(&path)
-                    .ok()
-                    .and_then(|bytes| psx_formats::sep::Package::parse(&bytes).ok())
-                    .map_or(0, |p| p.sequences.len());
+                let count = fs::read(&path).ok().and_then(|bytes| psx_formats::sep::Package::parse(&bytes).ok()).map_or(0, |p| p.sequences.len());
                 let folder = out.join("sequence").join(stem.parent().unwrap_or(Path::new("")));
                 let name = stem.file_name().and_then(|n| n.to_str()).unwrap_or("sequence");
                 for index in 0..count {
-                    jobs.push(ExportJob {
-                        label: format!("sequence {output}#{index}"),
-                        target: folder.join(format!("{name}.{index}.mid")),
-                        source: path.clone(),
-                        what: Export::Sequence(index),
-                    });
+                    jobs.push(ExportJob { label: format!("sequence {output}#{index}"), target: folder.join(format!("{name}.{index}.mid")), source: path.clone(), what: Export::Sequence(index) });
                 }
             }
             _ => {}
@@ -389,17 +336,11 @@ fn run_export(job: &ExportJob) -> Result<(), String> {
 fn export_step(context: &Context) -> Outcome {
     let manifest = context.folder("assets").join("assets.jsonl");
     let Ok(text) = fs::read_to_string(&manifest) else {
-        return Outcome {
-            skipped: true,
-            note: format!("needs {}: run the assets step first", manifest.display()),
-            ..Outcome::default()
-        };
+        return Outcome { skipped: true, note: format!("needs {}: run the assets step first", manifest.display()), ..Outcome::default() };
     };
-    let rows: Vec<Value> =
-        text.lines().filter(|line| !line.is_empty()).filter_map(|line| serde_json::from_str(line).ok()).collect();
+    let rows: Vec<Value> = text.lines().filter(|line| !line.is_empty()).filter_map(|line| serde_json::from_str(line).ok()).collect();
     let jobs = export_jobs(context, &rows);
-    let results =
-        parallel(&jobs, context.jobs, |job| run_export(job).map_err(|error| format!("{}: {error}", job.label)));
+    let results = parallel(&jobs, context.jobs, |job| run_export(job).map_err(|error| format!("{}: {error}", job.label)));
     Outcome { errors: results.into_iter().filter_map(Result::err).collect(), ..Outcome::default() }
 }
 
@@ -508,14 +449,10 @@ fn scan(context: &Context, step: &str) -> Vec<Value> {
 
 /// Steps of an earlier run that this run does not repeat keep their rows.
 fn load_previous(out: &Path) -> (BTreeMap<String, Value>, Vec<Value>) {
-    let Some(data) = fs::read_to_string(out.join(INDEX_JSON)).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok())
-    else {
+    let Some(data) = fs::read_to_string(out.join(INDEX_JSON)).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else {
         return (BTreeMap::new(), Vec::new());
     };
-    let records = data["consumers"]
-        .as_array()
-        .map(|list| list.iter().filter_map(|c| Some((c["name"].as_str()?.to_string(), c.clone()))).collect())
-        .unwrap_or_default();
+    let records = data["consumers"].as_array().map(|list| list.iter().filter_map(|c| Some((c["name"].as_str()?.to_string(), c.clone()))).collect()).unwrap_or_default();
     (records, data["files"].as_array().cloned().unwrap_or_default())
 }
 
@@ -544,12 +481,7 @@ fn write_index(context: &Context, records: &[Value], files: &[Value]) -> Result<
     };
     let mut md = format!("# Extract index\n\nDisc: `{}`\n\n## Consumers\n\n", context.image.display());
     let header = ["consumer", "status", "files", "bytes", "seconds", "failures", "note"];
-    let rows: Vec<Vec<String>> = records
-        .iter()
-        .map(|r| {
-            ["name", "status", "files", "bytes", "seconds", "failures", "note"].iter().map(|k| cell(r, k)).collect()
-        })
-        .collect();
+    let rows: Vec<Vec<String>> = records.iter().map(|r| ["name", "status", "files", "bytes", "seconds", "failures", "note"].iter().map(|k| cell(r, k)).collect()).collect();
     md.push_str(&table(&header, &rows));
     for record in records {
         let name = record["name"].as_str().unwrap_or("");
@@ -562,8 +494,7 @@ fn write_index(context: &Context, records: &[Value], files: &[Value]) -> Result<
         if kinds.is_empty() {
             continue;
         }
-        let rows: Vec<Vec<String>> =
-            kinds.iter().map(|(k, (n, b))| vec![(*k).into(), n.to_string(), b.to_string()]).collect();
+        let rows: Vec<Vec<String>> = kinds.iter().map(|(k, (n, b))| vec![(*k).into(), n.to_string(), b.to_string()]).collect();
         let _ = write!(md, "\n\n## {name}\n\n{}", table(&["kind", "files", "bytes"], &rows));
     }
     md.push('\n');

@@ -37,17 +37,9 @@ pub fn document(payload: &[u8]) -> Result<Vec<u8>> {
 /// `base` holds the table's stored bytes. Each named field is written over its base record, so the bytes no
 /// field names keep their stored values, and a name keeps its stored bytes while its text is unchanged.
 pub fn import(table: &str, json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
-    let descriptor = *TABLES
-        .iter()
-        .find(|descriptor| descriptor.name == table)
-        .ok_or_else(|| Error::Import(format!("there is no table named {table:?}")))?;
+    let descriptor = *TABLES.iter().find(|descriptor| descriptor.name == table).ok_or_else(|| Error::Import(format!("there is no table named {table:?}")))?;
     if base.len() != descriptor.count * descriptor.record {
-        return Err(Error::Import(format!(
-            "{table} is {} records of {} bytes; its stored bytes are {}",
-            descriptor.count,
-            descriptor.record,
-            base.len()
-        )));
+        return Err(Error::Import(format!("{table} is {} records of {} bytes; its stored bytes are {}", descriptor.count, descriptor.record, base.len())));
     }
     match table {
         "items" => rebuild(descriptor, json, base, super::put_item),
@@ -64,10 +56,7 @@ pub fn import(table: &str, json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
 
 /// One fixed table of `ETC/GAME.EMI` entry 0, from its JSON records and the stored payload of that entry.
 pub fn import_in_payload(table: &str, json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let descriptor = TABLES
-        .iter()
-        .find(|descriptor| descriptor.name == table)
-        .ok_or_else(|| Error::Import(format!("there is no table named {table:?}")))?;
+    let descriptor = TABLES.iter().find(|descriptor| descriptor.name == table).ok_or_else(|| Error::Import(format!("there is no table named {table:?}")))?;
     let start = descriptor.archive_offset - PAYLOAD_START;
     let end = start + descriptor.count * descriptor.record;
     let base = payload.get(start..end).ok_or_else(|| Error::Import(format!("the payload ends before {table}")))?;
@@ -75,21 +64,10 @@ pub fn import_in_payload(table: &str, json: &[u8], payload: &[u8]) -> Result<Vec
 }
 
 /// Parses a table's JSON records and writes each one over its base record.
-fn rebuild<T: serde::de::DeserializeOwned>(
-    table: Table,
-    json: &[u8],
-    base: &[u8],
-    put: fn(&mut [u8], &T) -> std::result::Result<(), String>,
-) -> Result<Vec<u8>> {
-    let records: Vec<T> =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("{} JSON: {error}", table.name)))?;
+fn rebuild<T: serde::de::DeserializeOwned>(table: Table, json: &[u8], base: &[u8], put: fn(&mut [u8], &T) -> std::result::Result<(), String>) -> Result<Vec<u8>> {
+    let records: Vec<T> = serde_json::from_slice(json).map_err(|error| Error::Import(format!("{} JSON: {error}", table.name)))?;
     if records.len() != table.count {
-        return Err(Error::Import(format!(
-            "{} has {} records; the table has {}",
-            table.name,
-            records.len(),
-            table.count
-        )));
+        return Err(Error::Import(format!("{} has {} records; the table has {}", table.name, records.len(), table.count)));
     }
     let mut bytes = base.to_vec();
     for (record, value) in bytes.chunks_exact_mut(table.record).zip(&records) {

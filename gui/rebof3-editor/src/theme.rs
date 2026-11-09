@@ -105,12 +105,5 @@ pub fn icon(side: f32) -> Div {
         grid = grid.child(cells);
     }
 
-    div()
-        .flex()
-        .flex_none()
-        .size(px(side))
-        .p(px(margin))
-        .rounded(px(side * ICON_CORNER))
-        .bg(color(BACKGROUND))
-        .child(grid.size_full())
+    div().flex().flex_none().size(px(side)).p(px(margin)).rounded(px(side * ICON_CORNER)).bg(color(BACKGROUND)).child(grid.size_full())
 }

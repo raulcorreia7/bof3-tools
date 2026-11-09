@@ -33,10 +33,7 @@ impl Disc {
         let _ = fs::remove_dir_all(&root);
 
         for (path, entries) in archives {
-            let payloads: Vec<Payload<'_>> = entries
-                .iter()
-                .map(|entry| Payload { bytes: entry.bytes, file_type: entry.file_type, ram_ptr: entry.ram_ptr })
-                .collect();
+            let payloads: Vec<Payload<'_>> = entries.iter().map(|entry| Payload { bytes: entry.bytes, file_type: entry.file_type, ram_ptr: entry.ram_ptr }).collect();
             let archive = pack_payloads(ARCHIVE_VERSION, &payloads).expect("the archive packs");
 
             let file = root.join("disc").join(path);

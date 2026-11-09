@@ -90,11 +90,7 @@ impl Scene {
 /// `SYS_StartFrontend`: `GFX_ClearRect(0, 0, 1024, 512)`, stream `FIRST`, `GFX_ResetPalette`;
 /// `SYS_Main` then runs `GFX_UploadPalette`.
 pub fn frontend() -> Scene {
-    Scene {
-        name: "Frontend".into(),
-        kind: Kind::Frontend,
-        steps: vec![Step::Clear, Step::Load(FIRST.into()), Step::ResetPalette, Step::UploadPalette],
-    }
+    Scene { name: "Frontend".into(), kind: Kind::Frontend, steps: vec![Step::Clear, Step::Load(FIRST.into()), Step::ResetPalette, Step::UploadPalette] }
 }
 
 /// `Game_BeginTitle (emi/etc/game/01)`: stream `DEMO`, then `GFX_ResetPalette`.
@@ -105,11 +101,7 @@ pub fn title() -> Scene {
 /// `func_8019FAA0`, the area loader: stream the area archive, then `GFX_ResetPalette`.
 pub fn field(area: &str) -> Scene {
     let kind = if area_id(area).is_some_and(|id| WORLD_MAP_AREAS.contains(&id)) { Kind::WorldMap } else { Kind::Field };
-    frontend().then(
-        kind,
-        format!("{}: {}", kind.label(), stem(area)),
-        [Step::Load(area.into()), Step::ResetPalette, Step::UploadPalette],
-    )
+    frontend().then(kind, format!("{}: {}", kind.label(), stem(area)), [Step::Load(area.into()), Step::ResetPalette, Step::UploadPalette])
 }
 
 /// A menu overlay over `base`. The open handler streams the archive, then copies the palette:
@@ -148,17 +140,7 @@ pub fn village(base: Scene, archive: &str) -> Scene {
 /// column 240, then rows 26 and 27 (`GFX_CopyPalette(0x1A)`, `GFX_CopyPalette(0x1B)`).
 pub fn battle(base: Scene, archive: &str) -> Scene {
     let name = format!("{}: {}", Kind::Battle.label(), stem(archive));
-    base.then(
-        Kind::Battle,
-        name,
-        [
-            Step::Load(archive.into()),
-            Step::CopyWords { row: 15, column: 240, count: 16 },
-            Step::CopyPalette(26),
-            Step::CopyPalette(27),
-            Step::UploadPalette,
-        ],
-    )
+    base.then(Kind::Battle, name, [Step::Load(archive.into()), Step::CopyWords { row: 15, column: 240, count: 16 }, Step::CopyPalette(26), Step::CopyPalette(27), Step::UploadPalette])
 }
 
 /// An archive a battle streams part-way, over the battle `base`, with the copy its ready step
@@ -311,9 +293,6 @@ mod tests {
     fn the_catalog_lists_one_scene_per_screen_the_archives_allow() {
         let archives = [FIRST, DEMO, "BIN/WORLD00/AREA000.EMI", "BIN/ETC/SHOP.EMI", BATTLE, "BIN/BATTLE/BATL_RE2.EMI"];
         let names: Vec<String> = catalog(archives).into_iter().map(|scene| scene.name).collect();
-        assert_eq!(
-            names,
-            ["Frontend", "Title", "Field: AREA000", "Menu: SHOP", "Battle: BATTLE", "Battle: BATTLE + BATL_RE2"]
-        );
+        assert_eq!(names, ["Frontend", "Title", "Field: AREA000", "Menu: SHOP", "Battle: BATTLE", "Battle: BATTLE + BATL_RE2"]);
     }
 }

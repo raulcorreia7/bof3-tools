@@ -33,21 +33,10 @@ fn retail_repack_is_byte_identical() {
         }
         fs::remove_dir_all(&entries).unwrap();
     }
-    assert!(
-        failures.is_empty(),
-        "{} of {} archives do not repack byte-exactly:\n{}",
-        failures.len(),
-        archives.len(),
-        failures.join("\n")
-    );
+    assert!(failures.is_empty(), "{} of {} archives do not repack byte-exactly:\n{}", failures.len(), archives.len(), failures.join("\n"));
 
     let container = verify::container_round_trip(&root).expect("repack the retail archives");
     assert_eq!(container.archives, archives.len());
-    assert!(
-        container.failures.is_empty(),
-        "{} in-memory failures:\n{}",
-        container.failures.len(),
-        container.failures.join("\n")
-    );
+    assert!(container.failures.is_empty(), "{} in-memory failures:\n{}", container.failures.len(), container.failures.join("\n"));
     eprintln!("repack gate: {}/{} archives byte-identical", container.archives, container.archives);
 }

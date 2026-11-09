@@ -119,12 +119,7 @@ struct Disc {
 impl Disc {
     fn open(path: &Path) -> Result<Self, Error> {
         let mut image = psx_cd::Image::open(path).map_err(|error| Error::Disc(error.to_string()))?;
-        let files = image
-            .entries()
-            .map_err(|error| Error::Disc(error.to_string()))?
-            .into_iter()
-            .map(|entry| (entry.path.to_string_lossy().replace('\\', "/"), entry))
-            .collect();
+        let files = image.entries().map_err(|error| Error::Disc(error.to_string()))?.into_iter().map(|entry| (entry.path.to_string_lossy().replace('\\', "/"), entry)).collect();
         Ok(Self { image, files, loaded: BTreeMap::new() })
     }
 

@@ -41,12 +41,7 @@ fn map_bundles_reencode_exactly_and_report_their_size() {
                 continue;
             };
             let encoded = bundle.encode();
-            assert_eq!(
-                bundle.encoded_len(),
-                encoded.len(),
-                "encoded_len mismatch: {} entry at {start:#x}",
-                path.display()
-            );
+            assert_eq!(bundle.encoded_len(), encoded.len(), "encoded_len mismatch: {} entry at {start:#x}", path.display());
             assert_eq!(encoded, payload, "re-encode mismatch: {} entry at {start:#x}", path.display());
             if checked == 0 {
                 support::write(&out, "first-map-bundle.map", &encoded);

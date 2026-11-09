@@ -110,11 +110,7 @@ pub enum Op {
 impl Op {
     /// The op of a stored step.
     pub fn of(step: Step) -> Self {
-        if step.delay >= JUMP {
-            Self::Jump { code: step.delay, target: step.frame }
-        } else {
-            Self::Show { ticks: step.delay, frame: step.frame }
-        }
+        if step.delay >= JUMP { Self::Jump { code: step.delay, target: step.frame } } else { Self::Show { ticks: step.delay, frame: step.frame } }
     }
 
     /// The stored step.
@@ -307,14 +303,8 @@ impl Program {
 
     /// The programs of a table read as sections and record bytes.
     pub fn from_table(table: &ScriptTable) -> Self {
-        let sections = table
-            .sections
-            .iter()
-            .map(|section: &ScriptSection| Section {
-                slots: section.slots.clone(),
-                records: section.records.iter().map(|record| Record::decode(record)).collect(),
-            })
-            .collect();
+        let sections =
+            table.sections.iter().map(|section: &ScriptSection| Section { slots: section.slots.clone(), records: section.records.iter().map(|record| Record::decode(record)).collect() }).collect();
         Self { sections }
     }
 
@@ -404,14 +394,7 @@ impl Program {
         if stream.animation.steps.len() == 1 {
             return Err(refused("a stream keeps one step: the step functions stage a step whatever the count"));
         }
-        if let Some(from) = stream
-            .animation
-            .steps
-            .iter()
-            .enumerate()
-            .find(|(index, step)| *index != at.step && step.jump() == Some(at.step))
-            .map(|(index, _)| index)
-        {
+        if let Some(from) = stream.animation.steps.iter().enumerate().find(|(index, step)| *index != at.step && step.jump() == Some(at.step)).map(|(index, _)| index) {
             return Err(Error::Import(format!("step {} is the target of the jump at step {from}", at.step)));
         }
 
@@ -429,12 +412,7 @@ impl Program {
     /// Replaces one cell of one frame, in place.
     pub fn set_cell(&mut self, at: CellAt, cell: Cell) -> Result<()> {
         let stream = self.stream_mut(at.section, at.record)?;
-        let slot = stream
-            .animation
-            .frames
-            .get_mut(at.frame)
-            .and_then(|frame| frame.cells.get_mut(at.cell))
-            .ok_or_else(|| refused("no such cell"))?;
+        let slot = stream.animation.frames.get_mut(at.frame).and_then(|frame| frame.cells.get_mut(at.cell)).ok_or_else(|| refused("no such cell"))?;
         *slot = cell;
         Ok(())
     }
@@ -454,9 +432,7 @@ fn resized(stream: &mut Stream, change: impl FnOnce(&mut Animation)) {
 /// frame table.
 fn check_target(op: Op, steps: usize) -> Result<()> {
     match op {
-        Op::Jump { target, .. } if usize::from(target) >= steps => {
-            Err(Error::Import(format!("jump target {target} is past the last step ({})", steps.saturating_sub(1))))
-        }
+        Op::Jump { target, .. } if usize::from(target) >= steps => Err(Error::Import(format!("jump target {target} is past the last step ({})", steps.saturating_sub(1)))),
         _ => Ok(()),
     }
 }
@@ -483,9 +459,7 @@ fn encode_section(section: &Section) -> Result<Vec<u8>> {
             return Err(Error::ScriptTableShape("a record starts past the reach of a u16 table word"));
         }
         if record.stream().is_some() && !at.is_multiple_of(FRAME_WORD) {
-            return Err(Error::ScriptTableShape(
-                "a stream starts at an odd offset, where its u16 frame words cannot be read",
-            ));
+            return Err(Error::ScriptTableShape("a stream starts at an odd offset, where its u16 frame words cannot be read"));
         }
         let bytes = record.encode();
         starts.push(at as u16);

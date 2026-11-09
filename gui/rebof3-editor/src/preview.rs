@@ -57,8 +57,7 @@ pub struct Note {
 /// of the sample. `header` and `body` are the bank's `.vh` and `.vb`, so an edited bank plays as edited.
 pub fn sample_pcm(header: &[u8], body: &[u8], sample: u32) -> Result<Pcm, String> {
     let archive = bank_archive(header, body, None)?;
-    render_preview(&archive, |item| item.kind == ItemKind::Sample && item.sub_index == sample)
-        .ok_or_else(|| format!("the bank has no sample {sample}"))?
+    render_preview(&archive, |item| item.kind == ItemKind::Sample && item.sub_index == sample).ok_or_else(|| format!("the bank has no sample {sample}"))?
 }
 
 /// Renders one note as the game's sound driver plays it: keyed on at full velocity on the driver's first
@@ -73,23 +72,15 @@ pub fn note_pcm(header: &[u8], body: &[u8], note: &Note) -> Result<Pcm, String> 
     let hold = (note.hold.max(0.0) * PREVIEW_TICKS_PER_SECOND).round().max(1.0) as u32;
     let package = Package { sequences: vec![one_note(program, note.note, hold)] }.encode();
     let archive = bank_archive(&header, body, Some(&package))?;
-    render_preview(&archive, |item| item.kind == ItemKind::Music)
-        .ok_or_else(|| "the preview sequence is not in the catalog".to_string())?
+    render_preview(&archive, |item| item.kind == ItemKind::Music).ok_or_else(|| "the preview sequence is not in the catalog".to_string())?
 }
 
 /// The header with every other tone of the program of tone `block`/`slot` emptied, and that program.
 fn only_tone(header: &[u8], body: &[u8], block: u8, slot: u8, note: u8) -> Result<(Vec<u8>, u8), String> {
     let mut bank = vab::Bank::parse(header, body).map_err(|error| error.to_string())?;
     let is_it = |tone: &vab::Tone| tone.storage_block == block && tone.tone_slot == slot;
-    let tone = *bank
-        .tones
-        .iter()
-        .find(|tone| is_it(tone))
-        .ok_or_else(|| format!("the bank has no tone in block {block}, slot {slot}"))?;
-    let program = u8::try_from(tone.program)
-        .ok()
-        .filter(|_| tone.is_usable(bank.vag_count))
-        .ok_or_else(|| "the tone names no sample the bank holds".to_string())?;
+    let tone = *bank.tones.iter().find(|tone| is_it(tone)).ok_or_else(|| format!("the bank has no tone in block {block}, slot {slot}"))?;
+    let program = u8::try_from(tone.program).ok().filter(|_| tone.is_usable(bank.vag_count)).ok_or_else(|| "the tone names no sample the bank holds".to_string())?;
     if !(tone.min_note..=tone.max_note).contains(&note) {
         return Err(format!("the tone answers notes {} to {}", tone.min_note, tone.max_note));
     }
@@ -101,8 +92,7 @@ fn only_tone(header: &[u8], body: &[u8], block: u8, slot: u8, note: u8) -> Resul
 
 /// A sequence of one note on channel 0: program change, key-on, key-off after `hold` ticks, end.
 fn one_note(program: u8, note: u8, hold: u32) -> Sequence {
-    let event =
-        |delta, status, data1, data2| Event { delta, status, data1, data2, status_byte: true, ..Event::default() };
+    let event = |delta, status, data1, data2| Event { delta, status, data1, data2, status_byte: true, ..Event::default() };
     Sequence {
         seq_id: 0,
         resolution: PREVIEW_RESOLUTION,
@@ -120,10 +110,7 @@ fn one_note(program: u8, note: u8, hold: u32) -> Sequence {
 
 /// An archive of one bank and, when given, one sequence package: the bank is the archive's bank 0.
 fn bank_archive(header: &[u8], body: &[u8], package: Option<&[u8]>) -> Result<Vec<u8>, String> {
-    let mut payloads = vec![
-        Payload { bytes: header, file_type: vab::HEADER_TYPE, ram_ptr: 0 },
-        Payload { bytes: body, file_type: vab::BODY_TYPE, ram_ptr: 0 },
-    ];
+    let mut payloads = vec![Payload { bytes: header, file_type: vab::HEADER_TYPE, ram_ptr: 0 }, Payload { bytes: body, file_type: vab::BODY_TYPE, ram_ptr: 0 }];
     if let Some(bytes) = package {
         payloads.push(Payload { bytes, file_type: sep::TYPE, ram_ptr: 0 });
     }
@@ -174,9 +161,7 @@ mod tests {
 
     /// A sample of `blocks` periods of a sine that loops over all of them.
     fn looping_sine(blocks: usize) -> Vec<u8> {
-        let samples: Vec<i16> = (0..PERIOD * blocks)
-            .map(|n| (AMPLITUDE * (std::f64::consts::TAU * n as f64 / PERIOD as f64).sin()) as i16)
-            .collect();
+        let samples: Vec<i16> = (0..PERIOD * blocks).map(|n| (AMPLITUDE * (std::f64::consts::TAU * n as f64 / PERIOD as f64).sin()) as i16).collect();
         let mut vag = adpcm::encode_stream(&samples);
         vag[FLAGS_AT] |= FLAG_LOOP_START;
         let last = vag.len() - BLOCK_BYTES;
@@ -194,18 +179,7 @@ mod tests {
 
     /// A tone of program 0 over every note that plays sample `vag` at `pan`.
     fn tone(vag: i16, pan: u8) -> Tone {
-        Tone {
-            program: 0,
-            vag,
-            vol: FULL,
-            pan,
-            center_note: CENTRE_NOTE,
-            min_note: 0,
-            max_note: 127,
-            adsr1: ADSR1,
-            adsr2: ADSR2,
-            ..Tone::default()
-        }
+        Tone { program: 0, vag, vol: FULL, pan, center_note: CENTRE_NOTE, min_note: 0, max_note: 127, adsr1: ADSR1, adsr2: ADSR2, ..Tone::default() }
     }
 
     /// A bank whose program 0 holds `tones`.

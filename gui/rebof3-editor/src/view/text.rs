@@ -65,16 +65,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .child(muted("New text must fit the old string's bytes. Shift+Enter breaks a line."));
 
     if state.compose {
-        return div()
-            .flex()
-            .flex_col()
-            .flex_1()
-            .min_h_0()
-            .gap(px(GAP))
-            .child(header)
-            .child(separator(false))
-            .child(compose::show(editor, entry, cx))
-            .into_any_element();
+        return div().flex().flex_col().flex_1().min_h_0().gap(px(GAP)).child(header).child(separator(false)).child(compose::show(editor, entry, cx)).into_any_element();
     }
 
     let needle = state.filter.to_lowercase();
@@ -87,10 +78,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         }
 
         let edited = payload[span.clone()] != original.get(span.clone()).unwrap_or_default()[..];
-        let offset = mono(format!("{:0OFFSET_DIGITS$X}", string.start))
-            .w(px(OFFSET_WIDTH))
-            .flex_none()
-            .text_color(if edited { color(EDITED) } else { color(MUTED) });
+        let offset = mono(format!("{:0OFFSET_DIGITS$X}", string.start)).w(px(OFFSET_WIDTH)).flex_none().text_color(if edited { color(EDITED) } else { color(MUTED) });
 
         if state.preview {
             let window = message::window(&text);
@@ -102,34 +90,17 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         list = list.child(div().flex().items_start().gap(px(GAP)).child(offset).child(string_field));
     }
 
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(header)
-        .child(separator(false))
-        .child(list)
-        .into_any_element()
+    div().flex().flex_col().flex_1().min_h_0().gap(px(GAP)).child(header).child(separator(false)).child(list).into_any_element()
 }
 
 /// The tab that shows the strings as text (`preview` false) or as message windows.
-fn mode_tab(
-    label: &'static str,
-    preview: bool,
-    compose: bool,
-    selected: bool,
-    cx: &mut Context<Editor>,
-) -> impl IntoElement {
+fn mode_tab(label: &'static str, preview: bool, compose: bool, selected: bool, cx: &mut Context<Editor>) -> impl IntoElement {
     let selected = if label == "Edit" { !selected } else { selected };
-    tab(("text-mode", usize::from(preview) + 2 * usize::from(compose)), label, selected).on_click(cx.listener(
-        move |editor, _, _, cx| {
-            editor.views.text.preview = preview;
-            editor.views.text.compose = compose;
-            cx.notify();
-        },
-    ))
+    tab(("text-mode", usize::from(preview) + 2 * usize::from(compose)), label, selected).on_click(cx.listener(move |editor, _, _, cx| {
+        editor.views.text.preview = preview;
+        editor.views.text.compose = compose;
+        cx.notify();
+    }))
 }
 
 /// Writes the new text of the string that starts at `start`.
@@ -198,13 +169,7 @@ mod tests {
                         *colors.entry(text[at + 7..at + 9].to_string()).or_default() += 1;
                     }
 
-                    let printed: String = message::pages(&text)
-                        .iter()
-                        .flatten()
-                        .flatten()
-                        .filter(|run| !run.placeholder)
-                        .map(|run| run.text.as_str())
-                        .collect();
+                    let printed: String = message::pages(&text).iter().flatten().flatten().filter(|run| !run.placeholder).map(|run| run.text.as_str()).collect();
                     if printed != glyphs(&text) {
                         failures.push(format!("{}#{index}@{:X}: {text}", path.0, string.start));
                     }

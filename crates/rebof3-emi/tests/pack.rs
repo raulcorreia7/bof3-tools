@@ -12,15 +12,7 @@ fn packs_and_roundtrips_entries_byte_exactly() {
     fs::write(&first, b"ABCDx").unwrap();
     fs::write(&second, b"yz").unwrap();
     let output = root.join("roundtrip.emi");
-    pack(
-        &output,
-        &[
-            PackEntry { path: first, file_type: 6, ram_ptr: 0x8010_0000 },
-            PackEntry { path: second, file_type: 0, ram_ptr: 0 },
-        ],
-        1,
-    )
-    .unwrap();
+    pack(&output, &[PackEntry { path: first, file_type: 6, ram_ptr: 0x8010_0000 }, PackEntry { path: second, file_type: 0, ram_ptr: 0 }], 1).unwrap();
 
     assert_eq!(fs::read(&output).unwrap(), support::fixture());
     let archive = Archive::open(output).unwrap();

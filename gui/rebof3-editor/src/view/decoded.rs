@@ -23,16 +23,7 @@ pub struct State {
 }
 
 pub fn decodes(format: Format) -> bool {
-    matches!(
-        format,
-        Format::CueTable
-            | Format::AreaActorDefsTable
-            | Format::AreaScriptTable
-            | Format::BattleScriptTable
-            | Format::MagicScriptTable
-            | Format::ClutBlock
-            | Format::CharacterSpritesLz77
-    )
+    matches!(format, Format::CueTable | Format::AreaActorDefsTable | Format::AreaScriptTable | Format::BattleScriptTable | Format::MagicScriptTable | Format::ClutBlock | Format::CharacterSpritesLz77)
 }
 
 pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
@@ -64,17 +55,13 @@ fn tree(state: &State, path: &str, name: &str, value: &Value, cx: &mut Context<E
 
     let key = path.to_string();
     let arrow = if open { "▾" } else { "▸" };
-    let header = div()
-        .id(gpui::SharedString::from(path.to_string()))
-        .cursor_pointer()
-        .child(format!("{arrow} {title}"))
-        .on_click(cx.listener(move |editor, _, _, cx| {
-            let toggled = &mut editor.views.decoded.toggled;
-            if !toggled.remove(&key) {
-                toggled.insert(key.clone());
-            }
-            cx.notify();
-        }));
+    let header = div().id(gpui::SharedString::from(path.to_string())).cursor_pointer().child(format!("{arrow} {title}")).on_click(cx.listener(move |editor, _, _, cx| {
+        let toggled = &mut editor.views.decoded.toggled;
+        if !toggled.remove(&key) {
+            toggled.insert(key.clone());
+        }
+        cx.notify();
+    }));
     let mut node = div().flex().flex_col().gap(px(GAP_SMALL / 2.0)).child(header);
     if !open {
         return node;

@@ -28,19 +28,15 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 /// The table bytes of `payload` with each translated message of `catalogue` put in place. Refuses an entry whose
 /// `msgctxt` names no message, text that does not encode, and a table past its limit.
 pub fn import(catalogue: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let text =
-        std::str::from_utf8(catalogue).map_err(|error| Error::Import(format!("the PO file is not UTF-8: {error}")))?;
+    let text = std::str::from_utf8(catalogue).map_err(|error| Error::Import(format!("the PO file is not UTF-8: {error}")))?;
     let mut parsed = table::parse(payload)?;
     for entry in entries(text)? {
         let Some(context) = entry.context else { continue };
-        let index = (0..parsed.messages.len())
-            .find(|&index| id(&parsed, index) == context)
-            .ok_or_else(|| Error::Import(format!("the PO entry {context} names no message of the table")))?;
+        let index = (0..parsed.messages.len()).find(|&index| id(&parsed, index) == context).ok_or_else(|| Error::Import(format!("the PO entry {context} names no message of the table")))?;
         if entry.translation.is_empty() || entry.translation == entry.source {
             continue;
         }
-        parsed.messages[index] = codec::encode(Encoding::Message, &entry.translation)
-            .map_err(|error| Error::Import(format!("{context}: {error}")))?;
+        parsed.messages[index] = codec::encode(Encoding::Message, &entry.translation).map_err(|error| Error::Import(format!("{context}: {error}")))?;
     }
     table::build_within_limit(&parsed)
 }
@@ -103,11 +99,7 @@ fn entries(text: &str) -> Result<Vec<Entry>> {
             Some((keyword, rest)) if !keyword.starts_with('"') => (keyword, rest),
             _ => ("", line),
         };
-        let quoted = rest
-            .strip_prefix('"')
-            .and_then(|rest| rest.strip_suffix('"'))
-            .map(unescape)
-            .ok_or_else(|| Error::Import(format!("PO line {}: expected a quoted string", number + 1)))?;
+        let quoted = rest.strip_prefix('"').and_then(|rest| rest.strip_suffix('"')).map(unescape).ok_or_else(|| Error::Import(format!("PO line {}: expected a quoted string", number + 1)))?;
         let entry = current.get_or_insert(Entry { context: None, source: String::new(), translation: String::new() });
         match keyword {
             "msgctxt" => {
@@ -158,8 +150,7 @@ mod tests {
     #[test]
     fn a_translation_replaces_its_message() {
         let table = sample();
-        let po =
-            String::from_utf8(export(&table).unwrap()).unwrap().replace("msgstr \"\"\n\n", "msgstr \"Yo{END}\"\n\n");
+        let po = String::from_utf8(export(&table).unwrap()).unwrap().replace("msgstr \"\"\n\n", "msgstr \"Yo{END}\"\n\n");
         let rebuilt = import(po.as_bytes(), &table).unwrap();
         assert_eq!(&rebuilt[4..], b"Yo\0");
     }

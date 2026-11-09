@@ -33,9 +33,7 @@ pub fn load_all(root: &Path, disc_sha: &str) -> Vec<Observation> {
         .map(|entry| entry.path())
         .filter(|path| path.extension().is_some_and(|extension| extension == EXTENSION))
         .filter_map(|path| read(&path))
-        .filter(|observation| {
-            Route::built_in(&observation.route).is_none_or(|route| route.sha == observation.route_sha)
-        })
+        .filter(|observation| Route::built_in(&observation.route).is_none_or(|route| route.sha == observation.route_sha))
         .collect();
     found.sort_by(|a, b| a.route.cmp(&b.route));
     found
@@ -59,8 +57,6 @@ pub fn store(root: &Path, observation: &Observation) -> Result<PathBuf, Error> {
 /// A cache file made by this format and machine revision.
 fn read(path: &Path) -> Option<Observation> {
     let observation: Observation = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
-    let fresh = observation.version == FORMAT_VERSION
-        && observation.player_revision == PLAYER_REVISION
-        && !PLAYER_REVISION.is_empty();
+    let fresh = observation.version == FORMAT_VERSION && observation.player_revision == PLAYER_REVISION && !PLAYER_REVISION.is_empty();
     fresh.then_some(observation)
 }

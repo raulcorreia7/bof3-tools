@@ -38,54 +38,15 @@ fn a_tim_goes_back_to_the_texture_and_the_palette() {
     std::fs::write(dir.join("t.img"), sheet()).unwrap();
     std::fs::write(dir.join("block.clut"), block_words()).unwrap();
 
-    bof3(
-        &dir,
-        &[
-            "assets",
-            "export",
-            "tim",
-            "t.img",
-            "--load-arg",
-            LOAD,
-            "--depth",
-            "4",
-            "--palette",
-            "block.clut",
-            "--palette-offset",
-            "16",
-            "--clut",
-            "160,483",
-        ],
-    );
-    let said =
-        bof3(&dir, &["assets", "import", "tim", "t.tim", "-o", "back.img", "--load-arg", LOAD, "--palette", "row.bin"]);
+    bof3(&dir, &["assets", "export", "tim", "t.img", "--load-arg", LOAD, "--depth", "4", "--palette", "block.clut", "--palette-offset", "16", "--clut", "160,483"]);
+    let said = bof3(&dir, &["assets", "import", "tim", "t.tim", "-o", "back.img", "--load-arg", LOAD, "--palette", "row.bin"]);
     assert!(said.contains("load argument 0x16080100"), "{said}");
     assert!(said.contains("CLUT at (160, 483)"), "{said}");
     assert_eq!(std::fs::read(dir.join("back.img")).unwrap(), sheet());
     assert_eq!(std::fs::read(dir.join("row.bin")).unwrap(), block_words()[32..64]);
 
-    bof3(
-        &dir,
-        &[
-            "assets",
-            "import",
-            "tim",
-            "t.tim",
-            "-o",
-            "again.img",
-            "--palette",
-            "spliced.clut",
-            "--clut-block",
-            "block.clut",
-            "--palette-offset",
-            "16",
-        ],
-    );
-    assert_eq!(
-        std::fs::read(dir.join("spliced.clut")).unwrap(),
-        block_words(),
-        "an unchanged row leaves the CLUT block as it was"
-    );
+    bof3(&dir, &["assets", "import", "tim", "t.tim", "-o", "again.img", "--palette", "spliced.clut", "--clut-block", "block.clut", "--palette-offset", "16"]);
+    assert_eq!(std::fs::read(dir.join("spliced.clut")).unwrap(), block_words(), "an unchanged row leaves the CLUT block as it was");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -97,11 +58,7 @@ fn a_texture_without_a_join_has_no_clut_and_no_guess() {
     let tim = psx_formats::gfx::tim::File::read(&std::fs::read(dir.join("t.tim")).unwrap()).unwrap();
     assert!(tim.clut.is_none());
     assert_eq!((tim.image.x, tim.image.y), (704, 256));
-    let run = Command::new(env!("CARGO_BIN_EXE_bof3"))
-        .args(["assets", "export", "tim", "t.img", "--load-arg", LOAD, "--depth", "4", "--palette", "t.img"])
-        .current_dir(&dir)
-        .output()
-        .unwrap();
+    let run = Command::new(env!("CARGO_BIN_EXE_bof3")).args(["assets", "export", "tim", "t.img", "--load-arg", LOAD, "--depth", "4", "--palette", "t.img"]).current_dir(&dir).output().unwrap();
     assert!(!run.status.success(), "a CLUT place is never guessed");
     assert!(String::from_utf8_lossy(&run.stderr).contains("--clut"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -129,14 +86,7 @@ fn sequences_go_through_seq_and_sep_files() {
     let dir = folder("seq");
     let end = Event { status: 0xff, meta_type: 0x2f, status_byte: true, ..Event::default() };
     let note = Event { status: 0x90, data1: 60, data2: 100, status_byte: true, ..Event::default() };
-    let sequence = |seq_id| Sequence {
-        seq_id,
-        resolution: 48,
-        tempo_us: 500_000,
-        time_num: 4,
-        time_den: 2,
-        events: vec![note.clone(), end.clone()],
-    };
+    let sequence = |seq_id| Sequence { seq_id, resolution: 48, tempo_us: 500_000, time_num: 4, time_den: 2, events: vec![note.clone(), end.clone()] };
     let package = Package { sequences: vec![sequence(1), sequence(5)] }.encode();
     std::fs::write(dir.join("p.seq"), &package).unwrap();
 

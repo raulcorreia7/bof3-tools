@@ -56,8 +56,7 @@ fn retail_area_maps_draw_from_their_replayed_vram() {
         }
         let vram = Vram::replay(&scene.steps, &mut |archive| {
             let (bytes, archive) = archives.get(archive)?;
-            let payloads =
-                (0..archive.entries().len()).map(|slot| archive.payload(bytes, slot).unwrap_or(&[])).collect();
+            let payloads = (0..archive.entries().len()).map(|slot| archive.payload(bytes, slot).unwrap_or(&[])).collect();
             Some(replay::Archive { entries: archive.entries(), payloads })
         });
         let Some((bytes, archive)) = archives.get(path.as_str()) else { continue };

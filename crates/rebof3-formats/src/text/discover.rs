@@ -144,8 +144,7 @@ fn table_slots(payload: &[u8]) -> Option<Vec<usize>> {
     if first < 4 || first % 2 != 0 || first > payload.len() {
         return None;
     }
-    let offsets: Vec<usize> =
-        payload[..first].as_chunks::<2>().0.iter().map(|pair| usize::from(u16::from_le_bytes(*pair))).collect();
+    let offsets: Vec<usize> = payload[..first].as_chunks::<2>().0.iter().map(|pair| usize::from(u16::from_le_bytes(*pair))).collect();
     if offsets[0] != first || offsets.iter().any(|&offset| offset < first || offset > payload.len()) {
         return None;
     }
@@ -244,8 +243,7 @@ fn pointer_table_at(payload: &[u8], position: usize, base: Option<u32>) -> bool 
         let mut hits = 0;
         let mut offset = start;
         while offset + 4 <= payload.len() && hits < POINTER_WORDS {
-            let word =
-                u32::from_le_bytes([payload[offset], payload[offset + 1], payload[offset + 2], payload[offset + 3]]);
+            let word = u32::from_le_bytes([payload[offset], payload[offset + 1], payload[offset + 2], payload[offset + 3]]);
             if !(base <= u64::from(word) && u64::from(word) < limit) {
                 break;
             }
@@ -326,9 +324,7 @@ fn is_text_record(raw: &[u8]) -> bool {
     }
     let letters = raw.iter().filter(|byte| byte.is_ascii_alphabetic()).count();
     let printable_bytes = raw.iter().filter(|byte| drawable(**byte)).count();
-    printable_bytes >= MIN_LOOSE_LENGTH
-        && letters >= MIN_LETTERS_RUN
-        && letters * 100 >= LETTER_PERCENT * printable_bytes.max(1)
+    printable_bytes >= MIN_LOOSE_LENGTH && letters >= MIN_LETTERS_RUN && letters * 100 >= LETTER_PERCENT * printable_bytes.max(1)
 }
 
 /// The fixed-width name fields: `start -> (length, stride)`, where `length` is the name's bytes in the field.
@@ -371,9 +367,7 @@ fn field_chains(payload: &[u8], starts: &[usize]) -> Vec<(usize, usize, Vec<usiz
     let mut candidates = Vec::new();
     for (stride, _) in counts {
         let anchors = span_starts.iter().copied().filter(|&position| {
-            start_set.contains(&(position + stride))
-                || position.checked_sub(stride).is_some_and(|before| start_set.contains(&before))
-                || (position > 0 && payload[position - 1] == 0)
+            start_set.contains(&(position + stride)) || position.checked_sub(stride).is_some_and(|before| start_set.contains(&before)) || (position > 0 && payload[position - 1] == 0)
         });
         let mut phases: Vec<(usize, Vec<usize>)> = Vec::new();
         for position in anchors {
@@ -389,15 +383,8 @@ fn field_chains(payload: &[u8], starts: &[usize]) -> Vec<(usize, usize, Vec<usiz
                     continue;
                 }
                 let (table_start, table_end) = (segment[0], segment[segment.len() - 1]);
-                let positions: Vec<usize> = (table_start..=table_end)
-                    .step_by(stride)
-                    .filter(|&position| field_at(payload, position, stride).is_some())
-                    .collect();
-                let observed: Vec<usize> = span_starts
-                    .iter()
-                    .copied()
-                    .filter(|&position| table_start <= position && position <= table_end)
-                    .collect();
+                let positions: Vec<usize> = (table_start..=table_end).step_by(stride).filter(|&position| field_at(payload, position, stride).is_some()).collect();
+                let observed: Vec<usize> = span_starts.iter().copied().filter(|&position| table_start <= position && position <= table_end).collect();
                 if observed.len() < MIN_STRIDE_RUN || positions.len() < MIN_STRIDE_RUN {
                     continue;
                 }
@@ -444,9 +431,7 @@ fn field_at(payload: &[u8], start: usize, stride: usize) -> Option<usize> {
     while length < field.len() && field[length] >= CONTROL_LIMIT && printable(field[length]) {
         length += 1;
     }
-    if length < MIN_LENGTH
-        || field[..length].iter().filter(|byte| byte.is_ascii_alphabetic()).count() < MIN_LETTERS_FIELD
-    {
+    if length < MIN_LENGTH || field[..length].iter().filter(|byte| byte.is_ascii_alphabetic()).count() < MIN_LETTERS_FIELD {
         return None;
     }
     if length < field.len() && field[length] == 0 {

@@ -642,16 +642,10 @@ mod tests {
         vram.reset_palette();
         vram.upload_palette();
         let regions = vram.regions();
-        let a: Vec<_> = regions
-            .iter()
-            .filter(|region| region.writer.as_entry().is_some_and(|(archive, _)| archive == "A.EMI"))
-            .collect();
+        let a: Vec<_> = regions.iter().filter(|region| region.writer.as_entry().is_some_and(|(archive, _)| archive == "A.EMI")).collect();
         assert_eq!(a.len(), 2);
         assert!(a.iter().all(|region| (region.width, region.height) == (32, 32)));
-        let b = regions
-            .iter()
-            .find(|region| region.writer.as_entry().is_some_and(|(archive, _)| archive == "B.EMI"))
-            .expect("the palette");
+        let b = regions.iter().find(|region| region.writer.as_entry().is_some_and(|(archive, _)| archive == "B.EMI")).expect("the palette");
         assert_eq!((b.x, b.y, b.width, b.height, b.kind), (0, 480, 16, 1, Kind::Palette));
     }
 

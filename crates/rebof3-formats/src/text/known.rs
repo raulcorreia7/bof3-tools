@@ -48,14 +48,7 @@ fn game_tables(payload: &[u8]) -> Vec<Known> {
         for (index, record) in records.iter().enumerate() {
             let field = &record[..game_tables::NAME_BYTES];
             let Some(length) = name_length(field) else { continue };
-            known.push(Known {
-                offset: table.archive_offset - PAYLOAD_START + index * table.record,
-                length,
-                stride: table.record,
-                text: game_tables::name_text(field),
-                table: table.name,
-                index,
-            });
+            known.push(Known { offset: table.archive_offset - PAYLOAD_START + index * table.record, length, stride: table.record, text: game_tables::name_text(field), table: table.name, index });
         }
     }
     known
@@ -76,14 +69,7 @@ fn characters(payload: &[u8]) -> Vec<Known> {
             let offset = characters::PAYLOAD_OFFSET + index * characters::RECORD_BYTES;
             let field = payload.get(offset..offset + characters::NAME_BYTES)?;
             let length = name_length(field)?;
-            Some(Known {
-                offset,
-                length,
-                stride: characters::RECORD_BYTES,
-                text: character.name.clone(),
-                table: "characters",
-                index,
-            })
+            Some(Known { offset, length, stride: characters::RECORD_BYTES, text: character.name.clone(), table: "characters", index })
         })
         .collect()
 }
@@ -99,14 +85,7 @@ fn enemies(payload: &[u8]) -> Vec<Known> {
         let offset = NAMES_START + index * RECORD;
         let Some(field) = payload.get(offset..offset + NAME_BYTES) else { break };
         let Some(length) = name_length(field) else { continue };
-        known.push(Known {
-            offset,
-            length,
-            stride: RECORD,
-            text: game_tables::name_text(field),
-            table: "enemies",
-            index,
-        });
+        known.push(Known { offset, length, stride: RECORD, text: game_tables::name_text(field), table: "enemies", index });
     }
     known
 }

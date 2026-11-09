@@ -174,13 +174,7 @@ pub fn sheet(slot: usize, load_arg: u32, payload_bytes: usize) -> Option<Sheet> 
         return None;
     }
     let side = vram::RECTANGLE_SIDE as u16;
-    Some(Sheet {
-        slot,
-        x: u16::from(descriptor.column) * side,
-        y: u16::from(descriptor.row) * side,
-        width: per_row as u16 * side,
-        height: (rectangles / per_row) as u16 * side,
-    })
+    Some(Sheet { slot, x: u16::from(descriptor.column) * side, y: u16::from(descriptor.row) * side, width: per_row as u16 * side, height: (rectangles / per_row) as u16 * side })
 }
 
 /// A draw site whose texture page and CLUT are both literal in one function.
@@ -204,26 +198,12 @@ pub struct Site {
 }
 
 /// Builds a [`Site`] table entry.
-const fn literal(
-    archive: &'static str,
-    overlay: usize,
-    function: u32,
-    source: &'static str,
-    tpage: u16,
-    clut: u16,
-) -> Site {
+const fn literal(archive: &'static str, overlay: usize, function: u32, source: &'static str, tpage: u16, clut: u16) -> Site {
     Site { archive, overlay, function, source, tpage, clut, page_writer: None }
 }
 
 /// Builds a [`Site`] whose page is the upload of `page_writer`.
-const fn streamed(
-    archive: &'static str,
-    overlay: usize,
-    function: u32,
-    source: &'static str,
-    (tpage, clut): (u16, u16),
-    page_writer: &'static str,
-) -> Site {
+const fn streamed(archive: &'static str, overlay: usize, function: u32, source: &'static str, (tpage, clut): (u16, u16), page_writer: &'static str) -> Site {
     Site { archive, overlay, function, source, tpage, clut, page_writer: Some(page_writer) }
 }
 
@@ -244,14 +224,7 @@ const HUD_SPRITE: &str = "src/overlays/area/Area_DrawHudSprite.h:8-11";
 /// A row enters the table only with its page and CLUT literal in the cited source. A rule that reads
 /// the page and CLUT from data the game reads, or a capture of the game's own draw calls, replaces it.
 pub const SITES: &[Site] = &[
-    literal(
-        "WORLD00/AREA024.EMI",
-        14,
-        0x801F_2DF8,
-        "src/overlays/area/area024/14/sprite_draw.c:423-424",
-        0x003B,
-        0x78CA,
-    ),
+    literal("WORLD00/AREA024.EMI", 14, 0x801F_2DF8, "src/overlays/area/area024/14/sprite_draw.c:423-424", 0x003B, 0x78CA),
     // The world-map HUD sprites: an 8bpp page at (768, 256) with CLUT (0, 494), one copy per
     // overlay.
     literal("WORLD00/AREA016.EMI", 13, 0x801F_39D8, HUD_SPRITE, 0x009C, 0x7B80),
@@ -266,39 +239,11 @@ pub const SITES: &[Site] = &[
     literal("WORLD03/AREA151.EMI", 13, 0x801F_3948, HUD_SPRITE, 0x009C, 0x7B80),
     literal("WORLD04/AREA152.EMI", 13, 0x801F_389C, HUD_SPRITE, 0x009C, 0x7B80),
     // AREA016's cloud cell, AREA030's backdrop quads, fish arrow and menu icons.
-    literal(
-        "WORLD00/AREA016.EMI",
-        13,
-        0x801F_4768,
-        "src/overlays/area/area016/13/func_801F4768.c:82-83",
-        0x005B,
-        0x78CB,
-    ),
+    literal("WORLD00/AREA016.EMI", 13, 0x801F_4768, "src/overlays/area/area016/13/func_801F4768.c:82-83", 0x005B, 0x78CB),
     literal("WORLD00/AREA030.EMI", 5, 0x800F_5E44, "src/overlays/area/area030/05/C.c:326-339", 0x0095, 0x7A80),
-    literal(
-        "WORLD00/AREA030.EMI",
-        4,
-        0x801D_2C34,
-        "src/overlays/area/area030/04/Fishing_DrawFishArrow.c:15-16",
-        0x0099,
-        0x7A40,
-    ),
-    literal(
-        "WORLD00/AREA030.EMI",
-        4,
-        0x801D_799C,
-        "src/overlays/area/area030/04/func_801D799C.c:14-17; src/overlays/area/area030/04/data.c:271",
-        0x001D,
-        0x7887,
-    ),
-    literal(
-        "WORLD00/AREA030.EMI",
-        4,
-        0x801D_8248,
-        "src/overlays/area/area030/04/func_801D8248.c:13-16",
-        0x001D,
-        0x7887,
-    ),
+    literal("WORLD00/AREA030.EMI", 4, 0x801D_2C34, "src/overlays/area/area030/04/Fishing_DrawFishArrow.c:15-16", 0x0099, 0x7A40),
+    literal("WORLD00/AREA030.EMI", 4, 0x801D_799C, "src/overlays/area/area030/04/func_801D799C.c:14-17; src/overlays/area/area030/04/data.c:271", 0x001D, 0x7887),
+    literal("WORLD00/AREA030.EMI", 4, 0x801D_8248, "src/overlays/area/area030/04/func_801D8248.c:13-16", 0x001D, 0x7887),
     // The battle panel quads: `GetTPage(0, 0, 0x380, 0x100)`, a 4bpp page at (896, 256), and
     // `setClut(16, STAGE_PALETTE_Y + 26)`. The same overlay's `Battle_LoadDraArchive` streams
     // `BATL_DRA`, which uploads the page and loads arena row 26, and `Battle_FinishDraLoad` copies
@@ -316,14 +261,7 @@ pub const SITES: &[Site] = &[
     // `GetClut(0, 0x1FA)`, arena row 26; `BATL_OVR` uploads both. From retail assembly.
     literal("BATTLE/BATL_OVR.EMI", 0, 0x801E_F3B4, "asm/emi/battle/batl_ovr/00/func_801EF3B4.s:15-36", 0x009D, 0x7E80),
     // MAGIC218's effect page and CLUT, from retail assembly.
-    literal(
-        "BMAGIC/MAGIC218.EMI",
-        3,
-        0x801E_F250,
-        "asm/emi/bmagic/magic218/03/func_801EF250.s:195-213",
-        0x00BD,
-        0x7E80,
-    ),
+    literal("BMAGIC/MAGIC218.EMI", 3, 0x801E_F250, "asm/emi/bmagic/magic218/03/func_801EF250.s:195-213", 0x00BD, 0x7E80),
 ];
 
 /// What named a join: a literal draw site or the world-map terrain descriptor rule.
@@ -386,12 +324,7 @@ pub fn joins<'a>(archive: &str, sheets: &[Sheet], blocks: &[&'a ResidentClutBloc
 /// `(0, 483 + index)`; in 4bpp it is `(16 * index, 483)`. The page is
 /// `(320 + 128 * block, 256)`. The same uniqueness rule applies: one covering sheet and one
 /// holding block, or no join. Repeated descriptors yield one join.
-pub fn terrain_joins<'a>(
-    archive: &str,
-    records: &[u32],
-    sheets: &[Sheet],
-    blocks: &[&'a ResidentClutBlock],
-) -> Vec<Join<'a>> {
+pub fn terrain_joins<'a>(archive: &str, records: &[u32], sheets: &[Sheet], blocks: &[&'a ResidentClutBlock]) -> Vec<Join<'a>> {
     let mut joins: Vec<Join<'a>> = Vec::new();
     for &descriptor in records {
         let Some((page_x, page_y, clut, depth)) = terrain_descriptor(descriptor) else {
@@ -417,24 +350,14 @@ pub fn terrain_descriptor(descriptor: u32) -> Option<(u16, u16, Clut, Depth)> {
         return None;
     }
     let index = ((descriptor >> TERRAIN_CLUT_INDEX_SHIFT) & 0xF) as u16;
-    let (clut, depth) = if descriptor >> TERRAIN_DEPTH_BIT == 0 {
-        (Clut::new(0, TERRAIN_CLUT_ROW + index)?, Depth::Eight)
-    } else {
-        (Clut::new(index * 16, TERRAIN_CLUT_ROW)?, Depth::Four)
-    };
+    let (clut, depth) = if descriptor >> TERRAIN_DEPTH_BIT == 0 { (Clut::new(0, TERRAIN_CLUT_ROW + index)?, Depth::Eight) } else { (Clut::new(index * 16, TERRAIN_CLUT_ROW)?, Depth::Four) };
     let page = ((descriptor >> TERRAIN_PAGE_SHIFT) & 3) as u16;
     Some((TERRAIN_PAGE_X + page * TERRAIN_PAGE_STEP, TERRAIN_PAGE_Y, clut, depth))
 }
 
 /// The one block that holds the row: the archive's own when it has one, else the family's.
-fn holder<'a>(
-    archive: &str,
-    blocks: &[&'a ResidentClutBlock],
-    clut: Clut,
-    depth: Depth,
-) -> Option<&'a ResidentClutBlock> {
-    let own: Vec<&ResidentClutBlock> =
-        blocks.iter().copied().filter(|block| block.archive == archive && block.holds(clut, depth)).collect();
+fn holder<'a>(archive: &str, blocks: &[&'a ResidentClutBlock], clut: Clut, depth: Depth) -> Option<&'a ResidentClutBlock> {
+    let own: Vec<&ResidentClutBlock> = blocks.iter().copied().filter(|block| block.archive == archive && block.holds(clut, depth)).collect();
     if !own.is_empty() {
         return one(own.into_iter());
     }
@@ -512,10 +435,7 @@ mod tests {
 
         let sheets = [sheet(7, 576, 256)];
         let blocks = [block(archive, 3, 0x8003_3E00, 2304), block_with(archive, 4, 0x8003_3E00, 2304, 1)];
-        assert!(
-            terrain_joins(archive, &[descriptor], &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(),
-            "two different blocks at the same row are ambiguous"
-        );
+        assert!(terrain_joins(archive, &[descriptor], &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(), "two different blocks at the same row are ambiguous");
     }
 
     #[test]
@@ -560,16 +480,10 @@ mod tests {
     #[test]
     fn identical_family_banks_collapse_and_disagreeing_ones_refuse() {
         let (own, sheets, ram) = area024();
-        let same = [
-            block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7),
-            block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 7),
-        ];
+        let same = [block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 7)];
         assert_eq!(joins(own, &sheets, &same.iter().collect::<Vec<_>>()).len(), 1);
 
-        let different = [
-            block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7),
-            block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8),
-        ];
+        let different = [block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8)];
         assert!(joins(own, &sheets, &different.iter().collect::<Vec<_>>()).is_empty());
     }
 
@@ -582,9 +496,6 @@ mod tests {
         let archive = "BIN/BATTLE/BATTLE.EMI";
         let sheets = [sheet(4, 896, 256)];
         let blocks = [block(archive, 6, 0x8003_6C00, 256)];
-        assert!(
-            joins(archive, &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(),
-            "BATTLE's own sheet is not BATL_DRA's"
-        );
+        assert!(joins(archive, &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(), "BATTLE's own sheet is not BATL_DRA's");
     }
 }

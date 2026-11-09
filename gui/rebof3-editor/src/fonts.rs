@@ -8,19 +8,9 @@ use std::sync::OnceLock;
 
 use gpui::{App, SharedString};
 
-const PROPORTIONAL: &[&str] =
-    &["Segoe UI", "SF Pro Text", "Helvetica Neue", "Inter", "Noto Sans", "DejaVu Sans", "Liberation Sans", "Arial"];
+const PROPORTIONAL: &[&str] = &["Segoe UI", "SF Pro Text", "Helvetica Neue", "Inter", "Noto Sans", "DejaVu Sans", "Liberation Sans", "Arial"];
 
-const MONOSPACE: &[&str] = &[
-    "Consolas",
-    "Menlo",
-    "SF Mono",
-    "JetBrains Mono",
-    "DejaVu Sans Mono",
-    "Noto Sans Mono",
-    "Liberation Mono",
-    "Courier New",
-];
+const MONOSPACE: &[&str] = &["Consolas", "Menlo", "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono", "Courier New"];
 
 /// gpui's name for the platform's interface font, used when no listed family is installed.
 const SYSTEM_FONT: &str = ".SystemUIFont";

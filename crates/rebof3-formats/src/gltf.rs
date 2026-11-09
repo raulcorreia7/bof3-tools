@@ -42,27 +42,13 @@ const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 
 /// Writes a `.glb` with one mesh named `name`. Every vertex has one position and one texture
 /// coordinate, and every index names one of them. Returns `None` when there is no triangle.
-pub fn glb(
-    name: &str,
-    positions: &[[f32; 3]],
-    uvs: &[[f32; 2]],
-    primitives: &[Primitive],
-    materials: &[&str],
-) -> Option<Vec<u8>> {
+pub fn glb(name: &str, positions: &[[f32; 3]], uvs: &[[f32; 2]], primitives: &[Primitive], materials: &[&str]) -> Option<Vec<u8>> {
     glb_with(name, positions, uvs, None, primitives, materials, &[])
 }
 
 /// Writes a `.glb` like [`glb`], with an RGBA vertex colour per vertex (`COLOR_0`, floats 0 to 1) when
 /// `colours` is given, and `nodes` as more root nodes after the mesh's node.
-pub fn glb_with(
-    name: &str,
-    positions: &[[f32; 3]],
-    uvs: &[[f32; 2]],
-    colours: Option<&[[f32; 4]]>,
-    primitives: &[Primitive],
-    materials: &[&str],
-    nodes: &[Node],
-) -> Option<Vec<u8>> {
+pub fn glb_with(name: &str, positions: &[[f32; 3]], uvs: &[[f32; 2]], colours: Option<&[[f32; 4]]>, primitives: &[Primitive], materials: &[&str], nodes: &[Node]) -> Option<Vec<u8>> {
     if positions.is_empty() || primitives.iter().all(|primitive| primitive.indices.is_empty()) {
         return None;
     }
@@ -206,18 +192,13 @@ fn pack(document: &Value, bin: &[u8]) -> Vec<u8> {
 /// could not have made is refused rather than misread.
 pub fn read_positions(glb: &[u8]) -> Result<Vec<[f32; 3]>, String> {
     let (document, bin) = chunks(glb)?;
-    let accessor = document["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
-        .as_u64()
-        .and_then(|index| document["accessors"].get(index as usize))
-        .ok_or("the first primitive has no POSITION accessor")?;
+    let accessor =
+        document["meshes"][0]["primitives"][0]["attributes"]["POSITION"].as_u64().and_then(|index| document["accessors"].get(index as usize)).ok_or("the first primitive has no POSITION accessor")?;
     if accessor["componentType"].as_u64() != Some(u64::from(FLOAT)) || accessor["type"] != "VEC3" {
         return Err("the POSITION accessor is not VEC3 floats".into());
     }
     let count = accessor["count"].as_u64().ok_or("the POSITION accessor has no count")? as usize;
-    let view = accessor["bufferView"]
-        .as_u64()
-        .and_then(|index| document["bufferViews"].get(index as usize))
-        .ok_or("the POSITION accessor has no buffer view")?;
+    let view = accessor["bufferView"].as_u64().and_then(|index| document["bufferViews"].get(index as usize)).ok_or("the POSITION accessor has no buffer view")?;
     let start = view["byteOffset"].as_u64().unwrap_or(0) + accessor["byteOffset"].as_u64().unwrap_or(0);
     let start = start as usize;
     let end = count.checked_mul(12).and_then(|bytes| start.checked_add(bytes));
@@ -245,8 +226,7 @@ pub fn read_nodes(glb: &[u8]) -> Result<Vec<NamedPlace>, String> {
         .filter_map(|node| {
             let name = node["name"].as_str()?.to_string();
             let translation = node["translation"].as_array().and_then(|values| {
-                let values: Vec<f32> =
-                    values.iter().filter_map(|value| value.as_f64().map(|value| value as f32)).collect();
+                let values: Vec<f32> = values.iter().filter_map(|value| value.as_f64().map(|value| value as f32)).collect();
                 <[f32; 3]>::try_from(values).ok()
             });
             Some((name, translation))
@@ -256,8 +236,7 @@ pub fn read_nodes(glb: &[u8]) -> Result<Vec<NamedPlace>, String> {
 
 /// The JSON document and the binary chunk of a `.glb`.
 fn chunks(glb: &[u8]) -> Result<(Value, &[u8]), String> {
-    let word =
-        |at: usize| glb.get(at..at + 4).map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
+    let word = |at: usize| glb.get(at..at + 4).map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
     if word(0) != Some(MAGIC) || word(4) != Some(VERSION) || word(16) != Some(CHUNK_JSON) {
         return Err("the file is not a glTF 2.0 binary with its JSON chunk first".into());
     }

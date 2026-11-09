@@ -34,8 +34,7 @@ fn retail_formations_place_and_draw() {
     let (game_bytes, game) = read(GAME);
     let code = game.payload(&game_bytes, 0).expect("the code image");
     let offsets = Offsets::from_code(code, game.entries()[0].ram_ptr).expect("s_EncounterEnemyOffsets");
-    let sizes =
-        SpriteSizes::from_executable(&fs::read(root.join(EXECUTABLE)).expect("the executable")).expect("g_SpriteSizes");
+    let sizes = SpriteSizes::from_executable(&fs::read(root.join(EXECUTABLE)).expect("the executable")).expect("g_SpriteSizes");
     let (first_bytes, first) = read(scenes::FIRST);
 
     let mut paths: Vec<String> = rebof3_emi::archives_under(&root.join("BIN"))
@@ -58,10 +57,7 @@ fn retail_formations_place_and_draw() {
                 .entries()
                 .iter()
                 .enumerate()
-                .find(|(slot, entry)| {
-                    entry.ram_ptr == load
-                        && classify(entry, archive.payload(&bytes, *slot).unwrap_or(&[])) != Format::Reserve
-                })
+                .find(|(slot, entry)| entry.ram_ptr == load && classify(entry, archive.payload(&bytes, *slot).unwrap_or(&[])) != Format::Reserve)
                 .and_then(|(slot, _)| archive.payload(&bytes, slot).ok())
         };
         let Some(block) = payload(0x800E_4000) else { continue };
@@ -69,10 +65,8 @@ fn retail_formations_place_and_draw() {
         let program = payload(0x800D_3800).and_then(|bytes| Program::decode(bytes).ok());
         let scene = scenes::field(path);
         let vram = Vram::replay(&scene.steps, &mut |name| {
-            let (bytes, archive) =
-                if name == path { (&bytes, &archive) } else { archives.get(name).map(|(b, a)| (b, a))? };
-            let payloads =
-                (0..archive.entries().len()).map(|slot| archive.payload(bytes, slot).unwrap_or(&[])).collect();
+            let (bytes, archive) = if name == path { (&bytes, &archive) } else { archives.get(name).map(|(b, a)| (b, a))? };
+            let payloads = (0..archive.entries().len()).map(|slot| archive.payload(bytes, slot).unwrap_or(&[])).collect();
             Some(replay::Archive { entries: archive.entries(), payloads })
         });
 
@@ -86,8 +80,7 @@ fn retail_formations_place_and_draw() {
                 enemies += 1;
                 let Some(record) = enemy.scene else { continue };
                 found += 1;
-                let Some(animation) = program.as_ref().and_then(|program| formation::stream(program, &record, 0))
-                else {
+                let Some(animation) = program.as_ref().and_then(|program| formation::stream(program, &record, 0)) else {
                     continue;
                 };
                 streams += 1;
@@ -102,9 +95,7 @@ fn retail_formations_place_and_draw() {
                             .pixels
                             .iter()
                             .flat_map(|pixel| match pixel {
-                                Some(pixel) if pixel.texel.drawn() => {
-                                    rebof3_formats::clut::color_rgba(pixel.texel.word)
-                                }
+                                Some(pixel) if pixel.texel.drawn() => rebof3_formats::clut::color_rgba(pixel.texel.word),
                                 _ => [0; 4],
                             })
                             .collect();
@@ -126,10 +117,6 @@ fn retail_formations_place_and_draw() {
          {frames} frames, {drawn} draw a pixel ({pixels} pixels, {outside} cell texels past an upload, \
          {unresolved} pixels past a loaded palette)"
     );
-    assert_eq!(
-        (formations, enemies, found, streams),
-        (599, 1872, 1780, 1780),
-        "formations, enemies, scene records, streams"
-    );
+    assert_eq!((formations, enemies, found, streams), (599, 1872, 1780, 1780), "formations, enemies, scene records, streams");
     assert_eq!((frames, drawn), (16322, 16322), "frames and frames that draw");
 }

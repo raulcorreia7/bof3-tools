@@ -173,20 +173,13 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
                 Format::VramUpload => {
                     let Some(sheet) = sheet(slot, entry.ram_ptr, payload.len()) else { continue };
                     let joined = joins.filter(|join| join.texture == writer);
-                    let (depths, sites): (BTreeSet<u32>, Vec<String>) =
-                        joined.map(|join| (join.depth.bits(), join.rule.evidence())).unzip();
-                    (
-                        Kind::Texture,
-                        vec![Rect { x: sheet.x, y: sheet.y, width: sheet.width, height: sheet.height }],
-                        depth_text(&depths),
-                        sites,
-                    )
+                    let (depths, sites): (BTreeSet<u32>, Vec<String>) = joined.map(|join| (join.depth.bits(), join.rule.evidence())).unzip();
+                    (Kind::Texture, vec![Rect { x: sheet.x, y: sheet.y, width: sheet.width, height: sheet.height }], depth_text(&depths), sites)
                 }
                 Format::ClutBlock => {
                     let Some(block) = ClutBlock::new(slot, entry.ram_ptr, payload.len()) else { continue };
                     let joined = joins.filter(|join| join.palette == writer);
-                    let (depths, sites): (BTreeSet<u32>, Vec<String>) =
-                        joined.map(|join| (join.depth.bits(), join.rule.evidence())).unzip();
+                    let (depths, sites): (BTreeSet<u32>, Vec<String>) = joined.map(|join| (join.depth.bits(), join.rule.evidence())).unzip();
                     let mut depth = format!("{} colours", block.words);
                     if !depths.is_empty() {
                         depth = format!("{depth}; {}", depth_text(&depths));
@@ -211,30 +204,12 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
             continue;
         }
         let (depth, note) = match (&region.writer, region.kind) {
-            (Writer::Named(name), _) => {
-                ("unknown".to_string(), format!("Uploaded by code ({name}); no data places it."))
-            }
-            (_, WriteKind::Palette) => (
-                "palette words".to_string(),
-                "Palette words of a compressed block, copied by the loader to the arena; this view does not move them."
-                    .to_string(),
-            ),
-            _ => (
-                "unknown".to_string(),
-                "Not a whole number of upload rectangles, so the loader places it itself.".to_string(),
-            ),
+            (Writer::Named(name), _) => ("unknown".to_string(), format!("Uploaded by code ({name}); no data places it.")),
+            (_, WriteKind::Palette) => ("palette words".to_string(), "Palette words of a compressed block, copied by the loader to the arena; this view does not move them.".to_string()),
+            _ => ("unknown".to_string(), "Not a whole number of upload rectangles, so the loader places it itself.".to_string()),
         };
         let rect = Rect { x: region.x, y: region.y, width: region.width, height: region.height };
-        placed.push(Placed {
-            writer: region.writer.clone(),
-            kind: Kind::Code,
-            rects: vec![rect],
-            depth,
-            load_arg: None,
-            on_disc: None,
-            note,
-            sites: Vec::new(),
-        });
+        placed.push(Placed { writer: region.writer.clone(), kind: Kind::Code, rects: vec![rect], depth, load_arg: None, on_disc: None, note, sites: Vec::new() });
     }
     placed
 }
@@ -254,8 +229,7 @@ fn depth_text(depths: &BTreeSet<u32>) -> String {
 pub fn collisions(placed: &[Placed]) -> Vec<Collision> {
     let mut found = Vec::new();
     for (first, one) in placed.iter().enumerate().filter(|(_, placed)| placed.kind != Kind::Code) {
-        for (second, other) in placed.iter().enumerate().skip(first + 1).filter(|(_, placed)| placed.kind != Kind::Code)
-        {
+        for (second, other) in placed.iter().enumerate().skip(first + 1).filter(|(_, placed)| placed.kind != Kind::Code) {
             for (left, right) in one.rects.iter().flat_map(|left| other.rects.iter().map(move |right| (left, right))) {
                 if let Some(area) = left.intersection(*right) {
                     found.push(Collision { first, second, area });
@@ -301,10 +275,8 @@ pub fn moved(project: &Project, placed: &Placed, step: Step) -> Result<u32, Stri
                 Step::Up => -(usize::from(ARENA_ROW_WORDS) as isize),
                 Step::Down => usize::from(ARENA_ROW_WORDS) as isize,
             };
-            let next =
-                word.checked_add_signed(delta).filter(|next| (next + payload_bytes / 2) * 2 <= ARENA_BYTES as usize);
-            next.map(|next| ARENA_BASE + 2 * next as u32)
-                .ok_or_else(|| "a step that way leaves the palette arena".to_string())
+            let next = word.checked_add_signed(delta).filter(|next| (next + payload_bytes / 2) * 2 <= ARENA_BYTES as usize);
+            next.map(|next| ARENA_BASE + 2 * next as u32).ok_or_else(|| "a step that way leaves the palette arena".to_string())
         }
     }
 }
@@ -332,12 +304,7 @@ pub fn prepare(editor: &mut Editor) {
     let found = collisions(&placed);
     let selected = editor.views.layout.selected.clone();
     // Start on the shown entry's own placement.
-    let own = editor
-        .archive
-        .as_ref()
-        .zip(editor.entry)
-        .map(|(archive, slot)| Writer::entry(archive.path.0.clone(), slot))
-        .filter(|writer| placed.iter().any(|placed| placed.writer == *writer));
+    let own = editor.archive.as_ref().zip(editor.entry).map(|(archive, slot)| Writer::entry(archive.path.0.clone(), slot)).filter(|writer| placed.iter().any(|placed| placed.writer == *writer));
     let selected = selected.filter(|writer| placed.iter().any(|placed| placed.writer == *writer)).or(own);
     editor.views.layout.selected = selected;
     editor.views.layout.cache = Some((replayed, Rc::new(placed), Rc::new(found)));
@@ -370,8 +337,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let zoom = zoom as f32;
     let own = Writer::entry(entry.archive.path.0.clone(), entry.index);
 
-    let mut surface =
-        div().relative().flex_none().w(px(f32::from(VRAM_WIDTH) * zoom)).h(px(f32::from(VRAM_HEIGHT) * zoom));
+    let mut surface = div().relative().flex_none().w(px(f32::from(VRAM_WIDTH) * zoom)).h(px(f32::from(VRAM_HEIGHT) * zoom));
     surface = surface.bg(color(BACKGROUND));
     for step in (GUIDE_STEP..VRAM_WIDTH).step_by(usize::from(GUIDE_STEP)) {
         surface = surface.child(guide(f32::from(step) * zoom, true));
@@ -451,8 +417,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         column = column.child(muted(format!("Not on the disc, skipped: {}", replayed.vram.missing().join(", "))));
     }
     column = column.child(separator(false)).child(list(editor, &placed, &found, cx));
-    if let Some(one) = state.selected.as_ref().and_then(|writer| placed.iter().find(|placed| placed.writer == *writer))
-    {
+    if let Some(one) = state.selected.as_ref().and_then(|writer| placed.iter().find(|placed| placed.writer == *writer)) {
         column = column.child(detail(editor, one, &placed, &found, cx));
     }
     column.into_any_element()
@@ -460,22 +425,11 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
 fn guide(at: f32, vertical: bool) -> Div {
     let line = div().absolute().bg(color(BORDER));
-    if vertical {
-        line.left(px(at)).top(px(0.0)).w(px(1.0)).h_full()
-    } else {
-        line.top(px(at)).left(px(0.0)).h(px(1.0)).w_full()
-    }
+    if vertical { line.left(px(at)).top(px(0.0)).w(px(1.0)).h_full() } else { line.top(px(at)).left(px(0.0)).h(px(1.0)).w_full() }
 }
 
 fn legend(placements: usize, collisions: usize) -> Div {
-    let key = |fill_color: u32, text: &'static str| {
-        div()
-            .flex()
-            .items_center()
-            .gap(px(GAP_SMALL))
-            .child(div().w(px(12.0)).h(px(12.0)).bg(Hsla::from(rgba(fill_color))))
-            .child(text)
-    };
+    let key = |fill_color: u32, text: &'static str| div().flex().items_center().gap(px(GAP_SMALL)).child(div().w(px(12.0)).h(px(12.0)).bg(Hsla::from(rgba(fill_color)))).child(text);
     div()
         .flex()
         .flex_wrap()
@@ -512,14 +466,10 @@ fn list(editor: &Editor, placed: &[Placed], found: &[Collision], cx: &mut Contex
             if one.moved() { "  MOVED" } else { "" },
         );
         let writer = one.writer.clone();
-        rows = rows.child(
-            selectable(("layout-row", at), state.selected.as_ref() == Some(&one.writer)).child(mono(line)).on_click(
-                cx.listener(move |editor, _, _, cx| {
-                    editor.views.layout.selected = Some(writer.clone());
-                    cx.notify();
-                }),
-            ),
-        );
+        rows = rows.child(selectable(("layout-row", at), state.selected.as_ref() == Some(&one.writer)).child(mono(line)).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.layout.selected = Some(writer.clone());
+            cx.notify();
+        })));
     }
     rows
 }
@@ -540,25 +490,13 @@ fn detail(editor: &Editor, one: &Placed, placed: &[Placed], found: &[Collision],
         column = column.child(mono(format!("Read by: {site}")).text_color(color(MUTED)));
     }
     if one.kind != Kind::Code && !one.sites.is_empty() {
-        column = column.child(muted(
-            "These sites name the page and row as literals in code. A move changes the data only; patch them to follow it.",
-        ));
+        column = column.child(muted("These sites name the page and row as literals in code. A move changes the data only; patch them to follow it."));
     }
     let at = placed.iter().position(|other| other.writer == one.writer);
     for collision in found.iter().filter(|collision| Some(collision.first) == at || Some(collision.second) == at) {
         let other = &placed[if Some(collision.first) == at { collision.second } else { collision.first }];
         let area = collision.area;
-        column = column.child(
-            mono(format!(
-                "Collides with {} at x {} y {}, {}×{} words",
-                short(&other.writer),
-                area.x,
-                area.y,
-                area.width,
-                area.height
-            ))
-            .text_color(Hsla::from(rgba(COLLISION_FILL))),
-        );
+        column = column.child(mono(format!("Collides with {} at x {} y {}, {}×{} words", short(&other.writer), area.x, area.y, area.width, area.height)).text_color(Hsla::from(rgba(COLLISION_FILL))));
     }
     if one.kind == Kind::Code {
         return column;
@@ -577,12 +515,10 @@ fn detail(editor: &Editor, one: &Placed, placed: &[Placed], found: &[Collision],
         moves = moves.child(control);
     }
     let writer = one.writer.clone();
-    moves = moves.child(separator(true)).child(button("layout-reset", "Back to the disc", one.moved()).on_click(
-        cx.listener(move |editor, _, _, cx| {
-            reset(editor, &writer);
-            cx.notify();
-        }),
-    ));
+    moves = moves.child(separator(true)).child(button("layout-reset", "Back to the disc", one.moved()).on_click(cx.listener(move |editor, _, _, cx| {
+        reset(editor, &writer);
+        cx.notify();
+    })));
     column.child(moves)
 }
 
@@ -619,16 +555,7 @@ mod tests {
     use super::*;
 
     fn palette(writer: Writer, rects: Vec<Rect>) -> Placed {
-        Placed {
-            writer,
-            kind: Kind::Palette,
-            rects,
-            depth: String::new(),
-            load_arg: None,
-            on_disc: None,
-            note: String::new(),
-            sites: Vec::new(),
-        }
+        Placed { writer, kind: Kind::Palette, rects, depth: String::new(), load_arg: None, on_disc: None, note: String::new(), sites: Vec::new() }
     }
 
     #[test]
@@ -636,10 +563,7 @@ mod tests {
         // 256 words from the arena start: one whole row at (0, 480).
         assert_eq!(palette_rects(0, 256), vec![Rect { x: 0, y: 480, width: 256, height: 1 }]);
         // 32 words from 240: the tail of row 480 and the head of row 481.
-        assert_eq!(
-            palette_rects(240, 32),
-            vec![Rect { x: 240, y: 480, width: 16, height: 1 }, Rect { x: 0, y: 481, width: 16, height: 1 }]
-        );
+        assert_eq!(palette_rects(240, 32), vec![Rect { x: 240, y: 480, width: 16, height: 1 }, Rect { x: 0, y: 481, width: 16, height: 1 }]);
         // 600 words from word 16: head, one whole row, then the tail.
         let spans = palette_rects(16, 600);
         assert_eq!(spans.iter().map(|rect| usize::from(rect.width) * usize::from(rect.height)).sum::<usize>(), 600);

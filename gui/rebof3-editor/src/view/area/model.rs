@@ -118,17 +118,11 @@ impl Area {
     pub fn read(sources: &Sources<'_>) -> Result<Self, String> {
         let bundle = MapBundle::decode(sources.bundle).map_err(|error| error.to_string())?;
         let quads = quads(&bundle);
-        let entry = |address: u32| {
-            sources.entries.iter().position(|&(load, _)| load == address).map(|index| (index, sources.entries[index].1))
-        };
+        let entry = |address: u32| sources.entries.iter().position(|&(load, _)| load == address).map(|index| (index, sources.entries[index].1));
 
         let (vram, scene_name, unwritten) = match sources.vram {
             Some((vram, name)) => {
-                let unwritten = quads
-                    .iter()
-                    .filter_map(|quad| quad.tile)
-                    .filter(|tile| resolve(vram, tile.page[0], tile.page[1], tile.clut, tile.depth).is_none())
-                    .count();
+                let unwritten = quads.iter().filter_map(|quad| quad.tile).filter(|tile| resolve(vram, tile.page[0], tile.page[1], tile.clut, tile.depth).is_none()).count();
                 (vram.words().to_vec(), Some(name.to_string()), unwritten)
             }
             None => (Vec::new(), None, 0),
@@ -141,9 +135,7 @@ impl Area {
         };
         let area = sources.area.ok_or_else(|| "the archive is not an area of g_AreaLoads".to_string());
         let program = entry(PROGRAM_ADDRESS);
-        let scenes = entry(SCENE_TABLE)
-            .and_then(|(_, bytes)| SceneTable::decode(bytes).ok())
-            .map_or(Vec::new(), |table| table.records().to_vec());
+        let scenes = entry(SCENE_TABLE).and_then(|(_, bytes)| SceneTable::decode(bytes).ok()).map_or(Vec::new(), |table| table.records().to_vec());
         let actors = match (&exe, &area, program) {
             (Err(error), _, _) | (_, Err(error), _) => Err(error.clone()),
             (_, _, None) => Err(format!("the archive has no area program at {PROGRAM_ADDRESS:#010X}")),
@@ -204,9 +196,7 @@ impl Area {
     pub fn zones_at(&self, cell: usize) -> Vec<(usize, Zone)> {
         let (column, row) = self.column_row(cell);
         let (Ok(x), Ok(y)) = (u8::try_from(column), u8::try_from(row)) else { return Vec::new() };
-        self.zones.as_ref().map_or(Vec::new(), |zones| {
-            zones.iter().copied().enumerate().filter(|(_, zone)| zone.holds(x, y)).collect()
-        })
+        self.zones.as_ref().map_or(Vec::new(), |zones| zones.iter().copied().enumerate().filter(|(_, zone)| zone.holds(x, y)).collect())
     }
 
     /// The encounter block, when the area ships one that parses.
@@ -222,17 +212,10 @@ impl Area {
 
 /// Walks the area's setup stream (`g_AreaLoads[area]` word 0) and joins each placing record to the
 /// scene record its id names.
-fn read_actors(
-    exe: &Executable<'_>,
-    area: usize,
-    program: &[u8],
-    scenes: &[SceneRecord],
-) -> Result<Vec<Actor>, String> {
+fn read_actors(exe: &Executable<'_>, area: usize, program: &[u8], scenes: &[SceneRecord]) -> Result<Vec<Actor>, String> {
     let offset = |address: u32| address.checked_sub(PROGRAM_ADDRESS).map(|offset| offset as usize);
     let load = exe.area_load(area).map_err(|error| error.to_string())?;
-    let at = offset(load)
-        .filter(|&at| at + 4 <= program.len())
-        .ok_or_else(|| format!("g_AreaLoads[{area}] = {load:#010X} is outside the area program"))?;
+    let at = offset(load).filter(|&at| at + 4 <= program.len()).ok_or_else(|| format!("g_AreaLoads[{area}] = {load:#010X} is outside the area program"))?;
     let start = u32::from_le_bytes([program[at], program[at + 1], program[at + 2], program[at + 3]]);
     let start = offset(start).ok_or_else(|| format!("the setup stream {start:#010X} is outside the area program"))?;
     let stream = setup::walk(program, start).map_err(|error| error.to_string())?;
@@ -280,13 +263,7 @@ impl View {
                 let target = actor_position(&area.bundle, x2, y2).map(|value| value as f32);
                 let mut translation = math::scale(math::apply(&rotation, target), -1.0);
                 translation[2] += GAME_CAMERA.distance as f32;
-                Camera {
-                    rotation,
-                    translation,
-                    focal: GAME_CAMERA.focal as f32,
-                    frame_width: (2 * GAME_CAMERA.offset[0]) as f32,
-                    near: GAME_NEAR,
-                }
+                Camera { rotation, translation, focal: GAME_CAMERA.focal as f32, frame_width: (2 * GAME_CAMERA.offset[0]) as f32, near: GAME_NEAR }
             }
         }
     }
@@ -354,14 +331,7 @@ fn terrain(quad: &Quad, tile: Option<Tile>, id: u32) -> Primitive {
             depth_test: true,
             id: Some(id),
         },
-        None => Primitive {
-            corners,
-            texture: Texture::None,
-            colour: untextured(quad),
-            blend: Blend::Opaque,
-            depth_test: true,
-            id: Some(id),
-        },
+        None => Primitive { corners, texture: Texture::None, colour: untextured(quad), blend: Blend::Opaque, depth_test: true, id: Some(id) },
     }
 }
 
@@ -408,14 +378,7 @@ fn untextured(quad: &Quad) -> [u8; 4] {
 
 /// A top quad lifted a little and filled with `colour`.
 fn overlay(quad: &Quad, colour: [u8; 4]) -> Primitive {
-    Primitive {
-        corners: quad.corners.map(|[x, y, z]| [x as f32, y as f32 + OVERLAY_LIFT, z as f32]),
-        texture: Texture::None,
-        colour,
-        blend: Blend::Alpha,
-        depth_test: true,
-        id: None,
-    }
+    Primitive { corners: quad.corners.map(|[x, y, z]| [x as f32, y as f32 + OVERLAY_LIFT, z as f32]), texture: Texture::None, colour, blend: Blend::Alpha, depth_test: true, id: None }
 }
 
 /// A hue per high nibble of a byte code; a code no reader tests is fainter.
@@ -459,26 +422,10 @@ fn marker(area: &Area, actor: &Actor, camera: &Camera, index: usize, picked: boo
     // The camera's rows are its right and down axes in model space.
     let right = math::scale(camera.rotation[0], MARKER_WIDTH / 2.0);
     let up = math::scale(camera.rotation[1], -MARKER_HEIGHT);
-    let corners = [
-        math::add(math::sub(base, right), up),
-        math::add(math::add(base, right), up),
-        math::sub(base, right),
-        math::add(base, right),
-    ];
+    let corners = [math::add(math::sub(base, right), up), math::add(math::add(base, right), up), math::sub(base, right), math::add(base, right)];
     let [red, green, blue] = hue(f32::from(actor.record.kind) / 15.0);
-    let colour = if picked {
-        [PICKED_COLOUR[0], PICKED_COLOUR[1], PICKED_COLOUR[2], 0xFF]
-    } else {
-        [red, green, blue, MARKER_ALPHA]
-    };
-    let mut primitives = vec![Primitive {
-        corners,
-        texture: Texture::None,
-        colour,
-        blend: Blend::Alpha,
-        depth_test: true,
-        id: Some(PICK_ACTOR | index as u32),
-    }];
+    let colour = if picked { [PICKED_COLOUR[0], PICKED_COLOUR[1], PICKED_COLOUR[2], 0xFF] } else { [red, green, blue, MARKER_ALPHA] };
+    let mut primitives = vec![Primitive { corners, texture: Texture::None, colour, blend: Blend::Alpha, depth_test: true, id: Some(PICK_ACTOR | index as u32) }];
     if let (Some(facing), Some(steps)) = (actor.placement.facing, area.facings.as_ref())
         && let Some(&[step_x, step_y]) = steps.get(usize::from(facing))
         && (step_x, step_y) != (0, 0)
@@ -534,12 +481,7 @@ fn describe_quad(area: &Area, quad: &Quad) -> Vec<String> {
         ));
     }
     lines.push(match meaning_of(code) {
-        Some(meaning) => format!(
-            "Code {code:#04X}: {} ({}{}).",
-            meaning.name,
-            meaning.reader,
-            if meaning.matched { "" } else { ", draft C" }
-        ),
+        Some(meaning) => format!("Code {code:#04X}: {} ({}{}).", meaning.name, meaning.reader, if meaning.matched { "" } else { ", draft C" }),
         None => format!("Code {code:#04X}: unknown, no reader of Area_GetCellCode tests it."),
     });
     if let Some(value) = area.battle_value(cell) {
@@ -548,15 +490,7 @@ fn describe_quad(area: &Area, quad: &Quad) -> Vec<String> {
     if let Some((index, zone)) = area.zones_at(cell).first() {
         lines.push(format!(
             "Zone row {index} at {:#010X}: cells ({}, {}) to ({}, {}), rate {}, kind {}, music {} {} (func_801B3C3C).",
-            zone.address,
-            zone.first[0],
-            zone.first[1],
-            zone.last[0],
-            zone.last[1],
-            zone.rate,
-            zone.kind,
-            zone.seed,
-            zone.pick
+            zone.address, zone.first[0], zone.first[1], zone.last[0], zone.last[1], zone.rate, zone.kind, zone.seed, zone.pick
         ));
     }
     lines
@@ -573,13 +507,7 @@ fn describe_actor(area: &Area, actor: &Actor) -> Vec<String> {
     let program = area.program.as_ref().map_or(&[][..], |(_, bytes)| bytes.as_slice());
     let bytes: Vec<String> = actor.record.bytes(program).iter().map(|byte| format!("{byte:02X}")).collect();
     let mut lines = vec![
-        format!(
-            "Kind {:X} record at program +{:#06X}, run by {}: {}.",
-            actor.record.kind,
-            actor.record.at,
-            actor.record.layout().handler,
-            bytes.join(" ")
-        ),
+        format!("Kind {:X} record at program +{:#06X}, run by {}: {}.", actor.record.kind, actor.record.at, actor.record.layout().handler, bytes.join(" ")),
         format!(
             "Cell ({}, {}), facing {}, scene id {}.",
             half(actor.placement.x2),
@@ -667,10 +595,7 @@ pub fn with_tile_field(payload: &[u8], index: usize, field: TileField, value: u3
 
 /// Decodes the bundle, edits it, and encodes it. The encoder writes the decoded sections back in
 /// place, and an edit changes no section's length, so every other byte stays.
-fn edit_bundle(
-    payload: &[u8],
-    edit: impl FnOnce(&mut MapBundle) -> Result<(), &'static str>,
-) -> Result<Vec<u8>, String> {
+fn edit_bundle(payload: &[u8], edit: impl FnOnce(&mut MapBundle) -> Result<(), &'static str>) -> Result<Vec<u8>, String> {
     let mut bundle = MapBundle::decode(payload).map_err(|error| error.to_string())?;
     edit(&mut bundle).map_err(str::to_string)?;
     Ok(bundle.encode())
@@ -731,10 +656,7 @@ pub fn with_encounter(block: &[u8], row: usize, slot: usize, value: u8) -> Resul
     let mut encounter = *parsed.encounters.get(row).ok_or("no such encounter row")?;
     if slot < ENCOUNTER_ENEMIES {
         if value != EMPTY_SLOT && usize::from(value) >= parsed.enemies.len() {
-            return Err(format!(
-                "enemy {value} is past the block's {} enemy records; {EMPTY_SLOT} empties the slot",
-                parsed.enemies.len()
-            ));
+            return Err(format!("enemy {value} is past the block's {} enemy records; {EMPTY_SLOT} empties the slot", parsed.enemies.len()));
         }
         encounter.enemies[slot] = value;
     } else if slot == ENCOUNTER_ENEMIES {
@@ -775,11 +697,7 @@ pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
             let Placement { x2, y2, facing, scene } = actor.placement;
             Node {
                 name: actor_node(index),
-                translation: Some([
-                    (f32::from(x2) + 1.0) / 2.0,
-                    ground(bundle, x2, y2) as f32,
-                    (f32::from(y2) + 1.0) / 2.0,
-                ]),
+                translation: Some([(f32::from(x2) + 1.0) / 2.0, ground(bundle, x2, y2) as f32, (f32::from(y2) + 1.0) / 2.0]),
                 extras: json!({
                     "kind": actor.record.kind,
                     "record": actor.record.at,
@@ -801,11 +719,7 @@ pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
             .enumerate()
             .map(|(index, zone)| Node {
                 name: format!("zone {index}"),
-                translation: Some([
-                    (f32::from(zone.first[0]) + f32::from(zone.last[0]) + 1.0) / 2.0,
-                    0.0,
-                    (f32::from(zone.first[1]) + f32::from(zone.last[1]) + 1.0) / 2.0,
-                ]),
+                translation: Some([(f32::from(zone.first[0]) + f32::from(zone.last[0]) + 1.0) / 2.0, 0.0, (f32::from(zone.first[1]) + f32::from(zone.last[1]) + 1.0) / 2.0]),
                 extras: json!({
                     "first": zone.first, "last": zone.last, "rate": zone.rate, "kind": zone.kind,
                     "seed": zone.seed, "pick": zone.pick, "address": zone.address,
@@ -814,23 +728,12 @@ pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
             })
             .collect()
     });
-    let formations = area.encounter_block().map_or(json!(null), |block| {
-        json!(
-            block
-                .encounters
-                .iter()
-                .map(|encounter| json!({"enemies": encounter.enemies, "rate": encounter.appearance_rate}))
-                .collect::<Vec<_>>()
-        )
-    });
+    let formations = area
+        .encounter_block()
+        .map_or(json!(null), |block| json!(block.encounters.iter().map(|encounter| json!({"enemies": encounter.enemies, "rate": encounter.appearance_rate})).collect::<Vec<_>>()));
     let nodes = [
         cells,
-        Node {
-            name: "actors".into(),
-            extras: json!({"reader": "Area_RunSetupStream (emi/etc/game/00@0x801A3E50)"}),
-            children: actors,
-            ..Node::default()
-        },
+        Node { name: "actors".into(), extras: json!({"reader": "Area_RunSetupStream (emi/etc/game/00@0x801A3E50)"}), children: actors, ..Node::default() },
         Node {
             name: "encounters".into(),
             extras: json!({
@@ -886,21 +789,12 @@ mod tests {
         for cell in [5, 6, 9, 10] {
             grid[cell] = 1;
         }
-        MapBundle {
-            width: 4,
-            height: 4,
-            cells: vec![Cell { heights: [1; CELL_BYTES] }; 16],
-            codes: vec![0; 16],
-            grid,
-            records: vec![0, 0x0080_0000],
-            ..MapBundle::default()
-        }
+        MapBundle { width: 4, height: 4, cells: vec![Cell { heights: [1; CELL_BYTES] }; 16], codes: vec![0; 16], grid, records: vec![0, 0x0080_0000], ..MapBundle::default() }
     }
 
     fn area() -> Area {
         let bundle = bundle().encode();
-        let sources =
-            Sources { bundle: &bundle, entries: Vec::new(), area: None, exe: None, game_code: None, vram: None };
+        let sources = Sources { bundle: &bundle, entries: Vec::new(), area: None, exe: None, game_code: None, vram: None };
         Area::read(&sources).expect("the area reads")
     }
 

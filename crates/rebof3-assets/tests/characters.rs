@@ -15,18 +15,12 @@ fn the_retail_characters_have_their_names_and_round_trip() {
         return;
     };
     let mut image = Image::open(&cue).expect("the disc opens");
-    let file = image
-        .entries()
-        .expect("the file table reads")
-        .into_iter()
-        .find(|file| file.path.display().to_string() == "BIN/ETC/START.EMI")
-        .expect("START.EMI is on the disc");
+    let file = image.entries().expect("the file table reads").into_iter().find(|file| file.path.display().to_string() == "BIN/ETC/START.EMI").expect("START.EMI is on the disc");
     let container = image.read_file(&file).expect("the archive reads");
     let archive = Archive::parse(&container).expect("the archive parses");
     let payload = archive.payload(&container, 8).expect("entry 8 is in the archive");
 
-    let names: Vec<String> =
-        characters::parse(payload).expect("the characters read").into_iter().map(|c| c.name).collect();
+    let names: Vec<String> = characters::parse(payload).expect("the characters read").into_iter().map(|c| c.name).collect();
     assert_eq!(names, ["Ryu", "Nina", "Garr", "Teepo", "Rei", "Momo", "Peco", "Whelp"]);
     assert_eq!(names.len(), CHARACTERS);
 

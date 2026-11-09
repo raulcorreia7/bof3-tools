@@ -9,9 +9,7 @@ use rebof3_assets::{Error, Result};
 use rebof3_formats::vram::{self, Placement};
 
 use super::write_output;
-use super::{
-    EXIT_OK, color_words, create_parent, number, optional_number, parse, read_file, single, with_extension_of,
-};
+use super::{EXIT_OK, color_words, create_parent, number, optional_number, parse, read_file, single, with_extension_of};
 
 pub(super) const EXPORT_TIM_HELP: &str = "\
 bof3 assets export tim: write a texture as a PlayStation TIM file.
@@ -156,8 +154,7 @@ struct ExportTim {
 pub(super) fn export_tim(args: &[String]) -> Result<i32> {
     let args: ExportTim = parse(args)?;
     let payload_path = single(args.files, "export tim needs a payload file")?;
-    let load_arg = optional_number(args.load_arg.as_deref(), "--load-arg")?
-        .ok_or_else(|| Error::Usage("export tim needs --load-arg, the entry's load address".into()))?;
+    let load_arg = optional_number(args.load_arg.as_deref(), "--load-arg")?.ok_or_else(|| Error::Usage("export tim needs --load-arg, the entry's load address".into()))?;
     let payload = read_file(&payload_path)?;
     let (tim, what) = match optional_number(args.depth.as_deref(), "--depth")? {
         None => {
@@ -167,20 +164,14 @@ pub(super) fn export_tim(args: &[String]) -> Result<i32> {
             (vram::texture_tim_direct(load_arg, &payload)?, "15-bit, no CLUT".to_string())
         }
         Some(bits @ (4 | 8)) => {
-            let bank = args
-                .palette
-                .ok_or_else(|| Error::Usage("--depth needs --palette, the CLUT block that holds the row".into()))?;
-            let clut = args.clut.ok_or_else(|| {
-                Error::Usage("--depth needs --clut X,Y, the CLUT row's VRAM place; none is guessed".into())
-            })?;
+            let bank = args.palette.ok_or_else(|| Error::Usage("--depth needs --palette, the CLUT block that holds the row".into()))?;
+            let clut = args.clut.ok_or_else(|| Error::Usage("--depth needs --clut X,Y, the CLUT row's VRAM place; none is guessed".into()))?;
             let (x, y) = clut.split_once(',').ok_or_else(|| Error::Usage(format!("--clut needs X,Y, not {clut:?}")))?;
             let (x, y) = (clut_part(x, "--clut")?, clut_part(y, "--clut")?);
             let count = if bits == 4 { 16 } else { 256 };
             let offset = optional_number(args.palette_offset.as_deref(), "--palette-offset")?.unwrap_or(0) as usize;
             let words = color_words(&read_file(&bank)?)?;
-            let row = words
-                .get(offset..offset + count)
-                .ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
+            let row = words.get(offset..offset + count).ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
             (vram::texture_tim_of(load_arg, &payload, bits, row, x, y)?, format!("{bits}-bit, CLUT at ({x}, {y})"))
         }
         Some(other) => return Err(Error::Usage(format!("--depth is 4 or 8, not {other}"))),
@@ -225,17 +216,10 @@ pub(super) fn import_tim(args: &[String]) -> Result<i32> {
     let Placement { column, row, chunks_per_row } = texture.placement;
     let depth = texture.depth.map_or("15-bit".to_string(), |depth| format!("{}-bit", depth.bits()));
     println!("wrote {} ({depth} image)", out.display());
-    println!(
-        "  image at ({}, {}), {chunks_per_row} rectangles per row: load argument {:#010x}",
-        texture.placement.x(),
-        texture.placement.y(),
-        texture.placement.load_argument(base.unwrap_or(0))
-    );
+    println!("  image at ({}, {}), {chunks_per_row} rectangles per row: load argument {:#010x}", texture.placement.x(), texture.placement.y(), texture.placement.load_argument(base.unwrap_or(0)));
     println!("  column {column}, row {row}");
     if let Some(path) = args.palette {
-        let clut = texture
-            .clut
-            .ok_or_else(|| Error::Usage("--palette needs a TIM with a CLUT block; this one has none".into()))?;
+        let clut = texture.clut.ok_or_else(|| Error::Usage("--palette needs a TIM with a CLUT block; this one has none".into()))?;
         println!("  CLUT at ({}, {}), {} rows of {} words", clut.x, clut.y, clut.height, clut.width);
         let bytes = match args.clut_block {
             Some(block) => {
@@ -293,10 +277,7 @@ pub(super) fn import_seq(args: &[String]) -> Result<i32> {
         return Err(Error::Usage("import seq needs at least one FILE:ID".into()));
     };
     let default = first.with_extension("bin");
-    let files = parts
-        .iter()
-        .map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) })
-        .collect::<Result<Vec<_>>>()?;
+    let files = parts.iter().map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) }).collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
     write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::psyq::import_seq(&borrowed)?)?;
     Ok(EXIT_OK)

@@ -33,15 +33,9 @@ fn every_string_payload_on_the_retail_disc_exports_and_imports_to_its_own_bytes(
                 continue;
             }
             let base = strings::load_address(entry);
-            let json = strings::export(payload, base)
-                .unwrap_or_else(|error| panic!("{}#{index}: {error}", file.path.display()));
-            let rebuilt = strings::import(&json, payload)
-                .unwrap_or_else(|error| panic!("{}#{index}: {error}", file.path.display()));
-            assert!(
-                rebuilt == payload,
-                "{}#{index} differs after its strings are exported and imported",
-                file.path.display()
-            );
+            let json = strings::export(payload, base).unwrap_or_else(|error| panic!("{}#{index}: {error}", file.path.display()));
+            let rebuilt = strings::import(&json, payload).unwrap_or_else(|error| panic!("{}#{index}: {error}", file.path.display()));
+            assert!(rebuilt == payload, "{}#{index} differs after its strings are exported and imported", file.path.display());
             if payloads < 8 {
                 support::write(&out, &format!("payload-{payloads}.json"), &json);
             }

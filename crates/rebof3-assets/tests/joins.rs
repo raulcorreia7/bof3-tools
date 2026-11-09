@@ -143,14 +143,7 @@ fn retail_battle_rows_show_cross_archive_bank_conflicts() {
     let Some(root) = support::retail_root() else {
         return;
     };
-    let names = [
-        "BATTLE/BATTLE.EMI",
-        "BATTLE/BATL_OVR.EMI",
-        "BATTLE/BATL_DRA.EMI",
-        "BATTLE/BATL_RE2.EMI",
-        "BATTLE/BATL_RET.EMI",
-        "BATTLE/BATTLE2.EMI",
-    ];
+    let names = ["BATTLE/BATTLE.EMI", "BATTLE/BATL_OVR.EMI", "BATTLE/BATL_DRA.EMI", "BATTLE/BATL_RE2.EMI", "BATTLE/BATL_RET.EMI", "BATTLE/BATTLE2.EMI"];
     let mut blocks = Vec::new();
     for name in names {
         let path = root.join(name);
@@ -173,21 +166,14 @@ fn retail_battle_rows_show_cross_archive_bank_conflicts() {
     let holders = |clut| blocks.iter().filter(|block| block.holds(clut, Depth::Eight)).collect::<Vec<_>>();
 
     let holders_506 = holders(row_506);
-    assert!(
-        !holders_506.iter().any(|block| block.archive == "BATTLE/BATTLE.EMI"),
-        "BATTLE.EMI has no row-506 block; the remaining archives must serve it"
-    );
-    assert!(
-        holders_506.iter().map(|block| &block.values).collect::<std::collections::BTreeSet<_>>().len() > 1,
-        "row 506 differs between BATL_OVR.EMI and BATL_DRA.EMI"
-    );
+    assert!(!holders_506.iter().any(|block| block.archive == "BATTLE/BATTLE.EMI"), "BATTLE.EMI has no row-506 block; the remaining archives must serve it");
+    assert!(holders_506.iter().map(|block| &block.values).collect::<std::collections::BTreeSet<_>>().len() > 1, "row 506 differs between BATL_OVR.EMI and BATL_DRA.EMI");
 
     let holders_507 = holders(row_507);
     assert!(holders_507.len() > 1, "several archives carry row 507");
     let distinct_507: std::collections::BTreeSet<&Vec<u16>> = holders_507.iter().map(|block| &block.values).collect();
     assert_eq!(distinct_507.len(), 2, "one archive disagrees at row 507");
-    let agreeing: Vec<_> =
-        holders_507.iter().filter(|block| block.archive != "BATTLE/BATL_DRA.EMI").map(|block| &block.values).collect();
+    let agreeing: Vec<_> = holders_507.iter().filter(|block| block.archive != "BATTLE/BATL_DRA.EMI").map(|block| &block.values).collect();
     assert!(agreeing.len() >= 4, "BATTLE, BATL_RE2, BATL_RET and BATTLE2 carry the same row 507");
     assert!(agreeing.iter().all(|values| *values == agreeing[0]), "the four named archives agree on row 507");
     assert!(

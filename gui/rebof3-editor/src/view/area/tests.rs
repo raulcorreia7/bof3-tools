@@ -48,11 +48,7 @@ fn bundle_index(project: &mut Project, archive: &ArchivePath) -> Option<usize> {
 fn round_trips(area: &Area, bundle: &[u8]) -> usize {
     let mut trips = 0;
     let mut same = |name: &str, rebuilt: Result<Vec<u8>, String>, original: &[u8]| {
-        assert_eq!(
-            rebuilt.unwrap_or_else(|error| panic!("{name}: {error}")),
-            original,
-            "{name} rebuilds byte for byte"
-        );
+        assert_eq!(rebuilt.unwrap_or_else(|error| panic!("{name}: {error}")), original, "{name} rebuilds byte for byte");
         trips += 1;
     };
 
@@ -82,9 +78,7 @@ fn round_trips(area: &Area, bundle: &[u8]) -> usize {
             if usize::from(placement.x2 / 2) < area.width() && usize::from(placement.y2 / 2) < area.height() {
                 same("position", model::with_actor_position(area, index, placement.x2, placement.y2), program);
             }
-            if let Some(facing) =
-                placement.facing.filter(|&facing| usize::from(facing) < rebof3_formats::field::FACINGS)
-            {
+            if let Some(facing) = placement.facing.filter(|&facing| usize::from(facing) < rebof3_formats::field::FACINGS) {
                 same("facing", model::with_actor_facing(area, index, facing), program);
             }
             if let Some(id) = placement.scene.filter(|_| actor.scene.is_some()) {
@@ -98,10 +92,7 @@ fn round_trips(area: &Area, bundle: &[u8]) -> usize {
         for (row, encounter) in parsed.encounters.iter().enumerate() {
             for slot in 0..ENCOUNTER_ENEMIES {
                 let enemy = encounter.enemies[slot];
-                assert!(
-                    enemy == model::EMPTY_SLOT || usize::from(enemy) < parsed.enemies.len(),
-                    "every retail slot names one of the block's enemy records or is empty"
-                );
+                assert!(enemy == model::EMPTY_SLOT || usize::from(enemy) < parsed.enemies.len(), "every retail slot names one of the block's enemy records or is empty");
                 same("enemy", model::with_encounter(block, row, slot, enemy), block);
             }
             same("rate", model::with_encounter(block, row, ENCOUNTER_ENEMIES, encounter.appearance_rate), block);
@@ -115,18 +106,12 @@ fn every_retail_area_reads_renders_and_round_trips() {
     let Some(disc) = crate::retail_support::retail_disc() else { return };
     let folder = scratch("coverage");
     let mut project = Project::open(&disc, &folder).expect("the disc opens");
-    let archives: Vec<ArchivePath> = project
-        .archives
-        .iter()
-        .filter(|path| rebof3_emi::replay::scenes::area_id(&path.0).is_some())
-        .cloned()
-        .collect();
+    let archives: Vec<ArchivePath> = project.archives.iter().filter(|path| rebof3_emi::replay::scenes::area_id(&path.0).is_some()).cloned().collect();
     let mut coverage = Coverage::default();
     for archive in &archives {
         let Some(index) = bundle_index(&mut project, archive) else { continue };
         let mut cache = Cache::default();
-        let area = read_area(&mut project, archive, index, &mut cache)
-            .unwrap_or_else(|error| panic!("{}: {error}", archive.0));
+        let area = read_area(&mut project, archive, index, &mut cache).unwrap_or_else(|error| panic!("{}: {error}", archive.0));
         coverage.areas += 1;
         coverage.textured += usize::from(!area.vram.is_empty() && area.unwritten == 0);
         let actors = area.actors.as_ref().unwrap_or_else(|error| panic!("{}: {error}", archive.0));
@@ -135,12 +120,8 @@ fn every_retail_area_reads_renders_and_round_trips() {
         coverage.zone_rows += area.zones.as_ref().map_or(0, Vec::len);
         coverage.with_battle += usize::from(area.battle.is_some());
         coverage.with_encounters += usize::from(area.encounter_block().is_some());
-        coverage.exit_cells += area
-            .quads
-            .iter()
-            .filter(|quad| quad.face == rebof3_formats::map::draw::Face::Top)
-            .filter(|quad| rebof3_formats::map::codes::is_exit(area.bundle.codes[quad.cell]))
-            .count();
+        coverage.exit_cells +=
+            area.quads.iter().filter(|quad| quad.face == rebof3_formats::map::draw::Face::Top).filter(|quad| rebof3_formats::map::codes::is_exit(area.bundle.codes[quad.cell])).count();
 
         let layers = Layers { codes: true, ..Layers::default() };
         let camera = View::overview(&area).camera(&area);
@@ -153,8 +134,7 @@ fn every_retail_area_reads_renders_and_round_trips() {
         coverage.round_trips += round_trips(&area, &bundle);
 
         let glb = model::export(&area, &archive.0).expect("a glb");
-        let (rebuilt, program) =
-            model::import(&area, &bundle, &glb).unwrap_or_else(|error| panic!("{}: {error}", archive.0));
+        let (rebuilt, program) = model::import(&area, &bundle, &glb).unwrap_or_else(|error| panic!("{}: {error}", archive.0));
         assert_eq!(rebuilt, bundle, "{}: the heights come back byte for byte", archive.0);
         assert!(program.is_none(), "{}: no actor moves", archive.0);
         coverage.gltf_round_trips += 1;
@@ -188,13 +168,7 @@ fn a_retail_area_draws_in_3d(cx: &mut TestAppContext) {
     let (editor, cx) = cx.add_window_view(|_, cx| Editor::new(Some(disc), Some(project), cx));
     editor.update(cx, |editor, _| {
         editor.select_archive(&ArchivePath("BIN/WORLD00/AREA001.EMI".into()));
-        let index = editor
-            .archive
-            .as_ref()
-            .expect("the area loads")
-            .formats
-            .iter()
-            .position(|format| *format == Format::AreaMapBundle);
+        let index = editor.archive.as_ref().expect("the area loads").formats.iter().position(|format| *format == Format::AreaMapBundle);
         editor.select_entry(index.expect("the area has a map bundle"));
         editor.tab = Tab::Area;
     });
@@ -218,8 +192,7 @@ fn a_retail_area_draws_in_3d(cx: &mut TestAppContext) {
         editor.views.area.picked = Some(super::Target::Face { cell, face: area.quads[0].face });
         let code = area.bundle.codes[cell] ^ 1;
         assert_eq!(super::field_changed(editor, super::Part::Code, &code.to_string()), None);
-        let actor =
-            area.actor_list().iter().position(|actor| actor.placement.facing.is_some()).expect("a facing actor");
+        let actor = area.actor_list().iter().position(|actor| actor.placement.facing.is_some()).expect("a facing actor");
         let facing = (area.actor_list()[actor].placement.facing.unwrap() + 1) % rebof3_formats::field::FACINGS as u8;
         editor.views.area.picked = Some(super::Target::Actor(actor));
         assert_eq!(super::field_changed(editor, super::Part::Facing, &facing.to_string()), None);

@@ -61,9 +61,7 @@ fn main() -> ExitCode {
             let editor = cx.new(|cx| app::Editor::new(disc, folder, cx));
             editor.read(cx).focus.focus(window);
             let closing = editor.clone();
-            window.on_window_should_close(cx, move |window, cx| {
-                closing.update(cx, |editor, cx| editor.should_close(window, cx))
-            });
+            window.on_window_should_close(cx, move |window, cx| closing.update(cx, |editor, cx| editor.should_close(window, cx)));
             editor
         });
         match window {
@@ -87,14 +85,8 @@ fn start() -> Option<Application> {
     std::panic::set_hook(hook);
     started
         .map_err(|panic| {
-            let reason = panic
-                .downcast_ref::<String>()
-                .map(String::as_str)
-                .or_else(|| panic.downcast_ref::<&str>().copied())
-                .unwrap_or("unknown error");
-            eprintln!(
-                "bof3-edit: cannot start the window: {reason}.\nCheck that a Vulkan graphics driver is installed and the display is reachable."
-            );
+            let reason = panic.downcast_ref::<String>().map(String::as_str).or_else(|| panic.downcast_ref::<&str>().copied()).unwrap_or("unknown error");
+            eprintln!("bof3-edit: cannot start the window: {reason}.\nCheck that a Vulkan graphics driver is installed and the display is reachable.");
         })
         .ok()
 }

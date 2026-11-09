@@ -9,48 +9,10 @@ use std::process::Command;
 
 const DISC: &[&str] = &["extract", "lba-json", "checksum", "verify", "rebuild"];
 const EMI: &[&str] = &["extract", "pack", "list", "vram", "clut", "vab", "sep", "coverage"];
-const ASSETS: &[&str] = &[
-    "extract",
-    "extract-all",
-    "coverage",
-    "kinds",
-    "terrain",
-    "soundfont",
-    "tables",
-    "encounters",
-    "export",
-    "import",
-];
-const EXPORT: &[&str] = &[
-    "texture",
-    "palette",
-    "terrain",
-    "vag",
-    "sequence",
-    "message",
-    "strings",
-    "characters",
-    "character-sprites",
-    "sprite-sheet",
-];
-const IMPORT: &[&str] = &[
-    "texture",
-    "palette",
-    "terrain",
-    "vag",
-    "table",
-    "encounters",
-    "layout",
-    "emi",
-    "sequence",
-    "disc",
-    "soundfont",
-    "message",
-    "strings",
-    "characters",
-    "character-sprites",
-    "sprite-sheet",
-];
+const ASSETS: &[&str] = &["extract", "extract-all", "coverage", "kinds", "terrain", "soundfont", "tables", "encounters", "export", "import"];
+const EXPORT: &[&str] = &["texture", "palette", "terrain", "vag", "sequence", "message", "strings", "characters", "character-sprites", "sprite-sheet"];
+const IMPORT: &[&str] =
+    &["texture", "palette", "terrain", "vag", "table", "encounters", "layout", "emi", "sequence", "disc", "soundfont", "message", "strings", "characters", "character-sprites", "sprite-sheet"];
 
 fn invocations() -> Vec<Vec<&'static str>> {
     let mut all: Vec<Vec<&str>> = vec![vec![], vec!["--help"], vec!["--version"], vec!["disc", "--help"]];
@@ -87,11 +49,6 @@ fn every_help_text_matches_the_snapshot() {
         std::fs::write(&path, &actual).unwrap();
         return;
     }
-    let expected = std::fs::read_to_string(&path)
-        .expect("tests/help.snap exists; run with UPDATE_SNAPSHOT=1")
-        .replace("\r\n", "\n");
-    assert!(
-        actual == expected,
-        "help output changed; diff tests/help.snap against the new output, or rerun with UPDATE_SNAPSHOT=1"
-    );
+    let expected = std::fs::read_to_string(&path).expect("tests/help.snap exists; run with UPDATE_SNAPSHOT=1").replace("\r\n", "\n");
+    assert!(actual == expected, "help output changed; diff tests/help.snap against the new output, or rerun with UPDATE_SNAPSHOT=1");
 }

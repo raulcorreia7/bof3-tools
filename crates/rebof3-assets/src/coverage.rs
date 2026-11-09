@@ -105,9 +105,7 @@ pub fn run(image: &Path) -> Result<Report> {
 fn format_round_trips(format: Format, payload: &[u8]) -> bool {
     match format {
         Format::AreaMessageTable => table_round_trips(payload),
-        Format::AreaEncounterTable => rebof3_formats::encounter::open::export(payload)
-            .and_then(|json| rebof3_formats::encounter::open::import(&json, payload))
-            .is_ok_and(|rebuilt| rebuilt == payload),
+        Format::AreaEncounterTable => rebof3_formats::encounter::open::export(payload).and_then(|json| rebof3_formats::encounter::open::import(&json, payload)).is_ok_and(|rebuilt| rebuilt == payload),
         _ => false,
     }
 }
@@ -127,9 +125,7 @@ fn palettes(report: &mut Report, format: Format, payload: &[u8]) {
 
 fn palette_tables(report: &mut Report, decoded: &[u8]) {
     let Ok(sprites) = rebof3_formats::sprite_palettes::parse(decoded) else { return };
-    let both = rebof3_formats::sprite_palettes::export(decoded)
-        .and_then(|json| rebof3_formats::sprite_palettes::import(&json, decoded))
-        .is_ok_and(|rebuilt| rebuilt == decoded);
+    let both = rebof3_formats::sprite_palettes::export(decoded).and_then(|json| rebof3_formats::sprite_palettes::import(&json, decoded)).is_ok_and(|rebuilt| rebuilt == decoded);
     let typed = if both { sprites.table_bytes() as u64 } else { 0 };
     report.palettes.count_part(decoded.len() as u64, typed, both);
 }
@@ -147,18 +143,12 @@ fn text_round_trips(entry: &rebof3_emi::Entry, payload: &[u8]) -> Option<bool> {
     if discover::strings(payload, base).is_empty() {
         return None;
     }
-    Some(
-        strings::export(payload, base)
-            .and_then(|json| strings::import(&json, payload))
-            .is_ok_and(|rebuilt| rebuilt == payload),
-    )
+    Some(strings::export(payload, base).and_then(|json| strings::import(&json, payload)).is_ok_and(|rebuilt| rebuilt == payload))
 }
 
 /// Each record of the playable characters: its stored bytes, and whether the table's JSON reads back to them.
 fn characters(report: &mut Report, payload: &[u8]) {
-    let both = rebof3_formats::characters::export(payload)
-        .and_then(|json| rebof3_formats::characters::import(&json, payload))
-        .is_ok_and(|rebuilt| rebuilt == payload);
+    let both = rebof3_formats::characters::export(payload).and_then(|json| rebof3_formats::characters::import(&json, payload)).is_ok_and(|rebuilt| rebuilt == payload);
     for _ in 0..rebof3_formats::characters::CHARACTERS {
         report.kinds.entry(Kind::DataTable).or_default().count(rebof3_formats::characters::RECORD_BYTES as u64, both);
     }
@@ -171,10 +161,7 @@ fn game_tables(report: &mut Report, payload: &[u8]) -> Result<()> {
         let start = table.archive_offset - rebof3_formats::game_tables::PAYLOAD_START;
         let stored = &payload[start..start + table.count * table.record];
         let json = files.iter().find(|(name, _)| *name == table.name).map(|(_, json)| json.as_slice());
-        let both = json.is_some_and(|json| {
-            rebof3_formats::game_tables::open::import_in_payload(table.name, json, payload)
-                .is_ok_and(|rebuilt| rebuilt == stored)
-        });
+        let both = json.is_some_and(|json| rebof3_formats::game_tables::open::import_in_payload(table.name, json, payload).is_ok_and(|rebuilt| rebuilt == stored));
         report.kinds.entry(Kind::DataTable).or_default().count(stored.len() as u64, both);
     }
     Ok(())

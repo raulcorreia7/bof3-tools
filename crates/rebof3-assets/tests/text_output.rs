@@ -32,10 +32,7 @@ fn files_under(directory: &Path) -> BTreeSet<String> {
 }
 
 fn messages() -> Vec<u8> {
-    let texts = [
-        codec::encode(Encoding::Message, "{BOX:05}Old man{NEWLINE}Is it true?{END}").unwrap(),
-        codec::encode(Encoding::Message, "You won the battle{END}").unwrap(),
-    ];
+    let texts = [codec::encode(Encoding::Message, "{BOX:05}Old man{NEWLINE}Is it true?{END}").unwrap(), codec::encode(Encoding::Message, "You won the battle{END}").unwrap()];
     let table = table::Table { messages: texts.to_vec(), slots: vec![Some(0), Some(1), None] };
     table::build(&table).unwrap()
 }
@@ -70,15 +67,7 @@ fn archive(disc: &Path) -> PathBuf {
 }
 
 fn options(disc: &Path, out: &Path, raw: bool, modern: bool) -> text::Options {
-    text::Options {
-        disc: disc.to_path_buf(),
-        out: out.to_path_buf(),
-        image: None,
-        raw,
-        modern,
-        write: true,
-        list: false,
-    }
+    text::Options { disc: disc.to_path_buf(), out: out.to_path_buf(), image: None, raw, modern, write: true, list: false }
 }
 
 #[test]
@@ -159,9 +148,7 @@ fn a_plan_lists_what_the_scan_drops() {
     plan.write = false;
     plan.list = true;
     let report = text::extract_with(&plan).unwrap();
-    assert!(
-        report.notes.iter().any(|note| note == "text scan drop: BIN/ETC/TEST.EMI#2 character sprites, LZ77 (type 1)")
-    );
+    assert!(report.notes.iter().any(|note| note == "text scan drop: BIN/ETC/TEST.EMI#2 character sprites, LZ77 (type 1)"));
     assert!(files_under(&out).is_empty(), "a plan writes nothing");
 }
 

@@ -17,12 +17,7 @@ fn bank() -> Vec<u8> {
 /// An archive holding a VAB header and body, a SEP package and a palette.
 fn archive_bytes() -> Vec<u8> {
     let (header, body) = tiny_bank();
-    archive_at(&[
-        (HEADER_TYPE, 0x8010_0000, &header),
-        (BODY_TYPE, 0x8010_0000, &body),
-        (psx_formats::sep::TYPE, 0, &tiny_sep()),
-        (0, 0x8003_3800, &bank()),
-    ])
+    archive_at(&[(HEADER_TYPE, 0x8010_0000, &header), (BODY_TYPE, 0x8010_0000, &body), (psx_formats::sep::TYPE, 0, &tiny_sep()), (0, 0x8003_3800, &bank())])
 }
 
 /// The archive on disk, and its path.

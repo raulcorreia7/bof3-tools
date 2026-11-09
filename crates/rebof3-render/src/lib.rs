@@ -246,14 +246,7 @@ mod tests {
     use super::*;
 
     fn square(depth: f32, id: u32, colour: [u8; 4]) -> Primitive {
-        Primitive {
-            corners: [[-1.0, -1.0, depth], [1.0, -1.0, depth], [-1.0, 1.0, depth], [1.0, 1.0, depth]],
-            texture: Texture::None,
-            colour,
-            blend: Blend::Opaque,
-            depth_test: true,
-            id: Some(id),
-        }
+        Primitive { corners: [[-1.0, -1.0, depth], [1.0, -1.0, depth], [-1.0, 1.0, depth], [1.0, 1.0, depth]], texture: Texture::None, colour, blend: Blend::Opaque, depth_test: true, id: Some(id) }
     }
 
     #[test]

@@ -38,10 +38,7 @@ fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
 /// The palette as JSON and as a swatch strip PNG.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
     let palette = Palette::decode(payload)?;
-    Ok(vec![
-        Derived { role: "json", extension: "json", data: palette.json().into_bytes() },
-        Derived { role: "png", extension: "png", data: palette.png_strip() },
-    ])
+    Ok(vec![Derived { role: "json", extension: "json", data: palette.json().into_bytes() }, Derived { role: "png", extension: "png", data: palette.png_strip() }])
 }
 
 /// A CLUT block: its color words, their RGBA view, and where the arena loads it in VRAM.
@@ -77,16 +74,13 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 /// Reads a palette's JSON (`<slot>.json`) back to its stored bytes: the `word` of each color, in order.
 /// The `rgba` and `stp` fields are views of the word and are not read.
 pub fn import(json: &[u8]) -> Result<Vec<u8>> {
-    let document: serde_json::Value =
-        serde_json::from_slice(json).map_err(|error| Error::Import(format!("palette JSON: {error}")))?;
+    let document: serde_json::Value = serde_json::from_slice(json).map_err(|error| Error::Import(format!("palette JSON: {error}")))?;
     if document["format"] != "psx-clut" {
         return Err(Error::Import("the JSON is not a psx-clut palette".into()));
     }
     let words = document["colors"]
         .as_array()
-        .and_then(|colors| {
-            colors.iter().map(|color| color["word"].as_u64().and_then(|word| u16::try_from(word).ok())).collect()
-        })
+        .and_then(|colors| colors.iter().map(|color| color["word"].as_u64().and_then(|word| u16::try_from(word).ok())).collect())
         .ok_or_else(|| Error::Import("each palette color needs a 16-bit word".into()))?;
     Ok(clut::Palette::from_words(words)?.encode())
 }
@@ -95,13 +89,10 @@ pub fn import(json: &[u8]) -> Result<Vec<u8>> {
 /// returns to. Every other byte of the block stays, so a block that holds the block's own words gives the
 /// block back.
 pub fn splice(block: &[u8], offset: usize, words: &[u16]) -> Result<Vec<u8>> {
-    let end = offset.checked_add(words.len()).filter(|end| end * 2 <= block.len()).ok_or_else(|| {
-        Error::Import(format!(
-            "{} color words at word {offset} run past the block's {} words",
-            words.len(),
-            block.len() / 2
-        ))
-    })?;
+    let end = offset
+        .checked_add(words.len())
+        .filter(|end| end * 2 <= block.len())
+        .ok_or_else(|| Error::Import(format!("{} color words at word {offset} run past the block's {} words", words.len(), block.len() / 2)))?;
     let mut out = block.to_vec();
     for (slot, word) in out[offset * 2..end * 2].as_chunks_mut::<2>().0.iter_mut().zip(words) {
         *slot = word.to_le_bytes();

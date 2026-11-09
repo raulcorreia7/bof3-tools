@@ -56,14 +56,9 @@ impl Offsets {
             .checked_sub(load)
             .map(|offset| offset as usize)
             .filter(|start| start + ENEMY_OFFSET_COUNT * PAIR_BYTES <= code.len())
-            .ok_or_else(|| {
-                Error::Formation(format!("the code image at {load:#010X} does not hold s_EncounterEnemyOffsets"))
-            })?;
+            .ok_or_else(|| Error::Formation(format!("the code image at {load:#010X} does not hold s_EncounterEnemyOffsets")))?;
         let word = |at: usize| i32::from_le_bytes([code[at], code[at + 1], code[at + 2], code[at + 3]]);
-        let pairs = (0..ENEMY_OFFSET_COUNT)
-            .map(|index| start + index * PAIR_BYTES)
-            .map(|at| (word(at), word(at + 4)))
-            .collect();
+        let pairs = (0..ENEMY_OFFSET_COUNT).map(|index| start + index * PAIR_BYTES).map(|at| (word(at), word(at + 4))).collect();
         Ok(Self { pairs })
     }
 
@@ -93,40 +88,20 @@ pub struct Placed {
 
 /// The enemies of encounter `encounter` of `block`, every listed slot kept, placed for scroll direction
 /// `direction` (0 to 3), with their scene records from `scenes`.
-pub fn place(
-    block: &[u8],
-    scenes: Option<&SceneTable>,
-    encounter: usize,
-    offsets: &Offsets,
-    direction: u8,
-) -> Result<Vec<Placed>> {
+pub fn place(block: &[u8], scenes: Option<&SceneTable>, encounter: usize, offsets: &Offsets, direction: u8) -> Result<Vec<Placed>> {
     let parsed = encounter::EncounterBlock::parse(block)?;
-    let listed = parsed
-        .encounters
-        .get(encounter)
-        .ok_or_else(|| Error::Formation(format!("the block has no encounter {encounter}")))?;
-    let kept: Vec<(usize, usize)> = listed
-        .enemies
-        .iter()
-        .take(ENCOUNTER_ENEMIES)
-        .enumerate()
-        .filter(|(_, enemy)| **enemy != encounter::EMPTY_SLOT)
-        .map(|(slot, enemy)| (slot, usize::from(*enemy)))
-        .collect();
+    let listed = parsed.encounters.get(encounter).ok_or_else(|| Error::Formation(format!("the block has no encounter {encounter}")))?;
+    let kept: Vec<(usize, usize)> =
+        listed.enemies.iter().take(ENCOUNTER_ENEMIES).enumerate().filter(|(_, enemy)| **enemy != encounter::EMPTY_SLOT).map(|(slot, enemy)| (slot, usize::from(*enemy))).collect();
     let count = kept.len();
     let first = count * count.saturating_sub(1) / 2;
 
     let mut placed = Vec::with_capacity(count);
     for (order, (slot, enemy)) in kept.into_iter().enumerate() {
-        let &(dx, dy) = offsets
-            .pairs
-            .get(first + order)
-            .ok_or_else(|| Error::Formation(format!("s_EncounterEnemyOffsets has no pair {}", first + order)))?;
+        let &(dx, dy) = offsets.pairs.get(first + order).ok_or_else(|| Error::Formation(format!("s_EncounterEnemyOffsets has no pair {}", first + order)))?;
         let (x, y) = turn((dx + FRONT_CELLS, dy), direction);
         let record = ENEMY_BASE + enemy * ENEMY_BYTES;
-        let fields = block
-            .get(record..record + ENEMY_BYTES)
-            .ok_or_else(|| Error::Formation(format!("slot {slot} names enemy {enemy}, past the block")))?;
+        let fields = block.get(record..record + ENEMY_BYTES).ok_or_else(|| Error::Formation(format!("slot {slot} names enemy {enemy}, past the block")))?;
         let scene_id = u16_at(fields, SCENE_ID_AT);
         let scene = scenes.and_then(|table| table.records().iter().find(|record| record.id == scene_id).copied());
         placed.push(Placed { slot, enemy, name: name_text(&fields[..NAME_BYTES]), scene_id, scene, x, y });

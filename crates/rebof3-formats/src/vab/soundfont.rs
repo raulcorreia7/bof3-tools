@@ -70,15 +70,11 @@ pub fn import(sf2_file: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
         if preset.number >= PROGRAM_LIMIT {
             return Err(Error::Import(format!("preset {} is past the 128 programs a bank holds", preset.number)));
         }
-        let instrument = font
-            .instruments
-            .get(usize::from(preset.instrument))
-            .ok_or_else(|| Error::Import(format!("preset {} names no instrument", preset.number)))?;
+        let instrument = font.instruments.get(usize::from(preset.instrument)).ok_or_else(|| Error::Import(format!("preset {} names no instrument", preset.number)))?;
         let mut tones = Vec::new();
         for zone in &instrument.zones {
             let index = usize::from(zone.sample);
-            let sample =
-                font.samples.get(index).ok_or_else(|| Error::Import(format!("a zone names no sample {index}")))?;
+            let sample = font.samples.get(index).ok_or_else(|| Error::Import(format!("a zone names no sample {index}")))?;
             if sample.pcm.is_empty() || zone.keys.0 > zone.keys.1 {
                 continue;
             }
@@ -88,8 +84,7 @@ pub fn import(sf2_file: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
             let vag = match vag_of_sample[index] {
                 Some(vag) => vag,
                 None => {
-                    let looped =
-                        zone.looped && (sample.loop_start as usize) < (sample.loop_end as usize).min(sample.pcm.len());
+                    let looped = zone.looped && (sample.loop_start as usize) < (sample.loop_end as usize).min(sample.pcm.len());
                     vags.push(vag_of(sample, looped));
                     let vag = u16::try_from(vags.len()).map_err(|_| Error::Import("too many samples".into()))?;
                     vag_of_sample[index] = Some(vag);
@@ -114,11 +109,7 @@ pub fn import(sf2_file: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
         if tones.is_empty() {
             continue;
         }
-        programs.push(BankProgram {
-            number: preset.number as u8,
-            record: Program { tones: tones.len() as u8, vol: PROGRAM_VOLUME, pan: PROGRAM_PAN, ..Program::default() },
-            tones,
-        });
+        programs.push(BankProgram { number: preset.number as u8, record: Program { tones: tones.len() as u8, vol: PROGRAM_VOLUME, pan: PROGRAM_PAN, ..Program::default() }, tones });
     }
     Ok(vab::encode_bank(0, &programs, &vags)?)
 }
@@ -161,13 +152,9 @@ struct Fields {
 fn fields() -> &'static Fields {
     static FIELDS: OnceLock<Fields> = OnceLock::new();
     FIELDS.get_or_init(|| Fields {
-        attack: (0..ATTACK_FIELDS as u16)
-            .map(|field| time(volume_envelope((field << 8) | FULL_SUSTAIN, 0), |envelope| envelope.attack))
-            .collect(),
+        attack: (0..ATTACK_FIELDS as u16).map(|field| time(volume_envelope((field << 8) | FULL_SUSTAIN, 0), |envelope| envelope.attack)).collect(),
         decay: (0..DECAY_FIELDS as u16).map(|key| time(volume_envelope(key, 0), |envelope| envelope.decay)).collect(),
-        sustain: (0..SUSTAIN_LEVELS as u16)
-            .map(|level| volume_envelope(level, 0).map_or(0, |envelope| envelope.sustain))
-            .collect(),
+        sustain: (0..SUSTAIN_LEVELS as u16).map(|level| volume_envelope(level, 0).map_or(0, |envelope| envelope.sustain)).collect(),
     })
 }
 
@@ -176,14 +163,7 @@ fn fields() -> &'static Fields {
 fn releases(key: u16) -> Vec<i16> {
     static CACHE: Mutex<BTreeMap<u16, Vec<i16>>> = Mutex::new(BTreeMap::new());
     let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
-    cache
-        .entry(key)
-        .or_insert_with(|| {
-            (0..RELEASE_FIELDS as u16)
-                .map(|field| time(volume_envelope(key, field), |envelope| envelope.release))
-                .collect()
-        })
-        .clone()
+    cache.entry(key).or_insert_with(|| (0..RELEASE_FIELDS as u16).map(|field| time(volume_envelope(key, field), |envelope| envelope.release)).collect()).clone()
 }
 
 /// The phase time an envelope gives, or [`NEVER`].

@@ -773,12 +773,7 @@ fn help_for(args: &[String]) -> String {
 /// Parses `args` into `T`. The help text is printed by `run`, so clap's own help is off; a parse
 /// error becomes a one-line usage error.
 fn parse<T: Parser>(args: &[String]) -> Result<T> {
-    let command = T::command()
-        .no_binary_name(true)
-        .disable_help_flag(true)
-        .disable_version_flag(true)
-        .disable_help_subcommand(true)
-        .args_override_self(true);
+    let command = T::command().no_binary_name(true).disable_help_flag(true).disable_version_flag(true).disable_help_subcommand(true).args_override_self(true);
     let usage = |error: clap::Error| {
         let text = error.to_string();
         let line = text.lines().next().unwrap_or_default();
@@ -921,8 +916,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
         }
         None => None,
     };
-    let (name, files) =
-        if op.named { (args.files.first().map(String::as_str), &args.files[1..]) } else { (None, &args.files[..]) };
+    let (name, files) = if op.named { (args.files.first().map(String::as_str), &args.files[1..]) } else { (None, &args.files[..]) };
     let input_path = Path::new(&files[0]);
     let input = read_file(input_path)?;
     let second = match (op.files, flagged) {
@@ -930,13 +924,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
         (_, Some(path)) => Some(read_file(path)?),
         _ => None,
     };
-    let job = Job {
-        name,
-        input: &input,
-        companion: second.as_deref(),
-        index,
-        load_arg: optional_number(args.load_arg.as_deref(), "--load-arg")?,
-    };
+    let job = Job { name, input: &input, companion: second.as_deref(), index, load_arg: optional_number(args.load_arg.as_deref(), "--load-arg")? };
     let bytes = (op.run)(&job)?;
     write_output(&with_extension_of(args.output, input_path, &op.extension_for(index)), &bytes)?;
     Ok(EXIT_OK)
@@ -981,8 +969,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
     let depth = optional_number(args.depth.as_deref(), "--depth")?;
     let offset = optional_number(args.palette_offset.as_deref(), "--palette-offset")?.unwrap_or(0) as usize;
     let payload_path = single(args.files, "export texture needs a payload file")?;
-    let load_arg =
-        load_arg.ok_or_else(|| Error::Usage("export texture needs --load-arg, the entry's load address".into()))?;
+    let load_arg = load_arg.ok_or_else(|| Error::Usage("export texture needs --load-arg, the entry's load address".into()))?;
     let bytes = read_file(&payload_path)?;
     let (png, what) = match depth {
         None => (rebof3_formats::vram::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
@@ -996,9 +983,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
                 other => return Err(Error::Usage(format!("--depth is 4 or 8, not {other}"))),
             };
             let words = color_words(&read_file(&bank)?)?;
-            let row = words
-                .get(offset..offset + count)
-                .ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
+            let row = words.get(offset..offset + count).ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
             let png = rebof3_formats::vram::texture_row_png(load_arg, &bytes, bits, row)?;
             (png, format!("{bits}-bit indexed row at word {offset}"))
         }
@@ -1056,9 +1041,7 @@ struct ImportSpriteSheet {
 fn import_sprite_sheet(args: &[String]) -> Result<i32> {
     let args: ImportSpriteSheet = parse(args)?;
     let json_path = single(args.files, "import sprite-sheet needs the sheet's JSON file")?;
-    let payload = args
-        .payload
-        .ok_or_else(|| Error::Usage("import sprite-sheet needs --payload, the payload it was exported from".into()))?;
+    let payload = args.payload.ok_or_else(|| Error::Usage("import sprite-sheet needs --payload, the payload it was exported from".into()))?;
     let sizes = sprite_sizes(args.exe.as_deref(), "import sprite-sheet")?;
 
     let json = read_file(&json_path)?;
@@ -1135,10 +1118,7 @@ fn import_sequence(args: &[String]) -> Result<i32> {
         return Err(Error::Usage("import sequence needs at least one FILE:ID".into()));
     };
     let default = first.with_extension("seq");
-    let files = parts
-        .iter()
-        .map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) })
-        .collect::<Result<Vec<_>>>()?;
+    let files = parts.iter().map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) }).collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
     write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::midi::import(&borrowed)?)?;
     Ok(EXIT_OK)
@@ -1167,10 +1147,7 @@ fn import_emi(args: &[String]) -> Result<i32> {
         })
         .collect::<Result<Vec<_>>>()?;
     let container = single(args.files, "import emi needs the container file")?;
-    let payloads = replacements
-        .iter()
-        .map(|(index, file)| -> Result<(usize, Vec<u8>)> { Ok((*index, read_file(file)?)) })
-        .collect::<Result<Vec<_>>>()?;
+    let payloads = replacements.iter().map(|(index, file)| -> Result<(usize, Vec<u8>)> { Ok((*index, read_file(file)?)) }).collect::<Result<Vec<_>>>()?;
     let replace: Vec<(usize, &[u8])> = payloads.iter().map(|(index, bytes)| (*index, bytes.as_slice())).collect();
     let bytes = import::emi(&read_file(&container)?, &replace)?;
     write_output(&with_extension_of(args.output, &container, "rebuilt.EMI"), &bytes)?;
@@ -1200,13 +1177,8 @@ fn import_disc(args: &[String]) -> Result<i32> {
         })
         .collect::<Result<Vec<_>>>()?;
     let cue = single(args.files, "import disc needs the cue sheet of the disc")?;
-    let out = args
-        .output
-        .ok_or_else(|| Error::Usage("import disc needs -o DIR, a new directory for the patched disc".into()))?;
-    let replacements = replacements
-        .into_iter()
-        .map(|(path, file)| -> Result<disc::Replacement> { Ok(disc::Replacement { path, bytes: read_file(file)? }) })
-        .collect::<Result<Vec<_>>>()?;
+    let out = args.output.ok_or_else(|| Error::Usage("import disc needs -o DIR, a new directory for the patched disc".into()))?;
+    let replacements = replacements.into_iter().map(|(path, file)| -> Result<disc::Replacement> { Ok(disc::Replacement { path, bytes: read_file(file)? }) }).collect::<Result<Vec<_>>>()?;
     let summary = disc::patch(&cue, &out, &replacements)?;
     println!("patched {} files and sealed {} sectors in {}", summary.files, summary.sealed, out.display());
     Ok(EXIT_OK)
@@ -1257,8 +1229,7 @@ fn terrain_command(args: &[String]) -> Result<i32> {
     let mesh = terrain::mesh_from_payload(&read_file(&bundle)?)?;
     let stem = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
     if out.extension().is_some_and(|extension| extension == "glb") {
-        let glb = terrain::glb_of_mesh(&mesh, &stem)
-            .ok_or_else(|| Error::Usage(format!("{} has no cell to draw", bundle.display())))?;
+        let glb = terrain::glb_of_mesh(&mesh, &stem).ok_or_else(|| Error::Usage(format!("{} has no cell to draw", bundle.display())))?;
         fs::write(&out, glb)?;
     } else {
         let mtl = out.with_extension("mtl");
@@ -1325,33 +1296,17 @@ fn coverage_command(args: &[String]) -> Result<i32> {
             both_bytes += line.both_bytes;
         }
         let note = if coverage::has_round_trip(*kind) { "" } else { "no round trip yet" };
-        let note = if *kind == Kind::DataTable {
-            "game tables of ETC/GAME.EMI entry 0 and START.EMI's characters"
-        } else {
-            note
-        };
-        println!(
-            "{:<17} {:>8} {:>10} {:>13} {:>13}  {note}",
-            kind.name(),
-            line.entries,
-            line.both_entries,
-            line.bytes,
-            line.both_bytes
-        );
+        let note = if *kind == Kind::DataTable { "game tables of ETC/GAME.EMI entry 0 and START.EMI's characters" } else { note };
+        println!("{:<17} {:>8} {:>10} {:>13} {:>13}  {note}", kind.name(), line.entries, line.both_entries, line.bytes, line.both_bytes);
     }
     let text = report.text;
-    println!(
-        "{:<17} {:>8} {:>10} {:>13} {:>13}  strings and message tables",
-        "text", text.entries, text.both_entries, text.bytes, text.both_bytes
-    );
+    println!("{:<17} {:>8} {:>10} {:>13} {:>13}  strings and message tables", "text", text.entries, text.both_entries, text.bytes, text.both_bytes);
     let palettes = report.palettes;
     println!(
         "{:<17} {:>8} {:>10} {:>13} {:>13}  palette tables of the character sprites, against their decoded bytes",
         "sprite palettes", palettes.entries, palettes.both_entries, palettes.bytes, palettes.both_bytes
     );
-    println!(
-        "total EMI entries (data tables not counted): {both_entries} of {entries} entries, {both_bytes} of {bytes} bytes"
-    );
+    println!("total EMI entries (data tables not counted): {both_entries} of {entries} entries, {both_bytes} of {bytes} bytes");
     Ok(EXIT_OK)
 }
 
@@ -1393,24 +1348,8 @@ fn extract_arguments(args: &[String]) -> Result<Arguments> {
     let mode = args.mode.as_deref().map(Mode::parse).transpose()?.unwrap_or_default();
     let audio = args.audio.as_deref().map(AudioFormat::parse).transpose()?.unwrap_or(AudioFormat::Wav);
     let selection = args.only.as_deref().map(Selection::parse).transpose()?.unwrap_or_else(Selection::all);
-    let jobs = args
-        .jobs
-        .map(|jobs| {
-            jobs.parse::<usize>()
-                .ok()
-                .filter(|jobs| *jobs > 0)
-                .ok_or_else(|| Error::Usage("--jobs needs a positive number".into()))
-        })
-        .transpose()?;
-    Ok(Arguments {
-        image: args.image,
-        out: args.out,
-        selection: selection.with_mode(mode).with_audio(audio),
-        list: args.list,
-        jobs,
-        text_disc: args.text_disc,
-        quiet: args.quiet,
-    })
+    let jobs = args.jobs.map(|jobs| jobs.parse::<usize>().ok().filter(|jobs| *jobs > 0).ok_or_else(|| Error::Usage("--jobs needs a positive number".into()))).transpose()?;
+    Ok(Arguments { image: args.image, out: args.out, selection: selection.with_mode(mode).with_audio(audio), list: args.list, jobs, text_disc: args.text_disc, quiet: args.quiet })
 }
 
 pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
@@ -1438,9 +1377,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
             out: out.clone(),
             selection: arguments.selection.clone(),
             write,
-            jobs: arguments
-                .jobs
-                .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)),
+            jobs: arguments.jobs.unwrap_or_else(|| std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)),
         };
         extract::run(&options)?
     };
@@ -1464,14 +1401,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
 }
 
 /// Extracts the `text` kind from the extracted disc, or notes why it did not run.
-fn add_text(
-    report: &mut rebof3_assets::report::Report,
-    arguments: &Arguments,
-    base: &Path,
-    out: &Path,
-    image: Option<&Path>,
-    write: bool,
-) -> Result<()> {
+fn add_text(report: &mut rebof3_assets::report::Report, arguments: &Arguments, base: &Path, out: &Path, image: Option<&Path>, write: bool) -> Result<()> {
     let mode = arguments.selection.mode();
     let raw = mode.writes("raw", true);
     let modern = mode.writes("json", true);
@@ -1481,15 +1411,7 @@ fn add_text(
     }
     let only_text = arguments.selection.is_only(Kind::Text);
     let disc = arguments.text_disc.clone().unwrap_or_else(|| base.join(DEFAULT_DISC));
-    let options = text::Options {
-        disc,
-        out: out.to_path_buf(),
-        image: image.map(Path::to_path_buf),
-        raw,
-        modern,
-        write,
-        list: arguments.list,
-    };
+    let options = text::Options { disc, out: out.to_path_buf(), image: image.map(Path::to_path_buf), raw, modern, write, list: arguments.list };
     match text::extract_with(&options) {
         Ok(text) => {
             report.rows.extend(text.rows);

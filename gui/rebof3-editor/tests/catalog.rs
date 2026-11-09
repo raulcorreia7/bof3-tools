@@ -52,8 +52,7 @@ fn every_retail_entry_is_filed_once() {
         }
     }
 
-    let unsorted =
-        catalog.groups.iter().find(|group| group.which == Which::Unsorted).map_or(0, |group| group.entries());
+    let unsorted = catalog.groups.iter().find(|group| group.which == Which::Unsorted).map_or(0, |group| group.entries());
     assert_eq!(unsorted, UNSORTED_ENTRIES);
     let counts: Vec<_> = catalog.groups.iter().map(|group| (group.which, group.entries(), group.archives())).collect();
     assert_eq!(counts, GROUPS);

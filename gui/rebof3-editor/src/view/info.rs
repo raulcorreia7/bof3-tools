@@ -55,14 +55,7 @@ fn grid(rows: Vec<Row>) -> Div {
     for (at, (label, value)) in rows.into_iter().enumerate() {
         let striped = at % 2 == 1;
         grid = grid.child(
-            div()
-                .flex()
-                .gap(px(GAP))
-                .px(px(GAP_SMALL))
-                .py(px(GAP_SMALL / 2.0))
-                .when(striped, |row| row.bg(color(RAISED)))
-                .child(strong(label).w(px(LABEL_WIDTH)).flex_none())
-                .child(mono(value)),
+            div().flex().gap(px(GAP)).px(px(GAP_SMALL)).py(px(GAP_SMALL / 2.0)).when(striped, |row| row.bg(color(RAISED))).child(strong(label).w(px(LABEL_WIDTH)).flex_none()).child(mono(value)),
         );
     }
     grid
@@ -89,12 +82,7 @@ fn place(entry: &Entry<'_>) -> Vec<Row> {
     } else {
         rows.push(("Load argument", format!("{:#010X}", toc.ram_ptr)));
     }
-    rows.extend([
-        ("Format", format.name().to_string()),
-        ("State", format.state().label().to_string()),
-        ("Spec", format.spec_state().to_string()),
-        ("Codec", format.codec_state().to_string()),
-    ]);
+    rows.extend([("Format", format.name().to_string()), ("State", format.state().label().to_string()), ("Spec", format.spec_state().to_string()), ("Codec", format.codec_state().to_string())]);
     rows
 }
 
@@ -118,15 +106,11 @@ fn details(entry: &Entry<'_>) -> Vec<Row> {
         Format::AreaScriptTable | Format::BattleScriptTable | Format::MagicScriptTable => script_table(payload),
         Format::AreaActorDefsTable => actor_defs(payload),
         Format::AreaEncounterTable => encounters(payload),
-        Format::AreaMapBundle => MapBundle::decode(payload)
-            .map(|bundle| vec![("Sections", map_summary(&bundle))])
-            .map_err(|error| error.to_string()),
-        Format::AreaCellGrid => super::cells::map_size(entry)
-            .map(|(width, height)| vec![("Map size", format!("{width} × {height} cells, from the map bundle"))])
-            .ok_or_else(|| "no map bundle in this archive".to_string()),
-        Format::CueTable => CueTable::decode(payload)
-            .map(|table| vec![("Cue records", table.records().len().to_string())])
-            .map_err(|error| error.to_string()),
+        Format::AreaMapBundle => MapBundle::decode(payload).map(|bundle| vec![("Sections", map_summary(&bundle))]).map_err(|error| error.to_string()),
+        Format::AreaCellGrid => {
+            super::cells::map_size(entry).map(|(width, height)| vec![("Map size", format!("{width} × {height} cells, from the map bundle"))]).ok_or_else(|| "no map bundle in this archive".to_string())
+        }
+        Format::CueTable => CueTable::decode(payload).map(|table| vec![("Cue records", table.records().len().to_string())]).map_err(|error| error.to_string()),
         Format::SharedResourceTable => resource_groups(payload),
         Format::AreaAuxWindow => aux_window(payload),
         _ => Ok(vec![("Fields", "no decoder reads this format yet".into())]),
@@ -145,8 +129,7 @@ fn texture(load_arg: u32, payload: &[u8]) -> Result<Vec<Row>, String> {
 
 fn palette(load_arg: u32, payload: &[u8]) -> Result<Vec<Row>, String> {
     let bank = clut_block(load_arg, payload).map_err(|error| error.to_string())?;
-    let mut rows =
-        vec![("Colours", bank.words.len().to_string()), ("4-bit rows", (bank.words.len() / ROW_COLOURS).to_string())];
+    let mut rows = vec![("Colours", bank.words.len().to_string()), ("4-bit rows", (bank.words.len() / ROW_COLOURS).to_string())];
     if let Some(clut) = bank.vram {
         rows.push(("VRAM position", format!("x {} y {}", clut.x, clut.y)));
     }
@@ -187,15 +170,7 @@ fn character_sprites(payload: &[u8]) -> Result<Vec<Row>, String> {
     let bank = sprite_palettes::parse(payload).map_err(|error| error.to_string())?;
     let mut rows = vec![("Sections", bank.sections.len().to_string())];
     for section in &bank.sections {
-        rows.push((
-            "Section",
-            format!(
-                "at {:#X}, palette table at {:#X}, {}",
-                section.start,
-                section.table,
-                count(section.palettes.len(), "palette")
-            ),
-        ));
+        rows.push(("Section", format!("at {:#X}, palette table at {:#X}, {}", section.start, section.table, count(section.palettes.len(), "palette"))));
     }
     Ok(rows)
 }
@@ -209,21 +184,14 @@ fn count(count: usize, thing: &str) -> String {
 fn messages(payload: &[u8], load_arg: u32) -> Vec<Row> {
     match discover::table_records(payload) {
         Some(records) => vec![("Messages", records.len().to_string())],
-        None => vec![
-            ("Messages", "no offset table".into()),
-            ("Strings found", discover::strings(payload, Some(load_arg)).len().to_string()),
-        ],
+        None => vec![("Messages", "no offset table".into()), ("Strings found", discover::strings(payload, Some(load_arg)).len().to_string())],
     }
 }
 
 fn script_table(payload: &[u8]) -> Result<Vec<Row>, String> {
     let table = ScriptTable::decode(payload).map_err(|error| error.to_string())?;
     let records: usize = table.sections().iter().map(|section| section.records.len()).sum();
-    Ok(vec![
-        ("Directory", format!("{} bytes", table.dir_bytes)),
-        ("Sections", table.sections().len().to_string()),
-        ("Scripts", records.to_string()),
-    ])
+    Ok(vec![("Directory", format!("{} bytes", table.dir_bytes)), ("Sections", table.sections().len().to_string()), ("Scripts", records.to_string())])
 }
 
 /// The module id that opens a window loaded at `0x80117000`. The nine retail windows hold ids `0xFC` to
@@ -243,11 +211,9 @@ fn aux_window(payload: &[u8]) -> Result<Vec<Row>, String> {
 fn resource_groups(payload: &[u8]) -> Result<Vec<Row>, String> {
     const BASE_WORD: usize = 4;
     const SLOT: usize = 2;
-    const LABELS: [&str; 4] =
-        ["Group 0 (ids 0x0000)", "Group 1 (ids 0x4000)", "Group 2 (ids 0x8000)", "Group 3 (ids 0xC000)"];
+    const LABELS: [&str; 4] = ["Group 0 (ids 0x0000)", "Group 1 (ids 0x4000)", "Group 2 (ids 0x8000)", "Group 3 (ids 0xC000)"];
 
-    let word =
-        |at: usize| payload.get(at..at + BASE_WORD).and_then(|bytes| bytes.try_into().ok()).map(u32::from_le_bytes);
+    let word = |at: usize| payload.get(at..at + BASE_WORD).and_then(|bytes| bytes.try_into().ok()).map(u32::from_le_bytes);
     let half = |at: usize| payload.get(at..at + SLOT).and_then(|bytes| bytes.try_into().ok()).map(u16::from_le_bytes);
 
     let first = word(0).ok_or("no base words")? as usize;
@@ -275,12 +241,8 @@ fn actor_defs(payload: &[u8]) -> Result<Vec<Row>, String> {
 pub fn encounters(payload: &[u8]) -> Result<Vec<Row>, String> {
     let block = EncounterBlock::parse(payload).map_err(|error| error.to_string())?;
     let live = block.encounters.iter().filter(|encounter| encounter.appearance_rate != 0).count();
-    let enemies: Vec<String> =
-        block.enemies.iter().map(|enemy| name_text(&enemy.name)).filter(|name| !name.is_empty()).collect();
-    Ok(vec![
-        ("Encounters", format!("{live} of {} with a nonzero rate", block.encounters.len())),
-        ("Enemies", enemies.join(", ")),
-    ])
+    let enemies: Vec<String> = block.enemies.iter().map(|enemy| name_text(&enemy.name)).filter(|name| !name.is_empty()).collect();
+    Ok(vec![("Encounters", format!("{live} of {} with a nonzero rate", block.encounters.len())), ("Enemies", enemies.join(", "))])
 }
 
 #[cfg(test)]

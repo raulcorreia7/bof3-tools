@@ -69,88 +69,54 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let section = &program.sections[section_index];
     let record_index = state.record.min(section.records.len().saturating_sub(1));
 
-    let ops: usize = program
-        .sections
-        .iter()
-        .flat_map(|section| &section.records)
-        .filter_map(Record::stream)
-        .map(|stream| stream.animation.steps.len())
-        .sum();
+    let ops: usize = program.sections.iter().flat_map(|section| &section.records).filter_map(Record::stream).map(|stream| stream.animation.steps.len()).sum();
     let records: usize = program.sections.iter().map(|section| section.records.len()).sum();
-    let summary = format!(
-        "{} sections, {records} records, {ops} ops. Actor_BeginScript points an actor at a record; Actor_SeekScript plays it.",
-        program.sections.len()
-    );
+    let summary = format!("{} sections, {records} records, {ops} ops. Actor_BeginScript points an actor at a record; Actor_SeekScript plays it.", program.sections.len());
 
     let mut bar = div().flex().flex_wrap().items_center().gap(px(GAP_SMALL)).child("Section");
     for number in 0..program.sections.len() {
-        bar = bar.child(tab(("script-section", number), number.to_string(), number == section_index).on_click(
-            cx.listener(move |editor, _, _, cx| {
-                editor.views.script = State { section: number, record: 0, focus: None };
-                cx.notify();
-            }),
-        ));
+        bar = bar.child(tab(("script-section", number), number.to_string(), number == section_index).on_click(cx.listener(move |editor, _, _, cx| {
+            editor.views.script = State { section: number, record: 0, focus: None };
+            cx.notify();
+        })));
     }
     bar = bar
         .child(separator(true))
-        .child(
-            button("script-export", "Export text", true).on_click(cx.listener(|editor, _, _, cx| export(editor, cx))),
-        )
-        .child(
-            button("script-import", "Import text", true).on_click(cx.listener(|editor, _, _, cx| import(editor, cx))),
-        );
+        .child(button("script-export", "Export text", true).on_click(cx.listener(|editor, _, _, cx| export(editor, cx))))
+        .child(button("script-import", "Import text", true).on_click(cx.listener(|editor, _, _, cx| import(editor, cx))));
 
     let original_section = original.as_ref().and_then(|program| program.sections.get(section_index));
-    let body = div()
-        .flex()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(record_list(section, original_section, record_index, cx))
-        .child(separator(true))
-        .child(listing(editor, section_index, section, record_index, cx));
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_h_0()
-        .gap(px(GAP))
-        .child(muted(summary))
-        .child(bar)
-        .child(separator(false))
-        .child(body)
-        .into_any_element()
+    let body = div().flex().flex_1().min_h_0().gap(px(GAP)).child(record_list(section, original_section, record_index, cx)).child(separator(true)).child(listing(
+        editor,
+        section_index,
+        section,
+        record_index,
+        cx,
+    ));
+    div().flex().flex_col().flex_1().min_h_0().gap(px(GAP)).child(muted(summary)).child(bar).child(separator(false)).child(body).into_any_element()
 }
 
 /// Every record of the section: the table entries that name it, and its shape.
 fn record_list(section: &Section, original: Option<&Section>, shown: usize, cx: &mut Context<Editor>) -> Stateful<Div> {
     let mut list = div().id("script-records").flex().flex_col().w(px(LIST_WIDTH)).flex_none().overflow_y_scroll();
     for (index, record) in section.records.iter().enumerate() {
-        let entries: Vec<String> = section
-            .slots
-            .iter()
-            .enumerate()
-            .filter(|(_, slot)| usize::from(**slot) == index)
-            .map(|(entry, _)| entry.to_string())
-            .collect();
+        let entries: Vec<String> = section.slots.iter().enumerate().filter(|(_, slot)| usize::from(**slot) == index).map(|(entry, _)| entry.to_string()).collect();
         let shape = match record {
             Record::Stream(stream) => {
-                let looping =
-                    stream.animation.loop_to().map_or(String::new(), |to| format!(", loops to {}", text::label(to)));
+                let looping = stream.animation.loop_to().map_or(String::new(), |to| format!(", loops to {}", text::label(to)));
                 format!("{} ops, {} frames{looping}", stream.animation.steps.len(), stream.animation.frames.len())
             }
             Record::Raw { bytes, .. } => format!("raw, {} bytes", bytes.len()),
         };
         let edited = original.and_then(|original| original.records.get(index)) != Some(record);
         let line = format!("{index:>3}  entries {}  {shape}", entries.join(" "));
-        let row = selectable(("script-record", index), index == shown)
-            .min_h(px(ROW_HEIGHT))
-            .child(mono(line).when(edited, |line| line.text_color(color(EDITED))))
-            .on_click(cx.listener(move |editor, _, _, cx| {
+        let row = selectable(("script-record", index), index == shown).min_h(px(ROW_HEIGHT)).child(mono(line).when(edited, |line| line.text_color(color(EDITED)))).on_click(cx.listener(
+            move |editor, _, _, cx| {
                 editor.views.script.record = index;
                 editor.views.script.focus = None;
                 cx.notify();
-            }));
+            },
+        ));
         list = list.child(row);
     }
     list
@@ -188,13 +154,7 @@ fn listing(editor: &Editor, section: usize, shown: &Section, record: usize, cx: 
             .when(focus == Some(index), |row| row.bg(color(RAISED)))
             .child(mono(label).w(px(LABEL_WIDTH)).flex_none())
             .child(mono(index.to_string()).w(px(INDEX_WIDTH)).flex_none().text_color(color(MUTED)))
-            .child(
-                strong(op.opcode().mnemonic)
-                    .id(("script-mnemonic", index))
-                    .w(px(MNEMONIC_WIDTH))
-                    .flex_none()
-                    .tooltip(tip(format!("{}: {}", op.opcode().handler, op.opcode().does))),
-            );
+            .child(strong(op.opcode().mnemonic).id(("script-mnemonic", index)).w(px(MNEMONIC_WIDTH)).flex_none().tooltip(tip(format!("{}: {}", op.opcode().handler, op.opcode().does))));
         row = match op {
             Op::Show { ticks, frame } => {
                 let shown_frame = match stream.animation.frames.get(usize::from(frame)) {
@@ -211,12 +171,10 @@ fn listing(editor: &Editor, section: usize, shown: &Section, record: usize, cx: 
             Op::Jump { code, target } => {
                 let target_index = usize::from(target);
                 row.child("to")
-                    .child(tab(("script-target", index), text::label(target_index), false).on_click(cx.listener(
-                        move |editor, _, _, cx| {
-                            editor.views.script.focus = Some(target_index);
-                            cx.notify();
-                        },
-                    )))
+                    .child(tab(("script-target", index), text::label(target_index), false).on_click(cx.listener(move |editor, _, _, cx| {
+                        editor.views.script.focus = Some(target_index);
+                        cx.notify();
+                    })))
                     .child(number(editor, at, StepPart::Target, target, cx))
                     .child("code")
                     .child(number(editor, at, StepPart::Code, code, cx))
@@ -245,12 +203,7 @@ fn listing(editor: &Editor, section: usize, shown: &Section, record: usize, cx: 
         }))
         .child(muted("Steps change at the end only: game code names stream positions."));
 
-    column
-        .child(strong(format!("Record {record}: {} ops", stream.animation.steps.len())))
-        .child(ops)
-        .child(edits)
-        .child(separator(false))
-        .child(frames(editor, section, record, stream, cx))
+    column.child(strong(format!("Record {record}: {} ops", stream.animation.steps.len()))).child(ops).child(edits).child(separator(false)).child(frames(editor, section, record, stream, cx))
 }
 
 /// The frames of a stream with an editable row per cell.
@@ -269,18 +222,7 @@ fn frames(editor: &Editor, section: usize, record: usize, stream: &Stream, cx: &
                 ("v", CellPart::V, i32::from(cell.v)),
             ] {
                 let which = Field::ScriptCell { at, part };
-                row = row.child(name).child(
-                    input(
-                        editor,
-                        ("script-cell", cell_id(at, part)),
-                        which,
-                        &value.to_string(),
-                        "",
-                        Some(NUMBER_WIDTH),
-                        cx,
-                    )
-                    .font_family(fonts::mono()),
-                );
+                row = row.child(name).child(input(editor, ("script-cell", cell_id(at, part)), which, &value.to_string(), "", Some(NUMBER_WIDTH), cx).font_family(fonts::mono()));
             }
             let flipped = if cell.flipped() { ", flipped" } else { "" };
             list = list.child(row.child(muted(format!("shape {}{flipped}", cell.shape()))));
@@ -302,37 +244,24 @@ fn cell_id(at: CellAt, part: CellPart) -> usize {
 /// A number field that edits one byte of step `at`.
 fn number(editor: &Editor, at: StepAt, part: StepPart, value: u8, cx: &mut Context<Editor>) -> Stateful<Div> {
     let which = Field::ScriptStep { at, part };
-    input(editor, ("script-step", at.step * 4 + part as usize), which, &value.to_string(), "", Some(NUMBER_WIDTH), cx)
-        .font_family(fonts::mono())
+    input(editor, ("script-step", at.step * 4 + part as usize), which, &value.to_string(), "", Some(NUMBER_WIDTH), cx).font_family(fonts::mono())
 }
 
 /// The ticks an appended step takes: the last show's, or [`APPENDED_TICKS`].
 fn appended_ticks(editor: &Editor, end: StepAt) -> u8 {
     let Some(entry) = editor.current() else { return APPENDED_TICKS };
     let Ok(program) = Program::decode(entry.payload()) else { return APPENDED_TICKS };
-    program
-        .stream(end.section, end.record)
-        .and_then(|stream| {
-            stream.ops().filter_map(|op| if let Op::Show { ticks, .. } = op { Some(ticks) } else { None }).last()
-        })
-        .unwrap_or(APPENDED_TICKS)
+    program.stream(end.section, end.record).and_then(|stream| stream.ops().filter_map(|op| if let Op::Show { ticks, .. } = op { Some(ticks) } else { None }).last()).unwrap_or(APPENDED_TICKS)
 }
 
 /// The payload after `change`, refused when the table would grow past `limit`, its stored size: what
 /// follows the table in memory is not known to be free.
-pub fn rewritten(
-    payload: &[u8],
-    limit: usize,
-    change: impl FnOnce(&mut Program) -> rebof3_formats::Result<()>,
-) -> Result<Vec<u8>, String> {
+pub fn rewritten(payload: &[u8], limit: usize, change: impl FnOnce(&mut Program) -> rebof3_formats::Result<()>) -> Result<Vec<u8>, String> {
     let mut program = Program::decode(payload).map_err(|error| error.to_string())?;
     change(&mut program).map_err(|error| error.to_string())?;
     let bytes = program.encode().map_err(|error| error.to_string())?;
     if bytes.len() > limit {
-        return Err(format!(
-            "the table would grow to {} bytes past its stored {limit}: what follows it in memory is not known to be free",
-            bytes.len()
-        ));
+        return Err(format!("the table would grow to {} bytes past its stored {limit}: what follows it in memory is not known to be free", bytes.len()));
     }
     Ok(bytes)
 }
@@ -446,9 +375,7 @@ mod tests {
     #[test]
     fn an_operand_edit_rewrites_one_byte() {
         let payload = table();
-        let edited =
-            rewritten(&payload, payload.len(), |program| program.set_op(at(0), Op::Show { ticks: 9, frame: 0 }))
-                .expect("edits");
+        let edited = rewritten(&payload, payload.len(), |program| program.set_op(at(0), Op::Show { ticks: 9, frame: 0 })).expect("edits");
         let changed = payload.iter().zip(&edited).filter(|(old, new)| old != new).count();
         assert_eq!((edited.len(), changed), (payload.len(), 1));
     }
@@ -456,9 +383,7 @@ mod tests {
     #[test]
     fn an_append_uses_the_padding_and_a_second_is_refused() {
         let payload = table();
-        let append = |bytes: &[u8]| {
-            rewritten(bytes, payload.len(), |program| program.insert_op(at(3), Op::Show { ticks: 1, frame: 0 }))
-        };
+        let append = |bytes: &[u8]| rewritten(bytes, payload.len(), |program| program.insert_op(at(3), Op::Show { ticks: 1, frame: 0 }));
         let once = append(&payload).expect("the padding takes the step");
         assert_eq!(once.len(), payload.len());
         assert!(append(&once).is_err(), "the table would grow");
@@ -496,18 +421,13 @@ mod tests {
                 };
                 let at = StepAt { section, record, step };
                 let changed = ticks ^ 1;
-                let edited = rewritten(&payload, payload.len(), |program| {
-                    program.set_op(at, Op::Show { ticks: changed, frame })
-                });
-                let differ =
-                    edited.as_ref().map(|bytes| bytes.iter().zip(&payload).filter(|(new, old)| new != old).count());
+                let edited = rewritten(&payload, payload.len(), |program| program.set_op(at, Op::Show { ticks: changed, frame }));
+                let differ = edited.as_ref().map(|bytes| bytes.iter().zip(&payload).filter(|(new, old)| new != old).count());
                 if differ != Ok(1) || edited.as_ref().map(Vec::len) != Ok(payload.len()) {
                     failures.push(format!("{}#{index}: the edit rewrites more than its byte", path.0));
                     continue;
                 }
-                let undone = rewritten(edited.as_deref().unwrap_or_default(), payload.len(), |program| {
-                    program.set_op(at, Op::Show { ticks, frame })
-                });
+                let undone = rewritten(edited.as_deref().unwrap_or_default(), payload.len(), |program| program.set_op(at, Op::Show { ticks, frame }));
                 if undone.as_deref() != Ok(payload.as_slice()) {
                     failures.push(format!("{}#{index}: the undone edit differs", path.0));
                 }

@@ -99,10 +99,7 @@ fn retail_audio_round_trips_byte_exactly() {
     assert_eq!(counted.packages, PACKAGES, "sequence packages in the retail archives");
     assert_eq!(counted.package_bytes, PACKAGE_BYTES, "package bytes");
 
-    assert!(
-        explained_seen.iter().all(|seen| *seen),
-        "the retail archives no longer holds every explained dangling tone reference"
-    );
+    assert!(explained_seen.iter().all(|seen| *seen), "the retail archives no longer holds every explained dangling tone reference");
     assert!(failures.is_empty(), "{} audio entries failed:\n{}", failures.len(), failures.join("\n"));
 
     let out = support::out_dir("retail_audio_round_trips_byte_exactly");
@@ -111,14 +108,7 @@ fn retail_audio_round_trips_byte_exactly() {
         "totals.json",
         format!(
             "{{\"headers\":{},\"header_bytes\":{},\"bodies\":{},\"body_bytes\":{},\"packages\":{},\"package_bytes\":{},\"tones\":{},\"events\":{}}}",
-            counted.headers,
-            counted.header_bytes,
-            counted.bodies,
-            counted.body_bytes,
-            counted.packages,
-            counted.package_bytes,
-            counted.tones,
-            counted.events
+            counted.headers, counted.header_bytes, counted.bodies, counted.body_bytes, counted.packages, counted.package_bytes, counted.tones, counted.events
         ),
     );
     if let Some((path, header, body)) = sample {

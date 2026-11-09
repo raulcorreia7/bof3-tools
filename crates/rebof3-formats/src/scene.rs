@@ -75,14 +75,7 @@ pub struct SceneRecord {
 
 impl SceneRecord {
     fn read(record: &[u8]) -> Self {
-        Self {
-            id: u16_le(record, 0),
-            clut_select: u16_le(record, 2),
-            texture_page: record[4],
-            texture_v: record[5],
-            texture_mode: record[6],
-            script_section: record[7],
-        }
+        Self { id: u16_le(record, 0), clut_select: u16_le(record, 2), texture_page: record[4], texture_v: record[5], texture_mode: record[6], script_section: record[7] }
     }
 
     fn write(self, out: &mut Vec<u8>) {

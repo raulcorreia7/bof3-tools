@@ -32,13 +32,10 @@ mod draw;
 mod image;
 mod sheet;
 
-pub use crate::animation::{
-    Animation, CELL_BYTES, Cell, FLIP, Frame, JUMP, Playback, Player, SHAPE_MASK, Step, TICK_MICROS, duration_ms,
-    ticks_of,
-};
+pub use crate::animation::{Animation, CELL_BYTES, Cell, FLIP, Frame, JUMP, Playback, Player, SHAPE_MASK, Step, TICK_MICROS, duration_ms, ticks_of};
 pub use draw::{
-    Bounds, Composite, FIELD_PAGE, FIELD_PALETTE, FIELD_PALETTE_STAGE, FIELD_SLOT_ROWS, Pixel, Placement, Reader,
-    SHAPES, SPRITE_SIZES, SpriteSizes, Stage, TRANSPARENT, Texel, animation_bounds, cell_rect, compose, frame_bounds,
+    Bounds, Composite, FIELD_PAGE, FIELD_PALETTE, FIELD_PALETTE_STAGE, FIELD_SLOT_ROWS, Pixel, Placement, Reader, SHAPES, SPRITE_SIZES, SpriteSizes, Stage, TRANSPARENT, Texel, animation_bounds,
+    cell_rect, compose, frame_bounds,
 };
 pub use image::{Encoding, Image, PACKED_MAX, TEXELS_PER_WORD};
 pub use sheet::{Sheet, export, export_section, image_name, import, import_section};
@@ -116,12 +113,7 @@ impl Section {
             *slot = to_usize(word(bytes, WORD * index)?);
         }
         let [images_at, palettes_at, animations_at, records_at] = header;
-        if !(HEADER_WORDS * WORD <= images_at
-            && images_at < palettes_at
-            && palettes_at < animations_at
-            && animations_at < records_at
-            && records_at <= bytes.len())
-        {
+        if !(HEADER_WORDS * WORD <= images_at && images_at < palettes_at && palettes_at < animations_at && animations_at < records_at && records_at <= bytes.len()) {
             return Err(Error::CharacterSprites(format!(
                 "the header offsets {images_at:#X}, {palettes_at:#X}, {animations_at:#X}, {records_at:#X} are not \
                  sheets, palettes, animations and records in order inside {:#X} bytes",
@@ -134,9 +126,7 @@ impl Section {
         for (index, &start) in image_offsets.iter().enumerate() {
             let end = image_offsets.get(index + 1).copied().unwrap_or(palettes_at);
             if start >= end {
-                return Err(Error::CharacterSprites(format!(
-                    "frame sheet {index} at {start:#X} is not before {end:#X}"
-                )));
+                return Err(Error::CharacterSprites(format!("frame sheet {index} at {start:#X} is not before {end:#X}")));
             }
             images.push(Image::decode(&bytes[start..end])?);
         }
@@ -171,31 +161,17 @@ impl Section {
             .0
             .iter()
             .map(|&[image, animation, mirror]| Record { image, animation, mirror })
-            .take_while(|record| {
-                usize::from(record.image) < images.len()
-                    && usize::from(record.animation) < animations.len()
-                    && record.mirror <= MIRROR_MAX
-            })
+            .take_while(|record| usize::from(record.image) < images.len() && usize::from(record.animation) < animations.len() && record.mirror <= MIRROR_MAX)
             .collect();
 
-        let layout = Layout {
-            header,
-            images: image_offsets,
-            palettes: palette_offsets,
-            animations: spans,
-            len: bytes.len(),
-            used: used.max(nonzero),
-        };
+        let layout = Layout { header, images: image_offsets, palettes: palette_offsets, animations: spans, len: bytes.len(), used: used.max(nonzero) };
         Ok(Self { images, palettes, animations, records, stored: bytes.to_vec(), layout })
     }
 
     /// The section's bytes; see the module documentation for what an edit may change.
     pub fn encode(&self) -> Result<Vec<u8>> {
         let [images_at, palettes_at, _, records_at] = self.layout.header;
-        if self.images.len() != self.layout.images.len()
-            || self.palettes.len() != self.layout.palettes.len()
-            || self.animations.len() != self.layout.animations.len()
-        {
+        if self.images.len() != self.layout.images.len() || self.palettes.len() != self.layout.palettes.len() || self.animations.len() != self.layout.animations.len() {
             return Err(Error::CharacterSprites("a section keeps its sheet, palette and animation counts".into()));
         }
 
@@ -236,10 +212,7 @@ impl Section {
         for (index, (animation, &(at, stored))) in self.animations.iter().zip(&self.layout.animations).enumerate() {
             let bytes = animation.encode();
             if bytes.len() != stored {
-                return Err(Error::CharacterSprites(format!(
-                    "animation {index} needs {} bytes; the section keeps its {stored}",
-                    bytes.len()
-                )));
+                return Err(Error::CharacterSprites(format!("animation {index} needs {} bytes; the section keeps its {stored}", bytes.len())));
             }
             let at = moved(at);
             out[at..at + bytes.len()].copy_from_slice(&bytes);
@@ -248,18 +221,12 @@ impl Section {
         let records_at = moved(records_at);
         for (index, record) in self.records.iter().enumerate() {
             let at = records_at + RECORD_BYTES * index;
-            let slot = out
-                .get_mut(at..at + RECORD_BYTES)
-                .ok_or_else(|| Error::CharacterSprites(format!("record {index} is past the end of the section")))?;
+            let slot = out.get_mut(at..at + RECORD_BYTES).ok_or_else(|| Error::CharacterSprites(format!("record {index} is past the end of the section")))?;
             slot.copy_from_slice(&[record.image, record.animation, record.mirror]);
         }
 
         if out.len() > self.layout.len {
-            return Err(Error::CharacterSprites(format!(
-                "the edited section needs {:#X} bytes; it keeps its {:#X}",
-                out.len(),
-                self.layout.len
-            )));
+            return Err(Error::CharacterSprites(format!("the edited section needs {:#X} bytes; it keeps its {:#X}", out.len(), self.layout.len)));
         }
         out.resize(self.layout.len, 0);
         Ok(out)
@@ -267,11 +234,7 @@ impl Section {
 
     /// The sheet every record that plays `animation` uploads, when the records name one.
     pub fn image_of(&self, animation: usize) -> Option<usize> {
-        let mut images = self
-            .records
-            .iter()
-            .filter(|record| usize::from(record.animation) == animation)
-            .map(|record| usize::from(record.image));
+        let mut images = self.records.iter().filter(|record| usize::from(record.animation) == animation).map(|record| usize::from(record.image));
         let first = images.next()?;
         images.all(|image| image == first).then_some(first)
     }
@@ -306,9 +269,7 @@ pub fn decode(payload: &[u8]) -> Result<CharacterSprites> {
     for (index, &start) in starts.iter().enumerate() {
         let end = starts.get(index + 1).copied().unwrap_or(payload.len());
         if start < CONTAINER_HEAD as usize || start >= end || end > payload.len() {
-            return Err(Error::CharacterSprites(format!(
-                "container section {index} at {start:#X} does not end at {end:#X}"
-            )));
+            return Err(Error::CharacterSprites(format!("container section {index} at {start:#X} does not end at {end:#X}")));
         }
         sections.push(Section::decode(&payload[start..end])?);
     }
@@ -383,9 +344,7 @@ fn table(bytes: &[u8], at: usize, width: usize, end: usize) -> Result<Vec<usize>
     for index in 0..count {
         let offset = at + read(index)?;
         if offset < at + first || offset >= end {
-            return Err(Error::CharacterSprites(format!(
-                "entry {index} of the table at {at:#X} points to {offset:#X}"
-            )));
+            return Err(Error::CharacterSprites(format!("entry {index} of the table at {at:#X} points to {offset:#X}")));
         }
         offsets.push(offset);
     }
@@ -400,10 +359,7 @@ fn word(bytes: &[u8], at: usize) -> Result<u32> {
 }
 
 fn half(bytes: &[u8], at: usize) -> Result<usize> {
-    bytes
-        .get(at..at + HALF)
-        .map(|pair| usize::from(u16::from_le_bytes([pair[0], pair[1]])))
-        .ok_or_else(|| Error::CharacterSprites(format!("the character sprites end before the halfword at {at:#X}")))
+    bytes.get(at..at + HALF).map(|pair| usize::from(u16::from_le_bytes([pair[0], pair[1]]))).ok_or_else(|| Error::CharacterSprites(format!("the character sprites end before the halfword at {at:#X}")))
 }
 
 fn to_usize(value: u32) -> usize {
@@ -426,12 +382,7 @@ pub(crate) mod tests {
             steps: vec![Step { delay: 4, frame: 0 }, Step { delay: 6, frame: 1 }, Step { delay: JUMP, frame: 0 }],
             frames: vec![
                 Frame { cells: vec![Cell { size: 5, x: -8, y: -8, u: 0, v: 0 }] },
-                Frame {
-                    cells: vec![
-                        Cell { size: 0, x: -8, y: -8, u: 0, v: 0 },
-                        Cell { size: 0x80, x: 0, y: -8, u: 8, v: 0 },
-                    ],
-                },
+                Frame { cells: vec![Cell { size: 0, x: -8, y: -8, u: 0, v: 0 }, Cell { size: 0x80, x: 0, y: -8, u: 8, v: 0 }] },
             ],
         };
         let stand = Animation { steps: vec![Step { delay: 1, frame: 0 }], frames: vec![walk.frames[0].clone()] };
@@ -499,14 +450,7 @@ pub(crate) mod tests {
         assert_eq!(section.images.len(), 2);
         assert_eq!(section.images[1].encoding, Encoding::Packed);
         assert_eq!(section.animations[0].loop_to(), Some(0));
-        assert_eq!(
-            section.records,
-            [
-                Record { image: 0, animation: 0, mirror: 0 },
-                Record { image: 0, animation: 0, mirror: 1 },
-                Record { image: 1, animation: 1, mirror: 0 },
-            ]
-        );
+        assert_eq!(section.records, [Record { image: 0, animation: 0, mirror: 0 }, Record { image: 0, animation: 0, mirror: 1 }, Record { image: 1, animation: 1, mirror: 0 },]);
         assert_eq!(section.image_of(1), Some(1));
         assert_eq!(encode(&sprites).expect("encodes"), payload);
     }
@@ -558,8 +502,7 @@ pub(crate) mod tests {
         let payload = section_bytes(1, 0);
         let mut sprites = decode(&payload).expect("decodes");
         // Noise does not pack, and a texel past five bits rules out the packed form.
-        let texels: Vec<u8> =
-            (0..16 * 8u32).map(|index| (index.wrapping_mul(2_654_435_761) >> 24) as u8 | 0x20).collect();
+        let texels: Vec<u8> = (0..16 * 8u32).map(|index| (index.wrapping_mul(2_654_435_761) >> 24) as u8 | 0x20).collect();
         sprites.sections[0].images[1].set_texels(texels).expect("same size");
         let error = encode(&sprites).expect_err("no room");
         assert!(error.to_string().contains("keeps its"), "{error}");

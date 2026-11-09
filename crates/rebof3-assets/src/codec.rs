@@ -78,16 +78,7 @@ pub struct Op {
 
 impl Op {
     const fn new(needs_input: &'static str, extension: &'static str, run: fn(&Job<'_>) -> Result<Vec<u8>>) -> Self {
-        Self {
-            needs_input,
-            files: 1,
-            named: false,
-            companion_flag: None,
-            index: Index::No,
-            load_arg: false,
-            extension,
-            run,
-        }
+        Self { needs_input, files: 1, named: false, companion_flag: None, index: Index::No, load_arg: false, extension, run }
     }
 
     const fn with_companion(mut self, flag: &'static str, missing: &'static str) -> Self {
@@ -134,33 +125,23 @@ fn companion<'a>(job: &Job<'a>) -> &'a [u8] {
 pub static CODECS: &[Codec] = &[
     Codec {
         kind: "palette",
-        export: Some(Op::new("export palette needs a CLUT block file", "json", |job| {
-            Ok(rebof3_formats::clut::export(job.input)?)
-        })),
-        import: Some(Op::new("import palette needs a palette JSON file", "bin", |job| {
-            Ok(rebof3_formats::clut::import(job.input)?)
-        })),
+        export: Some(Op::new("export palette needs a CLUT block file", "json", |job| Ok(rebof3_formats::clut::export(job.input)?))),
+        import: Some(Op::new("import palette needs a palette JSON file", "bin", |job| Ok(rebof3_formats::clut::import(job.input)?))),
     },
     Codec {
         kind: "vag",
         export: Some(Op {
             files: 2,
             index: Index::Required("export vag needs --index, the VAG's number in the bank"),
-            ..Op::new("export vag needs a header (.vh) and a body (.vb) file", "{index}.wav", |job| {
-                Ok(rebof3_formats::vab::vag::vab_vag_wav(job.input, companion(job), job.index.unwrap_or(0))?)
-            })
+            ..Op::new("export vag needs a header (.vh) and a body (.vb) file", "{index}.wav", |job| Ok(rebof3_formats::vab::vag::vab_vag_wav(job.input, companion(job), job.index.unwrap_or(0))?))
         }),
-        import: Some(Op::new("import vag needs a WAVE file", "vag", |job| {
-            Ok(rebof3_formats::vab::vag::import(job.input)?)
-        })),
+        import: Some(Op::new("import vag needs a WAVE file", "vag", |job| Ok(rebof3_formats::vab::vag::import(job.input)?))),
     },
     Codec {
         kind: "sequence",
         export: Some(Op {
             index: Index::Optional,
-            ..Op::new("export sequence needs a sequence package (.seq) file", "mid", |job| {
-                Ok(rebof3_formats::sep::midi::export(job.input, job.index.unwrap_or(0) as usize)?)
-            })
+            ..Op::new("export sequence needs a sequence package (.seq) file", "mid", |job| Ok(rebof3_formats::sep::midi::export(job.input, job.index.unwrap_or(0) as usize)?))
         }),
         import: None,
     },
@@ -177,106 +158,68 @@ pub static CODECS: &[Codec] = &[
     },
     Codec {
         kind: "sep",
-        export: Some(Op::new("export sep needs a sequence package (.seq) file", "sep", |job| {
-            Ok(rebof3_formats::sep::psyq::export_sep(job.input)?)
-        })),
-        import: Some(Op::new("import sep needs a SEP file", "bin", |job| {
-            Ok(rebof3_formats::sep::psyq::import_sep(job.input)?)
-        })),
+        export: Some(Op::new("export sep needs a sequence package (.seq) file", "sep", |job| Ok(rebof3_formats::sep::psyq::export_sep(job.input)?))),
+        import: Some(Op::new("import sep needs a SEP file", "bin", |job| Ok(rebof3_formats::sep::psyq::import_sep(job.input)?))),
     },
     Codec {
         kind: "seq",
         export: Some(Op {
             index: Index::Optional,
-            ..Op::new("export seq needs a sequence package (.seq) file", "{index}.seq", |job| {
-                Ok(rebof3_formats::sep::psyq::export_seq(job.input, job.index.unwrap_or(0) as usize)?)
-            })
+            ..Op::new("export seq needs a sequence package (.seq) file", "{index}.seq", |job| Ok(rebof3_formats::sep::psyq::export_seq(job.input, job.index.unwrap_or(0) as usize)?))
         }),
         import: None,
     },
     Codec {
         kind: "message",
-        export: Some(Op::new("export message needs a message table payload", "json", |job| {
-            Ok(table::export(job.input)?)
-        })),
-        import: Some(Op::new("import message needs a JSON file from export message", "bin", |job| {
-            Ok(table::import(job.input)?)
-        })),
+        export: Some(Op::new("export message needs a message table payload", "json", |job| Ok(table::export(job.input)?))),
+        import: Some(Op::new("import message needs a JSON file from export message", "bin", |job| Ok(table::import(job.input)?))),
     },
     Codec {
         kind: "message-po",
-        export: Some(Op::new("export message-po needs a message table payload", "po", |job| {
-            Ok(rebof3_formats::message::po::export(job.input)?)
-        })),
+        export: Some(Op::new("export message-po needs a message table payload", "po", |job| Ok(rebof3_formats::message::po::export(job.input)?))),
         import: Some(
-            Op::new("import message-po needs a PO file from export message-po", "bin", |job| {
-                Ok(rebof3_formats::message::po::import(job.input, companion(job))?)
-            })
-            .with_companion("--payload", "import message-po needs --payload, the message table it was exported from"),
+            Op::new("import message-po needs a PO file from export message-po", "bin", |job| Ok(rebof3_formats::message::po::import(job.input, companion(job))?))
+                .with_companion("--payload", "import message-po needs --payload, the message table it was exported from"),
         ),
     },
     Codec {
         kind: "script",
-        export: Some(Op::new("export script needs a script table payload", "txt", |job| {
-            Ok(rebof3_formats::script::text::export(job.input)?)
-        })),
+        export: Some(Op::new("export script needs a script table payload", "txt", |job| Ok(rebof3_formats::script::text::export(job.input)?))),
         import: Some(
-            Op::new("import script needs a text file from export script", "bin", |job| {
-                Ok(rebof3_formats::script::text::import(job.input, companion(job))?)
-            })
-            .with_companion("--payload", "import script needs --payload, the bank it was exported from"),
+            Op::new("import script needs a text file from export script", "bin", |job| Ok(rebof3_formats::script::text::import(job.input, companion(job))?))
+                .with_companion("--payload", "import script needs --payload, the bank it was exported from"),
         ),
     },
     Codec {
         kind: "strings",
-        export: Some(Op {
-            load_arg: true,
-            ..Op::new("export strings needs a payload file", "json", |job| {
-                Ok(strings::export(job.input, job.load_arg)?)
-            })
-        }),
+        export: Some(Op { load_arg: true, ..Op::new("export strings needs a payload file", "json", |job| Ok(strings::export(job.input, job.load_arg)?)) }),
         import: Some(
-            Op::new("import strings needs a JSON file from export strings", "bin", |job| {
-                Ok(strings::import(job.input, companion(job))?)
-            })
-            .with_companion("--payload", "import strings needs --payload, the file it was exported from"),
+            Op::new("import strings needs a JSON file from export strings", "bin", |job| Ok(strings::import(job.input, companion(job))?))
+                .with_companion("--payload", "import strings needs --payload, the file it was exported from"),
         ),
     },
     Codec {
         kind: "characters",
-        export: Some(Op::new("export characters needs the payload of ETC/START.EMI entry 8", "json", |job| {
-            tables::characters(job.input)
-        })),
+        export: Some(Op::new("export characters needs the payload of ETC/START.EMI entry 8", "json", |job| tables::characters(job.input))),
         import: Some(
-            Op::new("import characters needs a JSON file from export characters", "bin", |job| {
-                import::characters(job.input, companion(job))
-            })
-            .with_companion("--payload", "import characters needs --payload, the entry it was exported from"),
+            Op::new("import characters needs a JSON file from export characters", "bin", |job| import::characters(job.input, companion(job)))
+                .with_companion("--payload", "import characters needs --payload, the entry it was exported from"),
         ),
     },
     Codec {
         kind: "character-sprites",
-        export: Some(Op::new("export character-sprites needs the decoded character sprites", "json", |job| {
-            sprites::character_sprites(job.input)
-        })),
+        export: Some(Op::new("export character-sprites needs the decoded character sprites", "json", |job| sprites::character_sprites(job.input))),
         import: Some(
-            Op::new("import character-sprites needs a JSON file from export character-sprites", "bin", |job| {
-                import::character_sprites(job.input, companion(job))
-            })
-            .with_companion(
-                "--payload",
-                "import character-sprites needs --payload, the decoded sprites it was exported from",
-            ),
+            Op::new("import character-sprites needs a JSON file from export character-sprites", "bin", |job| import::character_sprites(job.input, companion(job)))
+                .with_companion("--payload", "import character-sprites needs --payload, the decoded sprites it was exported from"),
         ),
     },
     Codec {
         kind: "terrain",
         export: None,
         import: Some(
-            Op::new("import terrain needs a mesh file", "bin", |job| {
-                Ok(rebof3_formats::map::terrain::import(job.input, companion(job))?)
-            })
-            .with_companion("--payload", "import terrain needs --payload, the stored bundle"),
+            Op::new("import terrain needs a mesh file", "bin", |job| Ok(rebof3_formats::map::terrain::import(job.input, companion(job))?))
+                .with_companion("--payload", "import terrain needs --payload, the stored bundle"),
         ),
     },
     Codec {
@@ -285,11 +228,7 @@ pub static CODECS: &[Codec] = &[
         import: Some(Op {
             named: true,
             ..Op::new("import table needs a table name and its JSON file", "bin", |job| {
-                Ok(rebof3_formats::game_tables::open::import_in_payload(
-                    job.name.unwrap_or_default(),
-                    job.input,
-                    companion(job),
-                )?)
+                Ok(rebof3_formats::game_tables::open::import_in_payload(job.name.unwrap_or_default(), job.input, companion(job))?)
             })
             .with_companion("--payload", "import table needs --payload, the stored entry 0 of ETC/GAME.EMI")
         }),
@@ -298,20 +237,16 @@ pub static CODECS: &[Codec] = &[
         kind: "encounters",
         export: None,
         import: Some(
-            Op::new("import encounters needs the block's JSON file", "bin", |job| {
-                Ok(rebof3_formats::encounter::open::import(job.input, companion(job))?)
-            })
-            .with_companion("--base", "import encounters needs --base, the stored block"),
+            Op::new("import encounters needs the block's JSON file", "bin", |job| Ok(rebof3_formats::encounter::open::import(job.input, companion(job))?))
+                .with_companion("--base", "import encounters needs --base, the stored block"),
         ),
     },
     Codec {
         kind: "layout",
         export: None,
         import: Some(
-            Op::new("import layout needs the layout's JSON file", "bin", |job| {
-                Ok(rebof3_formats::map::layout::import(job.input, companion(job))?)
-            })
-            .with_companion("--payload", "import layout needs --payload, the stored bundle"),
+            Op::new("import layout needs the layout's JSON file", "bin", |job| Ok(rebof3_formats::map::layout::import(job.input, companion(job))?))
+                .with_companion("--payload", "import layout needs --payload, the stored bundle"),
         ),
     },
 ];

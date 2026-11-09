@@ -5,9 +5,7 @@
 //! changes exactly the bytes it names and every byte no column names keeps its stored value.
 
 use rebof3_formats::Format;
-use rebof3_formats::encounter::{
-    self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES,
-};
+use rebof3_formats::encounter::{self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES};
 use rebof3_formats::game_tables as tables;
 
 /// The archive that holds the fixed game tables in entry 0.
@@ -63,24 +61,13 @@ const HIGH_NIBBLE: Field = Field::Part { shift: 4, bits: 4 };
 const LOW_NIBBLE: Field = Field::Part { shift: 0, bits: 4 };
 
 /// `ItemFlags`.
-const ITEM_FLAGS: &[&str] = &[
-    "target both",
-    "target select",
-    "enemy default",
-    "target all",
-    "story item",
-    "show name",
-    "show animation",
-    "menu use",
-];
+const ITEM_FLAGS: &[&str] = &["target both", "target select", "enemy default", "target all", "story item", "show name", "show animation", "menu use"];
 /// `ElementFlags`, the low byte the weapon and ability masks hold.
 const ELEMENTS: &[&str] = &["fire", "frost", "electric", "earth", "wind", "holy", "psionic", "status"];
 /// `AbilityFlags`.
-const ABILITY_FLAGS: &[&str] =
-    &["death", "examinable", "silenceable", "physical", "affects stats", "bit 5", "bit 6", "bit 7"];
+const ABILITY_FLAGS: &[&str] = &["death", "examinable", "silenceable", "physical", "affects stats", "bit 5", "bit 6", "bit 7"];
 /// `AbilityTargetFlags`.
-const ABILITY_TARGETS: &[&str] =
-    &["field", "battle", "no hit reaction", "bit 3", "all", "opponent", "select", "both sides"];
+const ABILITY_TARGETS: &[&str] = &["field", "battle", "no hit reaction", "bit 3", "all", "opponent", "select", "both sides"];
 /// `EquipFlags`: the party members who may equip the item.
 const PARTY: &[&str] = &["Ryu", "Nina", "Garr", "Teepo", "Rei", "Momo", "Peco", "Whelp"];
 /// The low byte of `StatusFlags`.
@@ -88,14 +75,8 @@ const STATUS: &[&str] = &["bit 0", "bit 1", "paralyzed", "blind", "silenced", "c
 /// `ArmorType`: the equip slot an armor record fits.
 const ARMOR_TYPES: &[(u8, &str)] = &[(0, "nothing"), (2, "shield"), (3, "helmet"), (4, "body")];
 /// `ItemCategory`.
-const ITEM_CATEGORIES: &[(u8, &str)] = &[
-    (CATEGORY_ITEM, "item"),
-    (CATEGORY_WEAPON, "weapon"),
-    (CATEGORY_ARMOR, "armor"),
-    (CATEGORY_ACCESSORY, "accessory"),
-    (CATEGORY_VITAL, "vital"),
-    (EMPTY_CATEGORY, "empty"),
-];
+const ITEM_CATEGORIES: &[(u8, &str)] =
+    &[(CATEGORY_ITEM, "item"), (CATEGORY_WEAPON, "weapon"), (CATEGORY_ARMOR, "armor"), (CATEGORY_ACCESSORY, "accessory"), (CATEGORY_VITAL, "vital"), (EMPTY_CATEGORY, "empty")];
 /// The ability classes, in `AbilitySet` order.
 const ABILITY_CLASSES: &[(u8, &str)] = &[(0, "healing"), (1, "assist"), (2, "attack"), (3, "skill")];
 /// `EnemyFamily`, the high byte of an enemy id.
@@ -130,8 +111,7 @@ const CATEGORY_ACCESSORY: u8 = 3;
 const CATEGORY_VITAL: u8 = 4;
 
 /// The tables each item category indexes, in category order.
-const CATEGORY_TABLES: [tables::Table; 5] =
-    [tables::ITEMS, tables::WEAPONS, tables::ARMOR, tables::ACCESSORIES, tables::VITAL_ITEMS];
+const CATEGORY_TABLES: [tables::Table; 5] = [tables::ITEMS, tables::WEAPONS, tables::ARMOR, tables::ACCESSORIES, tables::VITAL_ITEMS];
 
 /// Where a sheet's records live.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -179,12 +159,8 @@ impl Table {
         match self.count {
             Count::Fixed(count) => count,
             Count::Payload => payload.len().saturating_sub(self.start) / self.record,
-            Count::Word(at) => payload
-                .get(at..at + 4)
-                .map_or(0, |word| u32::from_le_bytes(word.try_into().expect("four bytes")) as usize),
-            Count::Blocks { at, per } => payload
-                .get(at..at + 2)
-                .map_or(0, |half| usize::from(u16::from_le_bytes(half.try_into().expect("two bytes"))) * per),
+            Count::Word(at) => payload.get(at..at + 4).map_or(0, |word| u32::from_le_bytes(word.try_into().expect("four bytes")) as usize),
+            Count::Blocks { at, per } => payload.get(at..at + 2).map_or(0, |half| usize::from(u16::from_le_bytes(half.try_into().expect("two bytes"))) * per),
         }
     }
 
@@ -203,14 +179,7 @@ impl Table {
 }
 
 fn game(table: tables::Table, columns: Vec<Column>) -> Table {
-    Table {
-        name: table.name,
-        place: Place::Entry { archive: GAME, entry: 0 },
-        start: table.archive_offset - tables::PAYLOAD_START,
-        count: Count::Fixed(table.count),
-        record: table.record,
-        columns,
-    }
+    Table { name: table.name, place: Place::Entry { archive: GAME, entry: 0 }, start: table.archive_offset - tables::PAYLOAD_START, count: Count::Fixed(table.count), record: table.record, columns }
 }
 
 /// The sheets of entry `entry` of `archive`, whose format is `format`.
@@ -223,16 +192,7 @@ pub fn sheets() -> Vec<Table> {
     use Field::*;
     let name = Name(tables::NAME_BYTES);
     vec![
-        game(
-            tables::ITEMS,
-            vec![
-                col("name", 0x00, name),
-                col("flags", 0x0c, Bits(ITEM_FLAGS)),
-                col("icon", 0x0d, U8),
-                col("description", 0x0e, U16),
-                col("price", 0x10, U16),
-            ],
-        ),
+        game(tables::ITEMS, vec![col("name", 0x00, name), col("flags", 0x0c, Bits(ITEM_FLAGS)), col("icon", 0x0d, U8), col("description", 0x0e, U16), col("price", 0x10, U16)]),
         game(tables::VITAL_ITEMS, vec![col("name", 0x00, name), col("description", 0x0c, U16)]),
         game(
             tables::WEAPONS,
@@ -314,21 +274,9 @@ pub fn sheets() -> Vec<Table> {
     ]
 }
 
-const SHOP_SLOT_CATEGORY: [&str; tables::SHOP_SLOTS] = [
-    "1 category",
-    "2 category",
-    "3 category",
-    "4 category",
-    "5 category",
-    "6 category",
-    "7 category",
-    "8 category",
-    "9 category",
-    "10 category",
-    "11 category",
-];
-const SHOP_SLOT_ITEM: [&str; tables::SHOP_SLOTS] =
-    ["1 item", "2 item", "3 item", "4 item", "5 item", "6 item", "7 item", "8 item", "9 item", "10 item", "11 item"];
+const SHOP_SLOT_CATEGORY: [&str; tables::SHOP_SLOTS] =
+    ["1 category", "2 category", "3 category", "4 category", "5 category", "6 category", "7 category", "8 category", "9 category", "10 category", "11 category"];
+const SHOP_SLOT_ITEM: [&str; tables::SHOP_SLOTS] = ["1 item", "2 item", "3 item", "4 item", "5 item", "6 item", "7 item", "8 item", "9 item", "10 item", "11 item"];
 
 /// `ShopStock`: an item count, then eleven `ShopItemRef` slots of category and index.
 fn shop_columns() -> Vec<Column> {
@@ -385,30 +333,20 @@ fn party_sheet() -> Table {
 
 /// The six `u16` stats that open a `Stats` block: the live copy, then the base the equipment adds to.
 const STAT_NAMES: [&str; 6] = ["max hp", "max ap", "power", "defense", "agility", "intellect"];
-const BASE_STAT_NAMES: [&str; 6] =
-    ["base max hp", "base max ap", "base power", "base defense", "base agility", "base intellect"];
+const BASE_STAT_NAMES: [&str; 6] = ["base max hp", "base max ap", "base power", "base defense", "base agility", "base intellect"];
 
 /// The columns of the six `u16` stats of the `Stats` block at record offset `block`.
 fn stat_columns(names: [&'static str; 6], block: usize) -> Vec<Column> {
     names.into_iter().enumerate().map(|(at, name)| col(name, block + 2 * at, Field::U16)).collect()
 }
 
-const ENCOUNTER_SLOTS: [&str; ENCOUNTER_ENEMIES] =
-    ["enemy 1", "enemy 2", "enemy 3", "enemy 4", "enemy 5", "enemy 6", "enemy 7", "enemy 8"];
+const ENCOUNTER_SLOTS: [&str; ENCOUNTER_ENEMIES] = ["enemy 1", "enemy 2", "enemy 3", "enemy 4", "enemy 5", "enemy 6", "enemy 7", "enemy 8"];
 
 /// `Encounter`: eight enemy indexes and an appearance rate.
 fn encounter_sheet() -> Table {
-    let mut columns: Vec<Column> =
-        ENCOUNTER_SLOTS.into_iter().enumerate().map(|(at, name)| col(name, at, Field::Enemy)).collect();
+    let mut columns: Vec<Column> = ENCOUNTER_SLOTS.into_iter().enumerate().map(|(at, name)| col(name, at, Field::Enemy)).collect();
     columns.push(col("appearance rate", ENCOUNTER_ENEMIES, Field::U8));
-    Table {
-        name: "encounters",
-        place: Place::Format(Format::AreaEncounterTable),
-        start: 0,
-        count: Count::Fixed(ENCOUNTERS),
-        record: ENCOUNTER_BYTES,
-        columns,
-    }
+    Table { name: "encounters", place: Place::Format(Format::AreaEncounterTable), start: 0, count: Count::Fixed(ENCOUNTERS), record: ENCOUNTER_BYTES, columns }
 }
 
 /// The record offsets of an enemy's two drop rows (`EnemyDrop`); Steal takes the first.
@@ -417,8 +355,7 @@ const ENEMY_DROPS: [usize; 2] = [0x2c, 0x30];
 const ENEMY_RESISTANCES: usize = 0x78;
 /// `ResistanceIndex`.
 const RESISTANCES: [&str; 9] = ["fire", "frost", "electric", "earth", "wind", "holy", "psionic", "status", "death"];
-const INITIAL_SKILLS: [&str; 8] =
-    ["skill 1", "skill 2", "skill 3", "skill 4", "skill 5", "skill 6", "skill 7", "skill 8"];
+const INITIAL_SKILLS: [&str; 8] = ["skill 1", "skill 2", "skill 3", "skill 4", "skill 5", "skill 6", "skill 7", "skill 8"];
 
 /// `Enemy` (`include/game/enemy.h`): the eight enemy records after the encounters.
 fn enemy_sheet() -> Table {
@@ -439,8 +376,7 @@ fn enemy_sheet() -> Table {
         col("agility", 0x28, U16),
         col("intellect", 0x2a, U16),
     ];
-    const DROP_NAMES: [[&str; 3]; 2] =
-        [["drop 1 item", "drop 1 category", "drop 1 rate"], ["drop 2 item", "drop 2 category", "drop 2 rate"]];
+    const DROP_NAMES: [[&str; 3]; 2] = [["drop 1 item", "drop 1 category", "drop 1 rate"], ["drop 2 item", "drop 2 category", "drop 2 rate"]];
     for (row, [item, category, rate]) in ENEMY_DROPS.into_iter().zip(DROP_NAMES) {
         columns.push(col(item, row, ItemAt(row + 1)));
         columns.push(col(category, row + 1, Choice(ITEM_CATEGORIES)));
@@ -456,14 +392,7 @@ fn enemy_sheet() -> Table {
     columns.push(col("reach", 0x82, U8));
     columns.push(col("height", 0x83, U8));
 
-    Table {
-        name: "enemies",
-        place: Place::Format(Format::AreaEncounterTable),
-        start: ENEMY_BASE,
-        count: Count::Fixed(ENEMIES),
-        record: ENEMY_BYTES,
-        columns,
-    }
+    Table { name: "enemies", place: Place::Format(Format::AreaEncounterTable), start: ENEMY_BASE, count: Count::Fixed(ENEMIES), record: ENEMY_BYTES, columns }
 }
 
 /// The record offset of an enemy's four `EnemyAIBlock`s, and the bytes of one.
@@ -502,14 +431,7 @@ fn enemy_ai_sheet() -> Table {
     columns.extend(ai_block!(2));
     columns.extend(ai_block!(3));
     columns.extend(ai_block!(4));
-    Table {
-        name: "enemy AI",
-        place: Place::Format(Format::AreaEncounterTable),
-        start: ENEMY_BASE,
-        count: Count::Fixed(ENEMIES),
-        record: ENEMY_BYTES,
-        columns,
-    }
+    Table { name: "enemy AI", place: Place::Format(Format::AreaEncounterTable), start: ENEMY_BASE, count: Count::Fixed(ENEMIES), record: ENEMY_BYTES, columns }
 }
 
 /// `SpriteTextureMode`, the texture mode of an actor definition.
@@ -579,13 +501,7 @@ fn vab_bank_sheet() -> Table {
         start: 0,
         count: Count::Fixed(1),
         record: VAB_HEADER_SIZE,
-        columns: vec![
-            col("id", 0x08, U32),
-            col("master volume", 0x18, U8),
-            col("master pan", 0x19, U8),
-            col("attribute 1", 0x1a, U8),
-            col("attribute 2", 0x1b, U8),
-        ],
+        columns: vec![col("id", 0x08, U32), col("master volume", 0x18, U8), col("master pan", 0x19, U8), col("attribute 1", 0x1a, U8), col("attribute 2", 0x1b, U8)],
     }
 }
 
@@ -598,14 +514,7 @@ fn vab_program_sheet() -> Table {
         start: VAB_PROGRAM_TABLE,
         count: Count::Fixed(VAB_PROGRAM_MAX),
         record: VAB_PROGRAM_SIZE,
-        columns: vec![
-            col("tones", 0x00, U8),
-            col("volume", 0x01, U8),
-            col("priority", 0x02, U8),
-            col("mode", 0x03, U8),
-            col("pan", 0x04, U8),
-            col("attribute", 0x06, U16),
-        ],
+        columns: vec![col("tones", 0x00, U8), col("volume", 0x01, U8), col("priority", 0x02, U8), col("mode", 0x03, U8), col("pan", 0x04, U8), col("attribute", 0x06, U16)],
     }
 }
 
@@ -655,9 +564,7 @@ impl Names {
     /// when it is an encounter block.
     pub fn new(game: Option<&[u8]>, shown: Option<&[u8]>) -> Self {
         let names = |table: tables::Table| -> Vec<String> {
-            game.and_then(|payload| table.records(payload).ok())
-                .map(|records| records.iter().map(|record| tables::name_text(&record[..tables::NAME_BYTES])).collect())
-                .unwrap_or_default()
+            game.and_then(|payload| table.records(payload).ok()).map(|records| records.iter().map(|record| tables::name_text(&record[..tables::NAME_BYTES])).collect()).unwrap_or_default()
         };
         let enemies = shown
             .filter(|payload| payload.len() >= encounter::BLOCK_BYTES)
@@ -719,13 +626,7 @@ pub fn read(record: &[u8], column: &Column) -> u32 {
         Field::U32 => u32::from_le_bytes([record[at], record[at + 1], record[at + 2], record[at + 3]]),
         Field::Part { shift, bits } => u32::from(record[at] >> shift) & mask(bits),
         Field::Name(_) => 0,
-        Field::U8
-        | Field::Bits(_)
-        | Field::Choice(_)
-        | Field::ItemAt(_)
-        | Field::ItemOf(_)
-        | Field::Ability
-        | Field::Enemy => u32::from(record[at]),
+        Field::U8 | Field::Bits(_) | Field::Choice(_) | Field::ItemAt(_) | Field::ItemOf(_) | Field::Ability | Field::Enemy => u32::from(record[at]),
     }
 }
 
@@ -741,13 +642,7 @@ pub fn write(record: &mut [u8], column: &Column, value: u32) {
             record[at] = (record[at] & !mask) | ((value as u8) << shift & mask);
         }
         Field::Name(_) => {}
-        Field::U8
-        | Field::Bits(_)
-        | Field::Choice(_)
-        | Field::ItemAt(_)
-        | Field::ItemOf(_)
-        | Field::Ability
-        | Field::Enemy => record[at] = value as u8,
+        Field::U8 | Field::Bits(_) | Field::Choice(_) | Field::ItemAt(_) | Field::ItemOf(_) | Field::Ability | Field::Enemy => record[at] = value as u8,
     }
 }
 
@@ -899,9 +794,7 @@ mod tests {
 
     /// A game payload long enough for every table, with one weapon and one ability named.
     fn game_payload() -> Vec<u8> {
-        let end = tables::TABLES
-            .iter()
-            .map(|table| table.archive_offset - tables::PAYLOAD_START + table.count * table.record);
+        let end = tables::TABLES.iter().map(|table| table.archive_offset - tables::PAYLOAD_START + table.count * table.record);
         let mut payload = vec![0; end.max().unwrap()];
         let mut put = |table: tables::Table, index: usize, name: &str| {
             let at = table.archive_offset - tables::PAYLOAD_START + index * table.record;

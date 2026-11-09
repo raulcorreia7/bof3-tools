@@ -89,14 +89,7 @@ pub fn depth_scores(words: &[u16], width: usize, height: usize) -> Vec<DepthScor
 }
 
 /// The rows of the palette band one entry wrote, scored for the texture at `depth`, best first.
-pub fn clut_candidates(
-    vram: &Vram,
-    words: &[u16],
-    width: usize,
-    height: usize,
-    depth: Depth,
-    archive: &str,
-) -> Vec<Candidate> {
+pub fn clut_candidates(vram: &Vram, words: &[u16], width: usize, height: usize, depth: Depth, archive: &str) -> Vec<Candidate> {
     let colors = depth.colors();
     let row = width * depth.texels_per_word();
     let indices = texels(words, width, height, depth);
@@ -131,19 +124,11 @@ pub fn clut_candidates(
             let distance: f64 = if pair_count == 0 {
                 0.0
             } else {
-                pairs
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, count)| **count != 0)
-                    .map(|(at, &count)| count as f64 * gap(rgb[at / colors], rgb[at % colors]))
-                    .sum::<f64>()
-                    / pair_count as f64
+                pairs.iter().enumerate().filter(|(_, count)| **count != 0).map(|(at, &count)| count as f64 * gap(rgb[at / colors], rgb[at % colors])).sum::<f64>() / pair_count as f64
             };
-            let transparent: usize =
-                histogram.iter().zip(&row_words).filter(|(_, word)| **word == 0).map(|(count, _)| count).sum();
+            let transparent: usize = histogram.iter().zip(&row_words).filter(|(_, word)| **word == 0).map(|(count, _)| count).sum();
             let own = palette.as_entry().is_some_and(|(owner, _)| owner == archive);
-            let score = (1.0 - distance) - TRANSPARENT_WEIGHT * transparent as f64 / texel_count
-                + if own { OWN_ARCHIVE_BONUS } else { 0.0 };
+            let score = (1.0 - distance) - TRANSPARENT_WEIGHT * transparent as f64 / texel_count + if own { OWN_ARCHIVE_BONUS } else { 0.0 };
             candidates.push(Candidate { depth, clut, palette: palette.clone(), score });
         }
     }
@@ -235,10 +220,7 @@ mod tests {
         // Row 480 holds a grey ramp; row 481 alternates black and white.
         let ramp: Vec<u8> = (0..16u16).flat_map(|level| (0x8000 | (level * 2 * 0x421)).to_le_bytes()).collect();
         let noise: Vec<u8> = (0..16u16).flat_map(|level| (0x8000 | ((level % 2) * 0x7FFF)).to_le_bytes()).collect();
-        let entries = [
-            Entry { size: 32, offset: 0, ram_ptr: 0x8003_3800, first4: 0, file_type: 0 },
-            Entry { size: 32, offset: 0, ram_ptr: 0x8003_3A00, first4: 0, file_type: 0 },
-        ];
+        let entries = [Entry { size: 32, offset: 0, ram_ptr: 0x8003_3800, first4: 0, file_type: 0 }, Entry { size: 32, offset: 0, ram_ptr: 0x8003_3A00, first4: 0, file_type: 0 }];
         let mut vram = Vram::new();
         vram.load("BIN/OTHER.EMI", &entries, &[&ramp, &noise]);
         vram.reset_palette();

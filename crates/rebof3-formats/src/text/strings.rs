@@ -99,12 +99,7 @@ pub fn export(payload: &[u8], load_address: Option<u32>) -> Result<Vec<u8>> {
 }
 
 /// The payload's scanned strings as rows, with the fields of `exclude` left out.
-pub fn rows(
-    payload: &[u8],
-    load_address: Option<u32>,
-    source: Option<&PayloadSource>,
-    exclude: &[(usize, usize)],
-) -> Result<Vec<Item>> {
+pub fn rows(payload: &[u8], load_address: Option<u32>, source: Option<&PayloadSource>, exclude: &[(usize, usize)]) -> Result<Vec<Item>> {
     if discover::table_records(payload).is_some() {
         return Err(Error::Import("this payload is a message table; export it with the message table format".into()));
     }
@@ -134,12 +129,7 @@ pub fn rows(
 }
 
 /// The strings of `payload` as JSON, and how many strings it lists.
-pub fn export_counted(
-    payload: &[u8],
-    load_address: Option<u32>,
-    source: Option<&PayloadSource>,
-    exclude: &[(usize, usize)],
-) -> Result<(Vec<u8>, usize)> {
+pub fn export_counted(payload: &[u8], load_address: Option<u32>, source: Option<&PayloadSource>, exclude: &[(usize, usize)]) -> Result<(Vec<u8>, usize)> {
     let items = rows(payload, load_address, source, exclude)?;
     let count = items.len();
     Ok((document(payload.len(), &items), count))
@@ -154,8 +144,7 @@ pub fn document(size: usize, items: &[Item]) -> Vec<u8> {
 /// The strings that do not overlap: a name keeps its bytes, and a record that overlaps a name, or another record,
 /// is left out. Its bytes stay in the payload, which the import keeps as they are.
 pub fn disjoint(found: Vec<Found>) -> Vec<Found> {
-    let (names, records): (Vec<Found>, Vec<Found>) =
-        found.into_iter().partition(|string| !matches!(string.kind, Kind::Record));
+    let (names, records): (Vec<Found>, Vec<Found>) = found.into_iter().partition(|string| !matches!(string.kind, Kind::Record));
     let mut kept: BTreeMap<usize, Found> = BTreeMap::new();
     for string in names.into_iter().chain(records) {
         let before = kept.range(..=string.start).next_back().is_some_and(|(_, other)| other.end > string.start);
@@ -201,42 +190,26 @@ fn item(payload: &[u8], found: Found, source: Option<&PayloadSource>, row: Found
 
 /// The payload's bytes with each string's text encoded again. `payload` must be the bytes [`export`] read.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let document: Document = serde_json::from_slice(json)
-        .map_err(|error| Error::Import(format!("the strings JSON does not read: {error}")))?;
+    let document: Document = serde_json::from_slice(json).map_err(|error| Error::Import(format!("the strings JSON does not read: {error}")))?;
     if document.size != payload.len() {
-        return Err(Error::Import(format!(
-            "the strings were exported from {} bytes, and the payload has {}",
-            document.size,
-            payload.len()
-        )));
+        return Err(Error::Import(format!("the strings were exported from {} bytes, and the payload has {}", document.size, payload.len())));
     }
     let mut out = Vec::with_capacity(payload.len());
     let mut cursor = 0;
     for string in &document.strings {
-        let end =
-            string.origin.offset.checked_add(string.length).filter(|&end| end <= payload.len()).ok_or_else(|| {
-                Error::Import(format!(
-                    "the string at {:#x} runs past the payload's {} bytes",
-                    string.origin.offset,
-                    payload.len()
-                ))
-            })?;
+        let end = string
+            .origin
+            .offset
+            .checked_add(string.length)
+            .filter(|&end| end <= payload.len())
+            .ok_or_else(|| Error::Import(format!("the string at {:#x} runs past the payload's {} bytes", string.origin.offset, payload.len())))?;
         if string.origin.offset < cursor {
-            return Err(Error::Import(format!(
-                "the string at {:#x} overlaps the string before it",
-                string.origin.offset
-            )));
+            return Err(Error::Import(format!("the string at {:#x} overlaps the string before it", string.origin.offset)));
         }
-        let mut bytes = codec::encode(Encoding::Message, &string.text)
-            .map_err(|error| Error::Import(format!("the string at {:#x}: {error}", string.origin.offset)))?;
+        let mut bytes = codec::encode(Encoding::Message, &string.text).map_err(|error| Error::Import(format!("the string at {:#x}: {error}", string.origin.offset)))?;
         if string.stride.is_some() {
             if bytes.len() > string.length {
-                return Err(Error::Import(format!(
-                    "the name at {:#x} is {} bytes, and its field holds {}",
-                    string.origin.offset,
-                    bytes.len(),
-                    string.length
-                )));
+                return Err(Error::Import(format!("the name at {:#x} is {} bytes, and its field holds {}", string.origin.offset, bytes.len(), string.length)));
             }
             bytes.resize(string.length, 0);
         }

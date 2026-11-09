@@ -67,11 +67,5 @@ fn retail_coverage_reaches_the_pinned_totals() {
 
     let failures = report.all_failures();
     assert!(failures.is_empty(), "{} failures over the retail archives:\n{}", failures.len(), failures.join("\n"));
-    eprintln!(
-        "coverage gate: {} entries, {} bytes; {} codec-owned entries ({}) rebuild byte-exact",
-        report.entries(),
-        report.bytes(),
-        report.covered_entries(),
-        report.covered_bytes()
-    );
+    eprintln!("coverage gate: {} entries, {} bytes; {} codec-owned entries ({}) rebuild byte-exact", report.entries(), report.bytes(), report.covered_entries(), report.covered_bytes());
 }

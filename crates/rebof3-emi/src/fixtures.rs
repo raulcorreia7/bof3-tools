@@ -9,8 +9,7 @@ use crate::emi::{HEADER_SIZE, MAGIC, SECTOR_SIZE, TOC_ENTRY_SIZE};
 
 /// An archive of `(type, payload)` entries: the retail layout, payloads on sector boundaries.
 pub fn archive(entries: &[(u16, &[u8])]) -> Vec<u8> {
-    let entries: Vec<(u16, u32, &[u8])> =
-        entries.iter().map(|(file_type, payload)| (*file_type, 0, *payload)).collect();
+    let entries: Vec<(u16, u32, &[u8])> = entries.iter().map(|(file_type, payload)| (*file_type, 0, *payload)).collect();
     archive_at(&entries)
 }
 

@@ -65,16 +65,11 @@ impl Table {
     }
 }
 
-fn serialize_name<S: serde::Serializer>(
-    name: &[u8; NAME_BYTES],
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error> {
+fn serialize_name<S: serde::Serializer>(name: &[u8; NAME_BYTES], serializer: S) -> std::result::Result<S::Ok, S::Error> {
     serializer.serialize_str(&name_text(name))
 }
 
-fn deserialize_name<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> std::result::Result<[u8; NAME_BYTES], D::Error> {
+fn deserialize_name<'de, D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<[u8; NAME_BYTES], D::Error> {
     let text = <String as serde::Deserialize>::deserialize(deserializer)?;
     let bytes = name_field(&text, NAME_BYTES).map_err(<D::Error as serde::de::Error>::custom)?;
     Ok(bytes.try_into().expect("a name field is NAME_BYTES long"))
@@ -222,25 +217,11 @@ fn vital_item(record: &[u8]) -> VitalItem {
 }
 
 fn weapon(record: &[u8]) -> Weapon {
-    Weapon {
-        name: name(record),
-        equipability: record[0x0c],
-        element: record[0x0f],
-        weight: record[0x10],
-        power: record[0x12],
-        price: u16_at(record, 0x16),
-    }
+    Weapon { name: name(record), equipability: record[0x0c], element: record[0x0f], weight: record[0x10], power: record[0x12], price: u16_at(record, 0x16) }
 }
 
 fn armor(record: &[u8]) -> Armor {
-    Armor {
-        name: name(record),
-        equipability: record[0x0c],
-        equip_type: record[0x0e],
-        weight: record[0x0f],
-        power: record[0x10],
-        price: u16_at(record, 0x14),
-    }
+    Armor { name: name(record), equipability: record[0x0c], equip_type: record[0x0e], weight: record[0x0f], power: record[0x10], price: u16_at(record, 0x14) }
 }
 
 fn accessory(record: &[u8]) -> Accessory {
@@ -248,21 +229,12 @@ fn accessory(record: &[u8]) -> Accessory {
 }
 
 fn shop(record: &[u8]) -> Shop {
-    let slots =
-        std::array::from_fn(|slot| ShopSlot { item_type: record[1 + 2 * slot], item_index: record[2 + 2 * slot] });
+    let slots = std::array::from_fn(|slot| ShopSlot { item_type: record[1 + 2 * slot], item_index: record[2 + 2 * slot] });
     Shop { count: record[0], slots }
 }
 
 fn ability(record: &[u8]) -> Ability {
-    Ability {
-        name: name(record),
-        flags: record[0x0c],
-        r#type: record[0x0d],
-        cost: record[0x0e],
-        power: record[0x0f],
-        element: record[0x10],
-        ability_flags: record[0x11],
-    }
+    Ability { name: name(record), flags: record[0x0c], r#type: record[0x0d], cost: record[0x0e], power: record[0x0f], element: record[0x10], ability_flags: record[0x11] }
 }
 
 fn growth(record: &[u8]) -> Growth {
@@ -423,12 +395,7 @@ mod tests {
 
     #[test]
     fn a_name_field_writes_back_the_bytes_it_was_read_from() {
-        let fields: [&[u8]; 4] = [
-            b"Bronze\xffSword",
-            b"Potion\0\0\0\0\0\0",
-            &[0x05, 0x02, b'H', b'a', b'w', b'k', 0x8e, b's', 0xff, 0x8b, 0x06, 0x00],
-            &[b'A', 0x00, b'B', 0, 0, 0, 0, 0],
-        ];
+        let fields: [&[u8]; 4] = [b"Bronze\xffSword", b"Potion\0\0\0\0\0\0", &[0x05, 0x02, b'H', b'a', b'w', b'k', 0x8e, b's', 0xff, 0x8b, 0x06, 0x00], &[b'A', 0x00, b'B', 0, 0, 0, 0, 0]];
         for field in fields {
             let text = name_text(field);
             assert_eq!(name_field(&text, field.len()).unwrap(), field, "{text:?}");

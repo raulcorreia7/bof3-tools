@@ -43,13 +43,7 @@ impl Camera {
 
     /// A camera at the origin looking down `+z`, `focal` pixels from a 64-pixel frame.
     pub fn looking_down_z(focal: f32) -> Self {
-        Self {
-            rotation: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-            translation: [0.0; 3],
-            focal,
-            frame_width: 64.0,
-            near: 1.0,
-        }
+        Self { rotation: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], translation: [0.0; 3], focal, frame_width: 64.0, near: 1.0 }
     }
 
     /// A camera at `eye` looking at `target`, with model `up` pointing up on screen and a horizontal

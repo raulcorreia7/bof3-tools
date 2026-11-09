@@ -36,9 +36,7 @@ fn read_disc() -> Option<Vec<Disc>> {
             .map(|path| {
                 let bytes = fs::read(path).expect("read the retail archive");
                 let archive = Archive::parse(&bytes).expect("an archive");
-                let payloads = (0..archive.entries().len())
-                    .map(|slot| archive.payload(&bytes, slot).expect("a payload").to_vec())
-                    .collect();
+                let payloads = (0..archive.entries().len()).map(|slot| archive.payload(&bytes, slot).expect("a payload").to_vec()).collect();
                 let relative = path.strip_prefix(&root).unwrap_or(path).to_string_lossy().replace('\\', "/");
                 Disc { path: relative, archive, payloads }
             })
@@ -52,12 +50,7 @@ fn read_disc() -> Option<Vec<Disc>> {
 #[test]
 fn retail_joined_textures_round_trip_through_tim() {
     let Some(discs) = read_disc() else { return };
-    let blocks: BTreeMap<(&str, usize), &[u8]> = discs
-        .iter()
-        .flat_map(|disc| {
-            disc.payloads.iter().enumerate().map(|(slot, payload)| ((disc.path.as_str(), slot), payload.as_slice()))
-        })
-        .collect();
+    let blocks: BTreeMap<(&str, usize), &[u8]> = discs.iter().flat_map(|disc| disc.payloads.iter().enumerate().map(|(slot, payload)| ((disc.path.as_str(), slot), payload.as_slice()))).collect();
     let (mut textures, mut rows, mut spliced) = (0, 0, 0);
     for disc in &discs {
         let slices = disc.slices();
@@ -80,11 +73,7 @@ fn retail_joined_textures_round_trip_through_tim() {
 
                 // The CLUT block that holds the row takes the row back unchanged.
                 let stored = blocks.get(&(row.palette_archive.as_str(), row.palette)).expect("the palette entry");
-                let block_entry = discs
-                    .iter()
-                    .find(|other| other.path == row.palette_archive)
-                    .map(|other| &other.archive.entries()[row.palette])
-                    .expect("the palette archive");
+                let block_entry = discs.iter().find(|other| other.path == row.palette_archive).map(|other| &other.archive.entries()[row.palette]).expect("the palette archive");
                 let at = texture::ClutBlock::new(row.palette, block_entry.ram_ptr, stored.len())
                     .and_then(|clut_block| texture::arena_word(row.clut).map(|word| word - clut_block.arena_word))
                     .expect("the row lies in its CLUT block");
@@ -129,10 +118,10 @@ fn retail_banks_round_trip_through_vab_and_vh_vb() {
             if classify(entry, &disc.payloads[slot]) != Format::VabHeader {
                 continue;
             }
-            let body = entries.iter().enumerate().find_map(|(other, candidate)| {
-                (candidate.ram_ptr == entry.ram_ptr && classify(candidate, &disc.payloads[other]) == Format::VabBody)
-                    .then_some(&disc.payloads[other])
-            });
+            let body = entries
+                .iter()
+                .enumerate()
+                .find_map(|(other, candidate)| (candidate.ram_ptr == entry.ram_ptr && classify(candidate, &disc.payloads[other]) == Format::VabBody).then_some(&disc.payloads[other]));
             let Some(body) = body else { continue };
             banks += 1;
             let name = format!("{} #{slot}", disc.path);
@@ -163,14 +152,8 @@ fn retail_sequence_packages_round_trip_through_sep_and_seq() {
             assert_eq!(&sep::psyq::import_sep(payload).expect("a SEP file"), payload, "{name}: import");
 
             let package = psx_formats::sep::Package::parse(payload).expect("a package");
-            let files: Vec<Vec<u8>> = (0..package.sequences.len())
-                .map(|index| sep::psyq::export_seq(payload, index).expect("a SEQ file"))
-                .collect();
-            let parts: Vec<(&[u8], u16)> = files
-                .iter()
-                .zip(&package.sequences)
-                .map(|(file, sequence)| (file.as_slice(), sequence.seq_id))
-                .collect();
+            let files: Vec<Vec<u8>> = (0..package.sequences.len()).map(|index| sep::psyq::export_seq(payload, index).expect("a SEQ file")).collect();
+            let parts: Vec<(&[u8], u16)> = files.iter().zip(&package.sequences).map(|(file, sequence)| (file.as_slice(), sequence.seq_id)).collect();
             assert_eq!(&sep::psyq::import_seq(&parts).expect("the SEQ files"), payload, "{name}: SEQ files");
             sequences += files.len();
         }

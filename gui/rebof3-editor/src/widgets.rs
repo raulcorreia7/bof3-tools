@@ -6,15 +6,13 @@ use std::ops::RangeInclusive;
 use std::rc::Rc;
 
 use gpui::{
-    AnyView, App, Bounds, Context, Div, ElementId, FontWeight, IntoElement, MouseButton, MouseDownEvent,
-    MouseMoveEvent, Pixels, Render, SharedString, Stateful, Window, canvas, div, prelude::*, px, relative, rgba,
+    AnyView, App, Bounds, Context, Div, ElementId, FontWeight, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Render, SharedString, Stateful, Window, canvas, div, prelude::*, px,
+    relative, rgba,
 };
 
 use crate::edit::LineEdit;
 use crate::fonts;
-use crate::theme::{
-    self, ACCENT, BACKGROUND, BORDER, CORNER, DISABLED, HOVER, MUTED, PANEL, RAISED, SELECTION, TEXT, color,
-};
+use crate::theme::{self, ACCENT, BACKGROUND, BORDER, CORNER, DISABLED, HOVER, MUTED, PANEL, RAISED, SELECTION, TEXT, color};
 
 /// Height of a button, tab or field, in pixels.
 pub const CONTROL_HEIGHT: f32 = 26.0;
@@ -63,21 +61,8 @@ pub fn separator(vertical: bool) -> Div {
 
 /// A button. A disabled button draws dimmed; the caller adds `on_click` only when it is enabled.
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>, enabled: bool) -> Stateful<Div> {
-    let base = div()
-        .id(id)
-        .flex()
-        .flex_none()
-        .items_center()
-        .h(px(CONTROL_HEIGHT))
-        .px(px(GAP + GAP_SMALL / 2.0))
-        .rounded(px(CORNER))
-        .bg(color(RAISED))
-        .child(label.into());
-    if enabled {
-        base.cursor_pointer().hover(|style| style.bg(color(HOVER))).active(|style| style.bg(theme::pressed_fill()))
-    } else {
-        base.text_color(color(DISABLED))
-    }
+    let base = div().id(id).flex().flex_none().items_center().h(px(CONTROL_HEIGHT)).px(px(GAP + GAP_SMALL / 2.0)).rounded(px(CORNER)).bg(color(RAISED)).child(label.into());
+    if enabled { base.cursor_pointer().hover(|style| style.bg(color(HOVER))).active(|style| style.bg(theme::pressed_fill())) } else { base.text_color(color(DISABLED)) }
 }
 
 /// A row that can be selected: a tab, a list row or a menu choice.
@@ -94,13 +79,7 @@ pub fn tab(id: impl Into<ElementId>, label: impl Into<SharedString>, selected: b
 
 /// A text field. `edit` is the field's text and cursor while it has the keyboard; otherwise it shows
 /// `text`, or `hint` when `text` is empty. The caller adds `on_click` to give it the keyboard.
-pub fn field(
-    id: impl Into<ElementId>,
-    text: &str,
-    hint: &str,
-    edit: Option<&LineEdit>,
-    width: Option<f32>,
-) -> Stateful<Div> {
+pub fn field(id: impl Into<ElementId>, text: &str, hint: &str, edit: Option<&LineEdit>, width: Option<f32>) -> Stateful<Div> {
     let (shown, shown_color) = match edit {
         Some(edit) => (edit.shown(), color(TEXT)),
         None if text.is_empty() => (hint.to_string(), color(DISABLED)),
@@ -145,37 +124,16 @@ pub fn menu_panel(id: impl Into<ElementId>) -> Stateful<Div> {
 
 /// A line of a menu, with the shortcut on the right.
 pub fn menu_item(id: impl Into<ElementId>, label: &str, shortcut: &str, enabled: bool) -> Stateful<Div> {
-    let item = div()
-        .id(id)
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap(px(GAP_SECTION))
-        .h(px(CONTROL_HEIGHT))
-        .px(px(GAP))
-        .rounded(px(CORNER))
-        .child(label.to_string())
-        .child(muted(shortcut.to_string()));
-    if enabled {
-        item.cursor_pointer().hover(|style| style.bg(theme::selected_fill()))
-    } else {
-        item.text_color(color(DISABLED))
-    }
+    let item =
+        div().id(id).flex().items_center().justify_between().gap(px(GAP_SECTION)).h(px(CONTROL_HEIGHT)).px(px(GAP)).rounded(px(CORNER)).child(label.to_string()).child(muted(shortcut.to_string()));
+    if enabled { item.cursor_pointer().hover(|style| style.bg(theme::selected_fill())) } else { item.text_color(color(DISABLED)) }
 }
 
 /// A check box with a label.
 pub fn checkbox(id: impl Into<ElementId>, label: &str, checked: bool) -> Stateful<Div> {
     let mut mark = div().flex_none().size(px(CHECK_SIDE)).rounded(px(CORNER / 2.0)).border_1();
     mark = if checked { mark.bg(color(ACCENT)).border_color(color(ACCENT)) } else { mark.border_color(color(MUTED)) };
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .gap(px(GAP))
-        .h(px(CONTROL_HEIGHT))
-        .cursor_pointer()
-        .child(mark)
-        .child(label.to_string())
+    div().id(id).flex().items_center().gap(px(GAP)).h(px(CONTROL_HEIGHT)).cursor_pointer().child(mark).child(label.to_string())
 }
 
 /// A square of one color. `outline` is a width and a theme color.
@@ -234,15 +192,7 @@ pub fn slider<T: 'static>(
                 .bg(color(RAISED))
                 .child(div().h_full().w(relative(fraction)).rounded_full().bg(color(ACCENT))),
         )
-        .child(
-            div()
-                .absolute()
-                .left(relative(fraction))
-                .ml(px(-SLIDER_KNOB / 2.0))
-                .size(px(SLIDER_KNOB))
-                .rounded_full()
-                .bg(color(TEXT)),
-        )
+        .child(div().absolute().left(relative(fraction)).ml(px(-SLIDER_KNOB / 2.0)).size(px(SLIDER_KNOB)).rounded_full().bg(color(TEXT)))
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, event: &MouseDownEvent, _, cx| {

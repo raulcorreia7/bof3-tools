@@ -66,16 +66,8 @@ fn every_drawn_cell_names_its_tiles() {
         }
     }
     eprintln!("{counts:?} blends {blends:?}");
-    let pinned = [
-        ("bundles", 200),
-        ("tops", 681_293),
-        ("east walls", 39_924),
-        ("south walls", 38_233),
-        ("zero words", 3_614),
-        ("shaded quads", 94_850),
-        ("sorted quads", 28_424),
-        ("front quads", 102_896),
-    ];
+    let pinned =
+        [("bundles", 200), ("tops", 681_293), ("east walls", 39_924), ("south walls", 38_233), ("zero words", 3_614), ("shaded quads", 94_850), ("sorted quads", 28_424), ("front quads", 102_896)];
     for (name, count) in pinned {
         assert_eq!(counts.get(name).copied().unwrap_or(0), count, "{name}");
     }

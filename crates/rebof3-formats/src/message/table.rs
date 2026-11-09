@@ -128,9 +128,7 @@ pub fn build(table: &Table) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(end);
     for slot in &table.slots {
         let offset = match slot {
-            Some(index) => *starts.get(*index).ok_or_else(|| {
-                Error::Import(format!("a slot names message {index}, and the table has {}", starts.len()))
-            })?,
+            Some(index) => *starts.get(*index).ok_or_else(|| Error::Import(format!("a slot names message {index}, and the table has {}", starts.len())))?,
             None => end,
         };
         out.extend_from_slice(&(offset as u16).to_le_bytes());
@@ -180,8 +178,7 @@ pub fn export_counted(payload: &[u8], source: Option<&PayloadSource>) -> Result<
     let mut rows = Vec::with_capacity(table.messages.len());
     for (index, raw) in table.messages.iter().enumerate() {
         let start = starts[index];
-        let slots: Vec<usize> =
-            table.slots.iter().enumerate().filter_map(|(slot, at)| (*at == Some(index)).then_some(slot)).collect();
+        let slots: Vec<usize> = table.slots.iter().enumerate().filter_map(|(slot, at)| (*at == Some(index)).then_some(slot)).collect();
         let id = match slots.first() {
             Some(slot) => format!("message[{slot}]"),
             None => "message[?]".to_string(),
@@ -197,23 +194,17 @@ pub fn export_counted(payload: &[u8], source: Option<&PayloadSource>) -> Result<
             kind: "message".into(),
         });
     }
-    let document = Document {
-        size: Some(payload.len()),
-        messages: rows.iter().cloned().map(|row| WireMessage::Row(Box::new(row))).collect(),
-        slots: table.slots,
-    };
+    let document = Document { size: Some(payload.len()), messages: rows.iter().cloned().map(|row| WireMessage::Row(Box::new(row))).collect(), slots: table.slots };
     let count = rows.len();
     Ok((serde_json::to_vec_pretty(&document).expect("a message table serializes"), count, rows))
 }
 
 /// The table bytes that a JSON document from [`export`] stands for, with each message encoded again.
 pub fn import(json: &[u8]) -> Result<Vec<u8>> {
-    let document: Document = serde_json::from_slice(json)
-        .map_err(|error| Error::Import(format!("the message table JSON does not read: {error}")))?;
+    let document: Document = serde_json::from_slice(json).map_err(|error| Error::Import(format!("the message table JSON does not read: {error}")))?;
     let mut messages = Vec::with_capacity(document.messages.len());
     for (index, message) in document.messages.iter().enumerate() {
-        let bytes = codec::encode(Encoding::Message, message.text())
-            .map_err(|error| Error::Import(format!("message {index}: {error}")))?;
+        let bytes = codec::encode(Encoding::Message, message.text()).map_err(|error| Error::Import(format!("message {index}: {error}")))?;
         messages.push(bytes);
     }
     build(&Table { messages, slots: document.slots })
