@@ -9,7 +9,7 @@ use psx_formats::vab::{BODY_TYPE, HEADER_TYPE};
 use rebof3_emi::entry::{palette, sep};
 use rebof3_emi::fixtures::archive_at;
 
-/// A CLUT bank of one 4bpp row.
+/// A CLUT block of one 4bpp row.
 fn bank() -> Vec<u8> {
     (0..16u16).flat_map(u16::to_le_bytes).collect()
 }

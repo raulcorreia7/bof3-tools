@@ -644,7 +644,7 @@ dependencies = [
  "bitflags 2.13.2",
  "bytemuck",
  "codespan-reporting",
- "glow",
+ "glow 0.16.0",
  "gpu-alloc",
  "gpu-alloc-ash",
  "hidden-trait",
@@ -2312,6 +2312,18 @@ name = "glow"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c5e5ea60d70410161c8bf5da3fdfeaa1c72ed2c15f8bbb9d19fe3a4fad085f08"
+dependencies = [
+ "js-sys",
+ "slotmap",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "glow"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "263218b0ba2b0715c3370fb04674f5f8aa331594b521c94ff0a8e4a8472d1386"
 dependencies = [
  "js-sys",
  "slotmap",
@@ -4873,11 +4885,13 @@ dependencies = [
  "bof3player",
  "cpal",
  "gpui",
+ "image",
  "psx-formats",
  "rebof3-assets",
  "rebof3-emi",
  "rebof3-formats",
  "rebof3-observe",
+ "rebof3-render",
  "rubato",
  "serde",
  "serde_json",
@@ -4918,6 +4932,14 @@ dependencies = [
  "serde_json",
  "sha2 0.11.1",
  "toml 1.2.1+spec-1.1.0",
+]
+
+[[package]]
+name = "rebof3-render"
+version = "0.2.0"
+dependencies = [
+ "glow 0.18.0",
+ "khronos-egl",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
-//! Sprite banks: the character and enemy sprites the field loads to `0x8003B800`.
+//! Character sprites: the character and enemy sprites the field loads to `0x8003B800`.
 //!
-//! A bank is a container of three sections (its first word is [`CONTAINER_HEAD`]: `BPLCHAR`, `PLCHAR`
+//! Character sprites are a container of three sections (its first word is [`CONTAINER_HEAD`]: `BPLCHAR`, `PLCHAR`
 //! and `ETC/START.EMI` entry 7), or one section by itself (the `BPLCHAR` entries at `0x8003B80C` and the
 //! other section positions). `Party_LoadMemberSprite` (`emi/etc/game/00@0x801C1254`) points an actor's work
 //! `+0x4C` at section `n` (`0x8003B800 + header[n]`), and the readers below take its four header words:
@@ -23,7 +23,7 @@
 //! stores how many records there are: the table runs while each record names a sheet and an animation
 //! of the section and a mirror flag of 0 or 1, and the zero bytes that end a section are padding.
 //!
-//! [`decode`] reads a bank and [`encode`] writes it back; with nothing changed the bytes are the stored
+//! [`decode`] reads character sprites and [`encode`] writes it back; with nothing changed the bytes are the stored
 //! ones. An edit is written in place: palettes, steps, cells and records keep their size. An edited
 //! sheet is packed again, and the parts after it move; the section keeps its length, so an edit that
 //! needs more than the section's trailing zero bytes is refused.
@@ -100,11 +100,11 @@ pub struct Section {
     layout: Layout,
 }
 
-/// A bank's sections, in container order. A bare section is a bank of one.
+/// The sections of character sprites, in container order. A bare section is a container of one.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Bank {
+pub struct CharacterSprites {
     pub sections: Vec<Section>,
-    /// Whether the bank opens with the three-word container header.
+    /// Whether the character sprites open with the three-word container header.
     pub container: bool,
 }
 
@@ -122,7 +122,7 @@ impl Section {
             && animations_at < records_at
             && records_at <= bytes.len())
         {
-            return Err(Error::SpriteBank(format!(
+            return Err(Error::CharacterSprites(format!(
                 "the header offsets {images_at:#X}, {palettes_at:#X}, {animations_at:#X}, {records_at:#X} are not \
                  sheets, palettes, animations and records in order inside {:#X} bytes",
                 bytes.len()
@@ -134,7 +134,9 @@ impl Section {
         for (index, &start) in image_offsets.iter().enumerate() {
             let end = image_offsets.get(index + 1).copied().unwrap_or(palettes_at);
             if start >= end {
-                return Err(Error::SpriteBank(format!("frame sheet {index} at {start:#X} is not before {end:#X}")));
+                return Err(Error::CharacterSprites(format!(
+                    "frame sheet {index} at {start:#X} is not before {end:#X}"
+                )));
             }
             images.push(Image::decode(&bytes[start..end])?);
         }
@@ -143,7 +145,7 @@ impl Section {
         let mut palettes = Vec::with_capacity(palette_offsets.len());
         for &at in &palette_offsets {
             if at + PALETTE_BYTES > animations_at {
-                return Err(Error::SpriteBank(format!("the palette at {at:#X} runs into the animations")));
+                return Err(Error::CharacterSprites(format!("the palette at {at:#X} runs into the animations")));
             }
             let mut palette = [0u16; COLOURS];
             for (colour, pair) in palette.iter_mut().zip(bytes[at..at + PALETTE_BYTES].as_chunks::<HALF>().0) {
@@ -194,7 +196,7 @@ impl Section {
             || self.palettes.len() != self.layout.palettes.len()
             || self.animations.len() != self.layout.animations.len()
         {
-            return Err(Error::SpriteBank("a section keeps its sheet, palette and animation counts".into()));
+            return Err(Error::CharacterSprites("a section keeps its sheet, palette and animation counts".into()));
         }
 
         // The sheet table and the sheets: as stored while every sheet is, otherwise packed again after
@@ -234,7 +236,7 @@ impl Section {
         for (index, (animation, &(at, stored))) in self.animations.iter().zip(&self.layout.animations).enumerate() {
             let bytes = animation.encode();
             if bytes.len() != stored {
-                return Err(Error::SpriteBank(format!(
+                return Err(Error::CharacterSprites(format!(
                     "animation {index} needs {} bytes; the section keeps its {stored}",
                     bytes.len()
                 )));
@@ -248,12 +250,12 @@ impl Section {
             let at = records_at + RECORD_BYTES * index;
             let slot = out
                 .get_mut(at..at + RECORD_BYTES)
-                .ok_or_else(|| Error::SpriteBank(format!("record {index} is past the end of the section")))?;
+                .ok_or_else(|| Error::CharacterSprites(format!("record {index} is past the end of the section")))?;
             slot.copy_from_slice(&[record.image, record.animation, record.mirror]);
         }
 
         if out.len() > self.layout.len {
-            return Err(Error::SpriteBank(format!(
+            return Err(Error::CharacterSprites(format!(
                 "the edited section needs {:#X} bytes; it keeps its {:#X}",
                 out.len(),
                 self.layout.len
@@ -290,10 +292,10 @@ impl Section {
     }
 }
 
-/// The bank in `payload`: a container when its first word is [`CONTAINER_HEAD`], otherwise one section.
-pub fn decode(payload: &[u8]) -> Result<Bank> {
+/// The character sprites in `payload`: a container when its first word is [`CONTAINER_HEAD`], otherwise one section.
+pub fn decode(payload: &[u8]) -> Result<CharacterSprites> {
     if word(payload, 0)? != CONTAINER_HEAD {
-        return Ok(Bank { sections: vec![Section::decode(payload)?], container: false });
+        return Ok(CharacterSprites { sections: vec![Section::decode(payload)?], container: false });
     }
 
     let mut starts = Vec::with_capacity(CONTAINER_SECTIONS);
@@ -304,25 +306,27 @@ pub fn decode(payload: &[u8]) -> Result<Bank> {
     for (index, &start) in starts.iter().enumerate() {
         let end = starts.get(index + 1).copied().unwrap_or(payload.len());
         if start < CONTAINER_HEAD as usize || start >= end || end > payload.len() {
-            return Err(Error::SpriteBank(format!("container section {index} at {start:#X} does not end at {end:#X}")));
+            return Err(Error::CharacterSprites(format!(
+                "container section {index} at {start:#X} does not end at {end:#X}"
+            )));
         }
         sections.push(Section::decode(&payload[start..end])?);
     }
-    Ok(Bank { sections, container: true })
+    Ok(CharacterSprites { sections, container: true })
 }
 
-/// The bank's bytes: the container header, when it has one, then each section.
-pub fn encode(bank: &Bank) -> Result<Vec<u8>> {
+/// The character sprites' bytes: the container header, when it has one, then each section.
+pub fn encode(sprites: &CharacterSprites) -> Result<Vec<u8>> {
     let mut out = Vec::new();
-    if bank.container {
+    if sprites.container {
         let mut start = CONTAINER_HEAD as usize;
         out.extend(CONTAINER_HEAD.to_le_bytes());
-        for section in bank.sections.iter().take(CONTAINER_SECTIONS - 1) {
+        for section in sprites.sections.iter().take(CONTAINER_SECTIONS - 1) {
             start += section.len();
             out.extend((start as u32).to_le_bytes());
         }
     }
-    for section in &bank.sections {
+    for section in &sprites.sections {
         out.extend(section.encode()?);
     }
     Ok(out)
@@ -339,14 +343,14 @@ Actor_StepAnimLoop, Actor_StepAnimOnce, Actor_StepAnimReverse play the steps; Ar
 Area_BuildClut (exe/slus_004_22@0x8014C4D4, 0x8014CF9C, 0x8014CE78) draw the cells with g_SpriteSizes \
 (exe/slus_004_22@0x8017F53C)";
 
-/// What the bank holds, in the game's terms: one line per section and the evidence.
-pub fn describe(bank: &Bank) -> String {
+/// What the character sprites hold, in the game's terms: one line per section and the evidence.
+pub fn describe(sprites: &CharacterSprites) -> String {
     let mut lines = vec![format!(
-        "Sprite bank: {} {}, loaded to 0x8003B800 and read by the actor sprite code in the field and in battle.",
-        bank.sections.len(),
-        if bank.container { "sections in a container" } else { "section" }
+        "Character sprites: {} {}, loaded to 0x8003B800 and read by the actor sprite code in the field and in battle.",
+        sprites.sections.len(),
+        if sprites.container { "sections in a container" } else { "section" }
     )];
-    for (index, section) in bank.sections.iter().enumerate() {
+    for (index, section) in sprites.sections.iter().enumerate() {
         let frames: usize = section.animations.iter().map(|animation| animation.frames.len()).sum();
         let unplaced = (0..section.animations.len()).filter(|&animation| section.image_of(animation).is_none()).count();
         lines.push(format!(
@@ -372,14 +376,16 @@ fn table(bytes: &[u8], at: usize, width: usize, end: usize) -> Result<Vec<usize>
     };
     let first = read(0)?;
     if first == 0 || !first.is_multiple_of(width) {
-        return Err(Error::SpriteBank(format!("the table at {at:#X} opens with {first:#X}")));
+        return Err(Error::CharacterSprites(format!("the table at {at:#X} opens with {first:#X}")));
     }
     let count = first / width;
     let mut offsets = Vec::with_capacity(count);
     for index in 0..count {
         let offset = at + read(index)?;
         if offset < at + first || offset >= end {
-            return Err(Error::SpriteBank(format!("entry {index} of the table at {at:#X} points to {offset:#X}")));
+            return Err(Error::CharacterSprites(format!(
+                "entry {index} of the table at {at:#X} points to {offset:#X}"
+            )));
         }
         offsets.push(offset);
     }
@@ -390,14 +396,14 @@ fn word(bytes: &[u8], at: usize) -> Result<u32> {
     bytes
         .get(at..at + WORD)
         .map(|quad| u32::from_le_bytes([quad[0], quad[1], quad[2], quad[3]]))
-        .ok_or_else(|| Error::SpriteBank(format!("the bank ends before the word at {at:#X}")))
+        .ok_or_else(|| Error::CharacterSprites(format!("the character sprites end before the word at {at:#X}")))
 }
 
 fn half(bytes: &[u8], at: usize) -> Result<usize> {
     bytes
         .get(at..at + HALF)
         .map(|pair| usize::from(u16::from_le_bytes([pair[0], pair[1]])))
-        .ok_or_else(|| Error::SpriteBank(format!("the bank ends before the halfword at {at:#X}")))
+        .ok_or_else(|| Error::CharacterSprites(format!("the character sprites end before the halfword at {at:#X}")))
 }
 
 fn to_usize(value: u32) -> usize {
@@ -485,11 +491,11 @@ pub(crate) mod tests {
     #[test]
     fn a_container_decodes_and_encodes_to_its_bytes() {
         let payload = container(0x40);
-        let bank = decode(&payload).expect("decodes");
-        assert!(bank.container);
-        let counts: Vec<usize> = bank.sections.iter().map(|section| section.palettes.len()).collect();
+        let sprites = decode(&payload).expect("decodes");
+        assert!(sprites.container);
+        let counts: Vec<usize> = sprites.sections.iter().map(|section| section.palettes.len()).collect();
         assert_eq!(counts, [1, 2, 8]);
-        let section = &bank.sections[0];
+        let section = &sprites.sections[0];
         assert_eq!(section.images.len(), 2);
         assert_eq!(section.images[1].encoding, Encoding::Packed);
         assert_eq!(section.animations[0].loop_to(), Some(0));
@@ -502,26 +508,26 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(section.image_of(1), Some(1));
-        assert_eq!(encode(&bank).expect("encodes"), payload);
+        assert_eq!(encode(&sprites).expect("encodes"), payload);
     }
 
     #[test]
-    fn a_bare_section_is_a_bank_of_one() {
+    fn a_bare_section_is_one_character() {
         let payload = section_bytes(2, 0);
-        let bank = decode(&payload).expect("decodes");
-        assert!(!bank.container);
-        assert_eq!(bank.sections.len(), 1);
-        assert_eq!(encode(&bank).expect("encodes"), payload);
+        let sprites = decode(&payload).expect("decodes");
+        assert!(!sprites.container);
+        assert_eq!(sprites.sections.len(), 1);
+        assert_eq!(encode(&sprites).expect("encodes"), payload);
     }
 
     #[test]
     fn an_in_place_edit_changes_only_its_bytes() {
         let payload = section_bytes(1, 0);
-        let mut bank = decode(&payload).expect("decodes");
-        bank.sections[0].palettes[0][3] = 0x7FFF;
-        bank.sections[0].animations[0].steps[1].delay = 9;
-        bank.sections[0].animations[0].frames[1].cells[1].x = 5;
-        let edited = encode(&bank).expect("encodes");
+        let mut sprites = decode(&payload).expect("decodes");
+        sprites.sections[0].palettes[0][3] = 0x7FFF;
+        sprites.sections[0].animations[0].steps[1].delay = 9;
+        sprites.sections[0].animations[0].frames[1].cells[1].x = 5;
+        let edited = encode(&sprites).expect("encodes");
         let changed = (0..payload.len()).filter(|&at| payload[at] != edited[at]).count();
         assert_eq!(changed, 2 + 1 + 1);
         let again = decode(&edited).expect("decodes again");
@@ -533,37 +539,37 @@ pub(crate) mod tests {
     #[test]
     fn an_edited_sheet_moves_the_parts_after_it() {
         let payload = section_bytes(1, 0x200);
-        let mut bank = decode(&payload).expect("decodes");
-        let mut texels = bank.sections[0].images[0].texels().to_vec();
+        let mut sprites = decode(&payload).expect("decodes");
+        let mut texels = sprites.sections[0].images[0].texels().to_vec();
         texels.iter_mut().for_each(|texel| *texel = 7);
-        bank.sections[0].images[0].set_texels(texels.clone()).expect("same size");
-        let edited = encode(&bank).expect("fits in the padding");
+        sprites.sections[0].images[0].set_texels(texels.clone()).expect("same size");
+        let edited = encode(&sprites).expect("fits in the padding");
         assert_eq!(edited.len(), payload.len());
         let again = decode(&edited).expect("decodes again");
         assert_eq!(again.sections[0].images[0].texels(), &texels[..]);
-        assert_eq!(again.sections[0].images[1].texels(), bank.sections[0].images[1].texels());
-        assert_eq!(again.sections[0].palettes, bank.sections[0].palettes);
-        assert_eq!(again.sections[0].animations, bank.sections[0].animations);
-        assert_eq!(again.sections[0].records, bank.sections[0].records);
+        assert_eq!(again.sections[0].images[1].texels(), sprites.sections[0].images[1].texels());
+        assert_eq!(again.sections[0].palettes, sprites.sections[0].palettes);
+        assert_eq!(again.sections[0].animations, sprites.sections[0].animations);
+        assert_eq!(again.sections[0].records, sprites.sections[0].records);
     }
 
     #[test]
     fn a_sheet_that_outgrows_the_section_is_refused() {
         let payload = section_bytes(1, 0);
-        let mut bank = decode(&payload).expect("decodes");
+        let mut sprites = decode(&payload).expect("decodes");
         // Noise does not pack, and a texel past five bits rules out the packed form.
         let texels: Vec<u8> =
             (0..16 * 8u32).map(|index| (index.wrapping_mul(2_654_435_761) >> 24) as u8 | 0x20).collect();
-        bank.sections[0].images[1].set_texels(texels).expect("same size");
-        let error = encode(&bank).expect_err("no room");
+        sprites.sections[0].images[1].set_texels(texels).expect("same size");
+        let error = encode(&sprites).expect_err("no room");
         assert!(error.to_string().contains("keeps its"), "{error}");
     }
 
     #[test]
     fn a_resized_animation_is_refused() {
-        let mut bank = decode(&section_bytes(1, 0x40)).expect("decodes");
-        bank.sections[0].animations[1].steps.push(Step { delay: 1, frame: 0 });
-        assert!(encode(&bank).is_err());
+        let mut sprites = decode(&section_bytes(1, 0x40)).expect("decodes");
+        sprites.sections[0].animations[1].steps.push(Step { delay: 1, frame: 0 });
+        assert!(encode(&sprites).is_err());
     }
 
     #[test]
@@ -576,8 +582,8 @@ pub(crate) mod tests {
 
     #[test]
     fn describe_names_the_counts_and_the_readers() {
-        let bank = decode(&container(0)).expect("decodes");
-        let text = describe(&bank);
+        let sprites = decode(&container(0)).expect("decodes");
+        let text = describe(&sprites);
         assert!(text.contains("Section 2: 2 frame sheets, 8 palettes, 2 animations with 3 frames"), "{text}");
         assert!(text.contains("Actor_SelectScriptBank"), "{text}");
     }

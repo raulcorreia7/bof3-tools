@@ -1,7 +1,7 @@
 # Agent guide
 
 bof3-tools extracts and rebuilds *Breath of Fire III* (PlayStation) disc images and EMI archives.
-It is a Cargo workspace with one CLI, `bof3`. Read [README.md](README.md) first, then
+It is a Cargo workspace with one CLI, `bof3`, and one editor, `bof3-edit`. Read [README.md](README.md) first, then
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Where things are
@@ -13,13 +13,15 @@ It is a Cargo workspace with one CLI, `bof3`. Read [README.md](README.md) first,
 | `crates/rebof3-formats/` | The format registry, `classify` and the coverage table          | [docs/crates.md](docs/crates.md#rebof3-formats) |
 | `crates/rebof3-assets/`  | Asset conversion and the extract-all output                      | [docs/assets.md](docs/assets.md)           |
 | `crates/rebof3-observe/` | The disc run on a route: how the game draws each texture       | [docs/crates.md](docs/crates.md#rebof3-observe) |
-| `gui/rebof3-editor/`     | The `bof3-edit` asset editor: browse, view and edit EMI entries  | [README.md](README.md#asset-editor)        |
+| `crates/rebof3-render/`  | Field scenes drawn offscreen with OpenGL ES or in software       | [ADR 0003](docs/adr/0003-area-3d-rendering.md) |
+| `gui/rebof3-editor/`     | The `bof3-edit` asset editor: browse, view and edit EMI entries  | [docs/editor.md](docs/editor.md)           |
 | `Cargo.toml`             | Workspace members and the pinned `bof3player` crates         | [docs/crates.md](docs/crates.md)      |
 | `Makefile`               | `build`, `test`, `format`, `lint`, `check`, `clean`              | `make help`                                |
 
-## Checks
+## Build and check
 
-Run from this folder before every report. CI runs the same checks:
+Run from this folder. `make build` links `bin/bof3` and `bin/bof3-edit`; run those, not `cargo run`.
+Run the gate before every report; CI runs the same checks:
 
 ```sh
 make check
@@ -34,7 +36,7 @@ when `BOF3_DISC_DIR` (extracted disc) or `BOF3_DISC_IMAGE` (cue sheet) is unset,
 
 - Commit no game data, disc images, extracted assets or game text. Tests use synthetic fixtures;
   a test that needs the retail disc skips without it.
-- A task's `writes` list is the grant. Anything else is a `needs:` line in the report.
+- Change only what the task names; report anything else it needs.
 - Commit as `type(scope): subject`, imperative and lowercase, for example
   `fix(emi): reject a short header`. Add no AI attribution. Never amend, force-push or rewrite
   history.

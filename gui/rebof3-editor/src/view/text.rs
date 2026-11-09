@@ -1,4 +1,4 @@
-//! The strings of an entry: a message bank's records, or the strings a scan finds in any other
+//! The strings of an entry: a message table's records, or the strings a scan finds in any other
 //! payload.
 //!
 //! A string is rewritten in place. New text must encode to no more bytes than the old string took;
@@ -26,12 +26,12 @@ pub struct State {
     pub filter: String,
     /// Whether the strings show as message windows instead of editable text.
     pub preview: bool,
-    /// Whether a message bank shows as the compose view: the game's window, page by page.
+    /// Whether a message table shows as the compose view: the game's window, page by page.
     pub compose: bool,
 }
 
 fn found(payload: &[u8], load_arg: u32) -> Vec<Found> {
-    discover::bank_records(payload).unwrap_or_else(|| discover::strings(payload, Some(load_arg)))
+    discover::table_records(payload).unwrap_or_else(|| discover::strings(payload, Some(load_arg)))
 }
 
 pub fn has_text(payload: &[u8], load_arg: u32) -> bool {

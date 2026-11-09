@@ -6,9 +6,9 @@
 //! the count at `0x800E3800` itself as one byte.
 //!
 //! The byte at `+0x7` is the record's **section index in the archive's area
-//! script bank**: the reader stores it into `work+0x2C`, which the script-bank
+//! script table**: the reader stores it into `work+0x2C`, which the script-table
 //! reader `@0x8014D6DC` uses as `u32[bank + 4*lbu(work+0x2C)]`, and in all 200
-//! payloads the records' values cover exactly `0..u32[script_bank]/4 - 1`. An
+//! payloads the records' values cover exactly `0..u32[script_table]/4 - 1`. An
 //! earlier reading of it as "the record ordinal" is superseded.
 //!
 //! Layout and reader evidence: `wiki: formats/area#0x800e3800-scenestep-table`.
@@ -69,7 +69,7 @@ pub struct SceneRecord {
     pub texture_v: u8,
     /// Reaches `work+0x28`; the 9 and 10 cases belong to actor `+0x06` (C `texture_mode`).
     pub texture_mode: u8,
-    /// Section of the archive's area script bank this scene runs, `0`-based (C `script_section`).
+    /// Section of the archive's area script table this scene runs, `0`-based (C `script_section`).
     pub script_section: u8,
 }
 

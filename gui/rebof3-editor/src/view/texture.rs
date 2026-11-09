@@ -6,7 +6,7 @@
 //! the project's `build/cache/observe/`), a row a rule joins to it in the scene that loads it
 //! (`rebof3_emi::texture::scene`) or in its archive (`rebof3_formats::joins`), and otherwise 16 bits
 //! with the reason shown. A suggested row of the scene (`rebof3_emi::texture::suggest`), a row of a
-//! palette bank in the same archive and a grey ramp can be picked; a suggestion is listed, never
+//! CLUT block in the same archive and a grey ramp can be picked; a suggestion is listed, never
 //! chosen for the user. A route runs in the background and can be cancelled. Painting writes texel
 //! indices (or 16-bit colors) back into the words and the words back into the upload's rectangles;
 //! Export TIM and Import TIM move the words through a standard TIM file.
@@ -26,7 +26,7 @@ use psx_formats::gfx::texture::{Clut, Depth, texel_indices, texel_words};
 use psx_formats::gfx::vram;
 use rebof3_emi::replay::Writer;
 use rebof3_emi::replay::scenes;
-use rebof3_emi::texture::{ResidentBank, clut_at, suggest};
+use rebof3_emi::texture::{ResidentClutBlock, clut_at, suggest};
 use rebof3_formats::Format;
 use rebof3_formats::clut::color_rgba;
 use rebof3_formats::joins::joined_rows;
@@ -96,9 +96,9 @@ enum Source {
     Joined(usize),
     /// A row the suggestion ranks, which no rule names.
     Suggested(usize),
-    /// Row `row` of the palette bank in entry `bank`.
-    Bank {
-        bank: usize,
+    /// Row `row` of the CLUT block in entry `block`.
+    ClutBlock {
+        block: usize,
         row: usize,
     },
     Grey,
@@ -349,7 +349,7 @@ fn live_row(project: &mut crate::project::Project, palette: &Palette, clut: Clut
     let payload = project.payload(&loaded, palette.slot);
     let load_arg = project.load_arg(&loaded, palette.slot);
     match palette.via.as_str() {
-        "arena" => ResidentBank::new(palette.archive.clone(), palette.slot, load_arg, payload)?
+        "arena" => ResidentClutBlock::new(palette.archive.clone(), palette.slot, load_arg, payload)?
             .row(clut, depth)
             .map(<[u16]>::to_vec),
         _ => {
@@ -493,8 +493,8 @@ fn palette(entry: &Entry<'_>, state: &State, depth: Depth) -> Vec<u16> {
         Source::Observed(at) => state.observed.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Joined(at) => state.joined.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
         Source::Suggested(at) => state.suggested.get(*at).map(|row| row.words.clone()).unwrap_or_default(),
-        Source::Bank { bank, row } => {
-            words_of(entry.sibling(*bank)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
+        Source::ClutBlock { block, row } => {
+            words_of(entry.sibling(*block)).chunks(colors).nth(*row).map(<[u16]>::to_vec).unwrap_or_default()
         }
         Source::Grey => (0..colors).map(|index| grey(index, colors)).collect(),
     }
@@ -778,7 +778,7 @@ fn controls(editor: &Editor, entry: &Entry<'_>, words: &TextureWords, cx: &mut C
     column.child(inks)
 }
 
-/// The open chooser of palette rows: joined rows, the rows of every palette bank, and the grey ramp.
+/// The open chooser of palette rows: joined rows, the rows of every CLUT block, and the grey ramp.
 fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Editor>) -> gpui::Stateful<Div> {
     let state = &editor.views.texture;
     let mut choices: Vec<(Source, String, Option<String>)> = Vec::new();
@@ -791,13 +791,13 @@ fn sources(editor: &Editor, entry: &Entry<'_>, depth: Depth, cx: &mut Context<Ed
     for (at, row) in state.suggested.iter().enumerate().filter(|(_, row)| row.depth == depth) {
         choices.push((Source::Suggested(at), label(row, "suggested"), Some(row.evidence.clone())));
     }
-    for (bank, format) in entry.archive.formats.iter().enumerate() {
-        if *format != Format::ClutBank {
+    for (block, format) in entry.archive.formats.iter().enumerate() {
+        if *format != Format::ClutBlock {
             continue;
         }
-        let rows = entry.sibling(bank).len() / 2 / depth.colors();
+        let rows = entry.sibling(block).len() / 2 / depth.colors();
         for row in 0..rows {
-            choices.push((Source::Bank { bank, row }, format!("bank {bank} row {row}"), None));
+            choices.push((Source::ClutBlock { block, row }, format!("block {block} row {row}"), None));
         }
     }
     choices.push((Source::Grey, "grey ramp".into(), None));
@@ -909,10 +909,10 @@ fn tim(entry: &Entry<'_>, state: &State) -> Result<Vec<u8>, String> {
         Source::Observed(at) => state.observed.get(*at).map(|row| row.clut),
         Source::Joined(at) => state.joined.get(*at).map(|row| row.clut),
         Source::Suggested(at) => state.suggested.get(*at).map(|row| row.clut),
-        Source::Bank { bank, row } => {
-            let load_arg = entry.project.load_arg(entry.archive, *bank);
-            ResidentBank::new("", *bank, load_arg, entry.sibling(*bank))
-                .map(|resident| clut_at(resident.bank.arena_word + row * depth.colors()))
+        Source::ClutBlock { block, row } => {
+            let load_arg = entry.project.load_arg(entry.archive, *block);
+            ResidentClutBlock::new("", *block, load_arg, entry.sibling(*block))
+                .map(|resident| clut_at(resident.block.arena_word + row * depth.colors()))
         }
         Source::Grey => {
             return Err("The grey ramp is no palette row of the game; pick a row or export at 16 bits.".into());
@@ -945,7 +945,7 @@ fn import_tim(editor: &mut Editor, key: &(ArchivePath, usize), bytes: &[u8]) -> 
     written?;
     editor.views.texture.key = None;
     let depth = texture.depth.map_or("15-bit".to_string(), |depth| format!("{}-bit", depth.bits()));
-    let clut = if texture.clut.is_some() { "; its CLUT block is not imported, edit the palette bank" } else { "" };
+    let clut = if texture.clut.is_some() { "; its CLUT block is not imported, edit the CLUT block" } else { "" };
     Ok(format!(
         "Imported a {depth} TIM: {}×{} words at ({}, {}){clut}.",
         texture.placement.chunks_per_row as usize * psx_formats::gfx::vram::RECTANGLE_SIDE,
@@ -975,7 +975,7 @@ fn describe(source: &Source, state: &State) -> String {
         Source::Observed(at) => state.observed.get(*at).map_or("observed row".into(), |row| label(row, "observed")),
         Source::Joined(at) => state.joined.get(*at).map_or("joined row".into(), |row| label(row, "joined")),
         Source::Suggested(at) => state.suggested.get(*at).map_or("suggested row".into(), |row| label(row, "suggested")),
-        Source::Bank { bank, row } => format!("bank {bank} row {row}"),
+        Source::ClutBlock { block, row } => format!("block {block} row {row}"),
         Source::Grey => "grey ramp".into(),
     }
 }

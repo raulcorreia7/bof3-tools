@@ -141,7 +141,7 @@ pub fn placement(scene: &SceneRecord) -> Placement {
 }
 
 /// The animation stream table entry `entry` of the scene record's script section names, as
-/// `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) reads it from the area script bank.
+/// `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) reads it from the area script table.
 pub fn stream<'a>(program: &'a Program, scene: &SceneRecord, entry: usize) -> Option<&'a Animation> {
     let section = program.sections.get(usize::from(scene.script_section))?;
     let record = usize::from(*section.slots.get(entry)?);

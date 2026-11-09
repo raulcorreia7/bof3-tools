@@ -1,0 +1,24 @@
+[package]
+name = "rebof3-render"
+description = "Draws Breath of Fire III field scenes as the PlayStation GPU does: a software rasterizer, and OpenGL ES behind a feature"
+version = "0.2.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[features]
+default = ["gles"]
+# Offscreen OpenGL ES 3.0 through EGL, loaded at run time; without a display the software path draws.
+gles = ["dep:glow", "dep:khronos-egl"]
+
+[dependencies]
+glow = { version = "0.18.0", optional = true }
+khronos-egl = { version = "6.0.0", optional = true, features = ["dynamic"] }
+
+[lints]
+workspace = true

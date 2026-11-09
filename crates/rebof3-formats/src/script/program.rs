@@ -1,6 +1,6 @@
-//! A script bank read as the programs its records hold: one animation stream per record.
+//! A script table read as the programs its records hold: one animation stream per record.
 //!
-//! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points work `+0x50` at a record of the bank
+//! `Actor_BeginScript` (`exe/slus_004_22@0x8014D6DC`) points work `+0x50` at a record of the table
 //! `g_ScriptBank` (`exe/slus_004_22@0x801459F0`) names, and `Actor_SeekScript`
 //! (`exe/slus_004_22@0x8014D910`) reads it as an [`Animation`]: two counts, the steps, the frame
 //! table and the frames. No other reader takes a record, so a record is an animation stream and its
@@ -8,7 +8,7 @@
 //! two choices are [`OPCODES`], and every byte value selects one of them.
 //!
 //! A record that does not read as a stream is kept as [`Record::Raw`] with the reason; in the retail
-//! banks only empty records do. The bytes between a stream's end and the next record are its
+//! tables only empty records do. The bytes between a stream's end and the next record are its
 //! padding: zeros that keep the next record two-byte aligned for the `u16` frame table reads.
 
 use core::ops::RangeInclusive;
@@ -17,9 +17,9 @@ use std::collections::BTreeMap;
 use crate::animation::{Animation, CELL_BYTES, Cell, JUMP, Step};
 use crate::error::{Error, Result};
 
-use super::{ScriptBank, ScriptSection};
+use super::{ScriptSection, ScriptTable};
 
-/// The size of one directory word and of one table word, as [`ScriptBank`] reads them.
+/// The size of one directory word and of one table word, as [`ScriptTable`] reads them.
 const DIRECTORY_WORD: usize = 4;
 const TABLE_WORD: usize = 2;
 /// Bytes of the two counts that open a stream, of one step and of one frame-table word.
@@ -247,10 +247,10 @@ pub struct CellAt {
     pub cell: usize,
 }
 
-/// The decode's reach over a set of banks.
+/// The decode's reach over a set of tables.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Coverage {
-    pub banks: usize,
+    pub tables: usize,
     pub records: usize,
     /// Records that read as a stream.
     pub streams: usize,
@@ -265,9 +265,9 @@ pub struct Coverage {
 }
 
 impl Coverage {
-    /// Adds one bank.
+    /// Adds one table.
     pub fn add(&mut self, program: &Program) {
-        self.banks += 1;
+        self.tables += 1;
         for record in program.sections.iter().flat_map(|section| &section.records) {
             self.records += 1;
             let Some(stream) = record.stream() else { continue };
@@ -293,7 +293,7 @@ impl Coverage {
     }
 }
 
-/// A whole bank as programs.
+/// A whole table as programs.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program {
     pub sections: Vec<Section>,
@@ -302,12 +302,12 @@ pub struct Program {
 impl Program {
     /// Reads a `0x800D3800`, `0x800F0800` or `0x800C3800` payload.
     pub fn decode(bytes: &[u8]) -> Result<Self> {
-        Ok(Self::from_bank(&ScriptBank::decode(bytes)?))
+        Ok(Self::from_table(&ScriptTable::decode(bytes)?))
     }
 
-    /// The programs of a bank read as sections and record bytes.
-    pub fn from_bank(bank: &ScriptBank) -> Self {
-        let sections = bank
+    /// The programs of a table read as sections and record bytes.
+    pub fn from_table(table: &ScriptTable) -> Self {
+        let sections = table
             .sections
             .iter()
             .map(|section: &ScriptSection| Section {
@@ -323,7 +323,7 @@ impl Program {
     /// stored bytes.
     pub fn encode(&self) -> Result<Vec<u8>> {
         if self.sections.is_empty() {
-            return Err(Error::ScriptBankShape("a bank holds at least one section"));
+            return Err(Error::ScriptTableShape("a table holds at least one section"));
         }
         let mut sections = Vec::with_capacity(self.sections.len());
         for section in &self.sections {
@@ -469,10 +469,10 @@ fn refused(reason: &str) -> Error {
 /// the record `slots[k]` names.
 fn encode_section(section: &Section) -> Result<Vec<u8>> {
     if section.slots.first() != Some(&0) {
-        return Err(Error::ScriptBankShape("a section's first table entry names its first record"));
+        return Err(Error::ScriptTableShape("a section's first table entry names its first record"));
     }
     if section.slots.iter().any(|slot| usize::from(*slot) >= section.records.len()) {
-        return Err(Error::ScriptBankShape("a table entry names no record"));
+        return Err(Error::ScriptTableShape("a table entry names no record"));
     }
 
     let mut records = Vec::with_capacity(section.records.len());
@@ -480,10 +480,10 @@ fn encode_section(section: &Section) -> Result<Vec<u8>> {
     let mut at = TABLE_WORD * section.slots.len();
     for record in &section.records {
         if at > MAX_RECORD_OFFSET {
-            return Err(Error::ScriptBankShape("a record starts past the reach of a u16 table word"));
+            return Err(Error::ScriptTableShape("a record starts past the reach of a u16 table word"));
         }
         if record.stream().is_some() && !at.is_multiple_of(FRAME_WORD) {
-            return Err(Error::ScriptBankShape(
+            return Err(Error::ScriptTableShape(
                 "a stream starts at an odd offset, where its u16 frame words cannot be read",
             ));
         }
@@ -520,8 +520,8 @@ mod tests {
         }
     }
 
-    /// A bank of two sections: the first with a shared record and a padded stream, the second empty.
-    fn bank() -> Vec<u8> {
+    /// A table of two sections: the first with a shared record and a padded stream, the second empty.
+    fn table() -> Vec<u8> {
         let stream = walk().encode();
         let padded = stream.len() + 1;
         let first = [vec![6u8, 0, 6 + padded as u8, 0, 6 + padded as u8, 0], stream, vec![0], vec![1, 2, 3]].concat();
@@ -543,8 +543,8 @@ mod tests {
     }
 
     #[test]
-    fn a_bank_decodes_to_streams_and_encodes_back() {
-        let payload = bank();
+    fn a_table_decodes_to_streams_and_encodes_back() {
+        let payload = table();
         let program = Program::decode(&payload).expect("decodes");
         assert_eq!(program.sections[0].slots, vec![0, 1, 1]);
 
@@ -562,7 +562,7 @@ mod tests {
 
     #[test]
     fn an_op_edit_keeps_every_other_byte() {
-        let payload = bank();
+        let payload = table();
         let mut program = Program::decode(&payload).expect("decodes");
         program.set_op(at(0), Op::Show { ticks: 9, frame: 1 }).expect("edits");
         let edited = program.encode().expect("encodes");
@@ -573,21 +573,21 @@ mod tests {
 
     #[test]
     fn an_insert_moves_the_jumps_after_it() {
-        let mut program = Program::decode(&bank()).expect("decodes");
+        let mut program = Program::decode(&table()).expect("decodes");
         program.insert_op(at(1), Op::Show { ticks: 1, frame: 0 }).expect("inserts");
         let stream = program.stream(0, 0).expect("a stream");
         assert_eq!(stream.animation.steps.len(), 4);
         assert_eq!(stream.animation.steps[3].jump(), Some(2), "the jump still names the old step 1");
 
         let encoded = program.encode().expect("encodes");
-        let again = Program::decode(&encoded).expect("the rebuilt bank decodes");
+        let again = Program::decode(&encoded).expect("the rebuilt table decodes");
         assert_eq!(again, program);
-        assert_eq!(encoded.len() % KEPT_ALIGNMENT, bank().len() % KEPT_ALIGNMENT);
+        assert_eq!(encoded.len() % KEPT_ALIGNMENT, table().len() % KEPT_ALIGNMENT);
     }
 
     #[test]
     fn a_removal_is_refused_while_a_jump_names_the_step() {
-        let mut program = Program::decode(&bank()).expect("decodes");
+        let mut program = Program::decode(&table()).expect("decodes");
         assert!(program.remove_op(at(1)).is_err());
         program.remove_op(at(0)).expect("step 0 is no target");
         assert_eq!(program.stream(0, 0).expect("a stream").animation.steps[1].jump(), Some(0));
@@ -596,14 +596,14 @@ mod tests {
 
     #[test]
     fn a_jump_past_the_stream_is_refused() {
-        let mut program = Program::decode(&bank()).expect("decodes");
+        let mut program = Program::decode(&table()).expect("decodes");
         assert!(program.set_op(at(0), Op::Jump { code: JUMP, target: 3 }).is_err());
         assert!(program.set_op(at(0), Op::Jump { code: JUMP, target: 2 }).is_ok());
     }
 
     #[test]
     fn a_frame_reach_covers_its_word_and_cells() {
-        let program = Program::decode(&bank()).expect("decodes");
+        let program = Program::decode(&table()).expect("decodes");
         let stream = program.stream(0, 0).expect("a stream");
         let reach = stream.frame_reach(1).expect("inside the record");
         assert_eq!(reach.end, stream.animation.encode().len());

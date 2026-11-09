@@ -1,6 +1,6 @@
-$ bof3 assets export palette bank.clut
+$ bof3 assets export palette block.clut
 [exit 0]
-wrote bank.json
+wrote block.json
 
 {
   "format": "psx-clut",
@@ -187,17 +187,17 @@ wrote bank.json
   ]
 }
 
-$ bof3 assets import palette bank.json -o sub/back.clut
+$ bof3 assets import palette block.json -o sub/back.clut
 [exit 0]
 wrote sub/back.clut
 
-$ bof3 assets export palette bank.clut --out other.json
+$ bof3 assets export palette block.clut --out other.json
 [exit 0]
 wrote other.json
 
 $ bof3 assets export palette
 [exit 2]
-bof3 assets: export palette needs a palette bank file; run `bof3 assets export palette --help`
+bof3 assets: export palette needs a CLUT block file; run `bof3 assets export palette --help`
 
 $ bof3 assets export palette a b
 [exit 2]
@@ -205,17 +205,17 @@ bof3 assets: unexpected argument "b"; run `bof3 assets export palette --help`
 
 $ bof3 assets export bogus a
 [exit 2]
-bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-bank and sprite-sheet
+bof3 assets: export has no "bogus" direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-sprites and sprite-sheet
 
 $ bof3 assets export
 [exit 2]
 bof3 assets: export needs a kind, for example texture; run `bof3 assets export --help`
 
-$ bof3 assets export script bank.emi0
+$ bof3 assets export script table.emi0
 [exit 0]
-wrote bank.txt
+wrote table.txt
 
-; A script bank: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)
+; A script table: one animation stream per record. Actor_BeginScript (exe/slus_004_22@0x8014D6DC)
 ; points an actor at a record and Actor_SeekScript (exe/slus_004_22@0x8014D910) plays it.
 ; show: stage a frame for its ticks (Actor_StageAnimStep; a tick is 33.4 ms, 0 lasts 256).
 ; jump: continue at a step (Actor_StepAnimLoop, Actor_StepAnimOnce). Labels name the steps jumps reach.
@@ -235,11 +235,11 @@ frame 1
     cell shape 5 flip x -8 y -16 u 16 v 0
 pad 00 00
 
-$ bof3 assets import script bank.txt --payload bank.emi0 -o back.emi0
+$ bof3 assets import script table.txt --payload table.emi0 -o back.emi0
 [exit 0]
 wrote back.emi0
 
-$ bof3 assets import script bank.txt
+$ bof3 assets import script table.txt
 [exit 2]
 bof3 assets: import script needs --payload, the bank it was exported from; run `bof3 assets import script --help`
 

@@ -13,7 +13,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use psx_formats::gfx::texture::{Clut, Depth};
 use psx_formats::gfx::vram::{self, Descriptor, RECTANGLE_SIDE};
 use psx_machine::cdrom::CommandRecord;
-use rebof3_emi::texture::ResidentBank;
+use rebof3_emi::texture::ResidentClutBlock;
 use rebof3_emi::{Archive, Entry};
 
 /// The CD-ROM command that sets the seek target (psx-spx "CDROM Controller Command Summary",
@@ -48,8 +48,8 @@ pub struct File {
     pub path: String,
     /// The frame of the latest `Setloc` into the file.
     pub last_read: u64,
-    /// The palette banks it loads into the arena.
-    banks: Vec<ResidentBank>,
+    /// The CLUT blocks it loads into the arena.
+    banks: Vec<ResidentClutBlock>,
 }
 
 /// A rectangle a type-3 entry uploads.
@@ -133,7 +133,7 @@ impl Sources {
                 let at = EntryRef { file, slot };
                 match table.file_type {
                     vram::UPLOAD_TYPE => self.index_upload(at, table, payload),
-                    TYPE_RAM => banks.extend(ResidentBank::new(path.clone(), slot, table.ram_ptr, payload)),
+                    TYPE_RAM => banks.extend(ResidentClutBlock::new(path.clone(), slot, table.ram_ptr, payload)),
                     _ => {}
                 }
             }
@@ -174,7 +174,7 @@ impl Sources {
             .flat_map(|(file, record)| record.banks.iter().map(move |bank| (file, bank)))
             .filter(|(_, bank)| bank.row(clut, depth) == Some(words))
             .max_by_key(|(file, _)| self.files[*file].last_read)
-            .map(|(file, bank)| EntryRef { file, slot: bank.bank.slot })
+            .map(|(file, bank)| EntryRef { file, slot: bank.block.slot })
     }
 }
 

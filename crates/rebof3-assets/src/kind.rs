@@ -68,26 +68,26 @@ kinds! {
     XaAudio => ("xa-audio", Raw, "multiplexed XA ADPCM banks (2336-byte sectors)"),
     Cdda => ("cdda", Decoded, "CD-DA tracks: the stored 16-bit stereo PCM and a 44.1 kHz WAV"),
     Texture => ("texture", Decoded, "type-3 VRAM uploads: raw words and a 16bpp PNG view"),
-    Palette => ("palette", Decoded, "CLUT banks: raw words, JSON and a swatch PNG"),
+    Palette => ("palette", Decoded, "CLUT blocks: raw words, JSON and a swatch PNG"),
     AudioBank => ("audio-bank", Decoded, "VAB header (.vh) and body (.vb) halves, and a SoundFont 2 (.sf2) per bank"),
     AudioSequence => ("audio-sequence", Raw, "SEP sequence packages (.seq)"),
     AudioCues => ("audio-cues", Decoded, "type-8 cue tables: raw records and JSON"),
-    CharacterBank => ("character-bank", Decoded, "sprite banks: stored form and, for type 1, the LZ77-decoded blob"),
-    AreaMessage => ("area-message", Raw, "area message banks (0x80010000)"),
+    CharacterSprites => ("character-sprites", Decoded, "character sprites: stored form and, for type 1, the LZ77-decoded blob"),
+    AreaMessage => ("area-message", Raw, "area message tables (0x80010000)"),
     AreaCells => ("area-cells", Raw, "packed 4-bit cell grids (0x80032000)"),
-    AreaScript => ("area-script", Decoded, "area script banks (0x800D3800): stored bytes, JSON and the ops as text"),
-    BattleScript => ("battle-script", Decoded, "battle script banks (0x800F0800): stored bytes, JSON and the ops as text"),
+    AreaScript => ("area-script", Decoded, "area script tables (0x800D3800): stored bytes, JSON and the ops as text"),
+    BattleScript => ("battle-script", Decoded, "battle script tables (0x800F0800): stored bytes, JSON and the ops as text"),
     AreaActorDefs => ("area-actor-defs", Decoded, "actor definitions: raw records and JSON"),
     AreaEncounters => ("area-encounters", Decoded, "encounters and enemy records (0x800E4000): stored bytes and JSON"),
     AreaMap => ("area-map", Decoded, "map bundles (0x80104000): stored bytes and the terrain as OBJ, MTL and glTF binary"),
     AreaModule => ("area-module", Raw, "auxiliary module windows (0x80117000)"),
     ResourceTable => ("resource-table", Raw, "shared resource tables (0x8001A000)"),
-    MagicTable => ("bmagic-table", Decoded, "magic-effect script banks (0x800C3800): stored bytes, JSON and the ops as text"),
+    MagicScriptTable => ("bmagic-script", Decoded, "magic-effect script tables (0x800C3800): stored bytes, JSON and the ops as text"),
     Code => ("code", Raw, "code images loaded from EMI entries"),
     Reserve => ("reserve", Nothing, "all-zero payloads that reserve a RAM slot"),
     Unknown => ("unknown", Raw, "entries and files no rule classifies"),
     DataTable => ("data-table", Decoded, "fixed game tables from ETC/GAME.EMI entry 0: stored bytes and JSON for items, equipment, shops, abilities, level growth"),
-    Text => ("text", Decoded, "game strings and message banks as JSON, from the extracted disc"),
+    Text => ("text", Decoded, "game strings and message tables as JSON, from the extracted disc"),
 }
 
 impl Kind {
@@ -97,8 +97,18 @@ impl Kind {
         Self::ALL.iter().copied().find(|kind| kind.name() == name).unwrap_or_else(|| panic!("{name} is not a kind"))
     }
 
+    /// The current name of a kind named by an earlier release; any other name comes back unchanged.
+    pub fn canonical(name: &str) -> &str {
+        match name {
+            "character-bank" => "character-sprites",
+            "bmagic-table" => "bmagic-script",
+            other => other,
+        }
+    }
+
     /// Parses one `--only` name.
     pub fn parse(name: &str) -> Result<Self> {
+        let name = Self::canonical(name);
         Self::ALL.iter().copied().find(|kind| kind.name() == name).ok_or_else(|| {
             let valid: Vec<&str> = Self::ALL.iter().map(|kind| kind.name()).collect();
             Error::Usage(format!("unknown kind {name:?}; the kinds are {}", valid.join(", ")))
@@ -245,5 +255,12 @@ mod tests {
         for format in Format::ALL {
             assert!(Kind::ALL.iter().any(|kind| kind.name() == format.describe().kind), "{}", format.name());
         }
+    }
+
+    #[test]
+    fn earlier_kind_names_parse_to_the_current_kinds() {
+        assert_eq!(Kind::parse("character-bank").unwrap(), Kind::CharacterSprites);
+        assert_eq!(Kind::parse("bmagic-table").unwrap(), Kind::MagicScriptTable);
+        assert_eq!(Kind::canonical("palette"), "palette");
     }
 }

@@ -23,7 +23,7 @@ use rebof3_formats::map::terrain;
 use rebof3_formats::vab::soundfont;
 use rebof3_formats::vram::TextureImport;
 
-mod period;
+mod psyq;
 
 /// Exit codes: 0 success, 1 some payloads failed to write, 2 an error.
 const EXIT_OK: i32 = 0;
@@ -169,24 +169,24 @@ Usage: bof3 assets export <KIND> ...
 
 Kinds:
   texture         PNG view, or an indexed PNG in one palette row
-  tim             a texture as a TIM file, with its CLUT when you give one
-  palette         a CLUT bank as JSON
-  terrain         a map bundle as glTF or OBJ
-  vag             one sample of a VAB bank as WAVE
-  vab             a bank's header and body as one VAB file
-  sequence        one sequence of a package as MIDI
-  seq             one sequence of a package as a SEQ file
-  sep             a sequence package as a SEP file
-  message         a message bank as JSON
-  message-po      a message bank as a PO catalogue for translators
-  script          a script bank's animation streams as text, one op per line
-  strings         the strings of another payload as JSON
-  characters      the eight playable characters as JSON
-  character-bank  a sprite bank's palette tables as JSON
-  sprite-sheet    a sprite bank section as a PNG sheet and Aseprite JSON
+  tim                a texture as a TIM file, with its CLUT when you give one
+  palette            a CLUT block as JSON
+  terrain            a map bundle as glTF or OBJ
+  vag                one sample of a VAB bank as WAVE
+  vab                a bank's header and body as one VAB file
+  sequence           one sequence of a package as MIDI
+  seq                one sequence of a package as a SEQ file
+  sep                a sequence package as a SEP file
+  message            a message table as JSON
+  message-po         a message table as a PO catalogue for translators
+  script             a script table's animation streams as text, one op per line
+  strings            the strings of another payload as JSON
+  characters         the eight playable characters as JSON
+  character-sprites  the character sprites' palette tables as JSON
+  sprite-sheet       a character sprites section as a PNG sheet and Aseprite JSON
 
 Every kind has focused help: bof3 assets export <KIND> --help.
-Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette BANK,
+Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette CLUT_BLOCK,
 --palette-offset WORDS, --index N.
 
 Example:
@@ -199,28 +199,28 @@ bof3 assets import: read one asset's open form back into its stored bytes.
 Usage: bof3 assets import <KIND> ...
 
 Kinds:
-  texture         a PNG view or indexed PNG back into a payload
-  tim             a TIM file back into a payload and its palette
-  palette         palette JSON back into color words
-  terrain         a glTF or OBJ mesh back into a map bundle
-  vag             a WAVE file back into a sample
-  vab             a VAB file back into its header and body
-  seq             SEQ files back into a sequence package
-  sep             a SEP file back into a sequence package
-  table           one game table back into ETC/GAME.EMI entry 0
-  encounters      encounter JSON back into its block
-  layout          map layout JSON back into a bundle
-  emi             a container with named entries replaced
-  sequence        MIDI files back into a sequence package
-  disc            a patched copy of the whole disc
-  soundfont       a SoundFont 2 file back into a VAB bank
-  message         message JSON back into a bank
-  message-po      a translated PO catalogue back into a bank (needs --payload)
-  script          script text back into its bank
-  strings         strings JSON back into its payload
-  characters      character JSON back into ETC/START.EMI entry 8
-  character-bank  palette JSON back into a sprite bank
-  sprite-sheet    a PNG sheet and Aseprite JSON back into a sprite bank
+  texture            a PNG view or indexed PNG back into a payload
+  tim                a TIM file back into a payload and its palette
+  palette            palette JSON back into color words
+  terrain            a glTF or OBJ mesh back into a map bundle
+  vag                a WAVE file back into a sample
+  vab                a VAB file back into its header and body
+  seq                SEQ files back into a sequence package
+  sep                a SEP file back into a sequence package
+  table              one game table back into ETC/GAME.EMI entry 0
+  encounters         encounter JSON back into its block
+  layout             map layout JSON back into a bundle
+  emi                a container with named entries replaced
+  sequence           MIDI files back into a sequence package
+  disc               a patched copy of the whole disc
+  soundfont          a SoundFont 2 file back into a VAB bank
+  message            message JSON back into a message table
+  message-po         a translated PO catalogue back into a message table (needs --payload)
+  script             script text back into its script table
+  strings            strings JSON back into its payload
+  characters         character JSON back into ETC/START.EMI entry 8
+  character-sprites  palette JSON back into character sprites
+  sprite-sheet       a PNG sheet and Aseprite JSON back into character sprites
 
 Every kind has focused help: bof3 assets import <KIND> --help.
 Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
@@ -234,19 +234,19 @@ const EXPORT_TEXTURE_HELP: &str = "\
 bof3 assets export texture: write a texture's stored payload as a PNG.
 
 Usage: bof3 assets export texture PAYLOAD --load-arg HEX [-o OUT]
-       bof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette BANK
+       bof3 assets export texture PAYLOAD --load-arg HEX --depth 4|8 --palette CLUT_BLOCK
                                            [--palette-offset WORDS] [-o OUT]
 
-  PAYLOAD                  stored texture payload
-      --load-arg HEX       the entry's load address (required)
-      --depth 4|8          draw an indexed PNG at this depth (default: off, 16 bpp view)
-      --palette BANK       color-word file for --depth (required with it)
-      --palette-offset N   first word of the palette row (default: 0)
-  -o, --output OUT         PNG to write (default: PAYLOAD.png)
+  PAYLOAD                   stored texture payload
+      --load-arg HEX        the entry's load address (required)
+      --depth 4|8           draw an indexed PNG at this depth (default: off, 16 bpp view)
+      --palette CLUT_BLOCK  color-word file for --depth (required with it)
+      --palette-offset N    first word of the palette row (default: 0)
+  -o, --output OUT          PNG to write (default: PAYLOAD.png)
 
 Examples:
   bof3 assets export texture payload.img --load-arg 0x0a081000 -o 7.png
-  bof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette bank.clut -o 7.png
+  bof3 assets export texture payload.img --load-arg 0x0a081000 --depth 4 --palette block.clut -o 7.png
 ";
 
 const EXPORT_TERRAIN_HELP: &str = "\
@@ -263,12 +263,12 @@ Example:
 ";
 
 const EXPORT_PALETTE_HELP: &str = "\
-bof3 assets export palette: write a CLUT bank as JSON.
+bof3 assets export palette: write a CLUT block as JSON.
 
-Usage: bof3 assets export palette BANK [-o OUT]
+Usage: bof3 assets export palette CLUT_BLOCK [-o OUT]
 
-  BANK                raw color words
-  -o, --output OUT    JSON to write (default: BANK.json)
+  CLUT_BLOCK          raw color words
+  -o, --output OUT    JSON to write (default: CLUT_BLOCK.json)
 
 Example:
   bof3 assets export palette palette.clut -o palette.json
@@ -302,38 +302,38 @@ Example:
 ";
 
 const EXPORT_MESSAGE_HELP: &str = "\
-bof3 assets export message: write a message bank as JSON.
+bof3 assets export message: write a message table as JSON.
 
 Usage: bof3 assets export message PAYLOAD [-o OUT]
 
-  PAYLOAD             message-bank payload
+  PAYLOAD             message-table payload
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  bof3 assets export message bank.bin -o bank.json
+  bof3 assets export message table.bin -o table.json
 ";
 
 const EXPORT_MESSAGE_PO_HELP: &str = "\
-bof3 assets export message-po: write a message bank as a PO catalogue.
+bof3 assets export message-po: write a message table as a PO catalogue.
 
 Usage: bof3 assets export message-po PAYLOAD [-o OUT]
 
-  PAYLOAD             message-bank payload
+  PAYLOAD             message-table payload
   -o, --output OUT    PO file to write (default: PAYLOAD.po)
 
 Each message is an entry: msgctxt message[N], msgid the text with its control
 codes as {TAG} markup, an empty msgstr for the translation.
 
 Example:
-  bof3 assets export message-po bank.bin -o bank.po
+  bof3 assets export message-po table.bin -o table.po
 ";
 
 const EXPORT_SCRIPT_HELP: &str = "\
-bof3 assets export script: write a script bank as text, one op per line.
+bof3 assets export script: write a script table as text, one op per line.
 
 Usage: bof3 assets export script PAYLOAD [-o OUT]
 
-  PAYLOAD             script bank payload (0x800D3800, 0x800F0800 or 0x800C3800)
+  PAYLOAD             script table payload (0x800D3800, 0x800F0800 or 0x800C3800)
   -o, --output OUT    text to write (default: PAYLOAD.txt)
 
 Example:
@@ -366,16 +366,16 @@ Example:
   bof3 assets export characters START8.bin -o characters.json
 ";
 
-const EXPORT_CHARACTER_BANK_HELP: &str = "\
-bof3 assets export character-bank: write a sprite bank's palettes as JSON.
+const EXPORT_CHARACTER_SPRITES_HELP: &str = "\
+bof3 assets export character-sprites: write the character sprites' palettes as JSON.
 
-Usage: bof3 assets export character-bank PAYLOAD [-o OUT]
+Usage: bof3 assets export character-sprites PAYLOAD [-o OUT]
 
-  PAYLOAD             decoded sprite bank, container or one section
+  PAYLOAD             decoded character sprites, container or one section
   -o, --output OUT    JSON to write (default: PAYLOAD.json)
 
 Example:
-  bof3 assets export character-bank bank.bin -o palettes.json
+  bof3 assets export character-sprites sprites.bin -o palettes.json
 ";
 
 const IMPORT_TEXTURE_HELP: &str = "\
@@ -389,7 +389,7 @@ Usage: bof3 assets import texture PNG [-o OUT] [--palette OUT]
 
 Examples:
   bof3 assets import texture 7.png -o payload.img
-  bof3 assets import texture 7.png --palette bank.clut -o payload.img
+  bof3 assets import texture 7.png --palette block.clut -o payload.img
 ";
 
 const IMPORT_PALETTE_HELP: &str = "\
@@ -527,41 +527,41 @@ Example:
 ";
 
 const IMPORT_MESSAGE_HELP: &str = "\
-bof3 assets import message: read message JSON back into a bank.
+bof3 assets import message: read message JSON back into a message table.
 
 Usage: bof3 assets import message JSON [-o OUT]
 
   JSON                message JSON from export message
-  -o, --output OUT    bank to write (default: JSON.bin)
+  -o, --output OUT    table to write (default: JSON.bin)
 
 Example:
-  bof3 assets import message bank.json -o bank.bin
+  bof3 assets import message table.json -o table.bin
 ";
 
 const IMPORT_MESSAGE_PO_HELP: &str = "\
-bof3 assets import message-po: read a translated PO catalogue back into a bank.
+bof3 assets import message-po: read a translated PO catalogue back into a message table.
 
 Usage: bof3 assets import message-po PO --payload PAYLOAD [-o OUT]
 
   PO                  PO file from export message-po
-  --payload PAYLOAD   the bank it was exported from
-  -o, --output OUT    bank to write (default: PO.bin)
+  --payload PAYLOAD   the message table it was exported from
+  -o, --output OUT    table to write (default: PO.bin)
 
-An empty msgstr keeps the original message; the bank is refused past its limit.
+An empty msgstr keeps the original message; the table is refused past its limit.
 
 Example:
-  bof3 assets import message-po bank.po --payload bank.bin -o bank.new
+  bof3 assets import message-po table.po --payload table.bin -o table.new
 ";
 
 const IMPORT_SCRIPT_HELP: &str = "\
-bof3 assets import script: read script text back into its bank.
+bof3 assets import script: read script text back into its script table.
 
 Usage: bof3 assets import script TEXT --payload PAYLOAD [-o OUT]
 
   TEXT                text from export script
-      --payload PATH  the bank the text came from (required); the result may not
+      --payload PATH  the script table the text came from (required); the result may not
                       be larger than it
-  -o, --output OUT    bank to write (default: TEXT.bin)
+  -o, --output OUT    table to write (default: TEXT.bin)
 
 Example:
   bof3 assets import script AREA001-2.txt --payload AREA001-2.emi0 -o AREA001-2.new.emi0
@@ -593,25 +593,25 @@ Example:
   bof3 assets import characters characters.json --payload START8.bin -o START8.new.bin
 ";
 
-const IMPORT_CHARACTER_BANK_HELP: &str = "\
-bof3 assets import character-bank: read palette JSON back into a sprite bank.
+const IMPORT_CHARACTER_SPRITES_HELP: &str = "\
+bof3 assets import character-sprites: read palette JSON back into character sprites.
 
-Usage: bof3 assets import character-bank JSON --payload PAYLOAD [-o OUT]
+Usage: bof3 assets import character-sprites JSON --payload PAYLOAD [-o OUT]
 
-  JSON                palette JSON from export character-bank
-      --payload PATH  the decoded bank (required)
-  -o, --output OUT    bank to write (default: JSON.bin)
+  JSON                palette JSON from export character-sprites
+      --payload PATH  the decoded character sprites (required)
+  -o, --output OUT    payload to write (default: JSON.bin)
 
 Example:
-  bof3 assets import character-bank palettes.json --payload bank.bin -o bank.new.bin
+  bof3 assets import character-sprites palettes.json --payload sprites.bin -o sprites.new.bin
 ";
 
 const EXPORT_SPRITE_SHEET_HELP: &str = "\
-bof3 assets export sprite-sheet: write a sprite bank section as a PNG sheet and Aseprite JSON.
+bof3 assets export sprite-sheet: write a character sprites section as a PNG sheet and Aseprite JSON.
 
 Usage: bof3 assets export sprite-sheet PAYLOAD --exe SLUS_004.22 [--section N] [--palette N] [-o OUT]
 
-  PAYLOAD             stored sprite bank payload, raw or LZ77
+  PAYLOAD             stored character sprites payload, raw or LZ77
       --exe PATH      the executable, which holds the cell sizes (required)
       --section N     the container section (default: 0)
       --palette N     the section palette to draw with (default: 0, the one the field stages)
@@ -622,7 +622,7 @@ Example:
 ";
 
 const IMPORT_SPRITE_SHEET_HELP: &str = "\
-bof3 assets import sprite-sheet: read a PNG sheet and Aseprite JSON back into a sprite bank.
+bof3 assets import sprite-sheet: read a PNG sheet and Aseprite JSON back into character sprites.
 
 Usage: bof3 assets import sprite-sheet JSON --payload PAYLOAD --exe SLUS_004.22 [-o OUT]
 
@@ -638,10 +638,10 @@ Example:
 fn export_help(kind: &str) -> &'static str {
     match kind {
         "texture" => EXPORT_TEXTURE_HELP,
-        "tim" => period::EXPORT_TIM_HELP,
-        "vab" => period::EXPORT_VAB_HELP,
-        "seq" => period::EXPORT_SEQ_HELP,
-        "sep" => period::EXPORT_SEP_HELP,
+        "tim" => psyq::EXPORT_TIM_HELP,
+        "vab" => psyq::EXPORT_VAB_HELP,
+        "seq" => psyq::EXPORT_SEQ_HELP,
+        "sep" => psyq::EXPORT_SEP_HELP,
         "palette" => EXPORT_PALETTE_HELP,
         "terrain" => EXPORT_TERRAIN_HELP,
         "vag" => EXPORT_VAG_HELP,
@@ -651,7 +651,7 @@ fn export_help(kind: &str) -> &'static str {
         "script" => EXPORT_SCRIPT_HELP,
         "strings" => EXPORT_STRINGS_HELP,
         "characters" => EXPORT_CHARACTERS_HELP,
-        "character-bank" => EXPORT_CHARACTER_BANK_HELP,
+        "character-sprites" => EXPORT_CHARACTER_SPRITES_HELP,
         "sprite-sheet" => EXPORT_SPRITE_SHEET_HELP,
         _ => EXPORT_HELP,
     }
@@ -660,10 +660,10 @@ fn export_help(kind: &str) -> &'static str {
 fn import_help(kind: &str) -> &'static str {
     match kind {
         "texture" => IMPORT_TEXTURE_HELP,
-        "tim" => period::IMPORT_TIM_HELP,
-        "vab" => period::IMPORT_VAB_HELP,
-        "seq" => period::IMPORT_SEQ_HELP,
-        "sep" => period::IMPORT_SEP_HELP,
+        "tim" => psyq::IMPORT_TIM_HELP,
+        "vab" => psyq::IMPORT_VAB_HELP,
+        "seq" => psyq::IMPORT_SEQ_HELP,
+        "sep" => psyq::IMPORT_SEP_HELP,
         "palette" => IMPORT_PALETTE_HELP,
         "terrain" => IMPORT_TERRAIN_HELP,
         "vag" => IMPORT_VAG_HELP,
@@ -679,7 +679,7 @@ fn import_help(kind: &str) -> &'static str {
         "script" => IMPORT_SCRIPT_HELP,
         "strings" => IMPORT_STRINGS_HELP,
         "characters" => IMPORT_CHARACTERS_HELP,
-        "character-bank" => IMPORT_CHARACTER_BANK_HELP,
+        "character-sprites" => IMPORT_CHARACTER_SPRITES_HELP,
         "sprite-sheet" => IMPORT_SPRITE_SHEET_HELP,
         _ => IMPORT_HELP,
     }
@@ -715,7 +715,7 @@ fn run(args: Vec<OsString>) -> Result<i32> {
     let result = match first.as_str() {
         "kinds" => {
             for kind in Kind::ALL {
-                println!("{:<16} {:<9} {}", kind.name(), kind.handling().label(), kind.about());
+                println!("{:<17} {:<9} {}", kind.name(), kind.handling().label(), kind.about());
             }
             Ok(EXIT_OK)
         }
@@ -762,8 +762,8 @@ fn help_for(args: &[String]) -> String {
         ("tables", _) => TABLES_HELP.to_string(),
         ("encounters", _) => ENCOUNTERS_HELP.to_string(),
         ("kinds", _) => KINDS_HELP.to_string(),
-        ("export", Some(kind)) => export_help(kind).to_string(),
-        ("import", Some(kind)) => import_help(kind).to_string(),
+        ("export", Some(kind)) => export_help(Kind::canonical(kind)).to_string(),
+        ("import", Some(kind)) => import_help(Kind::canonical(kind)).to_string(),
         ("export", None) => EXPORT_HELP.to_string(),
         ("import", None) => IMPORT_HELP.to_string(),
         _ => USAGE.to_string(),
@@ -872,12 +872,13 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let Some((kind, rest)) = args.split_first() else {
         return Err(Error::Usage(format!("{verb} needs a kind, for example texture; run `bof3 assets {verb} --help`")));
     };
+    let kind = &Kind::canonical(kind).to_string();
     match (direction, kind.as_str()) {
         (Direction::Export, "texture") => return export_texture(rest),
-        (Direction::Export, "tim") => return period::export_tim(rest),
-        (Direction::Import, "tim") => return period::import_tim(rest),
-        (Direction::Import, "vab") => return period::import_vab(rest),
-        (Direction::Import, "seq") => return period::import_seq(rest),
+        (Direction::Export, "tim") => return psyq::export_tim(rest),
+        (Direction::Import, "tim") => return psyq::import_tim(rest),
+        (Direction::Import, "vab") => return psyq::import_vab(rest),
+        (Direction::Import, "seq") => return psyq::import_seq(rest),
         (Direction::Export, "terrain") => return terrain_command(rest),
         (Direction::Export, "sprite-sheet") => return export_sprite_sheet(rest),
         (Direction::Import, "sprite-sheet") => return import_sprite_sheet(rest),
@@ -891,7 +892,7 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(
-                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-bank and sprite-sheet"
+                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-sprites and sprite-sheet"
             ),
             Direction::Import => {
                 format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")
@@ -956,9 +957,9 @@ fn reject_unused_options(op: &codec::Op, args: &Convert) -> Result<()> {
     }
 }
 
-/// `bof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette BANK [--palette-offset WORDS]] [-o OUT]`:
+/// `bof3 assets export texture PAYLOAD --load-arg HEX [--depth 4|8 --palette CLUT_BLOCK [--palette-offset WORDS]] [-o OUT]`:
 /// writes a texture's stored payload as a PNG. Without `--depth` the PNG is the 16 bpp view. With it, the
-/// payload is drawn with the palette row that starts at word WORDS of BANK, a file of raw color words.
+/// payload is drawn with the palette row that starts at word WORDS of CLUT_BLOCK, a file of raw color words.
 #[derive(Parser)]
 struct ExportTexture {
     files: Vec<PathBuf>,
@@ -987,7 +988,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
         None => (rebof3_formats::vram::texture_view_png(load_arg, &bytes)?, "16 bpp view".to_string()),
         Some(bits) => {
             let Some(bank) = args.palette else {
-                return Err(Error::Usage("--depth needs --palette, the bank that holds the row".into()));
+                return Err(Error::Usage("--depth needs --palette, the CLUT block that holds the row".into()));
             };
             let count = match bits {
                 4 => 16,
@@ -1010,7 +1011,7 @@ fn export_texture(args: &[String]) -> Result<i32> {
 }
 
 /// `bof3 assets export sprite-sheet PAYLOAD --exe EXE [--section N] [--palette N] [-o OUT]`: writes one
-/// section of a stored sprite bank as an indexed PNG and, next to it, the Aseprite JSON that names it.
+/// section of a stored character sprites as an indexed PNG and, next to it, the Aseprite JSON that names it.
 #[derive(Parser)]
 struct ExportSpriteSheet {
     files: Vec<PathBuf>,
@@ -1026,7 +1027,7 @@ struct ExportSpriteSheet {
 
 fn export_sprite_sheet(args: &[String]) -> Result<i32> {
     let args: ExportSpriteSheet = parse(args)?;
-    let payload_path = single(args.files, "export sprite-sheet needs a sprite bank payload")?;
+    let payload_path = single(args.files, "export sprite-sheet needs a character sprites payload")?;
     let sizes = sprite_sizes(args.exe.as_deref(), "export sprite-sheet")?;
     let section = optional_number(args.section.as_deref(), "--section")?.unwrap_or(0) as usize;
     let palette = optional_number(args.palette.as_deref(), "--palette")?.unwrap_or(0) as usize;
@@ -1313,7 +1314,7 @@ fn coverage_command(args: &[String]) -> Result<i32> {
         None => find_disc_image(&current).map_err(Error::Usage)?,
     };
     let report = coverage::run(&image)?;
-    println!("{:<16} {:>8} {:>10} {:>13} {:>13}  note", "kind", "entries", "both ways", "bytes", "both ways");
+    println!("{:<17} {:>8} {:>10} {:>13} {:>13}  note", "kind", "entries", "both ways", "bytes", "both ways");
     let (mut entries, mut bytes, mut both_entries, mut both_bytes) = (0, 0, 0, 0);
     for kind in Kind::ALL {
         let Some(line) = report.kinds.get(kind) else { continue };
@@ -1330,7 +1331,7 @@ fn coverage_command(args: &[String]) -> Result<i32> {
             note
         };
         println!(
-            "{:<16} {:>8} {:>10} {:>13} {:>13}  {note}",
+            "{:<17} {:>8} {:>10} {:>13} {:>13}  {note}",
             kind.name(),
             line.entries,
             line.both_entries,
@@ -1340,12 +1341,12 @@ fn coverage_command(args: &[String]) -> Result<i32> {
     }
     let text = report.text;
     println!(
-        "{:<16} {:>8} {:>10} {:>13} {:>13}  strings and message banks",
+        "{:<17} {:>8} {:>10} {:>13} {:>13}  strings and message tables",
         "text", text.entries, text.both_entries, text.bytes, text.both_bytes
     );
     let palettes = report.palettes;
     println!(
-        "{:<16} {:>8} {:>10} {:>13} {:>13}  palette tables of the sprite banks, against their decoded bytes",
+        "{:<17} {:>8} {:>10} {:>13} {:>13}  palette tables of the character sprites, against their decoded bytes",
         "sprite palettes", palettes.entries, palettes.both_entries, palettes.bytes, palettes.both_bytes
     );
     println!(

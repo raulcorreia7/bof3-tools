@@ -10,6 +10,7 @@ disc and bundled-names libraries.
 | `rebof3-formats`| One module per entry format (codec, open files, description), the registry and the coverage table. |
 | `rebof3-assets` | The all-assets extractor: classify every file and EMI slot, write a tree. |
 | `rebof3-observe`| Runs the disc on a route in `psx-machine` and records how the game draws each texture. |
+| `rebof3-render` | Draws field scenes with the GPU's texturing rules, offscreen through OpenGL ES (the `gles` feature) or in software ([ADR 0003](adr/0003-area-3d-rendering.md)). |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 
 Every first-party crate is MIT; `cargo deny check` keeps dependencies permissive. The container
@@ -37,9 +38,10 @@ table instead of matching on formats. The rules a module follows are in
 [ADR 0002](adr/0002-self-contained-formats.md). The coverage table runs every format's round trip
 over the retail archives and pins the totals in `tests/retail_coverage.rs`.
 
-Beside the formats it holds three shared modules that are not formats: `joins` (a texture's palette
+Beside the formats it holds four shared modules that are not formats: `joins` (a texture's palette
 rows, read over a whole archive), `text` (the string scan, the strings of a payload and the sources
-of a string) and `gltf`. The SoundFont conversion is in `vab::soundfont`, which is why the crate
+of a string), `gltf`, and `field` (the area setup stream that places the actors, and the
+executable's encounter zones and facing steps). The SoundFont conversion is in `vab::soundfont`, which is why the crate
 depends on `bof3player` for the SPU envelope steps.
 
 ## rebof3-observe

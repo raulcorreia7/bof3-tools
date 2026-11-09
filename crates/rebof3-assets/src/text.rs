@@ -1,11 +1,11 @@
 //! The `text` kind: game strings.
 //!
-//! The codec is `rebof3_emi::text::codec`; the message banks are `rebof3_formats::message::bank` and the
+//! The codec is `rebof3_emi::text::codec`; the message tables are `rebof3_formats::message::table` and the
 //! strings of other payloads `rebof3_formats::text`. [`extract_with`] walks the extracted disc (`build/disc`, or `--text-disc DIR`) and writes, for every payload that
 //! holds text, the stored bytes, one JSON row per string and a plain-text view. [`known`] places the strings of
 //! the documented tables, and the scan finds the loose ones.
 
-use rebof3_formats::message::bank;
+use rebof3_formats::message::table;
 use rebof3_formats::text::{known, source, strings};
 
 use std::collections::BTreeMap;
@@ -254,11 +254,11 @@ fn text_file(
 ) -> Result<Option<TextFile>> {
     let known = known::strings(source, slot, format, payload);
     let exclude: Vec<(usize, usize)> = known.iter().map(known::Known::range).collect();
-    if format == Format::AreaMessageBank {
-        if discover::bank_records(payload).is_none_or(|records| records.is_empty()) {
+    if format == Format::AreaMessageTable {
+        if discover::table_records(payload).is_none_or(|records| records.is_empty()) {
             return Ok(None);
         }
-        let (json, strings, rows) = bank::export_counted(payload, Some(source))?;
+        let (json, strings, rows) = table::export_counted(payload, Some(source))?;
         if strings == 0 {
             return Ok(None);
         }

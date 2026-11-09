@@ -18,9 +18,9 @@ pub enum Error {
     MapBundleTooShort(usize),
     /// A map bundle's sections do not satisfy the identities its readers assume.
     MapBundleShape(&'static str),
-    /// A script bank's directory or a section's table words do not parse as the `0x800D3800`
+    /// A script table's directory or a section's table words do not parse as the `0x800D3800`
     /// layout (`wiki: formats/area`).
-    ScriptBankShape(&'static str),
+    ScriptTableShape(&'static str),
     /// A fixed game table runs past the end of its payload.
     GameTableShort {
         /// The table's name.
@@ -37,21 +37,23 @@ pub enum Error {
     },
     /// The characters table cannot be read or written: a count, a name, or the rest of a record that does not fit.
     CharacterTable(String),
-    /// A sprite bank's palettes cannot be read or written: a section that is not in the palette layout, or a palette
+    /// The character sprites' palettes cannot be read or written: a section that is not in the palette layout, or a palette
     /// that does not match the bank it is written to.
-    CharacterBank(String),
+    CharacterPalettes(String),
     /// An animation stream does not read or write in the layout `Actor_SeekScript` and the step
     /// functions assume.
     AnimationStream(String),
-    /// A sprite bank's sections, frame sheets or animations do not read or write in the layout the field
+    /// The character sprites' sections, frame sheets or animations do not read or write in the layout the field
     /// reader assumes.
-    SpriteBank(String),
+    CharacterSprites(String),
     /// An encounter formation that does not place: a missing encounter, enemy or placement table.
     Formation(String),
     /// A sound item that could not be read or rendered.
     Audio(String),
     /// An open-format file that an import cannot read back to the stored bytes.
     Import(String),
+    /// A field table of the executable or a setup stream of an area program that does not read.
+    Field(String),
 }
 
 impl fmt::Display for Error {
@@ -68,18 +70,19 @@ impl fmt::Display for Error {
                 write!(f, "map bundle is {bytes} bytes; its header and sections need more")
             }
             Self::MapBundleShape(reason) => write!(f, "map bundle: {reason}"),
-            Self::ScriptBankShape(reason) => write!(f, "script bank: {reason}"),
+            Self::ScriptTableShape(reason) => write!(f, "script table: {reason}"),
             Self::EncounterBlockShort { bytes } => {
                 write!(f, "encounter block is {bytes} bytes; it needs 1160")
             }
             Self::GameTableShort { table, bytes, needed } => {
                 write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
             }
-            Self::CharacterTable(message) | Self::CharacterBank(message) => f.write_str(message),
+            Self::CharacterTable(message) | Self::CharacterPalettes(message) => f.write_str(message),
             Self::AnimationStream(message) => write!(f, "animation stream: {message}"),
-            Self::SpriteBank(message) => write!(f, "sprite bank: {message}"),
+            Self::CharacterSprites(message) => write!(f, "character sprites: {message}"),
             Self::Formation(message) => write!(f, "formation: {message}"),
             Self::Audio(message) | Self::Import(message) => f.write_str(message),
+            Self::Field(message) => write!(f, "field: {message}"),
         }
     }
 }

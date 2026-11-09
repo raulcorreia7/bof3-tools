@@ -1,6 +1,6 @@
 //! The join of a texture to the palette rows it is drawn with.
 //!
-//! A join reads a whole archive: the texture uploads, the palette banks and the map bundles beside
+//! A join reads a whole archive: the texture uploads, the CLUT blocks and the map bundles beside
 //! them. It is not a format; it composes the `vram`, `clut` and `map` modules through the registry,
 //! and no format module imports it.
 
@@ -17,24 +17,24 @@ use crate::vram::RowUse;
 ///
 /// The rules are `rebof3_emi::texture::joins` (literal draw sites) and
 /// `rebof3_emi::texture::terrain_joins` (the world-map tile descriptors). A join needs exactly one
-/// sheet over its page and exactly one distinct bank over its CLUT row. `source` is the archive's
+/// sheet over its page and exactly one distinct block over its CLUT row. `source` is the archive's
 /// disc path, which selects the draw sites and owns the sheets. Each row carries its rule as
 /// evidence.
 pub fn joined_rows(source: &str, entries: &[rebof3_emi::Entry], payloads: &[&[u8]]) -> HashMap<usize, Vec<RowUse>> {
     joined_rows_in(source, entries, payloads, &[])
 }
 
-/// [`joined_rows`], with a resident set of palette banks available as a fallback.
+/// [`joined_rows`], with a resident set of CLUT blocks available as a fallback.
 ///
-/// `resident` holds the banks the caller loaded from other archives. A row uses this archive's
-/// own bank when it has one; otherwise a resident bank may serve it, provided every bank at that
-/// arena position agrees on the words. Banks of `source` itself are ignored here because
+/// `resident` holds the blocks the caller loaded from other archives. A row uses this archive's
+/// own block when it has one; otherwise a resident block may serve it, provided every block at that
+/// arena position agrees on the words. Blocks of `source` itself are ignored here because
 /// [`joined_rows_in`] builds them from `entries`.
 pub fn joined_rows_in(
     source: &str,
     entries: &[rebof3_emi::Entry],
     payloads: &[&[u8]],
-    resident: &[draw::ResidentBank],
+    resident: &[draw::ResidentClutBlock],
 ) -> HashMap<usize, Vec<RowUse>> {
     let mut sheets = Vec::new();
     let mut own = Vec::new();
@@ -42,7 +42,7 @@ pub fn joined_rows_in(
     for (slot, (entry, payload)) in entries.iter().zip(payloads).enumerate() {
         match classify(entry, payload) {
             Format::VramUpload => sheets.extend(draw::sheet(slot, entry.ram_ptr, payload.len())),
-            Format::ClutBank => own.extend(draw::ResidentBank::new(source, slot, entry.ram_ptr, payload)),
+            Format::ClutBlock => own.extend(draw::ResidentClutBlock::new(source, slot, entry.ram_ptr, payload)),
             Format::AreaMapBundle => {
                 if let Ok(bundle) = MapBundle::decode(payload) {
                     bundles.push(bundle);
@@ -51,15 +51,15 @@ pub fn joined_rows_in(
             _ => {}
         }
     }
-    let mut banks: Vec<&draw::ResidentBank> = own.iter().collect();
-    banks.extend(resident.iter().filter(|bank| bank.archive != source));
+    let mut blocks: Vec<&draw::ResidentClutBlock> = own.iter().collect();
+    blocks.extend(resident.iter().filter(|block| block.archive != source));
 
     let mut rows: HashMap<usize, Vec<RowUse>> = HashMap::new();
-    for join in draw::joins(source, &sheets, &banks) {
+    for join in draw::joins(source, &sheets, &blocks) {
         push_row(&mut rows, source, join);
     }
     for bundle in &bundles {
-        for join in draw::terrain_joins(source, &bundle.records, &sheets, &banks) {
+        for join in draw::terrain_joins(source, &bundle.records, &sheets, &blocks) {
             push_row(&mut rows, source, join);
         }
     }
@@ -94,10 +94,10 @@ fn push_row(rows: &mut HashMap<usize, Vec<RowUse>>, source: &str, join: draw::Jo
         ),
     };
     if join.palette.archive != source {
-        evidence.push_str(&format!("; palette bank {}#{}", join.palette.archive, join.palette.bank.slot));
+        evidence.push_str(&format!("; CLUT block {}#{}", join.palette.archive, join.palette.block.slot));
     }
     rows.entry(texture).or_default().push(RowUse {
-        palette: join.palette.bank.slot,
+        palette: join.palette.block.slot,
         palette_archive: join.palette.archive.clone(),
         clut: join.clut,
         depth: join.depth,
