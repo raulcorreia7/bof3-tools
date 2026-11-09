@@ -318,6 +318,62 @@ fn texel_at(corners: [[u8; 2]; 4], x: usize, y: usize) -> [u8; 2] {
     })
 }
 
+/// The terrain mesh's corner heights, written back into the map bundle it came from.
+///
+/// `mesh` is the binary glTF or the OBJ text that the export writes, and `payload` is that bundle's
+/// stored bytes. A corner's height is its `y` divided by [`HEIGHT_SCALE`]. The mesh does not carry the
+/// tiles, objects or height table, so those sections come from `payload`. A corner that the mesh moves
+/// in `x` or `z` is an error.
+pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
+    let mut bundle = MapBundle::decode(payload)?;
+    let positions = if mesh.starts_with(b"glTF") {
+        gltf::read_positions(mesh).map_err(Error::Import)?
+    } else {
+        obj_positions(mesh)?
+    };
+    let corners = 4 * bundle.cells.len();
+    if positions.len() != corners {
+        return Err(Error::Import(format!("the mesh has {} corners; the bundle needs {corners}", positions.len())));
+    }
+    let width = usize::from(bundle.width).max(1);
+    for (cell, record) in bundle.cells.iter_mut().enumerate() {
+        let (column, row) = ((cell % width) as f32, (cell / width) as f32);
+        for (corner, [step_x, step_z]) in CORNER_STEPS.iter().enumerate() {
+            let [x, y, z] = positions[4 * cell + corner];
+            if x != column + *step_x as f32 || z != row + *step_z as f32 {
+                return Err(Error::Import(format!("corner {corner} of cell {cell} is not at its cell")));
+            }
+            record.heights[corner] = height_byte(y)
+                .ok_or_else(|| Error::Import(format!("corner {corner} of cell {cell} is at {y}, not a height step")))?;
+        }
+    }
+    Ok(bundle.encode())
+}
+
+/// The height byte of a corner at `y`. `y` is the byte times [`HEIGHT_SCALE`], so it must be a whole step
+/// that an `i8` holds.
+fn height_byte(y: f32) -> Option<i8> {
+    let step = y / HEIGHT_SCALE as f32;
+    (step.fract() == 0.0 && (-128.0..=127.0).contains(&step)).then_some(step as i8)
+}
+
+/// The vertices of an OBJ text: its `v` lines, in file order.
+fn obj_positions(mesh: &[u8]) -> Result<Vec<[f32; 3]>> {
+    let text = std::str::from_utf8(mesh).map_err(|error| Error::Import(format!("the OBJ is not text: {error}")))?;
+    let mut positions = Vec::new();
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("v ") else {
+            continue;
+        };
+        let values: std::result::Result<Vec<f32>, _> = rest.split_whitespace().map(str::parse).collect();
+        match values.as_deref() {
+            Ok([x, y, z]) => positions.push([*x, *y, *z]),
+            _ => return Err(Error::Import(format!("the OBJ vertex {rest:?} is not three numbers"))),
+        }
+    }
+    Ok(positions)
+}
+
 #[cfg(test)]
 mod top_down_tests {
     use super::*;
@@ -384,60 +440,4 @@ mod top_down_tests {
         assert_eq!((view.textured, view.unwritten), (0, 1));
         assert_eq!(&view.png()[1..4], b"PNG");
     }
-}
-
-/// The terrain mesh's corner heights, written back into the map bundle it came from.
-///
-/// `mesh` is the binary glTF or the OBJ text that the export writes, and `payload` is that bundle's
-/// stored bytes. A corner's height is its `y` divided by [`HEIGHT_SCALE`]. The mesh does not carry the
-/// tiles, objects or height table, so those sections come from `payload`. A corner that the mesh moves
-/// in `x` or `z` is an error.
-pub fn import(mesh: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let mut bundle = MapBundle::decode(payload)?;
-    let positions = if mesh.starts_with(b"glTF") {
-        gltf::read_positions(mesh).map_err(Error::Import)?
-    } else {
-        obj_positions(mesh)?
-    };
-    let corners = 4 * bundle.cells.len();
-    if positions.len() != corners {
-        return Err(Error::Import(format!("the mesh has {} corners; the bundle needs {corners}", positions.len())));
-    }
-    let width = usize::from(bundle.width).max(1);
-    for (cell, record) in bundle.cells.iter_mut().enumerate() {
-        let (column, row) = ((cell % width) as f32, (cell / width) as f32);
-        for (corner, [step_x, step_z]) in CORNER_STEPS.iter().enumerate() {
-            let [x, y, z] = positions[4 * cell + corner];
-            if x != column + *step_x as f32 || z != row + *step_z as f32 {
-                return Err(Error::Import(format!("corner {corner} of cell {cell} is not at its cell")));
-            }
-            record.heights[corner] = height_byte(y)
-                .ok_or_else(|| Error::Import(format!("corner {corner} of cell {cell} is at {y}, not a height step")))?;
-        }
-    }
-    Ok(bundle.encode())
-}
-
-/// The height byte of a corner at `y`. `y` is the byte times [`HEIGHT_SCALE`], so it must be a whole step
-/// that an `i8` holds.
-fn height_byte(y: f32) -> Option<i8> {
-    let step = y / HEIGHT_SCALE as f32;
-    (step.fract() == 0.0 && (-128.0..=127.0).contains(&step)).then_some(step as i8)
-}
-
-/// The vertices of an OBJ text: its `v` lines, in file order.
-fn obj_positions(mesh: &[u8]) -> Result<Vec<[f32; 3]>> {
-    let text = std::str::from_utf8(mesh).map_err(|error| Error::Import(format!("the OBJ is not text: {error}")))?;
-    let mut positions = Vec::new();
-    for line in text.lines() {
-        let Some(rest) = line.strip_prefix("v ") else {
-            continue;
-        };
-        let values: std::result::Result<Vec<f32>, _> = rest.split_whitespace().map(str::parse).collect();
-        match values.as_deref() {
-            Ok([x, y, z]) => positions.push([*x, *y, *z]),
-            _ => return Err(Error::Import(format!("the OBJ vertex {rest:?} is not three numbers"))),
-        }
-    }
-    Ok(positions)
 }
