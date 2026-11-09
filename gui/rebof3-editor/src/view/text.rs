@@ -8,7 +8,7 @@ use gpui::{AnyElement, Context, div, prelude::*, px};
 use rebof3_emi::text::codec::{self, Encoding};
 use rebof3_formats::text::discover::{self, Found, Kind};
 
-use super::{Entry, Field, input, message};
+use super::{Entry, Field, compose, input, message};
 use crate::app::Editor;
 use crate::theme::{EDITED, MUTED, color};
 use crate::widgets::{GAP, GAP_SMALL, mono, muted, separator, strong, tab};
@@ -26,6 +26,8 @@ pub struct State {
     pub filter: String,
     /// Whether the strings show as message windows instead of editable text.
     pub preview: bool,
+    /// Whether a message bank shows as the compose view: the game's window, page by page.
+    pub compose: bool,
 }
 
 fn found(payload: &[u8], load_arg: u32) -> Vec<Found> {
@@ -57,9 +59,23 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .gap(px(GAP))
         .child(strong(format!("{} strings", strings.len())))
         .child(filter)
-        .child(mode_tab("Edit", false, state.preview, cx))
-        .child(mode_tab("Preview", true, state.preview, cx))
+        .child(mode_tab("Edit", false, false, state.preview || state.compose, cx))
+        .child(mode_tab("Preview", true, false, state.preview, cx))
+        .child(mode_tab("Compose", false, true, state.compose, cx))
         .child(muted("New text must fit the old string's bytes. Shift+Enter breaks a line."));
+
+    if state.compose {
+        return div()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_h_0()
+            .gap(px(GAP))
+            .child(header)
+            .child(separator(false))
+            .child(compose::show(editor, entry, cx))
+            .into_any_element();
+    }
 
     let needle = state.filter.to_lowercase();
     let mut list = div().id("strings").flex().flex_col().flex_1().gap(px(GAP_SMALL)).overflow_y_scroll();
@@ -99,11 +115,21 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 }
 
 /// The tab that shows the strings as text (`preview` false) or as message windows.
-fn mode_tab(label: &'static str, preview: bool, shown: bool, cx: &mut Context<Editor>) -> impl IntoElement {
-    tab(("text-mode", usize::from(preview)), label, preview == shown).on_click(cx.listener(move |editor, _, _, cx| {
-        editor.views.text.preview = preview;
-        cx.notify();
-    }))
+fn mode_tab(
+    label: &'static str,
+    preview: bool,
+    compose: bool,
+    selected: bool,
+    cx: &mut Context<Editor>,
+) -> impl IntoElement {
+    let selected = if label == "Edit" { !selected } else { selected };
+    tab(("text-mode", usize::from(preview) + 2 * usize::from(compose)), label, selected).on_click(cx.listener(
+        move |editor, _, _, cx| {
+            editor.views.text.preview = preview;
+            editor.views.text.compose = compose;
+            cx.notify();
+        },
+    ))
 }
 
 /// Writes the new text of the string that starts at `start`.
