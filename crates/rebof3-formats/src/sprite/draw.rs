@@ -14,9 +14,18 @@
 //!   `Area_BuildClut` (`exe/slus_004_22@0x8014CE78`), which for kind 2 is row `480 + (sel >> 3)`,
 //!   column `(sel & 7) * 32`: the arena row and column `GFX_LoadPalette` wrote.
 //!
-//! The battle reader of `BPLCHAR` banks is not traced, so a battle bank is drawn with the field
-//! placement. A texel outside the uploaded sheet, or a colour outside the staged palette, depends on
-//! what else the frame's VRAM holds at run time; the composite marks it instead of guessing it.
+//! A battle bank (`BPLD`, `BPLU`) is read the same way. `Battle_LoadPartySprites`
+//! (`emi/etc/game/00@0x80197AA4`) streams `BPLD` or `BPLU` to `0x8003B800` by `g_Battle.scroll_dir & 2`;
+//! `Battle_LoadBattleArchive` (`emi/etc/game/00@0x80197C94`) then runs `Party_BuildBattlers(PARTY_ORDER_BATTLE)`,
+//! which calls `Party_LoadMemberSprite` for every battle slot. The battle overlay reloads a bank mid-battle
+//! (`func_801E7948`, `emi/battle/battle/03@0x801E7948`) and stages palette 0 again for the slot at
+//! `GAME_PALETTE_STAGE + slot * 0x40` (`func_801E7634`, `func_801E7BA0`, `func_801E8684`). The slot, and
+//! so the sheet row and CLUT, is the member's place in the battle order, a run-time choice that moves the
+//! sprite in VRAM but not its colours; a status fade (`func_801DDAB4`, status bit `0x80`) tints it at run
+//! time.
+//!
+//! A texel outside the uploaded sheet, or a colour outside the staged palette, depends on what else the
+//! frame's VRAM holds at run time; the composite marks it instead of guessing it.
 
 use psx_formats::gfx::texture::{Clut, Depth};
 
@@ -171,7 +180,8 @@ pub enum Reader {
     /// A party bank: `Party_LoadMemberSprite` places it and loads palette [`FIELD_PALETTE`], called from
     /// `Party_JoinMember` and `Party_BuildBattlers` (`emi/etc/game/00`).
     Field,
-    /// A battle bank: its reader is not traced, so its placement and palette are not proven.
+    /// A battle bank: `Battle_LoadPartySprites` streams it and `Party_BuildBattlers(PARTY_ORDER_BATTLE)`
+    /// places it through `Party_LoadMemberSprite`, palette [`FIELD_PALETTE`]; see the module documentation.
     Battle,
     /// No traced loader streams the archive.
     Unknown,
@@ -196,7 +206,7 @@ impl Reader {
 
     /// The palette the reader loads, when it is traced.
     pub fn palette(self) -> Option<usize> {
-        (self == Reader::Field).then_some(FIELD_PALETTE)
+        matches!(self, Reader::Field | Reader::Battle).then_some(FIELD_PALETTE)
     }
 }
 
@@ -517,6 +527,7 @@ mod tests {
         assert_eq!(Reader::of("BIN/ETC/START.EMI"), Reader::Unknown);
         assert_eq!(Reader::of("BIN/ETC/PLATE.EMI"), Reader::Unknown, "a name that only starts like a family");
         assert_eq!(Reader::Field.palette(), Some(FIELD_PALETTE));
-        assert_eq!(Reader::Battle.palette(), None);
+        assert_eq!(Reader::Battle.palette(), Some(FIELD_PALETTE));
+        assert_eq!(Reader::Unknown.palette(), None);
     }
 }

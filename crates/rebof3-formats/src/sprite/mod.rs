@@ -329,7 +329,9 @@ pub fn encode(bank: &Bank) -> Result<Vec<u8>> {
 }
 
 /// The evidence behind the format, for a view or a report.
-pub const EVIDENCE: &str = "Party_LoadMemberSprite (emi/etc/game/00@0x801C1254) picks the section and placement; \
+pub const EVIDENCE: &str = "Party_LoadMemberSprite (emi/etc/game/00@0x801C1254) picks the section and placement, in the field \
+and, through Party_BuildBattlers(PARTY_ORDER_BATTLE) after Battle_LoadPartySprites (emi/etc/game/00@0x80197AA4) streams BPLD or \
+BPLU, in battle; \
 Actor_SelectScriptBank (exe/slus_004_22@0x8014DC08) reads the header, records, sheets and animations; \
 GFX_UpdateTransferQueue, GFX_ExpandRgb555, GFX_DecodeLzss (exe/slus_004_22@0x8014E6D0, 0x8014E7F8, 0x8014E8FC) \
 upload a sheet; GFX_LoadPalette (exe/slus_004_22@0x80166C48) stages a palette; Actor_SeekScript, Actor_StageAnimStep, \
@@ -340,7 +342,7 @@ Area_BuildClut (exe/slus_004_22@0x8014C4D4, 0x8014CF9C, 0x8014CE78) draw the cel
 /// What the bank holds, in the game's terms: one line per section and the evidence.
 pub fn describe(bank: &Bank) -> String {
     let mut lines = vec![format!(
-        "Sprite bank: {} {}, loaded to 0x8003B800 and read by the field's actor sprite code.",
+        "Sprite bank: {} {}, loaded to 0x8003B800 and read by the actor sprite code in the field and in battle.",
         bank.sections.len(),
         if bank.container { "sections in a container" } else { "section" }
     )];
