@@ -196,9 +196,9 @@ The other kinds round trip through their own commands. Results over the retail d
 | EMI archive, `emi extract -J` then `emi pack -J` | 880 of 880 archives                           | lossless |
 | EMI archive, `emi pack` without `-J`             | entry types and load addresses are lost       | lossy    |
 | texture, 16 bpp view                             | every view reads back to the stored words     | lossless |
-| texture, indexed PNG                             | all 882 joined rows                           | lossless |
+| texture, indexed PNG                             | all 883 joined rows                           | lossless |
 | palette                                          | every palette reads back to its words         | lossless |
-| texture through TIM                              | all 202 joined textures (882 rows); 593 uploads | lossless |
+| texture through TIM                              | all 203 joined textures (883 rows); 593 uploads | lossless |
 | sound bank through one VAB file or VH and VB     | 1,020 of 1,020 banks                          | lossless |
 | sequences through SEP and SEQ                    | 119 packages, 476 sequences                   | lossless |
 | sound bank through SoundFont                     | 0 of 1,020 banks come back to their own bytes | lossy    |
