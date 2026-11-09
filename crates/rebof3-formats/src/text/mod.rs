@@ -7,5 +7,6 @@
 
 pub mod discover;
 pub mod known;
+pub mod layout;
 pub mod source;
 pub mod strings;
