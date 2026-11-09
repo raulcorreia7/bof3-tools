@@ -301,7 +301,6 @@ fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Context<Editor>
         slider("vram-zoom", state.zoom.max(ZOOM_MIN), ZOOM_MIN..=ZOOM_MAX, &state.zoom_slider, cx, |editor, zoom| {
             editor.views.vram.zoom = zoom;
         });
-    let png = vram_png(&replayed.vram);
     let name = format!("{}.png", current.name.replace([':', ' ', '+'], "_"));
     row.child(separator(true))
         .child("Zoom")
@@ -309,7 +308,9 @@ fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Context<Editor>
         .child(mono(format!("{}×", state.zoom.max(ZOOM_MIN))))
         .child(separator(true))
         .child(button("vram-export", "Export PNG", true).on_click(cx.listener(move |editor, _, _, cx| {
-            editor.save_file(name.clone(), Ok(png.clone()), cx);
+            // Encode on click: a PNG of the whole VRAM is too slow to build on every frame.
+            let Some(replayed) = editor.views.vram.replayed.clone() else { return };
+            editor.save_file(name.clone(), Ok(vram_png(&replayed.vram)), cx);
         })))
 }
 
