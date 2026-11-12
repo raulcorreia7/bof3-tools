@@ -1,8 +1,8 @@
 # C interface
 
 `rebof3-capi` is the C ABI over the library crates. The library crates stay pure Rust; the crate
-holds every `extern "C"` function, the status codes and the ownership rules. It starts with the EMI
-container; the format and asset functions follow.
+holds every `extern "C"` function, the status codes and the ownership rules. It exports the EMI
+container and the entry formats; the asset functions follow.
 
 ## Build
 
@@ -25,6 +25,15 @@ crate; `make check` fails when the committed header is stale. Regenerate it with
 UPDATE_HEADER=1 cargo test -p rebof3-capi --test header
 ```
 
+## Formats
+
+`rebof3_format_classify` names an entry's format from its table record and payload.
+`rebof3_format_info_of` returns the format's static name, extension, state and asset kind; those
+strings are NUL-terminated and are not freed. The common decoders are `rebof3_texture_png`,
+`rebof3_texture_tim`, `rebof3_texture_row_png`, `rebof3_palette_json`, `rebof3_palette_swatch_png`,
+`rebof3_vag_wav`, `rebof3_vab_vag_wav`, `rebof3_soundfont` and `rebof3_sprite_sheet_export`. Each
+returns an owned buffer.
+
 ## Use
 
 Every fallible function returns a `rebof3_status`. On a failure, `rebof3_last_error_message`
@@ -36,7 +45,8 @@ Ownership:
 
 - A `rebof3_buffer` or `rebof3_string` returned by a function is owned by the caller and released
   with `rebof3_buffer_free` or `rebof3_string_free`.
-- A `rebof3_emi` handle is released with `rebof3_emi_free`.
+- A `rebof3_emi` handle is released with `rebof3_emi_free`; a sprite sheet with
+  `rebof3_sprite_sheet_free`.
 - `rebof3_emi_payload_at` borrows the container bytes the caller parsed; the pointer is valid while
   those bytes are.
 - Strings the header describes as static, and the fields of `rebof3_format_info`, are not freed.

@@ -11,6 +11,8 @@
 
 mod emi;
 mod error;
+mod ffi;
+mod formats;
 
 pub use error::rebof3_status;
 
@@ -60,6 +62,12 @@ unsafe fn free_boxed(data: *mut u8, len: usize) {
     }
 }
 
+pub(crate) unsafe fn release_buffer(buffer: &mut rebof3_buffer) {
+    unsafe { free_boxed(buffer.data, buffer.len) };
+    buffer.data = std::ptr::null_mut();
+    buffer.len = 0;
+}
+
 /// Releases a buffer returned by this library and zeroes its fields.
 ///
 /// # Safety
@@ -70,9 +78,7 @@ pub unsafe extern "C" fn rebof3_buffer_free(buffer: *mut rebof3_buffer) {
         return;
     }
     let buffer = unsafe { &mut *buffer };
-    unsafe { free_boxed(buffer.data, buffer.len) };
-    buffer.data = std::ptr::null_mut();
-    buffer.len = 0;
+    unsafe { release_buffer(buffer) };
 }
 
 /// Releases a string returned by this library and zeroes its fields.

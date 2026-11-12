@@ -52,6 +52,25 @@ int rebof3_smoke_run(void) {
     if (check(rebof3_emi_manifest_json(emi, 0, &json) == REBOF3_STATUS_OK && json.data != NULL && json.len > 0, "manifest")) return 1;
     rebof3_string_free(&json);
 
+    rebof3_format format = REBOF3_FORMAT_UNCLASSIFIED;
+    if (check(rebof3_format_classify(&entry, payload, payload_len, &format) == REBOF3_STATUS_OK && format == REBOF3_FORMAT_CLUT_BLOCK, "classify")) return 1;
+    rebof3_format_info info;
+    memset(&info, 0, sizeof info);
+    if (check(rebof3_format_info_of(format, &info) == REBOF3_STATUS_OK && info.name != NULL && strcmp(info.extension, "clut") == 0 && strcmp(info.kind, "palette") == 0, "format info")) return 1;
+    rebof3_buffer palette_png;
+    memset(&palette_png, 0, sizeof palette_png);
+    if (check(rebof3_palette_swatch_png(payload, payload_len, &palette_png) == REBOF3_STATUS_OK && palette_png.data != NULL && palette_png.len > 8 && palette_png.data[0] == 0x89 && memcmp(palette_png.data + 1, "PNG", 3) == 0, "palette png")) return 1;
+    rebof3_buffer_free(&palette_png);
+    rebof3_buffer palette_json;
+    memset(&palette_json, 0, sizeof palette_json);
+    if (check(rebof3_palette_json(payload, payload_len, &palette_json) == REBOF3_STATUS_OK && palette_json.data != NULL && palette_json.len > 0 && palette_json.data[0] == '{', "palette json")) return 1;
+    rebof3_buffer_free(&palette_json);
+    static const uint8_t vag[32] = {0};
+    rebof3_buffer wav;
+    memset(&wav, 0, sizeof wav);
+    if (check(rebof3_vag_wav(vag, sizeof vag, &wav) == REBOF3_STATUS_OK && wav.data != NULL && wav.len > 44 && memcmp(wav.data, "RIFF", 4) == 0, "vag wav")) return 1;
+    rebof3_buffer_free(&wav);
+
     rebof3_buffer rebuilt;
     memset(&rebuilt, 0, sizeof rebuilt);
     if (check(rebof3_emi_rebuild(archive, sizeof archive, NULL, 0, &rebuilt) == REBOF3_STATUS_OK && rebuilt.data != NULL, "rebuild")) return 1;

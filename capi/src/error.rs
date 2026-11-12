@@ -50,6 +50,7 @@ pub(crate) fn set_error(message: impl std::fmt::Display) {
 }
 
 /// One failure ready for the C boundary.
+#[derive(Debug)]
 pub(crate) struct Failure {
     pub(crate) status: rebof3_status,
     pub(crate) message: String,
@@ -69,6 +70,10 @@ pub(crate) fn usage(message: impl Into<String>) -> Failure {
     Failure::new(rebof3_status::Usage, message)
 }
 
+pub(crate) fn unsupported(message: impl Into<String>) -> Failure {
+    Failure::new(rebof3_status::Unsupported, message)
+}
+
 /// Runs `f` with the thread's error cleared, catches a panic and returns the status.
 pub(crate) fn guarded<T>(f: impl FnOnce() -> Result<T, Failure>) -> Result<T, rebof3_status> {
     clear_error();
@@ -81,6 +86,15 @@ pub(crate) fn guarded<T>(f: impl FnOnce() -> Result<T, Failure>) -> Result<T, re
         Err(_payload) => {
             set_error("the library panicked");
             Err(rebof3_status::Panic)
+        }
+    }
+}
+
+impl From<rebof3_formats::Error> for Failure {
+    fn from(error: rebof3_formats::Error) -> Self {
+        match error {
+            rebof3_formats::Error::Container(inner) => Self::from(inner),
+            other => Self { status: rebof3_status::Format, message: other.to_string() },
         }
     }
 }

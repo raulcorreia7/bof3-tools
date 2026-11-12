@@ -23,6 +23,7 @@ smoke = ["dep:cc"]
 
 [dependencies]
 rebof3-emi = { workspace = true, features = ["std"] }
+rebof3-formats.workspace = true
 
 [build-dependencies]
 cc = { version = "1", optional = true }

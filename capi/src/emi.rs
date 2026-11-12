@@ -10,6 +10,7 @@ use rebof3_emi_lib::pack::{self, Payload};
 use ::rebof3_emi as rebof3_emi_lib;
 
 use crate::error::{Failure, guarded, invalid, rebof3_status, usage};
+use crate::ffi::{array, input, out_ref, utf8};
 use crate::{rebof3_buffer, rebof3_string};
 
 /// One EMI table entry, as the C caller sees it.
@@ -54,36 +55,8 @@ unsafe fn archive_ref<'a>(archive: *const rebof3_emi) -> Result<&'a rebof3_emi, 
     unsafe { archive.as_ref() }.ok_or_else(|| invalid("the archive pointer is NULL"))
 }
 
-unsafe fn out_ref<'a, T>(pointer: *mut T, what: &str) -> Result<&'a mut T, Failure> {
-    if pointer.is_null() {
-        return Err(invalid(format!("{what} is NULL")));
-    }
-    Ok(unsafe { &mut *pointer })
-}
-
-unsafe fn input<'a>(data: *const u8, len: usize, what: &str) -> Result<&'a [u8], Failure> {
-    if data.is_null() {
-        if len == 0 {
-            return Ok(&[]);
-        }
-        return Err(invalid(format!("{what} is NULL with a nonzero length")));
-    }
-    Ok(unsafe { std::slice::from_raw_parts(data, len) })
-}
-
-unsafe fn array<'a, T>(data: *const T, count: usize, what: &str) -> Result<&'a [T], Failure> {
-    if count == 0 {
-        return Ok(&[]);
-    }
-    if data.is_null() {
-        return Err(invalid(format!("{what} is NULL with a nonzero count")));
-    }
-    Ok(unsafe { std::slice::from_raw_parts(data, count) })
-}
-
-unsafe fn utf8<'a>(data: *const c_char, len: usize, what: &str) -> Result<&'a str, Failure> {
-    let bytes = unsafe { input(data.cast::<u8>(), len, what)? };
-    std::str::from_utf8(bytes).map_err(|_| invalid(format!("{what} is not UTF-8")))
+pub(crate) fn entry_from_view(entry: &rebof3_emi_entry) -> Entry {
+    Entry { size: entry.size, offset: entry.offset, ram_ptr: entry.ram_ptr, first4: entry.first4, file_type: entry.file_type }
 }
 
 fn entry_view(entry: &Entry) -> rebof3_emi_entry {

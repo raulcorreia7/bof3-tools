@@ -10,6 +10,33 @@
 #include <stdlib.h>
 
 /**
+ * The format of one entry, in the registry's order.
+ */
+typedef enum {
+  REBOF3_FORMAT_VRAM_UPLOAD = 0,
+  REBOF3_FORMAT_CLUT_BLOCK = 1,
+  REBOF3_FORMAT_VAB_HEADER = 2,
+  REBOF3_FORMAT_VAB_BODY = 3,
+  REBOF3_FORMAT_SEP_PACKAGE = 4,
+  REBOF3_FORMAT_CHARACTER_SPRITES_LZ77 = 5,
+  REBOF3_FORMAT_CHARACTER_SPRITES = 6,
+  REBOF3_FORMAT_AREA_MESSAGE_TABLE = 7,
+  REBOF3_FORMAT_AREA_CELL_GRID = 8,
+  REBOF3_FORMAT_AREA_SCRIPT_TABLE = 9,
+  REBOF3_FORMAT_BATTLE_SCRIPT_TABLE = 10,
+  REBOF3_FORMAT_AREA_ACTOR_DEFS_TABLE = 11,
+  REBOF3_FORMAT_AREA_ENCOUNTER_TABLE = 12,
+  REBOF3_FORMAT_AREA_MAP_BUNDLE = 13,
+  REBOF3_FORMAT_AREA_AUX_WINDOW = 14,
+  REBOF3_FORMAT_SHARED_RESOURCE_TABLE = 15,
+  REBOF3_FORMAT_CUE_TABLE = 16,
+  REBOF3_FORMAT_MAGIC_SCRIPT_TABLE = 17,
+  REBOF3_FORMAT_CODE_IMAGE = 18,
+  REBOF3_FORMAT_RESERVE = 19,
+  REBOF3_FORMAT_UNCLASSIFIED = 20,
+} rebof3_format;
+
+/**
  * The result of every fallible C function.
  */
 typedef enum {
@@ -99,6 +126,26 @@ typedef struct {
   uint16_t reserved;
   uint32_t ram_ptr;
 } rebof3_emi_payload;
+
+/**
+ * What one format is: its names, its state and the asset kind it is written under.
+ */
+typedef struct {
+  const char *name;
+  const char *extension;
+  const char *state;
+  const char *spec_state;
+  const char *codec_state;
+  const char *kind;
+} rebof3_format_info;
+
+/**
+ * The PNG and JSON of a character sprite sheet.
+ */
+typedef struct {
+  rebof3_buffer json;
+  rebof3_buffer png;
+} rebof3_sprite_sheet;
 
 #ifdef __cplusplus
 extern "C" {
@@ -263,6 +310,142 @@ rebof3_status rebof3_emi_pack_payloads(uint32_t archive_version,
  * The pointer is NUL-terminated and valid until the next call on the same thread.
  */
 const char *rebof3_last_error_message(void);
+
+/**
+ * Classifies one entry from its table record and payload.
+ *
+ * # Safety
+ * `entry` must be a readable record and `payload` must point to `payload_len` readable bytes;
+ * `out_format` must be writable.
+ */
+rebof3_status rebof3_format_classify(const rebof3_emi_entry *entry,
+                                     const uint8_t *payload,
+                                     size_t payload_len,
+                                     rebof3_format *out_format);
+
+/**
+ * Reads one format's metadata. The strings are static and NUL-terminated.
+ *
+ * # Safety
+ * `out_info` must be writable.
+ */
+rebof3_status rebof3_format_info_of(rebof3_format format, rebof3_format_info *out_info);
+
+/**
+ * Writes the 16 bpp PNG view of a type-3 VRAM upload.
+ *
+ * # Safety
+ * `payload` must point to `payload_len` readable bytes and `out` must be writable.
+ */
+rebof3_status rebof3_texture_png(uint32_t load_arg,
+                                 const uint8_t *payload,
+                                 size_t payload_len,
+                                 rebof3_buffer *out);
+
+/**
+ * Writes the 15 bpp TIM file of a type-3 VRAM upload.
+ *
+ * # Safety
+ * `payload` must point to `payload_len` readable bytes and `out` must be writable.
+ */
+rebof3_status rebof3_texture_tim(uint32_t load_arg,
+                                 const uint8_t *payload,
+                                 size_t payload_len,
+                                 rebof3_buffer *out);
+
+/**
+ * Writes the indexed PNG of a texture read in one palette row.
+ *
+ * # Safety
+ * `payload` must point to `payload_len` readable bytes, `palette` must point to `palette_len`
+ * readable 16-bit words, and `out` must be writable.
+ */
+rebof3_status rebof3_texture_row_png(uint32_t load_arg,
+                                     const uint8_t *payload,
+                                     size_t payload_len,
+                                     uint32_t bits,
+                                     const uint16_t *palette,
+                                     size_t palette_len,
+                                     rebof3_buffer *out);
+
+/**
+ * Writes the JSON of a CLUT block.
+ *
+ * # Safety
+ * `payload` must point to `payload_len` readable bytes and `out` must be writable.
+ */
+rebof3_status rebof3_palette_json(const uint8_t *payload, size_t payload_len, rebof3_buffer *out);
+
+/**
+ * Writes the swatch-strip PNG of a CLUT block.
+ *
+ * # Safety
+ * `payload` must point to `payload_len` readable bytes and `out` must be writable.
+ */
+rebof3_status rebof3_palette_swatch_png(const uint8_t *payload,
+                                        size_t payload_len,
+                                        rebof3_buffer *out);
+
+/**
+ * Writes one VAG stream as a 44.1 kHz mono 16-bit WAVE file.
+ *
+ * # Safety
+ * `vag` must point to `vag_len` readable bytes and `out` must be writable.
+ */
+rebof3_status rebof3_vag_wav(const uint8_t *vag, size_t vag_len, rebof3_buffer *out);
+
+/**
+ * Writes one sample of a VAB bank as a 44.1 kHz mono 16-bit WAVE file.
+ *
+ * # Safety
+ * `header` and `body` must point to their readable lengths and `out` must be writable.
+ */
+rebof3_status rebof3_vab_vag_wav(const uint8_t *header,
+                                 size_t header_len,
+                                 const uint8_t *body,
+                                 size_t body_len,
+                                 uint32_t index,
+                                 rebof3_buffer *out);
+
+/**
+ * Writes a VAB bank as a SoundFont 2 file.
+ *
+ * # Safety
+ * `header` and `body` must point to their readable lengths, `title` must point to `title_len`
+ * readable UTF-8 bytes, and `out` must be writable.
+ */
+rebof3_status rebof3_soundfont(const uint8_t *header,
+                               size_t header_len,
+                               const uint8_t *body,
+                               size_t body_len,
+                               const char *title,
+                               size_t title_len,
+                               rebof3_buffer *out);
+
+/**
+ * Writes the PNG and JSON of one character sprite section.
+ *
+ * # Safety
+ * `sprites` and `executable` must point to their readable lengths, `image_name` must point to
+ * `image_name_len` readable UTF-8 bytes, and `out` must be writable.
+ */
+rebof3_status rebof3_sprite_sheet_export(const uint8_t *sprites,
+                                         size_t sprites_len,
+                                         const uint8_t *executable,
+                                         size_t executable_len,
+                                         uint32_t section,
+                                         uint32_t palette,
+                                         const char *image_name,
+                                         size_t image_name_len,
+                                         rebof3_sprite_sheet *out);
+
+/**
+ * Releases the two buffers of a sprite sheet.
+ *
+ * # Safety
+ * `sheet` must be NULL or a sheet this library returned, not yet freed.
+ */
+void rebof3_sprite_sheet_free(rebof3_sprite_sheet *sheet);
 
 #ifdef __cplusplus
 }  // extern "C"
