@@ -10,6 +10,23 @@
 #include <stdlib.h>
 
 /**
+ * The container rendered audio is written in.
+ */
+typedef enum {
+  REBOF3_AUDIO_WAV = 0,
+  REBOF3_AUDIO_FLAC = 1,
+  REBOF3_AUDIO_OGG = 2,
+} rebof3_audio;
+
+/**
+ * The direction of a codec conversion.
+ */
+typedef enum {
+  REBOF3_DIRECTION_EXPORT = 0,
+  REBOF3_DIRECTION_IMPORT = 1,
+} rebof3_direction;
+
+/**
  * The format of one entry, in the registry's order.
  */
 typedef enum {
@@ -35,6 +52,24 @@ typedef enum {
   REBOF3_FORMAT_RESERVE = 19,
   REBOF3_FORMAT_UNCLASSIFIED = 20,
 } rebof3_format;
+
+/**
+ * How a codec conversion uses its index.
+ */
+typedef enum {
+  REBOF3_INDEX_NONE = 0,
+  REBOF3_INDEX_OPTIONAL = 1,
+  REBOF3_INDEX_REQUIRED = 2,
+} rebof3_index;
+
+/**
+ * Which outputs an extraction writes.
+ */
+typedef enum {
+  REBOF3_MODE_BOTH = 0,
+  REBOF3_MODE_RAW = 1,
+  REBOF3_MODE_MODERN = 2,
+} rebof3_mode;
 
 /**
  * The result of every fallible C function.
@@ -94,6 +129,51 @@ typedef struct {
   char *data;
   size_t len;
 } rebof3_string;
+
+/**
+ * One codec and the direction's requirements.
+ */
+typedef struct {
+  const char *kind;
+  uint32_t files;
+  uint32_t named;
+  uint32_t load_arg;
+  rebof3_index index;
+  const char *extension;
+} rebof3_assets_codec;
+
+/**
+ * The files and options of one codec conversion.
+ */
+typedef struct {
+  const uint8_t *input;
+  size_t input_len;
+  const uint8_t *companion;
+  size_t companion_len;
+  const char *name;
+  size_t name_len;
+  const uint32_t *index;
+  const uint32_t *load_arg;
+} rebof3_assets_job;
+
+/**
+ * The inputs and outputs of an asset extraction.
+ */
+typedef struct {
+  const char *image_path;
+  size_t image_path_len;
+  const char *output_dir;
+  size_t output_dir_len;
+  const char *kinds;
+  size_t kinds_len;
+  const char *text_disc;
+  size_t text_disc_len;
+  rebof3_mode mode;
+  rebof3_audio audio;
+  uint32_t write;
+  uint32_t reserved;
+  size_t jobs;
+} rebof3_assets_options;
 
 /**
  * One EMI table entry, as the C caller sees it.
@@ -171,6 +251,49 @@ void rebof3_buffer_free(rebof3_buffer *buffer);
  * `string` must be NULL or a string this library returned, not yet freed.
  */
 void rebof3_string_free(rebof3_string *string);
+
+/**
+ * Reads the number of asset codecs.
+ *
+ * # Safety
+ * `out_count` must be writable.
+ */
+rebof3_status rebof3_assets_codec_count(size_t *out_count);
+
+/**
+ * Reads one codec's requirements in one direction.
+ *
+ * # Safety
+ * `kind` must point to `kind_len` readable UTF-8 bytes and `out` must be writable.
+ */
+rebof3_status rebof3_assets_codec_info(const char *kind,
+                                       size_t kind_len,
+                                       rebof3_direction direction,
+                                       rebof3_assets_codec *out);
+
+/**
+ * Runs one codec conversion from the supplied bytes.
+ *
+ * # Safety
+ * `kind` must point to `kind_len` readable UTF-8 bytes, `job` must be a readable job whose
+ * pointers are readable for their lengths, and `out` must be writable.
+ */
+rebof3_status rebof3_assets_convert(const char *kind,
+                                    size_t kind_len,
+                                    rebof3_direction direction,
+                                    const rebof3_assets_job *job,
+                                    rebof3_buffer *out);
+
+/**
+ * Runs the selected asset extraction and returns its `assets.jsonl` and summary.
+ *
+ * # Safety
+ * `options` must be a readable options record whose pointers are readable for their lengths;
+ * the out pointers may be NULL to skip that result.
+ */
+rebof3_status rebof3_assets_extract(const rebof3_assets_options *options,
+                                    rebof3_string *report_jsonl,
+                                    rebof3_string *summary);
 
 /**
  * Opens the EMI container at `path`.

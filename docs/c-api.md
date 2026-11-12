@@ -2,7 +2,7 @@
 
 `rebof3-capi` is the C ABI over the library crates. The library crates stay pure Rust; the crate
 holds every `extern "C"` function, the status codes and the ownership rules. It exports the EMI
-container and the entry formats; the asset functions follow.
+container, the entry formats, and the asset codecs and extractor.
 
 ## Build
 
@@ -33,6 +33,15 @@ strings are NUL-terminated and are not freed. The common decoders are `rebof3_te
 `rebof3_texture_tim`, `rebof3_texture_row_png`, `rebof3_palette_json`, `rebof3_palette_swatch_png`,
 `rebof3_vag_wav`, `rebof3_vab_vag_wav`, `rebof3_soundfont` and `rebof3_sprite_sheet_export`. Each
 returns an owned buffer.
+
+## Assets
+
+`rebof3_assets_codec_count` and `rebof3_assets_codec_info` describe the conversion table: a kind's
+files, whether it takes a name, an index or a load argument, and its default extension; the kind and
+extension strings are static and NUL-terminated. `rebof3_assets_convert` runs one export or import
+from memory. `rebof3_assets_extract` runs the selected kinds over a disc image and returns the
+`assets.jsonl` text and summary; with `write` set it writes them into the output directory too. A
+NULL `kinds` selects every kind, with the `text` kind included only when `text_disc` is set.
 
 ## Use
 
