@@ -50,6 +50,7 @@ pub(crate) fn set_error(message: impl std::fmt::Display) {
 }
 
 /// One failure ready for the C boundary.
+#[derive(Debug)]
 pub(crate) struct Failure {
     pub(crate) status: rebof3_status,
     pub(crate) message: String,
@@ -69,6 +70,10 @@ pub(crate) fn usage(message: impl Into<String>) -> Failure {
     Failure::new(rebof3_status::Usage, message)
 }
 
+pub(crate) fn unsupported(message: impl Into<String>) -> Failure {
+    Failure::new(rebof3_status::Unsupported, message)
+}
+
 /// Runs `f` with the thread's error cleared, catches a panic and returns the status.
 pub(crate) fn guarded<T>(f: impl FnOnce() -> Result<T, Failure>) -> Result<T, rebof3_status> {
     clear_error();
@@ -81,6 +86,47 @@ pub(crate) fn guarded<T>(f: impl FnOnce() -> Result<T, Failure>) -> Result<T, re
         Err(_payload) => {
             set_error("the library panicked");
             Err(rebof3_status::Panic)
+        }
+    }
+}
+
+impl From<std::io::Error> for Failure {
+    fn from(error: std::io::Error) -> Self {
+        Self { status: rebof3_status::Io, message: error.to_string() }
+    }
+}
+
+fn has_io_source(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if error.downcast_ref::<std::io::Error>().is_some() {
+            return true;
+        }
+        current = error.source();
+    }
+    false
+}
+
+impl From<rebof3_assets::Error> for Failure {
+    fn from(error: rebof3_assets::Error) -> Self {
+        match error {
+            rebof3_assets::Error::Io(inner) => Self { status: rebof3_status::Io, message: inner.to_string() },
+            rebof3_assets::Error::Disc(inner) => {
+                let status = if has_io_source(&inner) { rebof3_status::Io } else { rebof3_status::Format };
+                Self { status, message: inner.to_string() }
+            }
+            rebof3_assets::Error::Formats(inner) => Self::from(inner),
+            rebof3_assets::Error::Usage(message) | rebof3_assets::Error::Text(message) => Self { status: rebof3_status::Usage, message },
+            other => Self { status: rebof3_status::Format, message: other.to_string() },
+        }
+    }
+}
+
+impl From<rebof3_formats::Error> for Failure {
+    fn from(error: rebof3_formats::Error) -> Self {
+        match error {
+            rebof3_formats::Error::Container(inner) => Self::from(inner),
+            other => Self { status: rebof3_status::Format, message: other.to_string() },
         }
     }
 }
