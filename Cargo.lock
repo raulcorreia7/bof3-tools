@@ -4884,6 +4884,7 @@ version = "0.1.0"
 dependencies = [
  "cbindgen",
  "cc",
+ "rebof3-assets",
  "rebof3-capi",
  "rebof3-emi",
  "rebof3-formats",

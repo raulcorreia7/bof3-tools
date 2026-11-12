@@ -90,6 +90,38 @@ pub(crate) fn guarded<T>(f: impl FnOnce() -> Result<T, Failure>) -> Result<T, re
     }
 }
 
+impl From<std::io::Error> for Failure {
+    fn from(error: std::io::Error) -> Self {
+        Self { status: rebof3_status::Io, message: error.to_string() }
+    }
+}
+
+fn has_io_source(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if error.downcast_ref::<std::io::Error>().is_some() {
+            return true;
+        }
+        current = error.source();
+    }
+    false
+}
+
+impl From<rebof3_assets::Error> for Failure {
+    fn from(error: rebof3_assets::Error) -> Self {
+        match error {
+            rebof3_assets::Error::Io(inner) => Self { status: rebof3_status::Io, message: inner.to_string() },
+            rebof3_assets::Error::Disc(inner) => {
+                let status = if has_io_source(&inner) { rebof3_status::Io } else { rebof3_status::Format };
+                Self { status, message: inner.to_string() }
+            }
+            rebof3_assets::Error::Formats(inner) => Self::from(inner),
+            rebof3_assets::Error::Usage(message) | rebof3_assets::Error::Text(message) => Self { status: rebof3_status::Usage, message },
+            other => Self { status: rebof3_status::Format, message: other.to_string() },
+        }
+    }
+}
+
 impl From<rebof3_formats::Error> for Failure {
     fn from(error: rebof3_formats::Error) -> Self {
         match error {

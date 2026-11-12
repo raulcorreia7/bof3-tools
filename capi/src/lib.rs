@@ -9,6 +9,7 @@
 // Every exported type is named for C, which is not Rust's CamelCase.
 #![allow(non_camel_case_types)]
 
+mod assets;
 mod emi;
 mod error;
 mod ffi;
