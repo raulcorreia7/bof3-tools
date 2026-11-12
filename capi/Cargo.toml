@@ -1,0 +1,39 @@
+[package]
+name = "rebof3-capi"
+description = "The C interface to the Breath of Fire III EMI, format and asset libraries"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[lib]
+name = "rebof3_capi"
+# The rlib lets the C smoke test link the exported symbols; the C library itself is the first two.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = []
+# Builds the C smoke test; the test-only self dev-dependency turns it on.
+smoke = ["dep:cc"]
+
+[dependencies]
+rebof3-emi = { workspace = true, features = ["std"] }
+rebof3-formats.workspace = true
+rebof3-assets.workspace = true
+
+[build-dependencies]
+cc = { version = "1", optional = true }
+
+[dev-dependencies]
+# The committed header is generated and checked by the same cbindgen version.
+cbindgen = { version = "=0.28.0", default-features = false }
+# A self dev-dependency turns the smoke feature on for the test build only.
+rebof3-capi = { path = ".", features = ["smoke"] }
+
+[lints]
+workspace = true

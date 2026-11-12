@@ -8,6 +8,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "capi",
     "crates/rebof3-emi",
     "crates/rebof3-formats",
     "crates/rebof3-assets",

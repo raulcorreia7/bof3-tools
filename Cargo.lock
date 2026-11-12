@@ -4879,6 +4879,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rebof3-capi"
+version = "0.1.0"
+dependencies = [
+ "cbindgen",
+ "cc",
+ "rebof3-assets",
+ "rebof3-capi",
+ "rebof3-emi",
+ "rebof3-formats",
+]
+
+[[package]]
 name = "rebof3-editor"
 version = "0.1.0"
 dependencies = [
