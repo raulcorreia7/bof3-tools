@@ -20,122 +20,132 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Reads the whole pull request's file list; a per-job `git diff HEAD^1` sees only its last commit.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.files.outputs.code }}
+      lock: ${{ steps.files.outputs.lock }}
+    steps:
+      - id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=true
+          lock=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/${{ github.event.pull_request.number }}/files?per_page=100" --jq '.[].filename') || files=unknown
+            code=false
+            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
+            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
+            lock=false
+            if printf '%s\n' "$files" | grep -qE '(^|/)Cargo\.(lock|toml)$'; then lock=true; fi
+          fi
+          { echo "code=$code"; echo "lock=$lock"; } >> "$GITHUB_OUTPUT"
+
   check:
+    needs: changes
     strategy:
       fail-fast: false
       matrix:
-        # Linux covers Unix and Windows covers its paths; the release workflow builds macOS.
-        os: [ubuntu-latest, windows-latest]
+        # Linux covers Unix; Windows reports from check-windows; the release workflow builds macOS.
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     # gpui, the editor's toolkit, makes a cold build long; the player's CI allows the same.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
           persist-credentials: false
       # Docs-only pull requests skip the build steps.
-      - id: changes
-        name: Changes
-        shell: bash
-        run: |
-          code=true
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
-            code=false
-            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
-            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
-          fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
-        if: steps.changes.outputs.code == 'true' && runner.os == 'Linux'
+        if: needs.changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libvulkan-dev
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: rustup component add rustfmt
       - run: cargo fmt --all --check
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         run: rustup component add clippy
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         run: cargo test --workspace --locked
 
+  # The ruleset requires this context; a skipped job reports it as skipped, which counts as successful.
+  check-windows:
+    name: check (windows-latest)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: rustup component add clippy
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+
   msrv:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
           persist-credentials: false
       # Docs-only pull requests skip the build steps.
-      - id: changes
-        name: Changes
-        shell: bash
-        run: |
-          code=true
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
-            code=false
-            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
-            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
-          fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Install Linux dependencies
-        if: steps.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libvulkan-dev
       - name: Install the minimum supported Rust version
-        if: steps.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true'
         run: |
           msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
           rustup toolchain install "$msrv" --profile minimal
           echo "RUSTUP_TOOLCHAIN=$msrv" >> "$GITHUB_ENV"
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         run: cargo check --workspace --locked
 
   dependencies:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      # The lock rarely changes; the nightly deny workflow keeps advisories current between changes.
+      - if: needs.changes.outputs.lock == 'true' || github.event_name != 'pull_request'
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
 
   build-cli:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
           persist-credentials: false
       # Docs-only pull requests skip the build steps.
-      - id: changes
-        name: Changes
-        shell: bash
-        run: |
-          code=true
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            files=$(git diff --name-only HEAD^1 HEAD) || files=unknown
-            code=false
-            if printf '%s\n' "$files" | grep -qvE '^(.*\.md|docs/.*|LICENSE[^/]*|NOTICE|\.github/ISSUE_TEMPLATE/.*)$'; then code=true; fi
-            if printf '%s\n' "$files" | grep -qE '^\.github/workflows/'; then code=true; fi
-          fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-      - if: steps.changes.outputs.code == 'true'
+      - if: needs.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Build setup-only CLI
-        if: steps.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true'
         run: |
           cargo build --locked --release -p rebof3 --no-default-features
           ./target/release/bof3 disc --help
           ./target/release/bof3 emi --help
       - name: Build full assets CLI
-        if: steps.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true'
         run: |
           cargo build --locked --release -p rebof3
           ./target/release/bof3 disc --help
