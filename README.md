@@ -117,6 +117,7 @@ retail disc skip without it; `make check-retail` runs them with `BOF3_DISC_DIR` 
 - [Asset output](docs/assets.md): the folder layout and file kinds.
 - [Asset editor](docs/editor.md): the views, the game catalog and the format coverage.
 - [Crates](docs/crates.md): the libraries behind the command.
+- [C interface](docs/c-api.md): the C ABI over the libraries, its ownership rules and an example.
 - [CONTRIBUTING.md](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md) and the
   [security policy](SECURITY.md).
 - Related projects: [bof3-player](https://github.com/raulcorreia7/bof3-player) plays the extracted

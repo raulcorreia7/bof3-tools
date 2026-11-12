@@ -13,6 +13,9 @@ disc and bundled-names libraries.
 | `rebof3-render` | Draws field scenes with the GPU's texturing rules, offscreen through OpenGL ES (the `gles` feature) or in software ([ADR 0003](adr/0003-area-3d-rendering.md)). |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 
+The C interface is `capi/` (`rebof3-capi`): it wraps the library crates and is not part of the
+command. [C interface](c-api.md) has its build, ownership rules and example.
+
 Every first-party crate is MIT; `cargo deny check` keeps dependencies permissive. The container
 layout is in the [EMI format](https://raulcorreia7.github.io/bof3-wiki/formats/emi.html). The
 PlayStation formats inside the entries (VAB, SEP, VRAM, CLUT) are in
