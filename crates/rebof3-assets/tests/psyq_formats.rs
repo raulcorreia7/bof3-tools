@@ -8,10 +8,11 @@ mod support;
 use std::collections::BTreeMap;
 use std::fs;
 
+use psx_formats::sep::{Package, seq};
 use rebof3_emi::{Archive, texture};
 use rebof3_formats::joins::joined_rows;
 use rebof3_formats::vram::{self, Placement};
-use rebof3_formats::{Format, classify, clut, sep, vab};
+use rebof3_formats::{Format, classify, clut, vab};
 
 /// One archive of the disc: its entries and payloads.
 struct Disc {
@@ -148,13 +149,13 @@ fn retail_sequence_packages_round_trip_through_sep_and_seq() {
             packages += 1;
             let payload = &disc.payloads[slot];
             let name = format!("{} #{slot}", disc.path);
-            assert_eq!(&sep::psyq::export_sep(payload).expect("a SEP file"), payload, "{name}: export");
-            assert_eq!(&sep::psyq::import_sep(payload).expect("a SEP file"), payload, "{name}: import");
+            assert_eq!(&Package::validate(payload).expect("a SEP file").encode(), payload, "{name}: export");
+            assert_eq!(&Package::validate(payload).expect("a SEP file").encode(), payload, "{name}: import");
 
             let package = psx_formats::sep::Package::parse(payload).expect("a package");
-            let files: Vec<Vec<u8>> = (0..package.sequences.len()).map(|index| sep::psyq::export_seq(payload, index).expect("a SEQ file")).collect();
+            let files: Vec<Vec<u8>> = (0..package.sequences.len()).map(|index| seq::export(payload, index).expect("a SEQ file")).collect();
             let parts: Vec<(&[u8], u16)> = files.iter().zip(&package.sequences).map(|(file, sequence)| (file.as_slice(), sequence.seq_id)).collect();
-            assert_eq!(&sep::psyq::import_seq(&parts).expect("the SEQ files"), payload, "{name}: SEQ files");
+            assert_eq!(&seq::package(&parts).expect("the SEQ files").encode(), payload, "{name}: SEQ files");
             sequences += files.len();
         }
     }

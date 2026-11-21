@@ -26,12 +26,11 @@ pub mod gles;
 pub mod math;
 pub mod software;
 
-pub use camera::Camera;
+use psx_formats::gfx::texture::{Clut, Color};
 
-/// VRAM width in 16-bit words (psx-spx, "GPU Video Memory (VRAM)").
-pub const VRAM_WIDTH: usize = 1024;
-/// VRAM height in lines.
-pub const VRAM_HEIGHT: usize = 512;
+pub use camera::Camera;
+pub use psx_formats::gfx::vram::{VRAM_HEIGHT, VRAM_WIDTH};
+
 /// The vertex colour that leaves a texel unchanged (psx-spx, "GPU Rendering Attributes").
 pub const NEUTRAL_SHADE: u8 = 0x80;
 /// The semi-transparency bit of a colour word.
@@ -48,32 +47,13 @@ pub enum Blend {
     Alpha,
 }
 
-/// A texel depth of a VRAM texture page.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum Depth {
-    Four,
-    Eight,
-    Fifteen,
-}
-
-impl Depth {
-    /// Texels per VRAM word.
-    pub fn per_word(self) -> usize {
-        match self {
-            Self::Four => 4,
-            Self::Eight => 2,
-            Self::Fifteen => 1,
-        }
-    }
-}
-
 /// Where a primitive's texels come from.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Texture {
     /// Untextured: the colour fills the polygon.
     None,
     /// A VRAM texture page read through a CLUT, at byte coordinates per corner.
-    Vram { page: [u16; 2], clut: [u16; 2], depth: Depth, uvs: [[u8; 2]; 4] },
+    Vram { page: [u16; 2], clut: Clut, depth: Color, uvs: [[u8; 2]; 4] },
     /// One of the scene's images, at fractional coordinates per corner (`0` to `1`).
     Image { image: usize, uvs: [[f32; 2]; 4] },
 }

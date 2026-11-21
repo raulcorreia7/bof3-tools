@@ -1,7 +1,8 @@
 //! The OpenGL ES renderer draws what the software renderer draws. Without an EGL display (a CI runner
 //! with no GPU or Mesa) the comparison skips and says why.
 
-use rebof3_render::{Backend, Blend, Camera, Depth, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, software};
+use psx_formats::gfx::texture::{Clut, Color, Depth};
+use rebof3_render::{Backend, Blend, Camera, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, software};
 
 /// A VRAM with an 8-bit page at (64, 0) whose texel at `(u, v)` is `(u + v) & 0xFF`, a 4-bit page at
 /// (128, 0) whose texel is `u & 15`, and a CLUT row 480 mapping index `i` to a colour with bit 15 on
@@ -33,8 +34,8 @@ fn scene() -> Scene {
     let wall = [[-200.0, 150.0, 0.0], [200.0, 150.0, 0.0], [-200.0, 0.0, 0.0], [200.0, 0.0, 0.0]];
     let glass = [[-300.0, 100.0, 100.0], [0.0, 100.0, 100.0], [-300.0, 0.0, 100.0], [0.0, 0.0, 100.0]];
     let sign = [[100.0, 120.0, 150.0], [250.0, 120.0, 150.0], [100.0, 20.0, 150.0], [250.0, 20.0, 150.0]];
-    let eight = |uvs| Texture::Vram { page: [64, 0], clut: [0, 480], depth: Depth::Eight, uvs };
-    let four = Texture::Vram { page: [128, 0], clut: [16, 480], depth: Depth::Four, uvs: [[0, 0], [63, 0], [0, 63], [63, 63]] };
+    let eight = |uvs| Texture::Vram { page: [64, 0], clut: Clut { x: 0, y: 480 }, depth: Color::Indexed(Depth::Eight), uvs };
+    let four = Texture::Vram { page: [128, 0], clut: Clut { x: 16, y: 480 }, depth: Color::Indexed(Depth::Four), uvs: [[0, 0], [63, 0], [0, 63], [63, 63]] };
     let image = Image { width: 2, height: 2, rgba: vec![255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 0, 255, 255, 255, 255] };
     Scene {
         vram: vram(),

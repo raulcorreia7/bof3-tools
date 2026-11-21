@@ -2,6 +2,7 @@
 //! scene built from them, the cameras and the edits. Every edit returns a whole new payload in which
 //! only the edited bytes differ, so an untouched entry rebuilds byte for byte.
 
+use psx_formats::gfx::texture::Color;
 use rebof3_emi::replay::Vram;
 use rebof3_emi::texture::scene::resolve;
 use rebof3_formats::encounter::{ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, EncounterBlock, put_encounter};
@@ -14,7 +15,7 @@ use rebof3_formats::map::terrain::{self, HEIGHT_SCALE};
 use rebof3_formats::map::{CELL_BYTES, MapBundle};
 use rebof3_formats::scene::{SceneRecord, SceneTable};
 use rebof3_render::math::{self, rot_matrix};
-use rebof3_render::{Blend, Camera, Depth, Primitive, Scene, Texture};
+use rebof3_render::{Blend, Camera, Primitive, Scene, Texture};
 use serde_json::json;
 
 /// The load addresses of the area entries the view reads beside the bundle: the packed battle grid
@@ -357,11 +358,7 @@ fn cell_colour(area: &Area, layers: Layers, cell: usize) -> Option<[u8; 4]> {
 
 /// The VRAM texture of a tile.
 fn vram_texture(tile: &Tile) -> Texture {
-    let depth = match tile.depth {
-        psx_formats::gfx::texture::Depth::Four => Depth::Four,
-        psx_formats::gfx::texture::Depth::Eight => Depth::Eight,
-    };
-    Texture::Vram { page: tile.page, clut: [tile.clut.x, tile.clut.y], depth, uvs: tile.uvs }
+    Texture::Vram { page: tile.page, clut: tile.clut, depth: Color::Indexed(tile.depth), uvs: tile.uvs }
 }
 
 /// The grey of a quad drawn without its texture: by face, lighter for a higher cell.
