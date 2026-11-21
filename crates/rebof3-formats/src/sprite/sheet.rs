@@ -322,19 +322,48 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
     let mut stages = Stages::new(section, extension.palette)?;
     let mut out = section.clone();
 
-    let palette = &mut out.palettes[extension.palette];
-    for (index, colour) in palette.iter_mut().enumerate() {
-        let picked = *picture.colors.get(index).ok_or_else(|| Error::CharacterSprites(format!("the PNG palette has {} colours; a palette has {COLOURS}", picture.colors.len())))?;
-        if picked != word_to_view(*colour) {
-            *colour = view_to_word(picked);
-        }
-    }
+    recolour(&mut out.palettes[extension.palette], &picture.colors)?;
 
     let left = -extension.origin.x;
     let top = -extension.origin.y;
     let bounds = Bounds { left, top, right: left + extension.cell.w as i32, bottom: top + extension.cell.h as i32 };
-    let mut changes: BTreeMap<(usize, u8, u8), (u8, String)> = BTreeMap::new();
-    for pose in &extension.poses {
+    let changes = collect_texel_changes(section, &mut stages, sizes, &extension.poses, bounds, &picture)?;
+    apply_texel_changes(&mut out, changes)?;
+
+    let positions: Vec<(usize, usize)> = extension.animations.iter().flat_map(|exported| exported.steps.iter().map(move |&position| (exported.animation, position))).collect();
+    if positions.len() != json.frames.len() {
+        return Err(Error::CharacterSprites(format!("the JSON has {} frames; the section's animations show {}", json.frames.len(), positions.len())));
+    }
+    for (&(animation, position), frame) in positions.iter().zip(&json.frames) {
+        let step = out.animations.get_mut(animation).and_then(|animation| animation.steps.get_mut(position)).ok_or_else(|| missing("step", position))?;
+        if duration_ms(step.delay) != frame.duration {
+            step.delay = delay_of(frame.duration).ok_or_else(|| {
+                Error::CharacterSprites(format!("{} lasts {} ms; a step lasts 1 to {} ticks of {:.3} ms", frame.filename, frame.duration, super::JUMP - 1, TICK_MICROS / MICROS_PER_MILLI))
+            })?;
+        }
+    }
+    Ok(out)
+}
+
+/// The repainted texels by `(sheet, u, v)`: the new index and the place that painted it.
+type TexelChanges = BTreeMap<(usize, u8, u8), (u8, String)>;
+
+/// Copies the PNG palette into `palette`, changing only the colours that differ.
+fn recolour(palette: &mut super::Palette, picked: &[[u8; 4]]) -> Result<()> {
+    for (index, colour) in palette.iter_mut().enumerate() {
+        let picked = *picked.get(index).ok_or_else(|| Error::CharacterSprites(format!("the PNG palette has {} colours; a palette has {COLOURS}", picked.len())))?;
+        if picked != word_to_view(*colour) {
+            *colour = view_to_word(picked);
+        }
+    }
+    Ok(())
+}
+
+/// The sheet texels the PNG repaints, as `(sheet, u, v) -> (index, place)`; two poses must agree on a shared texel.
+fn collect_texel_changes(section: &Section, stages: &mut Stages, sizes: &SpriteSizes, poses: &[Pose], bounds: Bounds, picture: &png::Indexed) -> Result<TexelChanges> {
+    let width = picture.width as usize;
+    let mut changes = TexelChanges::new();
+    for pose in poses {
         let animation = section.animations.get(pose.animation).ok_or_else(|| missing("animation", pose.animation))?;
         let frame = animation.frames.get(pose.frame).ok_or_else(|| missing("frame", pose.frame))?;
         let sheet = section.image_of(pose.animation).ok_or_else(|| Error::CharacterSprites(format!("no record plays animation {}", pose.animation)))?;
@@ -362,7 +391,11 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
             }
         }
     }
+    Ok(changes)
+}
 
+/// Writes the repainted texels into their sheets.
+fn apply_texel_changes(out: &mut Section, changes: TexelChanges) -> Result<()> {
     let mut edited: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
     for ((sheet, u, v), (index, _)) in changes {
         let texels = edited.entry(sheet).or_insert_with(|| out.images[sheet].texels().to_vec());
@@ -371,20 +404,7 @@ pub fn import_section(section: &Section, sizes: &SpriteSizes, json: &[u8], png: 
     for (sheet, texels) in edited {
         out.images[sheet].set_texels(texels)?;
     }
-
-    let positions: Vec<(usize, usize)> = extension.animations.iter().flat_map(|exported| exported.steps.iter().map(move |&position| (exported.animation, position))).collect();
-    if positions.len() != json.frames.len() {
-        return Err(Error::CharacterSprites(format!("the JSON has {} frames; the section's animations show {}", json.frames.len(), positions.len())));
-    }
-    for (&(animation, position), frame) in positions.iter().zip(&json.frames) {
-        let step = out.animations.get_mut(animation).and_then(|animation| animation.steps.get_mut(position)).ok_or_else(|| missing("step", position))?;
-        if duration_ms(step.delay) != frame.duration {
-            step.delay = delay_of(frame.duration).ok_or_else(|| {
-                Error::CharacterSprites(format!("{} lasts {} ms; a step lasts 1 to {} ticks of {:.3} ms", frame.filename, frame.duration, super::JUMP - 1, TICK_MICROS / MICROS_PER_MILLI))
-            })?;
-        }
-    }
-    Ok(out)
+    Ok(())
 }
 
 fn read_json(json: &[u8]) -> Result<Json> {

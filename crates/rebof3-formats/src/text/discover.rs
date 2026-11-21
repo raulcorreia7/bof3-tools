@@ -254,6 +254,44 @@ fn pointer_table_at(payload: &[u8], position: usize, base: Option<u32>) -> bool 
     })
 }
 
+/// Where a record walk stopped and what it saw on the way.
+struct RecordWalk {
+    end: usize,
+    letters: usize,
+    aborted: bool,
+    terminated: bool,
+}
+
+/// Walks the bytes of one record from `start` to its terminator, a pointer table, a byte the game cannot run, or the end.
+fn walk_record(payload: &[u8], base: Option<u32>, start: usize) -> RecordWalk {
+    let size = payload.len();
+    let mut walk = RecordWalk { end: start, letters: 0, aborted: false, terminated: false };
+    while walk.end < size {
+        let at = walk.end;
+        let byte = payload[at];
+        if byte == 0 {
+            walk.terminated = true;
+            break;
+        }
+        if at.is_multiple_of(4) && pointer_table_at(payload, at, base) {
+            break;
+        }
+        if operand(byte) && at + 1 < size {
+            walk.end += 2;
+            continue;
+        }
+        if !drawable(byte) && !control(byte) {
+            walk.aborted = true;
+            break;
+        }
+        if byte.is_ascii_alphabetic() {
+            walk.letters += 1;
+        }
+        walk.end += 1;
+    }
+    walk
+}
+
 /// The records of a payload that begin with a byte the game can draw or run, as `(start, end)` with the terminator
 /// included when there is one. A record that holds a byte the game cannot run ends the candidate.
 fn scan_records(payload: &[u8], base: Option<u32>, limit: usize) -> Vec<(usize, usize)> {
@@ -266,34 +304,10 @@ fn scan_records(payload: &[u8], base: Option<u32>, limit: usize) -> Vec<(usize, 
             i += 1;
             continue;
         }
-        let mut j = i;
-        let mut letters = 0;
-        let mut aborted = false;
-        let mut terminated = false;
-        while j < size {
-            let byte = payload[j];
-            if byte == 0 {
-                terminated = true;
-                break;
-            }
-            if j % 4 == 0 && pointer_table_at(payload, j, base) {
-                break;
-            }
-            if operand(byte) && j + 1 < size {
-                j += 2;
-                continue;
-            }
-            if !drawable(byte) && !control(byte) {
-                aborted = true;
-                break;
-            }
-            if byte.is_ascii_alphabetic() {
-                letters += 1;
-            }
-            j += 1;
-        }
-        if !aborted && letters >= 1 && j - i <= limit {
-            spans.push((i, if terminated { j + 1 } else { j }));
+        let scan = walk_record(payload, base, i);
+        let j = scan.end;
+        if !scan.aborted && scan.letters >= 1 && j - i <= limit {
+            spans.push((i, if scan.terminated { j + 1 } else { j }));
         }
         i = if j > i { j + 1 } else { i + 1 };
     }

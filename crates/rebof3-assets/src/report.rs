@@ -57,6 +57,32 @@ pub struct Row {
 }
 
 impl Row {
+    /// A row of a whole file: no slot, no entry fields, nothing written yet.
+    pub(crate) fn new(source: String, format: &'static str, kind: Kind, state: &'static str, role: &'static str) -> Self {
+        Self {
+            source,
+            slot: None,
+            offset: 0,
+            size: 0,
+            file_type: None,
+            load_arg: None,
+            format,
+            kind,
+            state,
+            role,
+            output: None,
+            bytes: 0,
+            sha256: String::new(),
+            evidence: String::new(),
+            note: String::new(),
+        }
+    }
+
+    /// The row located at an EMI slot.
+    pub(crate) fn at_slot(self, slot: usize, entry: &rebof3_emi::Entry) -> Self {
+        Self { slot: Some(slot), offset: entry.offset, size: u64::from(entry.size), file_type: Some(entry.file_type), load_arg: Some(entry.ram_ptr), ..self }
+    }
+
     fn cells(&self) -> [String; 15] {
         let optional = |value: Option<String>| value.unwrap_or_else(|| NONE.to_string());
         [

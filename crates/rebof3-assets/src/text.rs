@@ -331,21 +331,11 @@ fn write_index(options: &Options, index: &mut [IndexRow], report: &mut Report) -
     let output = format!("{TEXT_DIR}/{INDEX_FILE}");
     write_bytes(options, &output, jsonl.as_bytes())?;
     report.rows.push(Row {
-        source: output.clone(),
-        slot: None,
-        offset: 0,
         size: jsonl.len() as u64,
-        file_type: None,
-        load_arg: None,
-        format: INDEX_FORMAT,
-        kind: Kind::Text,
-        state: "codec",
-        role: "index",
-        output: Some(output),
+        output: Some(output.clone()),
         bytes: jsonl.len() as u64,
         sha256: sha256_hex(jsonl.as_bytes()),
-        evidence: String::new(),
-        note: String::new(),
+        ..Row::new(output, INDEX_FORMAT, Kind::Text, "codec", "index")
     });
     Ok(())
 }
@@ -367,21 +357,10 @@ fn write_bytes(options: &Options, output: &str, bytes: &[u8]) -> Result<()> {
 fn row(source: &PayloadSource, entry: &Entry, payload: &[u8], output: String, written: &[u8], write: bool, role: &'static str) -> Row {
     let format = classify(entry, payload);
     Row {
-        source: source.source.clone(),
-        slot: Some(source.entry),
-        offset: entry.offset,
-        size: u64::from(entry.size),
-        file_type: Some(entry.file_type),
-        load_arg: Some(entry.ram_ptr),
-        format: format.name(),
-        kind: Kind::Text,
-        // The text codec produced the JSON, whatever the payload's own format state is.
-        state: "codec",
-        role,
         output: Some(output),
         bytes: written.len() as u64,
         sha256: if write { sha256_hex(written) } else { String::new() },
-        evidence: String::new(),
-        note: String::new(),
+        // The text codec produced the JSON, whatever the payload's own format state is.
+        ..Row::new(source.source.clone(), format.name(), Kind::Text, "codec", role).at_slot(source.entry, entry)
     }
 }
