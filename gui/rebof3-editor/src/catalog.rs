@@ -551,92 +551,117 @@ pub struct Line {
     pub tip: String,
 }
 
+/// The tree's filter and open keys, shared by the levels that build their lines.
+struct Walk<'a> {
+    filter: String,
+    open: &'a HashSet<String>,
+}
+
+/// The lines of one level and whether anything under it matched the filter.
+struct Level {
+    rows: Vec<Line>,
+    inner: bool,
+}
+
+impl Walk<'_> {
+    fn filtering(&self) -> bool {
+        !self.filter.is_empty()
+    }
+
+    fn hit(&self, text: &str) -> bool {
+        self.filtering() && text.to_ascii_uppercase().contains(&self.filter)
+    }
+
+    /// A line is open when the user opened it or a filter match below forces it.
+    fn is_open(&self, key: &str, forced: bool) -> bool {
+        forced || self.open.contains(key)
+    }
+
+    fn unit_level(&self, section_key: &str, section: &Section, anchor_hit: bool) -> Level {
+        let mut level = Level { rows: Vec::new(), inner: false };
+        for unit in &section.units {
+            let unit_key = format!("{section_key}/{}", unit.archive.0);
+            let unit_hit = self.hit(&unit.title) || self.hit(&unit.archive.0);
+            let matching: Vec<&Placed> = unit.entries.iter().filter(|entry| self.hit(&entry_label(entry))).collect();
+            if self.filtering() && !(anchor_hit || unit_hit) && matching.is_empty() {
+                continue;
+            }
+            level.inner |= unit_hit || !matching.is_empty();
+            let forced = self.filtering() && !matching.is_empty();
+            let is_open = self.is_open(&unit_key, forced);
+            level.rows.push(Line {
+                depth: 2,
+                key: unit_key.clone(),
+                label: unit.title.clone(),
+                count: unit.entries.len(),
+                open: Some(is_open),
+                archive: Some(unit.archive.clone()),
+                entry: None,
+                format: None,
+                tip: unit.archive.0.clone(),
+            });
+            if is_open {
+                let shown: Vec<&Placed> = if forced && !unit_hit && !anchor_hit { matching } else { unit.entries.iter().collect() };
+                level.rows.extend(shown.into_iter().map(|entry| Line {
+                    depth: 3,
+                    key: format!("{unit_key}#{}", entry.index),
+                    label: entry_label(entry),
+                    count: 1,
+                    open: None,
+                    archive: Some(unit.archive.clone()),
+                    entry: Some(entry.index),
+                    format: Some(entry.format),
+                    tip: entry.note.clone(),
+                }));
+            }
+        }
+        level
+    }
+
+    fn section_level(&self, group_key: &str, group: &Group, group_hit: bool) -> Level {
+        let mut level = Level { rows: Vec::new(), inner: false };
+        for section in &group.sections {
+            let section_key = format!("{group_key}/{}", section.title);
+            let section_hit = self.hit(section.title);
+            let units = self.unit_level(&section_key, section, group_hit || section_hit);
+            if units.rows.is_empty() {
+                continue;
+            }
+            level.inner |= section_hit || units.inner;
+            let is_open = self.is_open(&section_key, self.filtering() && units.inner);
+            level.rows.push(Line {
+                depth: 1,
+                key: section_key,
+                label: section.title.to_string(),
+                count: section.entries(),
+                open: Some(is_open),
+                archive: None,
+                entry: None,
+                format: None,
+                tip: section.source.to_string(),
+            });
+            if is_open {
+                level.rows.extend(units.rows);
+            }
+        }
+        level
+    }
+}
+
 impl Catalog {
     /// The lines of the tree. `open` holds the keys of the lines the user opened. A filter keeps the
     /// lines whose text matches, with their parents, and opens the parents; the contents of a line that
     /// matches stay shut until opened.
     pub fn lines(&self, filter: &str, open: &HashSet<String>) -> Vec<Line> {
-        let filter = filter.to_ascii_uppercase();
-        let hit = |text: &str| !filter.is_empty() && text.to_ascii_uppercase().contains(&filter);
-        let filtering = !filter.is_empty();
+        let walk = Walk { filter: filter.to_ascii_uppercase(), open };
         let mut rows = Vec::new();
-
         for group in &self.groups {
             let group_key = format!("g:{}", group.which.title());
-            let group_hit = hit(group.which.title());
-            let mut group_rows = Vec::new();
-            let mut group_inner = false;
-
-            for section in &group.sections {
-                let section_key = format!("{group_key}/{}", section.title);
-                let section_hit = hit(section.title);
-                let mut section_rows = Vec::new();
-                let mut section_inner = false;
-
-                for unit in &section.units {
-                    let unit_key = format!("{section_key}/{}", unit.archive.0);
-                    let unit_hit = hit(&unit.title) || hit(&unit.archive.0);
-                    let matching: Vec<&Placed> = unit.entries.iter().filter(|entry| hit(&entry_label(entry))).collect();
-                    let anchored = group_hit || section_hit || unit_hit;
-                    if filtering && !anchored && matching.is_empty() {
-                        continue;
-                    }
-                    section_inner |= unit_hit || !matching.is_empty();
-                    let forced = filtering && !matching.is_empty();
-                    let is_open = forced || open.contains(&unit_key);
-
-                    section_rows.push(Line {
-                        depth: 2,
-                        key: unit_key.clone(),
-                        label: unit.title.clone(),
-                        count: unit.entries.len(),
-                        open: Some(is_open),
-                        archive: Some(unit.archive.clone()),
-                        entry: None,
-                        format: None,
-                        tip: unit.archive.0.clone(),
-                    });
-                    if is_open {
-                        let shown: Vec<&Placed> = if forced && !unit_hit && !section_hit && !group_hit { matching } else { unit.entries.iter().collect() };
-                        section_rows.extend(shown.into_iter().map(|entry| Line {
-                            depth: 3,
-                            key: format!("{unit_key}#{}", entry.index),
-                            label: entry_label(entry),
-                            count: 1,
-                            open: None,
-                            archive: Some(unit.archive.clone()),
-                            entry: Some(entry.index),
-                            format: Some(entry.format),
-                            tip: entry.note.clone(),
-                        }));
-                    }
-                }
-
-                if section_rows.is_empty() {
-                    continue;
-                }
-                group_inner |= section_hit || section_inner;
-                let is_open = (filtering && section_inner) || open.contains(&section_key);
-                group_rows.push(Line {
-                    depth: 1,
-                    key: section_key,
-                    label: section.title.to_string(),
-                    count: section.entries(),
-                    open: Some(is_open),
-                    archive: None,
-                    entry: None,
-                    format: None,
-                    tip: section.source.to_string(),
-                });
-                if is_open {
-                    group_rows.extend(section_rows);
-                }
-            }
-
-            if group_rows.is_empty() {
+            let sections = walk.section_level(&group_key, group, walk.hit(group.which.title()));
+            if sections.rows.is_empty() {
                 continue;
             }
-            let is_open = (filtering && group_inner) || open.contains(&group_key);
+            let is_open = walk.is_open(&group_key, walk.filtering() && sections.inner);
             rows.push(Line {
                 depth: 0,
                 key: group_key,
@@ -649,7 +674,7 @@ impl Catalog {
                 tip: format!("{} archives", group.archives()),
             });
             if is_open {
-                rows.extend(group_rows);
+                rows.extend(sections.rows);
             }
         }
         rows
