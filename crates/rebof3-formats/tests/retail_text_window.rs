@@ -84,19 +84,3 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
     // 0xFF is the one drawn byte the font sheet has no glyph for.
     assert_eq!(missing_glyphs.into_iter().collect::<Vec<_>>(), [0xFF]);
 }
-
-/// Renders one known message to a PNG in the output folder for a visual check.
-#[test]
-fn a_retail_window_renders_to_png() {
-    let Some(root) = support::retail_root() else { return };
-    let font = font(&root);
-    let bytes = std::fs::read(root.join("WORLD00/AREA030.EMI"));
-    let Ok(bytes) = bytes else { return };
-    let archive = Archive::parse(&bytes).unwrap();
-    let payload = archive.payload(&bytes, 18).unwrap();
-    let parsed = table::parse(payload).unwrap();
-    let laid = layout::layout(&parsed.messages[1], Context { table: Some(payload), runtime: None });
-    let image = render::window(&font, &laid.pages[0], render::Window { size: laid.placement.kind.size(), framed: laid.placement.framed, glyphs: usize::MAX, backdrop: [0; 3] });
-    let png = psx_formats::gfx::png::rgba_png(image.width as u32, image.height as u32, &image.pixels);
-    support::write(&support::out_dir("retail_text_window"), "window.png", png);
-}

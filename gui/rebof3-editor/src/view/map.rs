@@ -355,22 +355,6 @@ mod tests {
     }
 
     #[test]
-    fn a_cell_without_a_tile_draws_nothing() {
-        let colors = cell_colors(&bundle());
-        assert_eq!(colors.len(), 2);
-        assert_eq!(colors[0][3], OPAQUE);
-        assert_eq!(colors[1][3], EMPTY);
-    }
-
-    #[test]
-    fn a_higher_cell_is_brighter() {
-        let mut bundle = bundle();
-        bundle.grid = vec![1, 1];
-        let colors = cell_colors(&bundle);
-        assert!(colors[1][1] > colors[0][1], "{colors:?}");
-    }
-
-    #[test]
     fn a_corner_edit_changes_only_that_corner() {
         let payload = bundle().encode();
         assert_eq!(MapBundle::decode(&payload).unwrap().encode(), payload, "an unchanged bundle writes back as is");

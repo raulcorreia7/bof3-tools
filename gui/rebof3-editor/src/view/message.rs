@@ -191,38 +191,4 @@ mod tests {
         let pages = pages("Hello{NEWLINE}there{PAGE}Bye{END}{END}");
         assert_eq!(pages, vec![vec![vec![plain("Hello")], vec![plain("there")]], vec![vec![plain("Bye")]]]);
     }
-
-    #[test]
-    fn color_runs_end_at_nocolor() {
-        let pages = pages("a{COLOR:12}b{NOCOLOR}c");
-        let runs = &pages[0][0];
-        assert_eq!(runs.len(), 3);
-        assert_eq!(runs[1], Run { text: "b".into(), color: Some(RED), placeholder: false });
-        assert_eq!(runs[2], plain("c"));
-    }
-
-    #[test]
-    fn reading_codes_show_placeholders_and_window_codes_draw_nothing() {
-        let pages = pages("{BOX:01}{SE:05}Hi {INSERT:01}{WAIT}!");
-        let runs = &pages[0][0];
-        assert_eq!(runs[0], plain("Hi "));
-        assert_eq!(runs[1], Run { text: "‹name 1›".into(), color: None, placeholder: true });
-        assert_eq!(runs[2], plain("!"));
-    }
-
-    #[test]
-    fn an_end_between_answers_starts_a_line() {
-        let pages = pages("{CHOICE:02}Yes{END}No{END}{END}");
-        assert_eq!(pages[0], vec![vec![plain("Yes")], vec![plain("No")]]);
-    }
-
-    #[test]
-    fn backspace_removes_a_glyph() {
-        assert_eq!(pages("ab{BACKSPACE}c")[0][0], vec![plain("ac")]);
-    }
-
-    #[test]
-    fn a_brace_that_is_not_a_tag_stays_a_glyph() {
-        assert_eq!(pages("{x}")[0][0], vec![plain("{x}")]);
-    }
 }

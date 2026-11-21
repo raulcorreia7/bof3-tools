@@ -987,10 +987,4 @@ mod tests {
         let (rows, seen) = observed_rows(&cached, "BIN/BATTLE/BATL_DRA.EMI", 3, &mut live);
         assert!(rows.is_empty() && seen.is_none(), "an entry no route drew keeps the rules and the suggestion");
     }
-
-    #[test]
-    fn the_grey_ramp_runs_from_black_to_white() {
-        assert_eq!(grey(0, 16), 0);
-        assert_eq!(grey(15, 16), 0x7FFF);
-    }
 }

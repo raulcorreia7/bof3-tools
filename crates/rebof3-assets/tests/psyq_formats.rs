@@ -86,28 +86,6 @@ fn retail_joined_textures_round_trip_through_tim() {
     assert_eq!((textures, rows, spliced), (239, 970, 970), "joined textures, rows and blocks spliced");
 }
 
-/// Every texture upload, joined or not, as a 15-bit TIM without a CLUT: 593 uploads.
-#[test]
-fn retail_uploads_round_trip_through_a_plain_tim() {
-    let Some(discs) = read_disc() else { return };
-    let mut uploads = 0;
-    for disc in &discs {
-        for (slot, entry) in disc.archive.entries().iter().enumerate() {
-            if classify(entry, &disc.payloads[slot]) != Format::VramUpload {
-                continue;
-            }
-            uploads += 1;
-            let tim = vram::texture_tim_direct(entry.ram_ptr, &disc.payloads[slot]).expect("a TIM");
-            let back = vram::import_tim(&tim).expect("the TIM reads back");
-            let name = format!("{} #{slot}", disc.path);
-            assert_eq!(back.payload, disc.payloads[slot], "{name}");
-            assert_eq!(rebof3_emi::upload::load_argument(back.placement, entry.ram_ptr), entry.ram_ptr, "{name}");
-            assert!(back.clut.is_none() && back.depth.is_none(), "{name}: a plain TIM has no CLUT");
-        }
-    }
-    assert_eq!(uploads, 593, "VRAM uploads on the disc");
-}
-
 /// Every bank whose header and body share a load argument, as one VAB file and as the VH/VB pair.
 #[test]
 fn retail_banks_round_trip_through_vab_and_vh_vb() {

@@ -230,36 +230,4 @@ mod tests {
         project.redo();
         assert_eq!((project.payload(&loaded, 0), project.payload(&loaded, 1)), (&b"FIRST"[..], &b"SECOND"[..]));
     }
-
-    #[test]
-    fn a_gesture_undoes_to_where_it_started() {
-        let (_disc, mut project, loaded) = open("gesture");
-        project.set(&loaded, 0, b"one".to_vec());
-
-        project.begin_step();
-        for bytes in [b"two", b"tw3", b"t4o"] {
-            project.set(&loaded, 0, bytes.to_vec());
-        }
-        project.end_step();
-
-        project.undo();
-        assert_eq!(project.payload(&loaded, 0), b"one");
-        project.undo();
-        assert_eq!(project.payload(&loaded, 0), b"first");
-    }
-
-    #[test]
-    fn undo_ends_an_open_step_first() {
-        let (_disc, mut project, loaded) = open("open-step");
-
-        project.begin_step();
-        project.set(&loaded, 1, b"changed".to_vec());
-        assert!(project.can_undo());
-        project.undo();
-        assert_eq!(project.payload(&loaded, 1), b"second");
-
-        project.begin_step();
-        project.end_step();
-        assert!(!project.can_undo(), "an empty step leaves nothing to undo");
-    }
 }

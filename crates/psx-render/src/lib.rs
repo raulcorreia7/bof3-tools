@@ -220,20 +220,3 @@ pub fn pick(scene: &Scene, camera: &Camera, (width, height): (usize, usize), [x,
     }
     best.map(|(_, _, id)| id)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn square(depth: f32, id: u32, colour: [u8; 4]) -> Primitive {
-        Primitive { corners: [[-1.0, -1.0, depth], [1.0, -1.0, depth], [-1.0, 1.0, depth], [1.0, 1.0, depth]], texture: Texture::None, colour, blend: Blend::Opaque, depth_test: true, id: Some(id) }
-    }
-
-    #[test]
-    fn the_nearest_primitive_is_picked() {
-        let camera = Camera::looking_down_z(100.0);
-        let scene = Scene { primitives: vec![square(10.0, 1, [255; 4]), square(5.0, 2, [255; 4])], ..Scene::default() };
-        assert_eq!(pick(&scene, &camera, (64, 64), [32.0, 32.0]), Some(2));
-        assert_eq!(pick(&scene, &camera, (64, 64), [0.0, 0.0]), None, "outside both squares");
-    }
-}

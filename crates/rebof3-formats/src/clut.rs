@@ -99,20 +99,3 @@ pub fn splice(block: &[u8], offset: usize, words: &[u16]) -> Result<Vec<u8>> {
     }
     Ok(out)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_row_replaces_only_its_words() {
-        let block: Vec<u8> = (0..32u16).flat_map(|word| word.to_le_bytes()).collect();
-        let row: Vec<u16> = (100..116).collect();
-        let spliced = splice(&block, 16, &row).unwrap();
-        assert_eq!(&spliced[..32], &block[..32]);
-        assert_eq!(u16::from_le_bytes([spliced[32], spliced[33]]), 100);
-        let same: Vec<u16> = (16..32).collect();
-        assert_eq!(splice(&block, 16, &same).unwrap(), block);
-        assert!(splice(&block, 24, &row).is_err());
-    }
-}

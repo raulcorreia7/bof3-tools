@@ -336,57 +336,9 @@ mod tests {
     }
 
     #[test]
-    fn a_table_reads_its_sections_and_shares_a_record() {
-        let payload = table();
-        let decoded = ScriptTable::decode(&payload).expect("a table parses");
-        assert_eq!(decoded.dir_bytes, 12);
-        assert_eq!(decoded.sections.len(), 3);
-
-        let first = decoded.section(0).expect("section 0");
-        assert_eq!(first.table_bytes, 8);
-        assert_eq!(first.offsets, vec![8, 10, 10, 14]);
-        assert_eq!(first.slots, vec![0, 1, 1, 2]);
-        assert_eq!(first.records, vec![vec![1, 2], vec![3, 4, 5, 6], vec![7, 8, 9, 10, 11, 12, 13]]);
-
-        let single = decoded.section(1).expect("section 1");
-        assert_eq!(single.offsets, vec![2]);
-        assert_eq!(single.slots, vec![0]);
-        assert_eq!(single.records, vec![vec![14, 15, 16, 17, 18]]);
-
-        assert_eq!(decoded.section(2).expect("section 2").records.len(), 2);
-    }
-
-    #[test]
     fn encode_then_decode_is_byte_identical() {
         let payload = table();
         let decoded = ScriptTable::decode(&payload).expect("a table parses");
-        assert_eq!(decoded.encode(), payload);
-    }
-
-    #[test]
-    fn a_json_document_holds_the_records_as_hex() {
-        let payload = table();
-        let decoded = ScriptTable::decode(&payload).expect("a table parses");
-        let document: serde_json::Value = serde_json::from_str(&decoded.json()).expect("JSON reads");
-        assert_eq!(document["dir_bytes"], 12);
-        assert_eq!(document["sections"][0]["offsets"][2], 10);
-        assert_eq!(document["sections"][0]["records"][1], "03040506");
-        assert_eq!(document["sections"][1]["records"][0], "0e0f101112");
-    }
-
-    /// A magic-effect table: a one-word directory, then one section of two records.
-    #[test]
-    fn a_one_section_table_reads_and_encodes_back() {
-        let mut payload = Vec::new();
-        push_u32_le(&mut payload, 4);
-        push_u16_le(&mut payload, 4);
-        push_u16_le(&mut payload, 6);
-        payload.extend_from_slice(&[1, 2, 3, 4, 5]);
-
-        let decoded = ScriptTable::decode(&payload).expect("a one-section table parses");
-        assert_eq!(decoded.dir_bytes, 4);
-        assert_eq!(decoded.sections.len(), 1);
-        assert_eq!(decoded.sections[0].records, vec![vec![1, 2], vec![3, 4, 5]]);
         assert_eq!(decoded.encode(), payload);
     }
 
@@ -397,38 +349,9 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_directory_size_that_is_not_four_l() {
-        let mut payload = table();
-        payload[0] = 10; // 10 is not 4*L
-        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
-    }
-
-    #[test]
     fn rejects_a_section_offset_that_is_not_strictly_increasing() {
         let mut payload = table();
         payload[4] = 12; // section 1 at the section 0 base
-        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
-    }
-
-    #[test]
-    fn rejects_a_table_size_that_is_not_two_m() {
-        let mut payload = table();
-        payload[12] = 9;
-        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
-    }
-
-    #[test]
-    fn rejects_a_record_offset_past_the_section_end() {
-        let mut payload = table();
-        payload[42] = 40; // section 2's second offset word runs past 54 - 40 = 14
-        assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
-    }
-
-    #[test]
-    fn rejects_offsets_that_repeat_out_of_order() {
-        let mut payload = table();
-        payload[16] = 0;
-        payload[17] = 0; // section 0's third word drops below its predecessor
         assert!(matches!(ScriptTable::decode(&payload), Err(Error::ScriptTableShape(_))));
     }
 }

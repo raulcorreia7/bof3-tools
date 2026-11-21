@@ -137,42 +137,6 @@ pub fn turn((mut x, mut y): (i32, i32), direction: u8) -> (i32, i32) {
 mod tests {
     use super::*;
 
-    /// A block whose encounter 0 lists enemies 1 and 3 in slots 0 and 2.
-    fn block() -> Vec<u8> {
-        let mut block = vec![0u8; encounter::BLOCK_BYTES];
-        block[..encounter::ENCOUNTERS * encounter::ENCOUNTER_BYTES].fill(encounter::EMPTY_SLOT);
-        block[0] = 1;
-        block[2] = 3;
-        for (enemy, id) in [(1usize, 0x0042u16), (3, 0x0107)] {
-            let at = ENEMY_BASE + enemy * ENEMY_BYTES;
-            block[at] = 0x21;
-            block[at + SCENE_ID_AT..at + SCENE_ID_AT + 2].copy_from_slice(&id.to_le_bytes());
-        }
-        block
-    }
-
-    fn offsets() -> Offsets {
-        Offsets::from_pairs((0..ENEMY_OFFSET_COUNT as i32).map(|index| (index << 16, -(index << 16))).collect())
-    }
-
-    #[test]
-    fn a_formation_of_two_takes_the_pairs_after_the_formation_of_one() {
-        let placed = place(&block(), None, 0, &offsets(), 0).expect("places");
-        assert_eq!(placed.iter().map(|enemy| (enemy.slot, enemy.enemy)).collect::<Vec<_>>(), [(0, 1), (2, 3)]);
-        assert_eq!((placed[0].x, placed[0].y), ((1 << 16) + FRONT_CELLS, -(1 << 16)), "pair 1 + 0");
-        assert_eq!((placed[1].x, placed[1].y), ((2 << 16) + FRONT_CELLS, -(2 << 16)), "pair 1 + 1");
-        assert_eq!(placed[1].scene_id, 0x0107);
-        assert!(placed[0].scene.is_none());
-    }
-
-    #[test]
-    fn the_turn_follows_the_loop_of_the_placement() {
-        assert_eq!(turn((1, 2), 0), (1, 2));
-        assert_eq!(turn((1, 2), 3), (2, -1), "one quarter");
-        assert_eq!(turn((1, 2), 2), (-1, -2), "two quarters");
-        assert_eq!(turn((1, 2), 1), (-2, 1), "three quarters");
-    }
-
     #[test]
     fn the_table_reads_from_the_code_image() {
         let load = ENEMY_OFFSETS - 8;

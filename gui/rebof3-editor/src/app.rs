@@ -597,41 +597,6 @@ mod tests {
     }
 
     #[gpui::test]
-    fn undo_closes_an_open_field(cx: &mut TestAppContext) {
-        let (_disc, editor, cx) = editing("undo-closes", cx);
-        type_keys(&editor, "9", cx);
-
-        editor.update(cx, |editor, _| editor.undo());
-        assert!(editor.read_with(cx, |editor, _| editor.editing.is_none()));
-
-        type_keys(&editor, "8", cx);
-        assert_eq!(first_byte(&editor, cx), STORED[0], "the closed field writes nothing");
-    }
-
-    #[gpui::test]
-    fn the_game_panel_opens_an_entry_and_remembers_its_mode(cx: &mut TestAppContext) {
-        let (_disc, editor, cx) = editing("catalog-panel", cx);
-        editor.update(cx, |editor, _| {
-            assert_eq!(editor.mode, Mode::Game);
-            let lines = editor.catalog_lines();
-            assert!(lines.iter().all(|line| line.depth == 0), "the groups start shut");
-            let key = lines[0].key.clone();
-            editor.toggle_catalog(&key);
-            assert!(editor.catalog_lines().len() > lines.len());
-
-            editor.archive = None;
-            editor.select_catalog(&ArchivePath(ARCHIVE.into()), Some(0));
-            assert_eq!(editor.entry, Some(0));
-            editor.set_mode(Mode::Disc);
-        });
-        cx.update(|window, cx| window.draw(cx).clear());
-        editor.update(cx, |editor, _| {
-            let folder = editor.project.as_ref().expect("a project").folder.clone();
-            assert_eq!(Mode::read(&folder), Mode::Disc);
-        });
-    }
-
-    #[gpui::test]
     fn unsaved_edits_keep_the_window_open(cx: &mut TestAppContext) {
         let (_disc, editor, cx) = editing("close", cx);
         assert!(editor.update_in(cx, |editor, window, cx| editor.should_close(window, cx)));

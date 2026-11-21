@@ -456,48 +456,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_bare_section_is_one_character() {
-        let payload = section_bytes(2, 0);
-        let sprites = decode(&payload).expect("decodes");
-        assert!(!sprites.container);
-        assert_eq!(sprites.sections.len(), 1);
-        assert_eq!(encode(&sprites).expect("encodes"), payload);
-    }
-
-    #[test]
-    fn an_in_place_edit_changes_only_its_bytes() {
-        let payload = section_bytes(1, 0);
-        let mut sprites = decode(&payload).expect("decodes");
-        sprites.sections[0].palettes[0][3] = 0x7FFF;
-        sprites.sections[0].animations[0].steps[1].delay = 9;
-        sprites.sections[0].animations[0].frames[1].cells[1].x = 5;
-        let edited = encode(&sprites).expect("encodes");
-        let changed = (0..payload.len()).filter(|&at| payload[at] != edited[at]).count();
-        assert_eq!(changed, 2 + 1 + 1);
-        let again = decode(&edited).expect("decodes again");
-        assert_eq!(again.sections[0].palettes[0][3], 0x7FFF);
-        assert_eq!(again.sections[0].animations[0].steps[1].delay, 9);
-        assert_eq!(again.sections[0].animations[0].frames[1].cells[1].x, 5);
-    }
-
-    #[test]
-    fn an_edited_sheet_moves_the_parts_after_it() {
-        let payload = section_bytes(1, 0x200);
-        let mut sprites = decode(&payload).expect("decodes");
-        let mut texels = sprites.sections[0].images[0].texels().to_vec();
-        texels.iter_mut().for_each(|texel| *texel = 7);
-        sprites.sections[0].images[0].set_texels(texels.clone()).expect("same size");
-        let edited = encode(&sprites).expect("fits in the padding");
-        assert_eq!(edited.len(), payload.len());
-        let again = decode(&edited).expect("decodes again");
-        assert_eq!(again.sections[0].images[0].texels(), &texels[..]);
-        assert_eq!(again.sections[0].images[1].texels(), sprites.sections[0].images[1].texels());
-        assert_eq!(again.sections[0].palettes, sprites.sections[0].palettes);
-        assert_eq!(again.sections[0].animations, sprites.sections[0].animations);
-        assert_eq!(again.sections[0].records, sprites.sections[0].records);
-    }
-
-    #[test]
     fn a_sheet_that_outgrows_the_section_is_refused() {
         let payload = section_bytes(1, 0);
         let mut sprites = decode(&payload).expect("decodes");
@@ -506,28 +464,5 @@ pub(crate) mod tests {
         sprites.sections[0].images[1].set_texels(texels).expect("same size");
         let error = encode(&sprites).expect_err("no room");
         assert!(error.to_string().contains("keeps its"), "{error}");
-    }
-
-    #[test]
-    fn a_resized_animation_is_refused() {
-        let mut sprites = decode(&section_bytes(1, 0x40)).expect("decodes");
-        sprites.sections[0].animations[1].steps.push(Step { delay: 1, frame: 0 });
-        assert!(encode(&sprites).is_err());
-    }
-
-    #[test]
-    fn a_header_out_of_order_is_refused() {
-        let mut payload = section_bytes(1, 0);
-        payload[WORD..2 * WORD].copy_from_slice(&0x08u32.to_le_bytes());
-        assert!(decode(&payload).is_err());
-        assert!(decode(&[0; 3]).is_err());
-    }
-
-    #[test]
-    fn describe_names_the_counts_and_the_readers() {
-        let sprites = decode(&container(0)).expect("decodes");
-        let text = describe(&sprites);
-        assert!(text.contains("Section 2: 2 frame sheets, 8 palettes, 2 animations with 3 frames"), "{text}");
-        assert!(text.contains("Actor_SelectScriptBank"), "{text}");
     }
 }

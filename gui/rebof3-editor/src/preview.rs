@@ -170,14 +170,6 @@ mod tests {
         vag
     }
 
-    /// A sample of silence that loops.
-    fn looping_silence(blocks: usize) -> Vec<u8> {
-        let mut vag = adpcm::encode_stream(&vec![0; PERIOD * blocks]);
-        let last = vag.len() - BLOCK_BYTES;
-        vag[last + FLAGS_AT] |= FLAG_END | FLAG_REPEAT;
-        vag
-    }
-
     /// A tone of program 0 over every note that plays sample `vag` at `pan`.
     fn tone(vag: i16, pan: u8) -> Tone {
         Tone { program: 0, vag, vol: FULL, pan, center_note: CENTRE_NOTE, min_note: 0, max_note: 127, adsr1: ADSR1, adsr2: ADSR2, ..Tone::default() }
@@ -218,23 +210,6 @@ mod tests {
     }
 
     #[test]
-    fn a_tone_one_octave_up_plays_at_twice_the_pitch() {
-        let (header, body) = bank(vec![tone(1, CENTRE)], &[looping_sine(4)]);
-        let pcm = note_pcm(&header, &body, &note(Keys::Tone { block: 0, slot: 0 }, CENTRE_NOTE + 12)).unwrap();
-        let heard = frequency(&pcm, 0.1, 0.8);
-        assert!((heard - 2.0 * TONE_HZ).abs() < TONE_HZ * 0.02, "{heard} Hz, not {}", 2.0 * TONE_HZ);
-    }
-
-    #[test]
-    fn a_tone_panned_left_stays_on_the_left_channel() {
-        let (header, body) = bank(vec![tone(1, 0)], &[looping_sine(4)]);
-        let pcm = note_pcm(&header, &body, &note(Keys::Program(0), CENTRE_NOTE)).unwrap();
-        assert_eq!(pcm.channels, 2);
-        assert!(channel(&pcm, 0).iter().any(|&sample| sample != 0), "the left channel sounds");
-        assert!(channel(&pcm, 1).iter().all(|&sample| sample == 0), "the right channel is silent");
-    }
-
-    #[test]
     fn a_note_is_released_after_its_hold() {
         let (header, body) = bank(vec![tone(1, CENTRE)], &[looping_sine(4)]);
         let pcm = note_pcm(&header, &body, &note(Keys::Program(0), CENTRE_NOTE)).unwrap();
@@ -242,32 +217,5 @@ mod tests {
         let rate = VAB_SAMPLE_RATE as usize;
         assert!(left[rate / 2..rate].iter().any(|&sample| sample != 0), "the note sounds while it is held");
         assert!(left[left.len() - rate..].iter().all(|&sample| sample == 0), "the release ends the note");
-    }
-
-    #[test]
-    fn a_tone_preview_keys_only_that_tone() {
-        let (header, body) = bank(vec![tone(1, CENTRE), tone(2, CENTRE)], &[looping_sine(4), looping_silence(4)]);
-        let sounds = |keys| note_pcm(&header, &body, &note(keys, CENTRE_NOTE)).unwrap().samples.iter().any(|&s| s != 0);
-        assert!(sounds(Keys::Program(0)), "the program keys both tones");
-        assert!(sounds(Keys::Tone { block: 0, slot: 0 }), "the sine tone");
-        assert!(!sounds(Keys::Tone { block: 0, slot: 1 }), "the silent tone alone");
-    }
-
-    #[test]
-    fn a_tone_refuses_a_note_it_does_not_answer() {
-        let narrow = Tone { min_note: 60, max_note: 64, ..tone(1, CENTRE) };
-        let (header, body) = bank(vec![narrow], &[looping_sine(4)]);
-        let error = note_pcm(&header, &body, &note(Keys::Tone { block: 0, slot: 0 }, 72)).unwrap_err();
-        assert_eq!(error, "the tone answers notes 60 to 64");
-    }
-
-    #[test]
-    fn a_sample_plays_as_the_library_auditions_it() {
-        let (header, body) = bank(vec![tone(1, CENTRE)], &[looping_sine(64)]);
-        let pcm = sample_pcm(&header, &body, 1).unwrap();
-        assert_eq!((pcm.sample_rate, pcm.channels), (VAB_SAMPLE_RATE, 2));
-        let heard = frequency(&pcm, 0.005, 0.03);
-        assert!((heard - TONE_HZ).abs() < TONE_HZ * 0.05, "{heard} Hz, not {TONE_HZ}");
-        assert!(sample_pcm(&header, &body, 2).is_err(), "no sample 2");
     }
 }

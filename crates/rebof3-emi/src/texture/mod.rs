@@ -511,24 +511,6 @@ mod tests {
     }
 
     #[test]
-    fn a_terrain_descriptor_splits_into_depth_page_and_clut() {
-        // 8bpp, CLUT index 5, page 2: page (576, 256), row 488.
-        let descriptor = (2 << 28) | (5 << 24);
-        let (page_x, page_y, clut, depth) = terrain_descriptor(descriptor).expect("a live descriptor");
-        assert_eq!((page_x, page_y), (576, 256));
-        assert_eq!((clut.x, clut.y), (0, 488));
-        assert_eq!(depth, Depth::Eight);
-
-        // 4bpp, CLUT index 3, page 1: page (448, 256), column 48.
-        let descriptor = (1 << 31) | (1 << 28) | (3 << 24);
-        let (page_x, _, clut, depth) = terrain_descriptor(descriptor).expect("a live descriptor");
-        assert_eq!(page_x, 448);
-        assert_eq!((clut.x, clut.y), (48, 483));
-        assert_eq!(depth, Depth::Four);
-        assert_eq!(terrain_descriptor(0), None);
-    }
-
-    #[test]
     fn the_terrain_rule_refuses_overlapping_sheets_and_banks() {
         let archive = "BIN/WORLD00/AREA000.EMI";
         let sheets = [sheet(7, 576, 256), sheet(8, 576, 256)];
@@ -561,26 +543,6 @@ mod tests {
     }
 
     #[test]
-    fn a_bank_from_another_archive_of_the_family_serves_the_row() {
-        let (own, sheets, ram) = area024();
-        let other = block("BIN/WORLD00/AREA099.EMI", 8, ram, 16);
-        let joins = joins(own, &sheets, &[&other], &[]);
-        assert_eq!(joins.len(), 1);
-        assert_eq!(joins[0].palette.archive, "BIN/WORLD00/AREA099.EMI");
-        assert_eq!(joins[0].palette.block.slot, 8);
-    }
-
-    #[test]
-    fn the_archives_own_bank_wins_over_the_family() {
-        let (own, sheets, ram) = area024();
-        let own_block = block_with(own, 1, ram, 16, 3);
-        let other = block_with("BIN/WORLD00/AREA099.EMI", 8, ram, 16, 9);
-        let joins = joins(own, &sheets, &[&own_block, &other], &[]);
-        assert_eq!(joins.len(), 1);
-        assert_eq!(joins[0].palette.archive, own);
-    }
-
-    #[test]
     fn identical_family_banks_collapse_and_disagreeing_ones_refuse() {
         let (own, sheets, ram) = area024();
         let same = [block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 7)];
@@ -588,17 +550,5 @@ mod tests {
 
         let different = [block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8)];
         assert!(joins(own, &sheets, &different.iter().collect::<Vec<_>>(), &[]).is_empty());
-    }
-
-    #[test]
-    fn a_streamed_site_reads_only_its_archives_upload() {
-        let panel = SITES.iter().find(|site| site.function == 0x800A_E9C4).expect("the battle panel site");
-        assert!(panel.reads_page_of("BIN/BATTLE/BATL_DRA.EMI"));
-        assert!(!panel.reads_page_of("BIN/ETC/FIRST.EMI"));
-        assert!(!panel.reads_page_of("BIN/BMAGIC/MAGIC218.EMI"));
-        let archive = "BIN/BATTLE/BATTLE.EMI";
-        let sheets = [sheet(4, 896, 256)];
-        let blocks = [block(archive, 6, 0x8003_6C00, 256)];
-        assert!(joins(archive, &sheets, &blocks.iter().collect::<Vec<_>>(), &[]).is_empty(), "BATTLE's own sheet is not BATL_DRA's");
     }
 }

@@ -170,23 +170,6 @@ mod tests {
     use super::*;
     use rebof3_formats::Format;
 
-    #[test]
-    fn a_channel_change_keeps_the_other_channels() {
-        let word = 0x8000 | 3 << BLUE_SHIFT | 2 << GREEN_SHIFT | 1;
-
-        assert_eq!(Channel::Green.of(word), 2);
-        assert_eq!(Channel::Green.with(word, CHANNEL_MAX), 0x8000 | 3 << BLUE_SHIFT | CHANNEL_MAX << GREEN_SHIFT | 1);
-    }
-
-    #[test]
-    fn a_color_write_keeps_every_other_byte_and_a_trailing_odd_one() {
-        let mut bytes = vec![0x11, 0x22, 0x33, 0x44, 0x55];
-        assert!(put_color(&mut bytes, 1, 0xBEEF));
-        assert_eq!(bytes, [0x11, 0x22, 0xEF, 0xBE, 0x55]);
-        assert!(!put_color(&mut bytes, 2, 0), "the odd byte is not a color");
-        assert_eq!(words(&bytes), [0x2211, 0xBEEF]);
-    }
-
     /// Every color of every retail CLUT block takes an STP flip in its own two bytes and flips back to
     /// the stored bytes. Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
     #[test]

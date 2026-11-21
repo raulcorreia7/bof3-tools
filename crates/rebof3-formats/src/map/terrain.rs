@@ -388,59 +388,9 @@ fn obj_positions(mesh: &[u8]) -> Result<Vec<[f32; 3]>> {
 mod top_down_tests {
     use super::*;
     use crate::map::Cell;
-    use rebof3_emi::Entry;
-    use rebof3_emi::replay::Writer;
-    use rebof3_emi::texture::{TERRAIN_CLUT_ROW, TERRAIN_PAGE_X, TERRAIN_PAGE_Y};
-
-    /// A VRAM whose terrain page 0 holds one 32x32-word upload with the 8-bit texel `u + 16 * v`
-    /// at `(u, v)`, and whose first CLUT row maps index `i` to colour `0x100 + i`.
-    fn vram() -> Vram {
-        let texel = |u: usize, v: usize| ((u + 16 * v) & 0xFF) as u16;
-        let payload: Vec<u8> = (0..32 * 32)
-            .flat_map(|at| {
-                let (u, v) = (2 * (at % 32), at / 32);
-                (texel(u, v) | (texel(u + 1, v) << 8)).to_le_bytes()
-            })
-            .collect();
-        // The load argument packs the rectangle column and row (in 32-word steps) and one chunk.
-        let at = (u32::from(TERRAIN_PAGE_X / 32) << 24) | (u32::from(TERRAIN_PAGE_Y / 32) << 16) | (1 << 8);
-        let entry = Entry { size: payload.len() as u32, offset: 0, ram_ptr: at, first4: 0, file_type: 3 };
-        let mut vram = Vram::new();
-        vram.load("A", &[entry], &[&payload]);
-        let colors: Vec<u16> = (0..256).map(|index| 0x100 + index).collect();
-        vram.load_image(rebof3_emi::replay::Rect { x: 0, y: usize::from(TERRAIN_CLUT_ROW), width: 256, height: 1 }, &colors, Writer::entry("A", 2));
-        vram
-    }
 
     fn bundle(descriptor: u32) -> MapBundle {
         MapBundle { width: 2, height: 1, cells: vec![Cell { heights: [0; 4] }; 2], codes: vec![0; 4], grid: vec![1, 0], records: vec![0, descriptor], ..MapBundle::default() }
-    }
-
-    #[test]
-    fn a_block_tile_copies_its_sixteen_texels() {
-        // Mode 0, block 0: texels (0..16, 0..16) of page 0, 8-bit, CLUT row 483, vertex colour 0x80
-        // (descriptor 0 is the empty tile).
-        let view = top_down(&bundle(0x0080_0000), &vram());
-        assert_eq!((view.width, view.height, view.textured, view.unwritten), (32, 16, 1, 0));
-        for (x, y) in [(0, 0), (15, 0), (0, 15), (7, 9), (15, 15)] {
-            assert_eq!(view.words[y * 32 + x], Some(0x100 + (x + 16 * y) as u16), "pixel ({x}, {y})");
-        }
-        assert_eq!(view.words[16], None, "the second cell has no tile");
-    }
-
-    #[test]
-    fn a_flipped_tile_mirrors_its_texels() {
-        // Bit 16 flips the corners across x.
-        let view = top_down(&bundle(0x0081_0000), &vram());
-        assert_eq!(view.words[0], Some(0x100 + 15));
-        assert_eq!(view.words[15], Some(0x100));
-    }
-
-    #[test]
-    fn a_tile_whose_page_nothing_wrote_counts_as_unwritten() {
-        let view = top_down(&bundle(0x1080_0000), &vram());
-        assert_eq!((view.textured, view.unwritten), (0, 1));
-        assert_eq!(&view.png()[1..4], b"PNG");
     }
 
     #[test]

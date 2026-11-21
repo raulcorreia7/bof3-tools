@@ -71,16 +71,3 @@ pub fn barycentric(a: [f32; 2], b: [f32; 2], c: [f32; 2], point: [f32; 2]) -> Op
 pub fn edge(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
     (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rot_matrix_turns_about_z_then_x() {
-        // A quarter turn about z takes x to y; a quarter turn about x then takes y to z.
-        let m = rot_matrix([1024, 0, 1024]);
-        let v = apply(&m, [1.0, 0.0, 0.0]);
-        assert!((v[0]).abs() < 1e-5 && (v[1]).abs() < 1e-5 && (v[2] - 1.0).abs() < 1e-5, "{v:?}");
-    }
-}

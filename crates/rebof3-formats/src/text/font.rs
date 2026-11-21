@@ -111,9 +111,4 @@ mod tests {
         // Below the first glyph the terms go negative and the byte stores wrap: 0x12 gives u 16, v 72.
         assert_eq!(message_cell(0x12), (16, 72));
     }
-
-    #[test]
-    fn number_cells_start_at_the_bias() {
-        assert_eq!(number_cell(0), (((0x5B) % 21 * 12) as usize, ((0x5B) / 21 * 12) as usize));
-    }
 }

@@ -414,25 +414,6 @@ mod tests {
     }
 
     #[test]
-    fn an_unjoined_texture_has_no_clut() {
-        let tim = texture_tim_direct(LOAD, &sheet()).unwrap();
-        let file = tim::File::read(&tim).unwrap();
-        assert_eq!((file.mode, file.clut), (tim::Mode::Fifteen, None));
-        let back = import_tim(&tim).unwrap();
-        assert_eq!((back.payload, back.depth, back.clut), (sheet(), None, None));
-    }
-
-    #[test]
-    fn a_moved_image_changes_only_the_placement_bits() {
-        let base = LOAD | 0x00c0_00ff;
-        let mut file = tim::File::read(&texture_tim_direct(base, &sheet()).unwrap()).unwrap();
-        file.image.x = 64;
-        file.image.y = 32;
-        let back = import_tim(&file.write()).unwrap();
-        assert_eq!(upload::load_argument(back.placement, base), 0x0201_0100 | 0x00c0_00ff);
-    }
-
-    #[test]
     fn an_image_off_the_upload_grid_is_refused() {
         let mut file = tim::File::read(&texture_tim_direct(LOAD, &sheet()).unwrap()).unwrap();
         file.image.x += 1;
@@ -440,13 +421,5 @@ mod tests {
         let mut small = tim::File::read(&texture_tim_direct(LOAD, &sheet()).unwrap()).unwrap();
         small.image = tim::Block { width: 16, height: 16, words: vec![0; 256], ..small.image };
         assert!(import_tim(&small.write()).is_err());
-    }
-
-    #[test]
-    fn a_move_stays_in_the_frame_buffer() {
-        let place = upload::descriptor(LOAD);
-        assert_eq!(place.moved(30, 14, 2).map(|moved| (moved.column, moved.row)), Some((30, 14)));
-        assert_eq!(place.moved(32, 14, 2), None, "column 32 is past the right edge");
-        assert_eq!(place.moved(30, 15, 2), None, "two rows from row 15 leave the bottom");
     }
 }

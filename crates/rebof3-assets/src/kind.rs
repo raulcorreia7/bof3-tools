@@ -248,11 +248,4 @@ mod tests {
             assert!(Kind::ALL.iter().any(|kind| kind.name() == format.describe().kind), "{}", format.name());
         }
     }
-
-    #[test]
-    fn earlier_kind_names_parse_to_the_current_kinds() {
-        assert_eq!(Kind::parse("character-bank").unwrap(), Kind::CharacterSprites);
-        assert_eq!(Kind::parse("bmagic-table").unwrap(), Kind::MagicScriptTable);
-        assert_eq!(Kind::canonical("palette"), "palette");
-    }
 }

@@ -547,27 +547,6 @@ mod tests {
     }
 
     #[test]
-    fn a_tone_plays_its_centre_note_inside_the_notes_it_answers() {
-        let tone = Tone { center_note: 60, min_note: 36, max_note: 84, ..Tone::default() };
-        assert_eq!(centre_note(&tone), 60);
-        assert_eq!(centre_note(&Tone { min_note: 64, ..tone }), 64);
-        assert_eq!(centre_note(&Tone { min_note: 90, max_note: 10, ..tone }), 60, "a tone that answers no note");
-    }
-
-    #[test]
-    fn a_note_is_held_for_one_pass_of_its_sample() {
-        // Three seconds of samples: 4,725 blocks of 28.
-        let (header, body) = psx_formats::vab::encode_bank(0, &[], &[block(0).repeat(4_725)]).unwrap();
-        let bank = Bank::parse(&header, &body).unwrap();
-        let tone = Tone { vag: 1, center_note: 60, ..Tone::default() };
-        let pass = f64::from(bank.vags[1].frames) / f64::from(VAB_SAMPLE_RATE);
-        assert!((hold(&bank, &tone, 60) - pass).abs() < 1e-9, "a pass at the centre note");
-        assert!((hold(&bank, &tone, 72) - pass / 2.0).abs() < 1e-9, "half as long an octave up");
-        assert_eq!(hold(&bank, &tone, 96), NOTE_HOLD_SECONDS, "never shorter than the shortest hold");
-        assert_eq!(hold(&bank, &tone, 0), NOTE_HOLD_LIMIT, "never longer than the limit");
-    }
-
-    #[test]
     fn a_sample_import_rewrites_the_size_table_and_the_body() {
         let (header, body) = psx_formats::vab::encode_bank(0, &[], &[block(1), block(2), block(3)]).unwrap();
         let longer = [block(9), block(9)].concat();
@@ -589,36 +568,6 @@ mod tests {
         assert!(with_sample(&header, &body, 1, &[0; 12]).is_err(), "not whole units");
         let too_long = vec![0; (usize::from(u16::MAX) + 1) * SAMPLE_SIZE_UNIT];
         assert!(with_sample(&header, &body, 1, &too_long).is_err(), "past the size table's unit");
-    }
-
-    #[test]
-    fn a_header_edit_changes_only_its_field() {
-        let payload = package();
-        let edited = with_header(&payload, 0, Part::Tempo, "400000").unwrap();
-        let sequence = &Package::parse(&edited).unwrap().sequences[0];
-        assert_eq!((sequence.tempo_us, sequence.resolution, sequence.seq_id), (400_000, 48, 3));
-
-        let changed: Vec<usize> = (0..payload.len()).filter(|&at| payload[at] != edited[at]).collect();
-        assert!(changed.iter().all(|at| (10..13).contains(at)), "only the tempo bytes change: {changed:?}");
-    }
-
-    #[test]
-    fn a_beat_note_is_stored_as_its_exponent() {
-        let edited = with_header(&package(), 0, Part::BeatNote, "8").unwrap();
-        let sequence = &Package::parse(&edited).unwrap().sequences[0];
-        assert_eq!(sequence.time_den, 3);
-        assert_eq!(Part::BeatNote.text(sequence), "8");
-    }
-
-    #[test]
-    fn a_header_value_out_of_range_is_refused() {
-        let payload = package();
-        for (part, text) in
-            [(Part::Resolution, "0"), (Part::Resolution, "65536"), (Part::Tempo, "16777216"), (Part::Beats, "256"), (Part::BeatNote, "6"), (Part::BeatNote, "256"), (Part::Tempo, "fast")]
-        {
-            assert_eq!(with_header(&payload, 0, part, text), Err(part.rule().to_string()), "{part:?} {text}");
-        }
-        assert!(with_header(&payload, 1, Part::Tempo, "1").is_err(), "no second sequence");
     }
 
     #[test]

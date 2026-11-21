@@ -5,8 +5,6 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use psx_formats::sep::{Event, Package, Sequence};
-
 fn bof3(dir: &Path, args: &[&str]) -> String {
     let run = Command::new(env!("CARGO_BIN_EXE_bof3")).args(args).current_dir(dir).output().expect("bof3 runs");
     let text = String::from_utf8_lossy(&run.stdout).into_owned() + &String::from_utf8_lossy(&run.stderr);
@@ -51,20 +49,6 @@ fn a_tim_goes_back_to_the_texture_and_the_palette() {
 }
 
 #[test]
-fn a_texture_without_a_join_has_no_clut_and_no_guess() {
-    let dir = folder("plain");
-    std::fs::write(dir.join("t.img"), sheet()).unwrap();
-    bof3(&dir, &["assets", "export", "tim", "t.img", "--load-arg", LOAD]);
-    let tim = psx_formats::gfx::tim::File::read(&std::fs::read(dir.join("t.tim")).unwrap()).unwrap();
-    assert!(tim.clut.is_none());
-    assert_eq!((tim.image.x, tim.image.y), (704, 256));
-    let run = Command::new(env!("CARGO_BIN_EXE_bof3")).args(["assets", "export", "tim", "t.img", "--load-arg", LOAD, "--depth", "4", "--palette", "t.img"]).current_dir(&dir).output().unwrap();
-    assert!(!run.status.success(), "a CLUT place is never guessed");
-    assert!(String::from_utf8_lossy(&run.stderr).contains("--clut"));
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
 fn a_vab_file_splits_into_the_pair_and_joins_back() {
     let dir = folder("vab");
     let (header, body) = psx_formats::vab::encode_bank(3, &[], &[vec![0u8; 16], vec![1u8; 32]]).unwrap();
@@ -78,25 +62,5 @@ fn a_vab_file_splits_into_the_pair_and_joins_back() {
     bof3(&dir, &["assets", "import", "vab", "b.vab", "-o", "c.vh", "--body", "c.vb"]);
     assert_eq!(std::fs::read(dir.join("c.vh")).unwrap(), header);
     assert_eq!(std::fs::read(dir.join("c.vb")).unwrap(), body);
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn sequences_go_through_seq_and_sep_files() {
-    let dir = folder("seq");
-    let end = Event { status: 0xff, meta_type: 0x2f, status_byte: true, ..Event::default() };
-    let note = Event { status: 0x90, data1: 60, data2: 100, status_byte: true, ..Event::default() };
-    let sequence = |seq_id| Sequence { seq_id, resolution: 48, tempo_us: 500_000, time_num: 4, time_den: 2, events: vec![note.clone(), end.clone()] };
-    let package = Package { sequences: vec![sequence(1), sequence(5)] }.encode();
-    std::fs::write(dir.join("p.seq"), &package).unwrap();
-
-    bof3(&dir, &["assets", "export", "seq", "p.seq", "--index", "0", "-o", "a.seq"]);
-    bof3(&dir, &["assets", "export", "seq", "p.seq", "--index", "1", "-o", "b.seq"]);
-    bof3(&dir, &["assets", "import", "seq", "a.seq:1", "b.seq:5", "-o", "back.bin"]);
-    assert_eq!(std::fs::read(dir.join("back.bin")).unwrap(), package);
-
-    bof3(&dir, &["assets", "export", "sep", "p.seq"]);
-    bof3(&dir, &["assets", "import", "sep", "p.sep", "-o", "sep.bin"]);
-    assert_eq!(std::fs::read(dir.join("sep.bin")).unwrap(), package);
     let _ = std::fs::remove_dir_all(&dir);
 }

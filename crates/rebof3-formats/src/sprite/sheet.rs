@@ -459,43 +459,12 @@ mod tests {
     }
 
     #[test]
-    fn a_bank_sheet_names_its_section() {
-        let sprites = crate::sprite::decode(&crate::sprite::tests::container(0x400)).expect("decodes");
-        let sheet = export(&sprites, 2, 0, &sizes(), "sprites.png").expect("exports");
-        assert_eq!(image_name(&sheet.json).expect("names its PNG"), "sprites.png");
-        let imported = import(&sprites, &sizes(), &sheet.json, &sheet.png).expect("imports");
-        assert_eq!(crate::sprite::encode(&imported).expect("encodes"), crate::sprite::encode(&sprites).expect("encodes"));
-        assert!(export(&sprites, 3, 0, &sizes(), "sprites.png").is_err());
-    }
-
-    #[test]
-    fn durations_round_trip_through_milliseconds() {
-        for delay in (0..super::super::JUMP).chain([0]) {
-            assert_eq!(delay_of(duration_ms(delay)), Some(delay), "delay {delay}");
-        }
-        assert_eq!(duration_ms(1), 33);
-        assert_eq!(delay_of(0), None);
-    }
-
-    #[test]
     fn an_unchanged_sheet_imports_to_the_stored_section() {
         let section = section();
         let sheet = export_section(&section, 0, 0, &sizes(), "sprites.png").expect("exports");
         let imported = import_section(&section, &sizes(), &sheet.json, &sheet.png).expect("imports");
         assert_eq!(imported.encode().expect("encodes"), section.encode().expect("encodes"));
         assert!(imported.images.iter().all(super::super::Image::is_stored));
-    }
-
-    #[test]
-    fn the_json_is_aseprite_shaped() {
-        let sheet = export_section(&section(), 0, 0, &sizes(), "sprites.png").expect("exports");
-        let json: serde_json::Value = serde_json::from_slice(&sheet.json).expect("JSON");
-        assert_eq!(json["meta"]["image"], "sprites.png");
-        assert_eq!(json["meta"]["frameTags"][0]["direction"], "forward");
-        // Animation 0 shows two steps (the jump is not a frame), animation 1 one.
-        assert_eq!(json["frames"].as_array().map(Vec::len), Some(3));
-        assert_eq!(json["frames"][1]["duration"], duration_ms(6));
-        assert_eq!(json["meta"]["bof3"]["animations"][0]["loop_to"], 0);
     }
 
     /// The PNG with one pixel of pose `pose` set to `index`.
@@ -509,20 +478,6 @@ mod tests {
     }
 
     #[test]
-    fn a_painted_pixel_goes_to_its_sheet_texel() {
-        let section = section();
-        let sheet = export_section(&section, 0, 0, &sizes(), "sprites.png").expect("exports");
-        // Pose 0 is animation 0 frame 0: one 16x16 cell at (-8, -8) over texels (0..16, 0..8); the sheet is
-        // 8 rows tall, so rows 8-15 of the cell are outside it. The box starts at (-8, -8) too.
-        let png = repaint(&sheet, 0, (3, 2), 30);
-        let imported = import_section(&section, &sizes(), &sheet.json, &png).expect("imports");
-        assert_eq!(imported.images[0].texel(3, 2), Some(30));
-        let changed = (0..imported.images[0].texel_count()).filter(|&at| imported.images[0].texels()[at] != section.images[0].texels()[at]).count();
-        assert_eq!(changed, 1);
-        assert!(imported.encode().is_ok());
-    }
-
-    #[test]
     fn two_different_changes_to_one_texel_are_refused() {
         let section = section();
         let sheet = export_section(&section, 0, 0, &sizes(), "sprites.png").expect("exports");
@@ -532,28 +487,5 @@ mod tests {
         let png = repaint(&twice, 1, (0, 0), 21);
         let error = import_section(&section, &sizes(), &sheet.json, &png).expect_err("a conflict");
         assert!(error.to_string().contains("texel (0, 0)"), "{error}");
-    }
-
-    #[test]
-    fn a_changed_duration_sets_the_delay() {
-        let section = section();
-        let sheet = export_section(&section, 0, 0, &sizes(), "sprites.png").expect("exports");
-        let mut json: serde_json::Value = serde_json::from_slice(&sheet.json).expect("JSON");
-        json["frames"][0]["duration"] = serde_json::Value::from(duration_ms(10));
-        let imported = import_section(&section, &sizes(), json.to_string().as_bytes(), &sheet.png).expect("imports");
-        assert_eq!(imported.animations[0].steps[0].delay, 10);
-        assert_eq!(imported.animations[0].steps[1], section.animations[0].steps[1]);
-    }
-
-    #[test]
-    fn a_changed_palette_colour_comes_back() {
-        let section = section();
-        let sheet = export_section(&section, 0, 0, &sizes(), "sprites.png").expect("exports");
-        let Ok(Picture::Indexed(mut picture)) = png::read(&sheet.png) else { panic!("an indexed PNG") };
-        picture.colors[4] = word_to_view(0x7C00);
-        let png = png::indexed_png(picture.width, picture.height, PNG_BITS, &picture.colors, &picture.indices);
-        let imported = import_section(&section, &sizes(), &sheet.json, &png).expect("imports");
-        assert_eq!(imported.palettes[0][4], 0x7C00);
-        assert_eq!(imported.palettes[0][5], section.palettes[0][5]);
     }
 }

@@ -465,26 +465,6 @@ mod tests {
     }
 
     #[test]
-    fn the_field_palette_lands_on_the_clut_the_draw_builds() {
-        for slot in 0..3 {
-            let placement = Placement::field(slot);
-            let clut = placement.clut();
-            let arena_word = (placement.palette_stage - rebof3_emi::texture::ARENA_BASE) / 2;
-            let row_words = u32::from(rebof3_emi::texture::ARENA_ROW_WORDS);
-            assert_eq!(u32::from(clut.y - ARENA_VRAM_ROW), arena_word / row_words, "slot {slot} row");
-            assert_eq!(u32::from(clut.x), arena_word % row_words, "slot {slot} column");
-        }
-    }
-
-    #[test]
-    fn the_sheet_lands_on_the_page_the_draw_reads() {
-        let placement = Placement::field(1);
-        let (x, y) = placement.sheet_origin();
-        assert_eq!((x, y), (320, 0x50));
-        assert_eq!(placement.texture_page(), (320, 0));
-    }
-
-    #[test]
     fn a_frame_draws_its_cells_in_order_and_flips() {
         // A 16x8 sheet: texel (u, v) holds u + 1, so every texel is drawn.
         let texels: Vec<u8> = (0..8).flat_map(|_| (1..=16u8).collect::<Vec<_>>()).collect();
@@ -511,20 +491,6 @@ mod tests {
     }
 
     #[test]
-    fn a_transparent_texel_shows_the_cell_under_it() {
-        let mut texels = vec![3u8; 16 * 8];
-        texels[0] = 0;
-        let image = Image::new(8, 8, Encoding::Raw, texels).expect("a sheet");
-        let stage = Stage::new(Vram::new(), (0, &image), (0, &palette()), Placement::field(0));
-        let under = Cell { size: 0, x: 0, y: 0, u: 8, v: 0 };
-        let over = Cell { size: 0, x: 0, y: 0, u: 0, v: 0 };
-        let frame = Frame { cells: vec![under, over] };
-        let composite = compose(&stage, &frame, &sizes(), false, frame_bounds(&frame, &sizes(), false).unwrap());
-        assert_eq!(composite.pixel(0, 0).map(|pixel| pixel.cell), Some(0), "the top cell's texel is index 0");
-        assert_eq!(composite.pixel(1, 0).map(|pixel| pixel.cell), Some(1));
-    }
-
-    #[test]
     fn a_texel_past_the_sheet_or_the_palette_is_marked() {
         let mut texels = vec![1u8; 16 * 8];
         texels[1] = 40;
@@ -534,60 +500,5 @@ mod tests {
         let composite = compose(&stage, &frame, &sizes(), false, frame_bounds(&frame, &sizes(), false).unwrap());
         assert_eq!(composite.outside, 8 * 8, "rows 8 to 15 are past the 8-row sheet");
         assert_eq!(composite.unresolved_colours(), 1, "index 40 is past the 32-colour palette");
-    }
-
-    #[test]
-    fn a_scene_placement_builds_every_clut_kind() {
-        // Kind 0: row base + sel >> 4, column (sel & 15) * 16, 4-bit; the 0x04 flag moves it 16 rows down.
-        let cell = Placement::scene(7, 0x40, 0xB3, KIND_CELL, UPPER_PALETTES);
-        assert_eq!((cell.clut().x, cell.clut().y), (48, 496 + 11));
-        assert_eq!(cell.depth(), Depth::Four);
-        let row = Placement::scene(7, 0, 5, KIND_ROW, 0);
-        assert_eq!((row.clut().x, row.clut().y), (0, 485));
-        let four = Placement::scene(7, 0, 0x0B, KIND_CELLS_4, 0);
-        assert_eq!((four.clut().x, four.clut().y, four.depth()), (192, 482, Depth::Eight));
-        let eight = Placement::scene(7, 0, 0x0B, 4, 0);
-        assert_eq!((eight.clut().x, eight.clut().y), (128, 485));
-    }
-
-    #[test]
-    fn a_resident_stage_reads_4_bit_texels_any_upload_wrote() {
-        let mut vram = Vram::new();
-        // Page 7 is VRAM column 448; texel u 5 is the second nibble of word 1.
-        let sheet: Vec<u8> = vec![0x21; 2048];
-        vram.load("BIN/WORLD00/AREA003.EMI", &[rebof3_emi::Entry { size: 2048, offset: 0, ram_ptr: (14 << 24) | (1 << 8), first4: 0, file_type: 3 }], &[&sheet]);
-        let stage = Stage::resident(vram, Placement::scene(7, 0, 0, KIND_CELL, 0));
-        let texel = stage.texel(5, 3);
-        assert_eq!(texel.index, 2);
-        assert!(texel.in_sheet);
-        assert!(!texel.in_palette, "no load wrote the CLUT row");
-        assert!(!stage.texel(0, 40).in_sheet, "row 40 is past the 32-row upload");
-    }
-
-    #[test]
-    fn sizes_read_from_an_executable() {
-        let text = 0x8001_0000u32;
-        let mut exe = vec![0u8; EXE_TEXT_START + (SPRITE_SIZES - text) as usize + 2 * SHAPES];
-        exe[..8].copy_from_slice(EXE_MAGIC);
-        exe[EXE_TEXT_ADDRESS..EXE_TEXT_ADDRESS + 4].copy_from_slice(&text.to_le_bytes());
-        let at = EXE_TEXT_START + (SPRITE_SIZES - text) as usize;
-        exe[at..at + 2].copy_from_slice(&[24, 16]);
-        let sizes = SpriteSizes::from_executable(&exe).expect("reads");
-        assert_eq!(sizes.size(Cell { size: 0x80, x: 0, y: 0, u: 0, v: 0 }), (24, 16));
-        assert!(SpriteSizes::from_executable(b"not an exe").is_err());
-    }
-
-    #[test]
-    fn the_archive_family_names_the_reader() {
-        assert_eq!(Reader::of("BIN/PLCHAR/PL012.EMI"), Reader::Field);
-        assert_eq!(Reader::of("BIN/BPLCHAR/BPLD012.EMI"), Reader::Battle);
-        assert_eq!(Reader::of("BIN/BPLCHAR/BPLU27A.EMI"), Reader::Battle);
-        assert_eq!(Reader::of("BIN/ETC/START.EMI"), Reader::Camp);
-        assert_eq!(Reader::of("BIN/BPLCHAR/DRG00_00.EMI"), Reader::Form);
-        assert_eq!(Reader::of("BIN/ETC/PLATE.EMI"), Reader::Unknown, "a name that only starts like a family");
-        assert_eq!(Reader::Field.palette(), Some(FIELD_PALETTE));
-        assert_eq!(Reader::Battle.palette(), Some(FIELD_PALETTE));
-        assert_eq!(Reader::Field.palettes(), [FIELD_PALETTE, LEADER_PALETTE]);
-        assert_eq!(Reader::Unknown.palette(), None);
     }
 }

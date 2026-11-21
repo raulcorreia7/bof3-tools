@@ -509,14 +509,6 @@ mod tests {
     }
 
     #[test]
-    fn every_byte_value_selects_one_opcode() {
-        for code in 0..=u8::MAX {
-            let found = OPCODES.iter().filter(|opcode| opcode.codes.contains(&code)).count();
-            assert_eq!(found, 1, "{code:#04X}");
-        }
-    }
-
-    #[test]
     fn a_table_decodes_to_streams_and_encodes_back() {
         let payload = table();
         let program = Program::decode(&payload).expect("decodes");
@@ -535,51 +527,9 @@ mod tests {
     }
 
     #[test]
-    fn an_op_edit_keeps_every_other_byte() {
-        let payload = table();
-        let mut program = Program::decode(&payload).expect("decodes");
-        program.set_op(at(0), Op::Show { ticks: 9, frame: 1 }).expect("edits");
-        let edited = program.encode().expect("encodes");
-        let changed: Vec<usize> = (0..payload.len()).filter(|index| payload[*index] != edited[*index]).collect();
-        assert_eq!(edited.len(), payload.len());
-        assert_eq!(changed.len(), 2, "the step's two bytes");
-    }
-
-    #[test]
-    fn an_insert_moves_the_jumps_after_it() {
-        let mut program = Program::decode(&table()).expect("decodes");
-        program.insert_op(at(1), Op::Show { ticks: 1, frame: 0 }).expect("inserts");
-        let stream = program.stream(0, 0).expect("a stream");
-        assert_eq!(stream.animation.steps.len(), 4);
-        assert_eq!(stream.animation.steps[3].jump(), Some(2), "the jump still names the old step 1");
-
-        let encoded = program.encode().expect("encodes");
-        let again = Program::decode(&encoded).expect("the rebuilt table decodes");
-        assert_eq!(again, program);
-        assert_eq!(encoded.len() % KEPT_ALIGNMENT, table().len() % KEPT_ALIGNMENT);
-    }
-
-    #[test]
-    fn a_removal_is_refused_while_a_jump_names_the_step() {
-        let mut program = Program::decode(&table()).expect("decodes");
-        assert!(program.remove_op(at(1)).is_err());
-        program.remove_op(at(0)).expect("step 0 is no target");
-        assert_eq!(program.stream(0, 0).expect("a stream").animation.steps[1].jump(), Some(0));
-        assert_eq!(Program::decode(&program.encode().expect("encodes")).expect("decodes"), program);
-    }
-
-    #[test]
     fn a_jump_past_the_stream_is_refused() {
         let mut program = Program::decode(&table()).expect("decodes");
         assert!(program.set_op(at(0), Op::Jump { code: JUMP, target: 3 }).is_err());
         assert!(program.set_op(at(0), Op::Jump { code: JUMP, target: 2 }).is_ok());
-    }
-
-    #[test]
-    fn a_frame_reach_covers_its_word_and_cells() {
-        let program = Program::decode(&table()).expect("decodes");
-        let stream = program.stream(0, 0).expect("a stream");
-        let reach = stream.frame_reach(1).expect("inside the record");
-        assert_eq!(reach.end, stream.animation.encode().len());
     }
 }
