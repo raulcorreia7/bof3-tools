@@ -96,6 +96,14 @@ pub fn label(index: usize) -> String {
 }
 
 fn write_stream(out: &mut String, stream: &Stream) {
+    write_steps(out, stream);
+    write_frames(out, &stream.animation);
+    if !stream.padding.is_empty() {
+        write_bytes(out, "pad", &stream.padding);
+    }
+}
+
+fn write_steps(out: &mut String, stream: &Stream) {
     let targets = stream.targets();
     let frames = stream.animation.frames.len();
     for (index, op) in stream.ops().enumerate() {
@@ -114,7 +122,10 @@ fn write_stream(out: &mut String, stream: &Stream) {
         };
         let _ = writeln!(out, "{INDENT}{line}");
     }
-    for (index, frame) in stream.animation.frames.iter().enumerate() {
+}
+
+fn write_frames(out: &mut String, animation: &Animation) {
+    for (index, frame) in animation.frames.iter().enumerate() {
         let _ = writeln!(out, "frame {index}");
         for cell in &frame.cells {
             let size = if cell.size & OTHER_SIZE_BITS == 0 {
@@ -125,9 +136,6 @@ fn write_stream(out: &mut String, stream: &Stream) {
             };
             let _ = writeln!(out, "{INDENT}cell {size} x {} y {} u {} v {}", cell.x, cell.y, cell.u, cell.v);
         }
-    }
-    if !stream.padding.is_empty() {
-        write_bytes(out, "pad", &stream.padding);
     }
 }
 
