@@ -12,7 +12,7 @@
 
 use psx_formats::gfx::texture::{Clut, Color, Depth, Tpage};
 
-use super::{SITES, Site, terrain_descriptor};
+use super::{Code, SITES, Site, terrain_descriptor};
 use crate::replay::scenes::Scene;
 use crate::replay::{Kind, Vram, Writer};
 
@@ -29,7 +29,7 @@ impl Rule {
     /// One line of evidence for the join.
     pub fn evidence(&self) -> String {
         match self {
-            Rule::Site(site) => format!("{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {:#06x}", site.archive, site.overlay, site.function, site.source, site.tpage, site.clut),
+            Rule::Site(site) => format!("{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {}", site.archive, site.overlay, site.function, site.source, site.tpage, site.clut),
             Rule::Terrain(descriptor) => {
                 format!("world-map tile descriptor {descriptor:#010x} (func_80155560)")
             }
@@ -62,10 +62,10 @@ pub fn resolve(vram: &Vram, page_x: u16, page_y: u16, clut: Clut, depth: Depth) 
     Some((texture.clone(), palette.clone()))
 }
 
-/// Every join the rules prove in a replayed scene: the sites of the archives it loads and the
-/// tile `descriptors` of its area map bundles. Repeated joins of one texture, row and depth are
+/// Every join the rules prove in a replayed scene: the sites of the archives it loads, with the
+/// tables they read from `code`, and the tile `descriptors` of its area map bundles. Repeated joins of one texture, row and depth are
 /// kept once.
-pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32]) -> Vec<Join> {
+pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32], code: &[Code]) -> Vec<Join> {
     let mut joins: Vec<Join> = Vec::new();
     let mut push = |join: Join| {
         let seen = joins.iter().any(|old| old.texture == join.texture && old.clut == join.clut && old.depth == join.depth);
@@ -77,10 +77,11 @@ pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32]) -> Vec<Join>
         for site in SITES.iter().filter(|site| path.ends_with(&format!("/{}", site.archive))) {
             let Some(tpage) = Tpage::from_word(site.tpage) else { continue };
             let Color::Indexed(depth) = tpage.color else { continue };
-            let clut = Clut::from_word(site.clut);
-            let Some((texture, palette)) = resolve(vram, tpage.x, tpage.y, clut, depth) else { continue };
-            if texture.as_entry().is_some_and(|(archive, _)| site.reads_page_of(archive)) {
-                push(Join { texture, palette, page: (tpage.x, tpage.y), clut, depth, rule: Rule::Site(site) });
+            for clut in site.cluts(code) {
+                let Some((texture, palette)) = resolve(vram, tpage.x, tpage.y, clut, depth) else { continue };
+                if texture.as_entry().is_some_and(|(archive, _)| site.reads_page_of(archive)) {
+                    push(Join { texture, palette, page: (tpage.x, tpage.y), clut, depth, rule: Rule::Site(site) });
+                }
             }
         }
     }

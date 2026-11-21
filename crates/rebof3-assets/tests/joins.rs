@@ -1,8 +1,8 @@
-//! The palette joins over the retail archives: 203 textures and 883 rows.
+//! The palette joins over the retail archives: 239 textures and 968 rows.
 //!
 //! The test skips when no retail archive directory is present. Set `BOF3_DISC_DIR` to an
 //! extracted disc. The counts
-//! are the world-map terrain rule plus the literal sites (`rebof3_emi::texture::SITES`).
+//! are the world-map terrain rule plus the draw sites (`rebof3_emi::texture::SITES`).
 //!
 //! Every joined row is written to the test artifacts as its palette-applied PNG and its TIM, so
 //! the result can be inspected by eye (`target/tmp/retail_textures_join_their_proven_palette_rows`).
@@ -18,9 +18,9 @@ use rebof3_emi::texture::ResidentClutBlock;
 use rebof3_formats::joins::joined_rows;
 use rebof3_formats::vram::{indexed_rows, texture_view_png};
 
-/// The proven palette joins: 203 textures and 883 rows.
-const TEXTURES: usize = 203;
-const ROWS: usize = 883;
+/// The proven palette joins: 239 textures and 968 rows.
+const TEXTURES: usize = 239;
+const ROWS: usize = 968;
 
 /// The archive's payloads, or the slots that failed to read.
 fn payloads(archive: &Archive, bytes: &[u8]) -> Vec<Vec<u8>> {

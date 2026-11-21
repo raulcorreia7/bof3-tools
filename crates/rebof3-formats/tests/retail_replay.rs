@@ -158,10 +158,12 @@ fn retail_joins_and_the_suggestion_scorer() {
     for scene in scenes::catalog(paths.iter().map(String::as_str)) {
         let vram = disc.replay(&scene);
         let mut descriptors = Vec::new();
+        let mut code = Vec::new();
         for path in scene.archives() {
             let (bytes, archive) = &disc.archives[path];
             for (slot, entry) in archive.entries().iter().enumerate() {
                 let payload = archive.payload(bytes, slot).unwrap_or(&[]);
+                code.push(rebof3_emi::texture::Code { archive: path, slot, ram: entry.ram_ptr, bytes: payload });
                 if classify(entry, payload) == Format::AreaMapBundle
                     && let Ok(bundle) = MapBundle::decode(payload)
                 {
@@ -169,7 +171,7 @@ fn retail_joins_and_the_suggestion_scorer() {
                 }
             }
         }
-        let found = joins::scene_joins(&scene, &vram, &descriptors);
+        let found = joins::scene_joins(&scene, &vram, &descriptors, &code);
         for join in found {
             let Some((archive, slot)) = join.texture.as_entry() else { continue };
             joined.insert((archive.to_string(), slot));
@@ -215,7 +217,7 @@ fn retail_joins_and_the_suggestion_scorer() {
         100.0 * depth_hits as f64 / total as f64,
         100.0 * row_hits as f64 / total as f64
     );
-    assert_eq!(joined.len(), 204, "the textures the rules join in some scene");
+    assert_eq!(joined.len(), 245, "the textures the rules join in some scene");
 }
 
 /// The battle archives a battle streams part-way: each texture a battle draw site names is joined
@@ -231,7 +233,7 @@ fn retail_battle_archive_joins() {
     for (archive, slot, bits, x, y, palette) in expected {
         let scene = scenes::home(archive).expect("a home scene");
         let vram = disc.replay(&scene);
-        let found = joins::scene_joins(&scene, &vram, &[]);
+        let found = joins::scene_joins(&scene, &vram, &[], &[]);
         let texture = Writer::entry(archive, slot);
         let join = found.iter().find(|join| join.texture == texture).unwrap_or_else(|| panic!("{archive} #{slot}"));
         assert_eq!((join.depth.bits(), join.clut.x, join.clut.y), (bits, x, y), "{archive} #{slot}");
