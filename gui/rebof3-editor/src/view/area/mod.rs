@@ -22,7 +22,6 @@ use rebof3_emi::replay::scenes;
 use rebof3_emi::text::codec::name_text;
 use rebof3_formats::encounter::ENCOUNTER_ENEMIES;
 use rebof3_formats::field::{FACINGS, GAME_CODE};
-use rebof3_formats::map::CELL_BYTES;
 use rebof3_formats::map::draw::{Face, TileField};
 use rebof3_render::{Backend, Camera, Renderer, Scene};
 
@@ -829,8 +828,8 @@ fn labelled(label: impl Into<gpui::SharedString>, field: impl IntoElement) -> Di
 fn cell_fields(editor: &Editor, area: &Area, cell: usize, face: Face, cx: &mut Context<Editor>) -> Div {
     let (column, row) = area.column_row(cell);
     let mut fields = div().flex().flex_col().gap(px(GAP_SMALL)).child(strong(format!("Cell x {column} y {row}, {} face", face.label())));
-    for corner in 0..CELL_BYTES {
-        let text = area.bundle.cells[cell].heights[corner].to_string();
+    for (corner, height) in area.bundle.cells[cell].heights.iter().enumerate() {
+        let text = height.to_string();
         let field = input(editor, ("area-corner", corner), Field::Area(Part::Corner(corner)), &text, "", Some(NUMBER_WIDTH), cx);
         fields = fields.child(labelled(format!("Corner {corner}"), field));
     }
