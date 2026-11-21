@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use rebof3_emi::replay::scenes::{self, Scene};
 use rebof3_emi::replay::{self, Region, Vram};
+use rebof3_emi::texture::Code;
 use rebof3_emi::texture::scene::{Join, scene_joins};
 use rebof3_formats::map::MapBundle;
 use rebof3_formats::{Format, classify};
@@ -49,10 +50,12 @@ pub fn replay(project: &mut Project, scene: &Scene) -> Rc<Replayed> {
         Some(replay::Archive { entries: tables.get(path)?, payloads })
     });
     let mut descriptors = Vec::new();
+    let mut code = Vec::new();
     for path in scene.archives() {
         let Some(loaded) = project.loaded(&ArchivePath(path.to_string())) else { continue };
         for (index, entry) in project.entries_of(loaded).iter().enumerate() {
             let payload = project.payload(loaded, index);
+            code.push(Code { archive: path, slot: index, ram: entry.ram_ptr, bytes: payload });
             if classify(entry, payload) == Format::AreaMapBundle
                 && let Ok(bundle) = MapBundle::decode(payload)
             {
@@ -60,7 +63,7 @@ pub fn replay(project: &mut Project, scene: &Scene) -> Rc<Replayed> {
             }
         }
     }
-    let joins = scene_joins(scene, &vram, &descriptors);
+    let joins = scene_joins(scene, &vram, &descriptors, &code);
     let regions = vram.regions();
     Rc::new(Replayed { scene: scene.clone(), vram, regions, joins, revision: project.revision() })
 }

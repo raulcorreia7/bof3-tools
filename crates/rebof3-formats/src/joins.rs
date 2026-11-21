@@ -50,7 +50,8 @@ pub fn joined_rows_in(source: &str, entries: &[rebof3_emi::Entry], payloads: &[&
     blocks.extend(resident.iter().filter(|block| block.archive != source));
 
     let mut rows: HashMap<usize, Vec<RowUse>> = HashMap::new();
-    for join in draw::joins(source, &sheets, &blocks) {
+    let code: Vec<draw::Code> = entries.iter().zip(payloads).enumerate().map(|(slot, (entry, bytes))| draw::Code { archive: source, slot, ram: entry.ram_ptr, bytes }).collect();
+    for join in draw::joins(source, &sheets, &blocks, &code) {
         push_row(&mut rows, source, join);
     }
     for bundle in &bundles {
@@ -74,7 +75,7 @@ fn push_row(rows: &mut HashMap<usize, Vec<RowUse>>, source: &str, join: draw::Jo
     let colors = words.iter().map(|&word| clut::color_rgba(word)).collect();
     let mut evidence = match join.rule {
         draw::Rule::Site(site) => {
-            format!("{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {:#06x}, sheet slot {}", site.archive, site.overlay, site.function, site.source, site.tpage, site.clut, texture)
+            format!("{} overlay {} function {:#010x} ({}): tpage {:#06x}, clut {}, sheet slot {}", site.archive, site.overlay, site.function, site.source, site.tpage, site.clut, texture)
         }
         draw::Rule::Terrain { page_x, page_y } => format!(
             "world-map terrain rule (func_80155560): page ({page_x}, {page_y}), depth {}bpp, \

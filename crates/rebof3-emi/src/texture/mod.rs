@@ -190,27 +190,81 @@ pub struct Site {
     pub source: &'static str,
     /// The `tpage` word the function writes.
     pub tpage: u16,
-    /// The `clut` word the function writes.
-    pub clut: u16,
+    /// The CLUT the function writes.
+    pub clut: SiteClut,
     /// The archive whose upload the draw reads, when the overlay names it: the one its own loader
     /// streams and follows with the copy of the site's CLUT row. `None` accepts any upload.
     pub page_writer: Option<&'static str>,
 }
 
+/// Where a site's CLUT comes from.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SiteClut {
+    /// A literal `clut` word.
+    Word(u16),
+    /// `getClut(record[2], record[3] + 480)` from `records` 4-byte records at `address` in the overlay.
+    Atlas { address: u32, records: usize },
+}
+
+impl std::fmt::Display for SiteClut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SiteClut::Word(word) => write!(f, "{word:#06x}"),
+            SiteClut::Atlas { address, records } => write!(f, "atlas {address:#010x} x{records}"),
+        }
+    }
+}
+
+/// An archive entry as loaded: the overlay code a table site reads.
+#[derive(Clone, Copy, Debug)]
+pub struct Code<'a> {
+    /// The archive's disc path.
+    pub archive: &'a str,
+    /// EMI slot of the entry.
+    pub slot: usize,
+    /// RAM address the entry loads at.
+    pub ram: u32,
+    /// The entry's payload.
+    pub bytes: &'a [u8],
+}
+
 /// Builds a [`Site`] table entry.
 const fn literal(archive: &'static str, overlay: usize, function: u32, source: &'static str, tpage: u16, clut: u16) -> Site {
-    Site { archive, overlay, function, source, tpage, clut, page_writer: None }
+    Site { archive, overlay, function, source, tpage, clut: SiteClut::Word(clut), page_writer: None }
 }
 
 /// Builds a [`Site`] whose page is the upload of `page_writer`.
 const fn streamed(archive: &'static str, overlay: usize, function: u32, source: &'static str, (tpage, clut): (u16, u16), page_writer: &'static str) -> Site {
-    Site { archive, overlay, function, source, tpage, clut, page_writer: Some(page_writer) }
+    Site { archive, overlay, function, source, tpage, clut: SiteClut::Word(clut), page_writer: Some(page_writer) }
+}
+
+/// Builds a `Menu_DrawPortrait` site: page (896, 256) at 4bpp, the CLUT from the 12-record portrait atlas at `address`.
+const fn portrait(archive: &'static str, overlay: usize, function: u32, address: u32) -> Site {
+    Site { archive, overlay, function, source: "src/shared/Menu_DrawPortrait.h", tpage: 0x001E, clut: SiteClut::Atlas { address, records: 12 }, page_writer: None }
 }
 
 impl Site {
     /// Whether the upload of `archive` (a disc path) may serve the site's page.
     pub fn reads_page_of(&self, archive: &str) -> bool {
         self.page_writer.is_none_or(|owner| archive.ends_with(&format!("/{owner}")) || archive == owner)
+    }
+
+    /// Whether `archive` (a disc path) is the site's archive.
+    pub fn is_in(&self, archive: &str) -> bool {
+        archive == self.archive || archive.ends_with(&format!("/{}", self.archive))
+    }
+
+    /// The CLUT rows the site names, reading a table from its overlay in `code`; empty when the overlay is absent.
+    pub fn cluts(&self, code: &[Code]) -> Vec<Clut> {
+        match self.clut {
+            SiteClut::Word(word) => vec![Clut::from_word(word)],
+            SiteClut::Atlas { address, records } => {
+                let Some(code) = code.iter().find(|code| code.slot == self.overlay && self.is_in(code.archive)) else { return Vec::new() };
+                let Some(start) = address.checked_sub(code.ram).map(|offset| offset as usize) else { return Vec::new() };
+                let table = code.bytes.get(start..start + records * 4).unwrap_or(&[]);
+                table.as_chunks::<4>().0.iter().filter_map(|&[_, _, x, row]| Clut::new(u16::from(x), ARENA_VRAM_ROW + u16::from(row))).collect()
+            }
+        }
     }
 }
 
@@ -244,6 +298,18 @@ pub const SITES: &[Site] = &[
     literal("WORLD00/AREA030.EMI", 4, 0x801D_2C34, "src/overlays/area/area030/04/Fishing_DrawFishArrow.c:15-16", 0x0099, 0x7A40),
     literal("WORLD00/AREA030.EMI", 4, 0x801D_799C, "src/overlays/area/area030/04/func_801D799C.c:14-17; src/overlays/area/area030/04/data.c:271", 0x001D, 0x7887),
     literal("WORLD00/AREA030.EMI", 4, 0x801D_8248, "src/overlays/area/area030/04/func_801D8248.c:13-16", 0x001D, 0x7887),
+    // SCENA00's actor glow cell and chapter title card.
+    literal("SCENARIO/SCENA00.EMI", 0, 0x801F_6E48, "src/overlays/scenario/scena00/00/1C0.c:78-150", 0x001B, 0x78CB),
+    literal("SCENARIO/SCENA00.EMI", 0, 0x801F_7134, "src/overlays/scenario/scena00/00/1C0.c:157-175", 0x00DD, 0x7A80),
+    // The shop's icon cells.
+    literal("ETC/SHOP.EMI", 0, 0x801D_A00C, "src/overlays/menu/shop/00/Menu_DrawIcon.c", 0x002F, 0x7800),
+    // The menu portraits, one atlas per overlay.
+    portrait("ETC/BATE.EMI", 0, 0x801D_3518, 0x801D_8B54),
+    portrait("ETC/COMMU02.EMI", 8, 0x801D_8F8C, 0x801D_AEDC),
+    portrait("ETC/SHISU.EMI", 0, 0x801D_44C0, 0x801D_9B78),
+    portrait("ETC/SHOP.EMI", 0, 0x801D_8FC0, 0x801E_5850),
+    portrait("ETC/SISYOU.EMI", 0, 0x801D_23A0, 0x801D_4058),
+    portrait("ETC/START.EMI", 8, 0x801D_C4B8, 0x801E_C96C),
     // The battle panel quads: `GetTPage(0, 0, 0x380, 0x100)`, a 4bpp page at (896, 256), and
     // `setClut(16, STAGE_PALETTE_Y + 26)`. The same overlay's `Battle_LoadDraArchive` streams
     // `BATL_DRA`, which uploads the page and loads arena row 26, and `Battle_FinishDraLoad` copies
@@ -262,6 +328,47 @@ pub const SITES: &[Site] = &[
     literal("BATTLE/BATL_OVR.EMI", 0, 0x801E_F3B4, "asm/emi/battle/batl_ovr/00/func_801EF3B4.s:15-36", 0x009D, 0x7E80),
     // MAGIC218's effect page and CLUT, from retail assembly.
     literal("BMAGIC/MAGIC218.EMI", 3, 0x801E_F250, "asm/emi/bmagic/magic218/03/func_801EF250.s:195-213", 0x00BD, 0x7E80),
+    // Effect sprites with a literal page and CLUT in one function of the effect's overlay.
+    literal("BMAGIC/MAGIC009.EMI", 3, 0x801E_F3B8, "src/overlays/bmagic/magic009/03/BMagic_Effect.c: func_801EF3B8", 0x001D, 0x7E82),
+    literal("BMAGIC/MAGIC012.EMI", 0, 0x801E_F79C, "src/overlays/bmagic/magic012/00/BMagic_Effect.c: func_801EF79C", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC044.EMI", 3, 0x801F_06D8, "src/overlays/bmagic/magic044/03/BMagic_Effect.c: func_801F06D8", 0x001D, 0x7E82),
+    literal("BMAGIC/MAGIC046.EMI", 3, 0x801E_F7E8, "src/overlays/bmagic/magic046/03/BMagic_Effect.c: func_801EF7E8", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC053.EMI", 3, 0x801F_01C0, "src/overlays/bmagic/magic053/03/BMagic_Effect.c: func_801F01C0", 0x001D, 0x7880),
+    literal("BMAGIC/MAGIC055.EMI", 3, 0x801E_F1B8, "src/overlays/bmagic/magic055/03/BMagic_Effect.c: func_801EF1B8", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC056.EMI", 3, 0x801E_F4C0, "src/overlays/bmagic/magic056/03/BMagic_Effect.c: BMagic_DrawDome", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC059.EMI", 3, 0x801F_01A4, "src/overlays/bmagic/magic059/03/BMagic_Effect.c: func_801F01A4", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC060.EMI", 0, 0x801E_FCE8, "src/overlays/bmagic/magic060/00/func_801EFCE8.c: func_801EFCE8", 0x001F, 0x7800),
+    literal("BMAGIC/MAGIC066.EMI", 3, 0x801E_F158, "src/overlays/bmagic/magic066/03/BMagic_Effect.c: func_801EF158", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC066.EMI", 3, 0x801E_FCC8, "src/overlays/bmagic/magic066/03/BMagic_Effect.c: func_801EFCC8", 0x001D, 0x7880),
+    literal("BMAGIC/MAGIC067.EMI", 3, 0x801E_F79C, "src/overlays/bmagic/magic067/03/BMagic_Effect.c: func_801EF79C", 0x009D, 0x7880),
+    literal("BMAGIC/MAGIC069.EMI", 3, 0x801E_FA84, "src/overlays/bmagic/magic069/03/BMagic_Effect.c: func_801EFA84", 0x001E, 0x7E82),
+    literal("BMAGIC/MAGIC076.EMI", 3, 0x801E_F698, "src/overlays/bmagic/magic076/03/BMagic_Effect.c: func_801EF698", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC081.EMI", 3, 0x801E_F6A0, "src/overlays/bmagic/magic081/03/BMagic_Effect.c: func_801EF6A0", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC087.EMI", 3, 0x801E_F580, "src/overlays/bmagic/magic087/03/BMagic_Effect.c: func_801EF580", 0x001F, 0x7E80),
+    literal("BMAGIC/MAGIC091.EMI", 3, 0x801E_F1B8, "src/overlays/bmagic/magic091/03/BMagic_Effect.c: func_801EF1B8", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC093.EMI", 3, 0x801F_01F0, "src/overlays/bmagic/magic093/03/BMagic_Effect.c: func_801F01F0", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC103.EMI", 3, 0x801E_F1D8, "src/overlays/bmagic/magic103/03/BMagic_Effect.c: func_801EF1D8", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC103.EMI", 3, 0x801E_FE20, "src/overlays/bmagic/magic103/03/BMagic_Effect.c: func_801EFE20", 0x001D, 0x7E81),
+    literal("BMAGIC/MAGIC110.EMI", 3, 0x801F_01E8, "src/overlays/bmagic/magic110/03/BMagic_Effect.c: func_801F01E8", 0x001D, 0x7880),
+    literal("BMAGIC/MAGIC114.EMI", 3, 0x801F_0004, "src/overlays/bmagic/magic114/03/BMagic_Effect.c: func_801F0004", 0x009D, 0x7880),
+    literal("BMAGIC/MAGIC114.EMI", 3, 0x801F_04D4, "src/overlays/bmagic/magic114/03/BMagic_Effect.c: func_801F04D4", 0x009D, 0x7880),
+    literal("BMAGIC/MAGIC118.EMI", 3, 0x801E_F194, "src/overlays/bmagic/magic118/03/BMagic_Effect.c: BMagic_DrawBurnSprites", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC120.EMI", 3, 0x801E_F44C, "src/overlays/bmagic/magic120/03/BMagic_Effect.c: BMagic_DrawWhelpBreath", 0x001E, 0x7E80),
+    literal("BMAGIC/MAGIC120.EMI", 3, 0x801F_04B0, "src/overlays/bmagic/magic120/03/BMagic_Effect.c: func_801F04B0", 0x001D, 0x7E82),
+    literal("BMAGIC/MAGIC122.EMI", 3, 0x801E_F324, "src/overlays/bmagic/magic122/03/BMagic_Effect.c: func_801EF324", 0x001E, 0x7E80),
+    literal("BMAGIC/MAGIC126.EMI", 3, 0x801E_FD5C, "src/overlays/bmagic/magic126/03/BMagic_Effect.c: func_801EFD5C", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC126.EMI", 3, 0x801F_0ED0, "src/overlays/bmagic/magic126/03/BMagic_Effect.c: BMagic_DrawMote", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC131.EMI", 3, 0x801F_06B4, "src/overlays/bmagic/magic131/03/BMagic_Effect.c: func_801F06B4", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC131.EMI", 3, 0x801F_0DF4, "src/overlays/bmagic/magic131/03/BMagic_Effect.c: func_801F0DF4", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC132.EMI", 3, 0x801E_F5B0, "src/overlays/bmagic/magic132/03/BMagic_Effect.c: func_801EF5B0", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC137.EMI", 3, 0x801E_F4C4, "src/overlays/bmagic/magic137/03/BMagic_Effect.c: func_801EF4C4", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC145.EMI", 3, 0x801E_F118, "src/overlays/bmagic/magic145/03/BMagic_Effect.c: Effect_DrawTexturedQuad", 0x001D, 0x7E82),
+    literal("BMAGIC/MAGIC146.EMI", 3, 0x801E_F604, "src/overlays/bmagic/magic146/03/BMagic_Effect.c: Effect_DrawTexturedQuad", 0x001D, 0x7E82),
+    literal("BMAGIC/MAGIC159.EMI", 3, 0x801E_F08C, "src/overlays/bmagic/magic159/03/BMagic_Effect.c: func_801EF08C", 0x001D, 0x7E80),
+    literal("BMAGIC/MAGIC169.EMI", 3, 0x801E_F070, "src/overlays/bmagic/magic169/03/BMagic_Effect.c: func_801EF070", 0x009D, 0x7E80),
+    literal("BMAGIC/MAGIC220.EMI", 3, 0x801F_0334, "src/overlays/bmagic/magic220/03/BMagic_Effect.c: func_801F0334", 0x001D, 0x7880),
+    literal("BMAGIC/MAGIC222.EMI", 3, 0x801F_0218, "src/overlays/bmagic/magic222/03/BMagic_Effect.c: func_801F0218", 0x001D, 0x7880),
+    literal("BMAGIC/MAGIC226.EMI", 3, 0x801F_01B8, "src/overlays/bmagic/magic226/03/BMagic_Effect.c: func_801F01B8", 0x001D, 0x7880),
 ];
 
 /// What named a join: a literal draw site or the world-map terrain descriptor rule.
@@ -297,24 +404,19 @@ pub struct Join<'a> {
 /// consulted and identical blocks collapse. A cross-archive block is what serves the battle icon
 /// rows, whose pages are in `BATTLE.EMI` and whose palettes are in `BATL_OVR.EMI` and
 /// `BATL_DRA.EMI`.
-pub fn joins<'a>(archive: &str, sheets: &[Sheet], blocks: &[&'a ResidentClutBlock]) -> Vec<Join<'a>> {
-    SITES
-        .iter()
-        .filter(|site| archive == site.archive || archive.ends_with(&format!("/{}", site.archive)))
-        .filter_map(|site| {
-            let tpage = Tpage::from_word(site.tpage)?;
-            let Color::Indexed(depth) = tpage.color else {
-                return None;
-            };
-            let clut = Clut::from_word(site.clut);
-            if !site.reads_page_of(archive) {
-                return None;
+pub fn joins<'a>(archive: &str, sheets: &[Sheet], blocks: &[&'a ResidentClutBlock], code: &[Code]) -> Vec<Join<'a>> {
+    let mut joins = Vec::new();
+    for site in SITES.iter().filter(|site| site.is_in(archive) && site.reads_page_of(archive)) {
+        let Some(tpage) = Tpage::from_word(site.tpage) else { continue };
+        let Color::Indexed(depth) = tpage.color else { continue };
+        let Some(texture) = only(sheets.iter().filter(|sheet| sheet.covers(tpage.x, tpage.y))) else { continue };
+        for clut in site.cluts(code) {
+            if let Some(palette) = holder(archive, blocks, clut, depth) {
+                joins.push(Join { texture: texture.slot, palette, clut, depth, rule: Rule::Site(site) });
             }
-            let texture = only(sheets.iter().filter(|sheet| sheet.covers(tpage.x, tpage.y)))?;
-            let palette = holder(archive, blocks, clut, depth)?;
-            Some(Join { texture: texture.slot, palette, clut, depth, rule: Rule::Site(site) })
-        })
-        .collect()
+        }
+    }
+    joins
 }
 
 /// The joins implied by a world-map bundle's tile descriptor words.
@@ -461,7 +563,7 @@ mod tests {
     fn a_bank_from_another_archive_of_the_family_serves_the_row() {
         let (own, sheets, ram) = area024();
         let other = block("BIN/WORLD00/AREA099.EMI", 8, ram, 16);
-        let joins = joins(own, &sheets, &[&other]);
+        let joins = joins(own, &sheets, &[&other], &[]);
         assert_eq!(joins.len(), 1);
         assert_eq!(joins[0].palette.archive, "BIN/WORLD00/AREA099.EMI");
         assert_eq!(joins[0].palette.block.slot, 8);
@@ -472,7 +574,7 @@ mod tests {
         let (own, sheets, ram) = area024();
         let own_block = block_with(own, 1, ram, 16, 3);
         let other = block_with("BIN/WORLD00/AREA099.EMI", 8, ram, 16, 9);
-        let joins = joins(own, &sheets, &[&own_block, &other]);
+        let joins = joins(own, &sheets, &[&own_block, &other], &[]);
         assert_eq!(joins.len(), 1);
         assert_eq!(joins[0].palette.archive, own);
     }
@@ -481,10 +583,10 @@ mod tests {
     fn identical_family_banks_collapse_and_disagreeing_ones_refuse() {
         let (own, sheets, ram) = area024();
         let same = [block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 7)];
-        assert_eq!(joins(own, &sheets, &same.iter().collect::<Vec<_>>()).len(), 1);
+        assert_eq!(joins(own, &sheets, &same.iter().collect::<Vec<_>>(), &[]).len(), 1);
 
         let different = [block_with("BIN/WORLD00/AREA098.EMI", 2, ram, 16, 7), block_with("BIN/WORLD00/AREA099.EMI", 3, ram, 16, 8)];
-        assert!(joins(own, &sheets, &different.iter().collect::<Vec<_>>()).is_empty());
+        assert!(joins(own, &sheets, &different.iter().collect::<Vec<_>>(), &[]).is_empty());
     }
 
     #[test]
@@ -496,6 +598,6 @@ mod tests {
         let archive = "BIN/BATTLE/BATTLE.EMI";
         let sheets = [sheet(4, 896, 256)];
         let blocks = [block(archive, 6, 0x8003_6C00, 256)];
-        assert!(joins(archive, &sheets, &blocks.iter().collect::<Vec<_>>()).is_empty(), "BATTLE's own sheet is not BATL_DRA's");
+        assert!(joins(archive, &sheets, &blocks.iter().collect::<Vec<_>>(), &[]).is_empty(), "BATTLE's own sheet is not BATL_DRA's");
     }
 }

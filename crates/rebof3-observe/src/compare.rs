@@ -11,6 +11,7 @@ use std::path::Path;
 use psx_formats::gfx::texture::{Clut, Depth};
 use rebof3_emi::replay::scenes;
 use rebof3_emi::replay::{self, Vram};
+use rebof3_emi::texture::Code;
 use rebof3_emi::texture::scene::scene_joins;
 use rebof3_emi::{Archive, Entry};
 use rebof3_formats::joins::joined_rows;
@@ -65,7 +66,7 @@ pub fn against_rules(observation: &Observation, image: &Path) -> Result<Vec<Comp
         }
         if let Some(scene) = scenes::home(archive) {
             let (vram, descriptors) = disc.replay(&scene);
-            for join in scene_joins(&scene, &vram, &descriptors) {
+            for join in scene_joins(&scene, &vram, &descriptors, &disc.code(&scene)) {
                 if let Some((owner, slot)) = join.texture.as_entry()
                     && owner == archive
                 {
@@ -134,6 +135,15 @@ impl Disc {
             self.loaded.insert(path.to_string(), loaded);
         }
         self.loaded.get(path)?.as_ref()
+    }
+
+    /// Every entry of the scene's archives, as the table sites read them.
+    fn code<'a>(&'a self, scene: &'a scenes::Scene) -> Vec<Code<'a>> {
+        let mut code = Vec::new();
+        for (path, archive) in scene.archives().filter_map(|path| Some((path, self.loaded.get(path)?.as_ref()?))) {
+            code.extend(archive.entries.iter().enumerate().map(|(slot, entry)| Code { archive: path, slot, ram: entry.ram_ptr, bytes: archive.payload(slot) }));
+        }
+        code
     }
 
     /// The scene's replayed VRAM and the tile descriptors of its area map bundles.
