@@ -15,8 +15,8 @@ const WAYS_DRAWN: usize = 53;
 /// Of the indexed ways, those whose CLUT row an entry of a file read holds.
 const ROWS_NAMED: usize = 41;
 /// Rule rows that a draw also names, and of those the ones the draws agree with.
-const RULE_ROWS: usize = 14;
-const RULE_ROWS_AGREEING: usize = 10;
+const RULE_ROWS: usize = 29;
+const RULE_ROWS_AGREEING: usize = 15;
 
 #[test]
 fn the_new_game_route_proves_texture_depths_and_rows() {
@@ -69,7 +69,8 @@ fn the_new_game_route_proves_texture_depths_and_rows() {
     assert_eq!(comparisons.len(), RULE_ROWS);
     let agreeing = comparisons.iter().filter(|comparison| comparison.verdict == Verdict::Agrees).count();
     assert_eq!(agreeing, RULE_ROWS_AGREEING);
-    // Every rule's depth agrees; the four that do not agree are the terrain rule's rows 485 and 487 of
-    // the area's sheet, which the draws of page (448, 256) use as rows 486 and 488.
+    // Every rule's depth agrees. Of the rows that do not: four are the terrain rule's rows 485 and 487 of the
+    // area's sheet, which the draws of page (448, 256) use as rows 486 and 488; ten are portrait rows the
+    // route never draws (it shows one portrait).
     assert!(comparisons.iter().all(|comparison| !matches!(comparison.verdict, Verdict::OtherDepth(_))));
 }
