@@ -20,6 +20,7 @@ lint:
 	@command -v cargo-deny >/dev/null 2>&1 || { echo "cargo-deny missing: cargo install cargo-deny" >&2; exit 1; }
 	cargo clippy --workspace --all-targets --locked -- -D warnings
 	cargo deny check
+	python3 scripts/check-layers.py
 check:
 	$(MAKE) format CHECK=1
 	$(MAKE) lint

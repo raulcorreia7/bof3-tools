@@ -6,7 +6,8 @@
 //! and `wiki: formats/area#0x800e4000-encounters-and-enemy-records`; the picker is
 //! `emi/etc/game/00@0x801C6A7C`.
 
-use rebof3_emi::record::{bytes, u16_at};
+use psx_formats::bytes::u16_le;
+use rebof3_emi::record::bytes;
 use rebof3_emi::text::codec::{name_field, name_text};
 
 use crate::error::{Error, Result};
@@ -155,19 +156,19 @@ fn action_block(record: &[u8], at: usize) -> ActionBlock {
 fn enemy(record: &[u8]) -> Enemy {
     Enemy {
         name: bytes(record, 0x00),
-        enemy_id: u16_at(record, 0x08),
+        enemy_id: u16_le(record, 0x08),
         choice_ai: record[0x0a],
         target_preference: record[0x0e],
-        zenny: u16_at(record, 0x10),
-        exp: u16_at(record, 0x12),
+        zenny: u16_le(record, 0x10),
+        exp: u16_le(record, 0x12),
         level: record[0x14],
         initial_skills: bytes(record, 0x18),
-        hp: u16_at(record, 0x20),
-        ap: u16_at(record, 0x22),
-        power: u16_at(record, 0x24),
-        defense: u16_at(record, 0x26),
-        agility: u16_at(record, 0x28),
-        intellect: u16_at(record, 0x2a),
+        hp: u16_le(record, 0x20),
+        ap: u16_le(record, 0x22),
+        power: u16_le(record, 0x24),
+        defense: u16_le(record, 0x26),
+        agility: u16_le(record, 0x28),
+        intellect: u16_le(record, 0x2a),
         steal: ItemRef { index: record[0x2c], item_type: record[0x2d] },
         steal_rate: record[0x2e],
         drop: ItemRef { index: record[0x30], item_type: record[0x31] },

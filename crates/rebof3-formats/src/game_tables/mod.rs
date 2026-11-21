@@ -10,7 +10,8 @@
 //! the field, so the stored bytes come back exactly. The other fields keep the documented offsets. Fields the
 //! decompilation has not named are left out.
 
-use rebof3_emi::record::{bytes, u16_at};
+use psx_formats::bytes::u16_le;
+use rebof3_emi::record::bytes;
 pub use rebof3_emi::text::codec::{name_field, name_text};
 
 use crate::error::{Error, Result};
@@ -209,7 +210,7 @@ fn name(record: &[u8]) -> [u8; NAME_BYTES] {
 }
 
 fn item(record: &[u8]) -> Item {
-    Item { name: name(record), flags: record[0x0c], price: u16_at(record, 0x10) }
+    Item { name: name(record), flags: record[0x0c], price: u16_le(record, 0x10) }
 }
 
 fn vital_item(record: &[u8]) -> VitalItem {
@@ -217,15 +218,15 @@ fn vital_item(record: &[u8]) -> VitalItem {
 }
 
 fn weapon(record: &[u8]) -> Weapon {
-    Weapon { name: name(record), equipability: record[0x0c], element: record[0x0f], weight: record[0x10], power: record[0x12], price: u16_at(record, 0x16) }
+    Weapon { name: name(record), equipability: record[0x0c], element: record[0x0f], weight: record[0x10], power: record[0x12], price: u16_le(record, 0x16) }
 }
 
 fn armor(record: &[u8]) -> Armor {
-    Armor { name: name(record), equipability: record[0x0c], equip_type: record[0x0e], weight: record[0x0f], power: record[0x10], price: u16_at(record, 0x14) }
+    Armor { name: name(record), equipability: record[0x0c], equip_type: record[0x0e], weight: record[0x0f], power: record[0x10], price: u16_le(record, 0x14) }
 }
 
 fn accessory(record: &[u8]) -> Accessory {
-    Accessory { name: name(record), equipability: record[0x0c], weight: record[0x0f], price: u16_at(record, 0x12) }
+    Accessory { name: name(record), equipability: record[0x0c], weight: record[0x0f], price: u16_le(record, 0x12) }
 }
 
 fn shop(record: &[u8]) -> Shop {
@@ -239,7 +240,7 @@ fn ability(record: &[u8]) -> Ability {
 
 fn growth(record: &[u8]) -> Growth {
     Growth {
-        exp: u16_at(record, 0),
+        exp: u16_le(record, 0),
         hp: record[2],
         ap: record[3],
         power: record[4] >> 4,

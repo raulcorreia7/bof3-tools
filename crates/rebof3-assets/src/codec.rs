@@ -7,6 +7,7 @@
 //! op's needs, read the files, call [`Op::run`], write the bytes.
 
 use crate::error::Result;
+use psx_formats::sep::{Package, seq};
 use rebof3_formats::message::table;
 use rebof3_formats::text::strings;
 
@@ -158,15 +159,12 @@ pub static CODECS: &[Codec] = &[
     },
     Codec {
         kind: "sep",
-        export: Some(Op::new("export sep needs a sequence package (.seq) file", "sep", |job| Ok(rebof3_formats::sep::psyq::export_sep(job.input)?))),
-        import: Some(Op::new("import sep needs a SEP file", "bin", |job| Ok(rebof3_formats::sep::psyq::import_sep(job.input)?))),
+        export: Some(Op::new("export sep needs a sequence package (.seq) file", "sep", |job| Ok(Package::validate(job.input)?.encode()))),
+        import: Some(Op::new("import sep needs a SEP file", "bin", |job| Ok(Package::validate(job.input)?.encode()))),
     },
     Codec {
         kind: "seq",
-        export: Some(Op {
-            index: Index::Optional,
-            ..Op::new("export seq needs a sequence package (.seq) file", "{index}.seq", |job| Ok(rebof3_formats::sep::psyq::export_seq(job.input, job.index.unwrap_or(0) as usize)?))
-        }),
+        export: Some(Op { index: Index::Optional, ..Op::new("export seq needs a sequence package (.seq) file", "{index}.seq", |job| Ok(seq::export(job.input, job.index.unwrap_or(0) as usize)?)) }),
         import: None,
     },
     Codec {

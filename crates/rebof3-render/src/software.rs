@@ -1,7 +1,10 @@
 //! The software renderer: the GPU's polygon rules on the CPU, with a depth buffer.
 
 use crate::math::{self, barycentric};
-use crate::{Blend, Camera, Depth, Frame, Image, NEUTRAL_SHADE, Primitive, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, draw_order};
+use psx_formats::gfx::color::shifted;
+use psx_formats::gfx::texture::fetch;
+
+use crate::{Blend, Camera, Frame, Image, NEUTRAL_SHADE, Primitive, STP_BIT, Scene, Texture, draw_order};
 
 /// A clipped corner: its view position and texture coordinate.
 #[derive(Clone, Copy)]
@@ -104,11 +107,11 @@ fn shade(scene: &Scene, primitive: &Primitive, uv: [f32; 2]) -> Option<Fragment>
     match primitive.texture {
         Texture::None => Some(Fragment { rgb: [red, green, blue], mix: true, alpha }),
         Texture::Vram { page, clut, depth, .. } => {
-            let word = fetch(&scene.vram, page, clut, depth, uv[0] as u8, uv[1] as u8);
+            let word = fetch(&scene.vram, page, clut, depth, [uv[0] as u8, uv[1] as u8]);
             if word == 0 {
                 return None;
             }
-            let texel = word_rgb(word);
+            let texel = shifted(word);
             let shade = [red, green, blue];
             let rgb = std::array::from_fn(|channel| modulate(texel[channel], shade[channel]));
             Some(Fragment { rgb, mix: word & STP_BIT != 0, alpha: 0xFF })
@@ -120,32 +123,6 @@ fn shade(scene: &Scene, primitive: &Primitive, uv: [f32; 2]) -> Option<Fragment>
             (alpha != 0).then_some(Fragment { rgb: [texel[0], texel[1], texel[2]], mix: true, alpha })
         }
     }
-}
-
-/// The colour word the GPU reads at texel `u`, `v` of a page through a CLUT (psx-spx, "GPU Texture
-/// Caching": a 4-bit texel is nibble `u % 4` of word `u / 4`, an 8-bit one byte `u % 2` of word
-/// `u / 2`, low first). An empty VRAM reads as zero.
-pub fn fetch(vram: &[u16], page: [u16; 2], clut: [u16; 2], depth: Depth, u: u8, v: u8) -> u16 {
-    if vram.len() < VRAM_WIDTH * VRAM_HEIGHT {
-        return 0;
-    }
-    let per_word = depth.per_word();
-    let x = (usize::from(page[0]) + usize::from(u) / per_word) % VRAM_WIDTH;
-    let y = (usize::from(page[1]) + usize::from(v)) % VRAM_HEIGHT;
-    let word = vram[y * VRAM_WIDTH + x];
-    if depth == Depth::Fifteen {
-        return word;
-    }
-    let bits = 16 / per_word;
-    let index = (usize::from(word) >> ((usize::from(u) % per_word) * bits)) & ((1 << bits) - 1);
-    let column = (usize::from(clut[0]) + index) % VRAM_WIDTH;
-    vram[usize::from(clut[1]) % VRAM_HEIGHT * VRAM_WIDTH + column]
-}
-
-/// The 8-bit channels of a colour word: each 5-bit channel shifted up by three (psx-spx, "GPU Color
-/// Depth").
-pub fn word_rgb(word: u16) -> [u8; 3] {
-    [0, 5, 10].map(|shift| (((word >> shift) & 0x1F) as u8) << 3)
 }
 
 /// A texel channel times a vertex colour channel, where [`NEUTRAL_SHADE`] is one.
@@ -197,8 +174,10 @@ fn clip(triangle: [Corner; 3], near: f32) -> Vec<Corner> {
 
 #[cfg(test)]
 mod tests {
+    use psx_formats::gfx::texture::{Clut, Color, Depth};
+
     use super::*;
-    use crate::{Primitive, Scene};
+    use crate::{Primitive, Scene, VRAM_HEIGHT, VRAM_WIDTH};
 
     /// A VRAM whose 8-bit page at (0, 0) holds texel `u` at every `(u, v)`, with CLUT row 500 mapping
     /// index `i` to the colour word `i` (and index 0 to transparent).
@@ -222,7 +201,7 @@ mod tests {
 
     #[test]
     fn a_vram_texel_is_read_through_its_clut_and_shaded() {
-        let texture = Texture::Vram { page: [0, 0], clut: [0, 500], depth: Depth::Eight, uvs: [[0, 0], [31, 0], [0, 31], [31, 31]] };
+        let texture = Texture::Vram { page: [0, 0], clut: Clut { x: 0, y: 500 }, depth: Color::Indexed(Depth::Eight), uvs: [[0, 0], [31, 0], [0, 31], [31, 31]] };
         let scene = Scene { vram: vram(), primitives: vec![quad(texture, [0x40; 4], Blend::Opaque)], ..Scene::default() };
         let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
         // The quad spans pixels 16..48; pixel 47's texel is u = 30.5 -> 30, red channel 30 << 3 = 240,
@@ -234,7 +213,7 @@ mod tests {
 
     #[test]
     fn semi_transparency_mixes_only_texels_with_bit_15() {
-        let texture = Texture::Vram { page: [0, 0], clut: [0, 500], depth: Depth::Eight, uvs: [[31, 0], [31, 0], [31, 31], [31, 31]] };
+        let texture = Texture::Vram { page: [0, 0], clut: Clut { x: 0, y: 500 }, depth: Color::Indexed(Depth::Eight), uvs: [[31, 0], [31, 0], [31, 31], [31, 31]] };
         let mut scene = Scene { vram: vram(), background: [200, 200, 200, 255], ..Scene::default() };
         scene.primitives.push(quad(texture, [NEUTRAL_SHADE; 4], Blend::Psx(2)));
         let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);

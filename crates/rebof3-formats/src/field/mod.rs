@@ -7,6 +7,9 @@
 
 pub mod setup;
 
+use psx_formats::bytes::u32_le;
+use psx_formats::exe;
+
 use crate::error::{Error, Result};
 
 /// Where an area program loads (`AreaLoad` records and setup streams point into it; `g_AreaLoads`
@@ -35,40 +38,26 @@ pub const AREAS: usize = 200;
 /// Facings a step table row exists for.
 pub const FACINGS: usize = 8;
 
-/// The magic of a PlayStation executable, and where its header keeps the text address; the text
-/// starts at file offset `0x800` (psx-spx, "CDROM File Formats", "PS-X EXE").
-const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
-const EXE_TEXT_ADDRESS: usize = 0x18;
-const EXE_TEXT_START: usize = 0x800;
 /// Bytes in one zone row.
 pub const ZONE_BYTES: usize = 8;
 
 /// The executable's text, addressed by RAM address.
-pub struct Executable<'a> {
-    bytes: &'a [u8],
-    text: u32,
-}
+pub struct Executable<'a>(exe::Executable<'a>);
 
 impl<'a> Executable<'a> {
     /// Reads a PS-X EXE header.
     pub fn new(bytes: &'a [u8]) -> Result<Self> {
-        if bytes.get(..EXE_MAGIC.len()) != Some(&EXE_MAGIC[..]) {
-            return Err(Error::Field("the executable is not a PS-X EXE".into()));
-        }
-        let text = word_at(bytes, EXE_TEXT_ADDRESS).ok_or_else(|| Error::Field("the executable's header is short".into()))?;
-        Ok(Self { bytes, text })
+        exe::Executable::parse(bytes).map(Self).map_err(|error| Error::Field(error.to_string()))
     }
 
     /// The `length` bytes at RAM `address`.
     pub fn bytes(&self, address: u32, length: usize) -> Result<&'a [u8]> {
-        let offset = address.checked_sub(self.text).map(|offset| EXE_TEXT_START + offset as usize);
-        offset.and_then(|offset| self.bytes.get(offset..offset + length)).ok_or_else(|| Error::Field(format!("the executable does not hold {length} bytes at {address:#010X}")))
+        self.0.bytes_at(address, length).ok_or_else(|| Error::Field(format!("the executable does not hold {length} bytes at {address:#010X}")))
     }
 
     /// The word at RAM `address`.
     pub fn word(&self, address: u32) -> Result<u32> {
-        let bytes = self.bytes(address, 4)?;
-        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        Ok(u32_le(self.bytes(address, 4)?, 0))
     }
 
     /// The address of area `area`'s `AreaLoad` record (`g_AreaLoads[area]`).
@@ -154,10 +143,6 @@ fn check_area(area: usize) -> Result<()> {
     (area < AREAS).then_some(()).ok_or_else(|| Error::Field(format!("area {area} is past the {AREAS} areas")))
 }
 
-fn word_at(bytes: &[u8], at: usize) -> Option<u32> {
-    bytes.get(at..at + 4).map(|word| u32::from_le_bytes([word[0], word[1], word[2], word[3]]))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,11 +150,11 @@ mod tests {
     /// An executable whose text starts at `0x8017F000` and holds the tables the readers need.
     fn exe() -> Vec<u8> {
         let text = 0x8017_F000u32;
-        let mut bytes = vec![0u8; EXE_TEXT_START + 0x3000];
-        bytes[..8].copy_from_slice(EXE_MAGIC);
-        bytes[EXE_TEXT_ADDRESS..EXE_TEXT_ADDRESS + 4].copy_from_slice(&text.to_le_bytes());
+        let mut bytes = vec![0u8; exe::HEADER_SIZE + 0x3000];
+        bytes[..8].copy_from_slice(exe::MAGIC);
+        bytes[0x18..0x1c].copy_from_slice(&text.to_le_bytes());
         let mut put = |address: u32, data: &[u8]| {
-            let at = EXE_TEXT_START + (address - text) as usize;
+            let at = exe::HEADER_SIZE + (address - text) as usize;
             bytes[at..at + data.len()].copy_from_slice(data);
         };
         // Area 0's list has two rows, area 1's one; the rest point at area 1's.

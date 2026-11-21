@@ -31,7 +31,7 @@ pub mod scenes;
 
 use std::collections::BTreeMap;
 
-use psx_formats::gfx::texture::{Clut, Depth, texel_indices};
+use psx_formats::gfx::texture::{self, Clut, Color, Depth, texel_indices};
 use psx_formats::gfx::vram::{self, Descriptor, VRAM_HEIGHT, VRAM_WIDTH};
 
 use crate::Entry;
@@ -392,21 +392,9 @@ impl Vram {
         indices
     }
 
-    /// The colour word a textured primitive reads at texel `u`, `v` of the page whose top-left
-    /// word is `page_x`, `page_y`, through the CLUT at `clut`: the GPU's texture fetch without a
-    /// texture window. A 4-bit texel is the `u % 4`-th nibble of word `u / 4`, an 8-bit texel the
-    /// `u % 2`-th byte of word `u / 2`, low first. Coordinates wrap at the VRAM edges, as the GPU's
-    /// do.
+    /// The colour word a textured primitive reads at texel `uv` of the page at `page` through `clut`.
     pub fn fetch(&self, page: [u16; 2], clut: Clut, depth: Depth, uv: [u8; 2]) -> u16 {
-        let ([page_x, page_y], [u, v]) = (page, uv);
-        let per_word = depth.texels_per_word();
-        let bits = depth.bits() as usize;
-        let x = (usize::from(page_x) + usize::from(u) / per_word) % VRAM_WIDTH;
-        let y = (usize::from(page_y) + usize::from(v)) % VRAM_HEIGHT;
-        let shift = (usize::from(u) % per_word) * bits;
-        let index = (usize::from(self.words[y * VRAM_WIDTH + x]) >> shift) & ((1 << bits) - 1);
-        let column = (usize::from(clut.x) + index) % VRAM_WIDTH;
-        self.words[usize::from(clut.y) % VRAM_HEIGHT * VRAM_WIDTH + column]
+        texture::fetch(&self.words, page, clut, Color::Indexed(depth), uv)
     }
 
     /// The rectangles each entry wrote, merged from per-row runs, in VRAM order.

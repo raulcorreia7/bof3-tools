@@ -8,7 +8,6 @@ use crate::identity::difference;
 use crate::registry::{Description, Format, RoundTrip, Selector, State};
 
 pub mod midi;
-pub mod psyq;
 
 /// The package as a format-registry row.
 pub static PACKAGE: Description = Description {
