@@ -15,12 +15,6 @@ pub enum Error {
     TextIndex(serde_json::Error),
     /// The sound library or a player rejected an item.
     Audio(bof3player::Error),
-    /// A sound item that has no PCM sample data.
-    NoPcm(String),
-    /// A sound item that is not a music item.
-    NotMusic(String),
-    /// A catalog index with no sound item.
-    NoSoundItem(usize),
     /// An archive that has no playable sequence of this id.
     NoSequence {
         path: String,
@@ -50,9 +44,6 @@ impl fmt::Display for Error {
             Self::NoTextDisc(disc) => write!(f, "no extracted disc at {}; pass --text-disc DIR with the tree `bof3 disc extract` wrote", disc.display()),
             Self::TextIndex(error) => write!(f, "{error}"),
             Self::Audio(error) => write!(f, "{error}"),
-            Self::NoPcm(id) => write!(f, "{id} has no PCM sample data"),
-            Self::NotMusic(id) => write!(f, "{id} is not a music item"),
-            Self::NoSoundItem(index) => write!(f, "no sound item {index}"),
             Self::NoSequence { path, sequence } => write!(f, "{path} has no playable sequence {sequence}"),
             Self::UnknownKind(name) => write!(f, "unknown kind {name:?}; the kinds are {}", crate::kind::Kind::ALL.iter().map(|kind| kind.name()).collect::<Vec<_>>().join(", ")),
             Self::UnknownAudioFormat(name) => write!(f, "unknown audio format {name:?}; the formats are wav, flac and ogg"),

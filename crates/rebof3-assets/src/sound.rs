@@ -15,8 +15,7 @@ use std::thread;
 use bof3player::catalog::{Item, Kind as ItemKind};
 use bof3player::discover::{self, SourceKind};
 use bof3player::export::Tags;
-use bof3player::{DiscSource, Library, MemorySource, NoNaming, export};
-use psx_cd::ReadSeek;
+use bof3player::{Library, MemorySource, NoNaming, export};
 
 use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Mode};
@@ -203,70 +202,6 @@ pub(crate) fn encode(container: AudioFormat, pcm: &[i16], rate: u32, channels: u
     .map_err(audio)
 }
 
-/// The kind of a `bof3player` catalog item.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SoundKind {
-    /// A sequence: exported as a Standard MIDI File.
-    Music,
-    /// A VAB bank: its samples are the sample items.
-    Bank,
-    /// One VAG sample of a bank: rendered as PCM.
-    Sample,
-    /// A streaming XA channel: rendered as PCM.
-    Xa,
-    /// A CD-DA track, which exists only on a `.cue` sheet's audio track.
-    Cdda,
-}
-
-impl From<ItemKind> for SoundKind {
-    fn from(kind: ItemKind) -> Self {
-        match kind {
-            ItemKind::Music => Self::Music,
-            ItemKind::Bank => Self::Bank,
-            ItemKind::Sample => Self::Sample,
-            ItemKind::Xa => Self::Xa,
-            ItemKind::Cdda => Self::Cdda,
-        }
-    }
-}
-
-/// One catalog item of a disc's sound.
-#[derive(Clone, Debug, PartialEq)]
-pub struct SoundItem {
-    /// What the item is.
-    pub kind: SoundKind,
-    /// The catalog id, for example `music:BGM000#0`.
-    pub id: String,
-    /// The archive the item is read from.
-    pub path: String,
-    /// Whether the item has audio to play.
-    pub playable: bool,
-    /// For banks, samples and music: the archive's bank number.
-    pub bank: u32,
-    /// The file-level index: sequence id, bank number or channel.
-    pub index: u32,
-    /// The sample number or the first sector.
-    pub sub_index: u32,
-    /// For XA items: the sectors in the item's range.
-    pub sectors: u32,
-    /// The length in seconds, when it is known without rendering.
-    pub duration: Option<f64>,
-}
-
-fn item_view(item: &Item) -> SoundItem {
-    SoundItem {
-        kind: item.kind.into(),
-        id: item.id.clone(),
-        path: item.path.clone(),
-        playable: item.playable,
-        bank: item.bank,
-        index: item.index,
-        sub_index: item.sub_index,
-        sectors: item.sectors,
-        duration: item.duration,
-    }
-}
-
 /// Decoded audio: interleaved 16-bit PCM.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Pcm {
@@ -276,64 +211,6 @@ pub struct Pcm {
     pub channels: u32,
     /// `frames * channels` samples.
     pub samples: Vec<i16>,
-}
-
-/// A disc's sound catalog, read through `bof3player`.
-pub struct Sounds {
-    library: Library<'static>,
-}
-
-impl Sounds {
-    /// Opens a disc image from a path: a `.cue` sheet, an image, or a directory that holds one.
-    pub fn open_path(image: &Path) -> Result<Self> {
-        Ok(Self { library: open(image)? })
-    }
-
-    /// Opens a single-track disc image read through `reader`, which may come from memory or from
-    /// read callbacks. A `.cue` sheet's audio track is not available this way.
-    pub fn open_reader(reader: Box<dyn ReadSeek>) -> Result<Self> {
-        let source = DiscSource::from_reader(reader).map_err(audio)?;
-        Ok(Self { library: Library::open_with(source, bof3player::names::game_names()).map_err(audio)? })
-    }
-
-    /// The number of catalog items, playable or not.
-    pub fn len(&self) -> usize {
-        self.library.catalog().items().len()
-    }
-
-    /// Whether the catalog has no items.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// The item at `index`, if there is one.
-    pub fn item(&self, index: usize) -> Option<SoundItem> {
-        self.library.catalog().items().get(index).map(item_view)
-    }
-
-    /// Renders a sample or XA item to PCM with the stored loop mode (one shot by default).
-    pub fn pcm(&self, index: usize) -> Result<Pcm> {
-        let item = self.catalog_item(index)?;
-        if !matches!(item.kind, ItemKind::Sample | ItemKind::Xa) {
-            return Err(Error::NoPcm(item.id.to_string()));
-        }
-        let mut player = self.library.player(item).map_err(audio)?;
-        let samples = player.render_all().map_err(audio)?;
-        Ok(Pcm { sample_rate: player.sample_rate(), channels: player.channels(), samples })
-    }
-
-    /// Exports a music item's sequence as a Standard MIDI File.
-    pub fn midi(&self, index: usize) -> Result<Vec<u8>> {
-        let item = self.catalog_item(index)?;
-        if item.kind != ItemKind::Music {
-            return Err(Error::NotMusic(item.id.to_string()));
-        }
-        self.library.export_midi(item).map_err(audio)
-    }
-
-    fn catalog_item(&self, index: usize) -> Result<&Item> {
-        self.library.catalog().items().get(index).ok_or(Error::NoSoundItem(index))
-    }
 }
 
 /// Interleaved samples rendered per call while a sequence plays.

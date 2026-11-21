@@ -331,12 +331,6 @@ pub fn quads_of_cell(bundle: &MapBundle, cell: usize) -> Vec<Quad> {
     quads
 }
 
-/// The descriptor words a cell's rows take, in [`quads`] order: its top, its east wall and its
-/// south wall, as `Area_UploadCell` reads them. Empty for a cell the renderer does not draw.
-pub fn descriptor_indices(bundle: &MapBundle, cell: usize) -> Vec<(Face, usize)> {
-    quads_of_cell(bundle, cell).into_iter().filter_map(|quad| Some((quad.face, quad.tile?.index))).collect()
-}
-
 /// Whether the field renderer draws `cell`: strictly inside the bundle, with a grid value that names
 /// a descriptor (`Area_GetCell`, `func_801530D0`).
 pub fn is_drawn(bundle: &MapBundle, cell: usize) -> bool {
@@ -416,7 +410,6 @@ mod tests {
         assert_eq!(east.corners, [[256, 32, 256], [256, 32, 128], [256, 0, 256], [256, 0, 128]]);
         let south = quads[2];
         assert_eq!(south.corners, [[128, 32, 256], [256, 32, 256], [128, 0, 256], [256, 0, 256]]);
-        assert_eq!(descriptor_indices(&bundle(), 5), [(Face::Top, 1), (Face::East, 2), (Face::South, 3)]);
     }
 
     #[test]

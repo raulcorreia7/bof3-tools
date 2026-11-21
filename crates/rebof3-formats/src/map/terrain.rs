@@ -141,11 +141,6 @@ pub fn of_bundle(bundle: &MapBundle, mtl_name: &str) -> Terrain {
     of_mesh(&mesh_of_bundle(bundle), mtl_name)
 }
 
-/// Builds the OBJ and MTL text of a map bundle payload. `mtl_name` is the MTL file the OBJ names.
-pub fn from_payload(payload: &[u8], mtl_name: &str) -> Result<Terrain> {
-    Ok(of_mesh(&mesh_from_payload(payload)?, mtl_name))
-}
-
 /// The terrain as a binary glTF (`.glb`), with one primitive per page material and the same
 /// corners as the OBJ. Each quad is two triangles that face up: corners 0, 2, 3 and 0, 3, 1. Returns
 /// `None` when the mesh has no cell.
