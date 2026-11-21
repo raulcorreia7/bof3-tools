@@ -46,36 +46,62 @@ pub fn to_json(archive_version: u32, entries: &[Entry], typed: bool) -> String {
     serde_json::to_string_pretty(&manifest).expect("manifest model is serializable")
 }
 
+/// The entries a manifest names, and its container version.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedManifest {
+    /// The container's `archive_version`; `0` when the manifest has none.
+    pub archive_version: u32,
+    /// The named entries in manifest order. Rows without a non-empty `name` are metadata rows: the
+    /// extractor writes them, and they are never packed.
+    pub entries: Vec<ManifestInput>,
+}
+
+/// One named entry of a manifest.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ManifestInput {
+    /// The file name, relative to the manifest's folder.
+    pub name: String,
+    /// The EMI entry type.
+    pub file_type: u16,
+    /// The load address.
+    pub ram_ptr: u32,
+}
+
+/// Reads manifest text: its named entries and `archive_version`.
+pub fn parse_manifest(bytes: &[u8]) -> Result<ParsedManifest> {
+    let value: Value = serde_json::from_slice(bytes).map_err(|_| Error::InvalidArchive("invalid manifest JSON"))?;
+    let rows = value.get("entries").and_then(Value::as_array).ok_or(Error::InvalidArchive("manifest entries must be an array"))?;
+    let entries: Vec<ManifestInput> = rows
+        .iter()
+        .filter_map(|row| {
+            row.get("name").and_then(Value::as_str).filter(|name| !name.is_empty()).map(|name| ManifestInput {
+                name: name.to_owned(),
+                file_type: json_number(row.get("type")),
+                ram_ptr: json_number(row.get("ram_ptr")),
+            })
+        })
+        .collect();
+    if entries.is_empty() {
+        return Err(Error::InvalidArchive("manifest has no named entries"));
+    }
+    Ok(ParsedManifest { archive_version: json_number(value.get("archive_version")), entries })
+}
+
 /// Loads a manifest's named entries and validates every one of them against
 /// `folder` before any payload is read or any output is created.
 ///
 /// Returns the entries in manifest order, with the canonical path of the
 /// validated regular file each name resolves to, plus the manifest's
-/// `archive_version`. Entries without a non-empty `name` are metadata rows:
-/// they are skipped, as the extractor writes them, and never packed.
+/// `archive_version`.
 ///
 /// A name is rejected when it is absolute, when it contains a parent-directory
 /// component, when it is missing or not a regular file, or when its resolved
 /// path leaves the canonical input folder (a symlink escape).
 pub fn manifest_entries(folder: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<(Vec<PackEntry>, u32)> {
-    let value: Value = serde_json::from_slice(&fs::read(manifest_path.as_ref())?).map_err(|_| Error::InvalidArchive("invalid manifest JSON"))?;
-    let entries = value.get("entries").and_then(Value::as_array).ok_or(Error::InvalidArchive("manifest entries must be an array"))?;
-    let archive_version = json_number(value.get("archive_version"));
+    let manifest = parse_manifest(&fs::read(manifest_path.as_ref())?)?;
     let root = canonical_folder(folder.as_ref())?;
-    let mut inputs = Vec::new();
-    for entry in entries {
-        let Some(name) = entry.get("name").and_then(Value::as_str) else {
-            continue;
-        };
-        if name.is_empty() {
-            continue;
-        }
-        inputs.push(PackEntry { path: manifest_input_path(&root, name)?, file_type: json_number(entry.get("type")), ram_ptr: json_number(entry.get("ram_ptr")) });
-    }
-    if inputs.is_empty() {
-        return Err(Error::InvalidArchive("manifest has no named entries"));
-    }
-    Ok((inputs, archive_version))
+    let inputs = manifest.entries.iter().map(|entry| Ok(PackEntry { path: manifest_input_path(&root, &entry.name)?, file_type: entry.file_type, ram_ptr: entry.ram_ptr })).collect::<Result<_>>()?;
+    Ok((inputs, manifest.archive_version))
 }
 
 /// The canonical input folder: the containment root every manifest name is

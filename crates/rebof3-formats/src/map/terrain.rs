@@ -196,7 +196,7 @@ fn glb_with(mesh: &Mesh, name: &str, colours: Option<&[[f32; 4]]>, nodes: &[gltf
     primitives.retain(|primitive| !primitive.indices.is_empty());
     let materials: Vec<String> = (0..SELECTORS).map(|selector| format!("page{selector}")).collect();
     let names: Vec<&str> = materials.iter().map(String::as_str).collect();
-    gltf::glb_with(name, &positions, &uvs, colours, &primitives, &names, nodes)
+    gltf::glb_with(name, gltf::Geometry { positions: &positions, uvs: &uvs, colours }, &primitives, &names, nodes)
 }
 
 /// The page selector and the four texture-coordinate corners of a cell, in corner order.
@@ -318,7 +318,7 @@ pub fn top_down(bundle: &MapBundle, vram: &Vram) -> TopDown {
         for y in 0..CELL_PIXELS {
             for x in 0..CELL_PIXELS {
                 let [u, v] = texel_at(corners, x, y);
-                view.words[(top + y) * width + left + x] = Some(vram.fetch(page_x, page_y, clut, depth, u, v));
+                view.words[(top + y) * width + left + x] = Some(vram.fetch([page_x, page_y], clut, depth, [u, v]));
             }
         }
     }
@@ -413,7 +413,7 @@ mod top_down_tests {
         let mut vram = Vram::new();
         vram.load("A", &[entry], &[&payload]);
         let colors: Vec<u16> = (0..256).map(|index| 0x100 + index).collect();
-        vram.load_image(0, usize::from(TERRAIN_CLUT_ROW), 256, 1, &colors, Writer::entry("A", 2));
+        vram.load_image(rebof3_emi::replay::Rect { x: 0, y: usize::from(TERRAIN_CLUT_ROW), width: 256, height: 1 }, &colors, Writer::entry("A", 2));
         vram
     }
 

@@ -117,7 +117,7 @@ impl Recorder {
         for logged in log {
             match &logged.command {
                 Command::Upload { rect, pixels } => {
-                    let writer = self.sources.upload(rect.x, rect.y, rect.width, rect.height, pixels);
+                    let writer = self.sources.upload(rect, pixels);
                     self.uploads.total += 1;
                     self.uploads.attributed += u64::from(writer.is_some());
                     self.writers.push(writer);

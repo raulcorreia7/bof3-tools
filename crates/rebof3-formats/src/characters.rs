@@ -34,14 +34,14 @@ pub fn parse(payload: &[u8]) -> Result<Vec<Character>> {
 pub fn write(characters: &[Character], payload: &[u8]) -> Result<Vec<u8>> {
     table_bytes(payload)?;
     if characters.len() != CHARACTERS {
-        return Err(Error::CharacterTable(format!("{} characters; the table holds {CHARACTERS}", characters.len())));
+        return Err(Error::CharacterCount { found: characters.len(), expected: CHARACTERS });
     }
     let mut table = Vec::with_capacity(CHARACTERS * RECORD_BYTES);
     for character in characters {
         table.extend(name_field(&character.name, NAME_BYTES)?);
         let rest = unhex(&character.rest)?;
         if rest.len() != RECORD_BYTES - NAME_BYTES {
-            return Err(Error::CharacterTable(format!("{:?} has {} bytes after its name; a record has {}", character.name, rest.len(), RECORD_BYTES - NAME_BYTES)));
+            return Err(Error::CharacterRecord { name: character.name.clone(), found: rest.len(), expected: RECORD_BYTES - NAME_BYTES });
         }
         table.extend(rest);
     }
@@ -57,7 +57,7 @@ pub fn export(payload: &[u8]) -> Result<Vec<u8>> {
 
 /// The entry payload with its characters replaced by the JSON that [`export`] wrote.
 pub fn import(json: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    let characters: Vec<Character> = serde_json::from_slice(json).map_err(|error| Error::CharacterTable(format!("the characters JSON does not read: {error}")))?;
+    let characters: Vec<Character> = serde_json::from_slice(json).map_err(|error| Error::CharacterJson(error.to_string()))?;
     write(&characters, payload)
 }
 
@@ -76,7 +76,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 fn unhex(text: &str) -> Result<Vec<u8>> {
-    let not_hex = || Error::CharacterTable(format!("{text:?} is not an even run of hex digits"));
+    let not_hex = || Error::NotHex(text.to_owned());
     if !text.len().is_multiple_of(2) {
         return Err(not_hex());
     }

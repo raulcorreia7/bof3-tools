@@ -13,6 +13,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use psx_formats::gfx::texture::{Clut, Depth};
 use psx_formats::gfx::vram::{self, Descriptor, RECTANGLE_SIDE};
 use psx_machine::cdrom::CommandRecord;
+use psx_machine::gpu::VramRect as Rect;
 use rebof3_emi::texture::ResidentClutBlock;
 use rebof3_emi::{Archive, Entry};
 
@@ -150,7 +151,8 @@ impl Sources {
 
     /// The entry whose rectangle an upload of `width`×`height` words at (`x`, `y`) sent, or `None`
     /// when no file read holds it. Two files with the same rectangle name the one read last.
-    pub fn upload(&self, x: u16, y: u16, width: u16, height: u16, pixels: &[u16]) -> Option<EntryRef> {
+    pub fn upload(&self, rect: &Rect, pixels: &[u16]) -> Option<EntryRef> {
+        let Rect { x, y, width, height } = *rect;
         if usize::from(width) != RECTANGLE_SIDE || usize::from(height) != RECTANGLE_SIDE {
             return None;
         }

@@ -35,8 +35,26 @@ pub enum Error {
         /// The block size.
         bytes: usize,
     },
-    /// The characters table cannot be read or written: a count, a name, or the rest of a record that does not fit.
-    CharacterTable(String),
+    /// The characters table is written with a count other than the table's.
+    CharacterCount {
+        /// The characters given.
+        found: usize,
+        /// The characters the table holds.
+        expected: usize,
+    },
+    /// A character's record bytes after its name are not the size a record has.
+    CharacterRecord {
+        /// The character's name.
+        name: String,
+        /// The bytes given after the name.
+        found: usize,
+        /// The bytes a record has after its name.
+        expected: usize,
+    },
+    /// The characters JSON does not read.
+    CharacterJson(String),
+    /// A character's record text is not an even run of hex digits.
+    NotHex(String),
     /// The character sprites' palettes cannot be read or written: a section that is not in the palette layout, or a palette
     /// that does not match the bank it is written to.
     CharacterPalettes(String),
@@ -77,7 +95,11 @@ impl fmt::Display for Error {
             Self::GameTableShort { table, bytes, needed } => {
                 write!(f, "game table {table} needs {needed} bytes; its payload is {bytes}")
             }
-            Self::CharacterTable(message) | Self::CharacterPalettes(message) => f.write_str(message),
+            Self::CharacterCount { found, expected } => write!(f, "{found} characters; the table holds {expected}"),
+            Self::CharacterRecord { name, found, expected } => write!(f, "{name:?} has {found} bytes after its name; a record has {expected}"),
+            Self::CharacterJson(error) => write!(f, "the characters JSON does not read: {error}"),
+            Self::NotHex(text) => write!(f, "{text:?} is not an even run of hex digits"),
+            Self::CharacterPalettes(message) => f.write_str(message),
             Self::AnimationStream(message) => write!(f, "animation stream: {message}"),
             Self::CharacterSprites(message) => write!(f, "character sprites: {message}"),
             Self::Formation(message) => write!(f, "formation: {message}"),

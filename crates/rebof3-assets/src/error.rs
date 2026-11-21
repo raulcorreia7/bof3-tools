@@ -9,14 +9,33 @@ pub enum Error {
     Formats(rebof3_formats::Error),
     /// A VAB bank the reader or the SoundFont writer rejects.
     Bank(psx_formats::Error),
-    /// A command line the tool cannot act on.
-    Usage(String),
-    /// A text extraction that could not run.
-    Text(String),
-    /// A sound item that could not be read or rendered.
-    Audio(String),
-    /// An open-format file that an import cannot read back to the stored bytes.
-    Import(String),
+    /// A text extraction that needs an extracted disc and has none at this path.
+    NoTextDisc(std::path::PathBuf),
+    /// A text index row that does not serialize.
+    TextIndex(serde_json::Error),
+    /// The sound library or a player rejected an item.
+    Audio(bof3player::Error),
+    /// A sound item that has no PCM sample data.
+    NoPcm(String),
+    /// A sound item that is not a music item.
+    NotMusic(String),
+    /// A catalog index with no sound item.
+    NoSoundItem(usize),
+    /// An archive that has no playable sequence of this id.
+    NoSequence {
+        path: String,
+        sequence: u32,
+    },
+    /// An `--only` name that is no kind.
+    UnknownKind(String),
+    /// An `--audio-format` value that is no format.
+    UnknownAudioFormat(String),
+    /// A `--mode` value that is neither mode.
+    UnknownMode(String),
+    /// An `--only` list with no kind.
+    NoKinds,
+    /// A worker thread stopped before its work was sent.
+    WorkerStopped,
 }
 
 impl fmt::Display for Error {
@@ -26,7 +45,18 @@ impl fmt::Display for Error {
             Self::Disc(error) => write!(f, "{error}"),
             Self::Formats(error) => write!(f, "{error}"),
             Self::Bank(error) => write!(f, "{error}"),
-            Self::Usage(message) | Self::Text(message) | Self::Audio(message) | Self::Import(message) => f.write_str(message),
+            Self::NoTextDisc(disc) => write!(f, "no extracted disc at {}; pass --text-disc DIR with the tree `bof3 disc extract` wrote", disc.display()),
+            Self::TextIndex(error) => write!(f, "{error}"),
+            Self::Audio(error) => write!(f, "{error}"),
+            Self::NoPcm(id) => write!(f, "{id} has no PCM sample data"),
+            Self::NotMusic(id) => write!(f, "{id} is not a music item"),
+            Self::NoSoundItem(index) => write!(f, "no sound item {index}"),
+            Self::NoSequence { path, sequence } => write!(f, "{path} has no playable sequence {sequence}"),
+            Self::UnknownKind(name) => write!(f, "unknown kind {name:?}; the kinds are {}", crate::kind::Kind::ALL.iter().map(|kind| kind.name()).collect::<Vec<_>>().join(", ")),
+            Self::UnknownAudioFormat(name) => write!(f, "unknown audio format {name:?}; the formats are wav, flac and ogg"),
+            Self::UnknownMode(name) => write!(f, "unknown mode {name:?}; the modes are raw and modern"),
+            Self::NoKinds => f.write_str("--only needs at least one kind"),
+            Self::WorkerStopped => f.write_str("a worker thread stopped early"),
         }
     }
 }
@@ -38,7 +68,9 @@ impl std::error::Error for Error {
             Self::Disc(error) => Some(error),
             Self::Formats(error) => Some(error),
             Self::Bank(error) => Some(error),
-            Self::Usage(_) | Self::Text(_) | Self::Audio(_) | Self::Import(_) => None,
+            Self::TextIndex(error) => Some(error),
+            Self::Audio(error) => Some(error),
+            _ => None,
         }
     }
 }

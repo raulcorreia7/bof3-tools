@@ -4,8 +4,8 @@
 use std::fs;
 use std::path::PathBuf;
 
+use super::{Error, Result};
 use clap::Parser;
-use rebof3_assets::{Error, Result};
 use rebof3_formats::vram::{self, Placement};
 
 use super::write_output;
@@ -172,7 +172,7 @@ pub(super) fn export_tim(args: &[String]) -> Result<i32> {
             let offset = optional_number(args.palette_offset.as_deref(), "--palette-offset")?.unwrap_or(0) as usize;
             let words = color_words(&read_file(&bank)?)?;
             let row = words.get(offset..offset + count).ok_or_else(|| Error::Usage(format!("{} has no {count}-color row at word {offset}", bank.display())))?;
-            (vram::texture_tim_of(load_arg, &payload, bits, row, x, y)?, format!("{bits}-bit, CLUT at ({x}, {y})"))
+            (vram::texture_tim_of(load_arg, &payload, vram::ClutRow { bits, words: row, x, y })?, format!("{bits}-bit, CLUT at ({x}, {y})"))
         }
         Some(other) => return Err(Error::Usage(format!("--depth is 4 or 8, not {other}"))),
     };

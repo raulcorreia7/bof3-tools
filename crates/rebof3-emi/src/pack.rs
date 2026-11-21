@@ -1,8 +1,8 @@
 //! Writing containers: byte-exact repacking of an extracted folder, a manifest
 //! or an explicit file list (`wiki: formats/emi#padding`).
 
-use std::fs::{self, File};
-use std::io::{BufWriter, Cursor, Read, Seek, Write};
+use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::emi::{Archive, HEADER_SIZE, MAGIC, SECTOR_SIZE, TOC_ENTRY_SIZE, align_sector, ensure_parent};
@@ -44,36 +44,24 @@ pub struct PackFolderOptions {
     pub exclude_patterns: Vec<String>,
 }
 
-/// A table entry plus the stream its payload is copied from.
-struct Slot<R> {
-    file_type: u16,
-    ram_ptr: u32,
-    size: u32,
-    first4: u32,
-    source: R,
-}
-
-/// Writes `slots` as a container; `out` receives exactly the retail layout.
-fn write_archive<R: Read>(out: &mut impl Write, archive_version: u32, slots: Vec<Slot<R>>) -> Result<()> {
-    let toc_end = table_end(slots.len())?;
-    out.write_all(&(slots.len() as u32).to_le_bytes())?;
+/// Writes `payloads` as a container; `out` receives exactly the retail layout.
+fn write_archive(out: &mut impl Write, archive_version: u32, payloads: &[Payload<'_>]) -> Result<()> {
+    let toc_end = table_end(payloads.len())?;
+    out.write_all(&(payloads.len() as u32).to_le_bytes())?;
     out.write_all(&archive_version.to_le_bytes())?;
     out.write_all(MAGIC)?;
-    for slot in &slots {
-        out.write_all(&slot.size.to_le_bytes())?;
-        out.write_all(&slot.ram_ptr.to_le_bytes())?;
-        out.write_all(&slot.first4.to_le_bytes())?;
-        out.write_all(&slot.file_type.to_le_bytes())?;
+    for payload in payloads {
+        let size = u32::try_from(payload.bytes.len()).map_err(|_| Error::InvalidArchive("entry exceeds 4 GiB"))?;
+        out.write_all(&size.to_le_bytes())?;
+        out.write_all(&payload.ram_ptr.to_le_bytes())?;
+        out.write_all(&first_word(payload.bytes).to_le_bytes())?;
+        out.write_all(&payload.file_type.to_le_bytes())?;
         out.write_all(&HEADER_PAD.to_le_bytes())?;
     }
-    let mut position = toc_end;
-    position = pad_to_sector(out, position, HEADER_PAD as u8)?;
-    for mut slot in slots {
-        let copied = std::io::copy(&mut slot.source, out)?;
-        if copied != u64::from(slot.size) {
-            return Err(Error::InvalidArchive("entry changed while packing"));
-        }
-        position = pad_to_sector(out, position + copied, PAYLOAD_PAD)?;
+    let mut position = pad_to_sector(out, toc_end, HEADER_PAD as u8)?;
+    for payload in payloads {
+        out.write_all(payload.bytes)?;
+        position = pad_to_sector(out, position + payload.bytes.len() as u64, PAYLOAD_PAD)?;
     }
     debug_assert_eq!(position % SECTOR_SIZE, 0);
     out.flush()?;
@@ -108,21 +96,24 @@ fn first_word(bytes: &[u8]) -> u32 {
     u32::from_le_bytes(word)
 }
 
-/// Packs files into the container `output`.
-pub fn pack(output: impl AsRef<Path>, inputs: &[PackEntry], archive_version: u32) -> Result<()> {
+/// What a pack wrote.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PackReport {
+    /// The entries in the container.
+    pub entries: usize,
+    /// The container's size in bytes.
+    pub bytes: u64,
+}
+
+/// Packs files into the container `output`: reads each file, packs the payloads, writes the container.
+pub fn pack(output: impl AsRef<Path>, inputs: &[PackEntry], archive_version: u32) -> Result<PackReport> {
     table_end(inputs.len())?;
-    let mut slots = Vec::with_capacity(inputs.len());
-    for input in inputs {
-        let size = u32::try_from(fs::metadata(&input.path)?.len()).map_err(|_| Error::InvalidArchive("entry exceeds 4 GiB"))?;
-        let mut file = File::open(&input.path)?;
-        let mut head = [0; 4];
-        let count = file.read(&mut head)?;
-        file.rewind()?;
-        slots.push(Slot { file_type: input.file_type, ram_ptr: input.ram_ptr, size, first4: first_word(&head[..count]), source: file });
-    }
+    let files = inputs.iter().map(|input| fs::read(&input.path)).collect::<std::io::Result<Vec<_>>>()?;
+    let payloads: Vec<Payload> = inputs.iter().zip(&files).map(|(input, bytes)| Payload { bytes, file_type: input.file_type, ram_ptr: input.ram_ptr }).collect();
+    let packed = pack_payloads(archive_version, &payloads)?;
     ensure_parent(output.as_ref())?;
-    let mut out = BufWriter::new(File::create(output.as_ref())?);
-    write_archive(&mut out, archive_version, slots)
+    fs::write(output.as_ref(), &packed)?;
+    Ok(PackReport { entries: inputs.len(), bytes: packed.len() as u64 })
 }
 
 /// Rebuilds an EMI container from its own entries, with the entries named in `replace` swapped for new payloads.
@@ -155,36 +146,26 @@ pub fn rebuild_placed(container: &[u8], replace: &[(usize, &[u8])], placed: &[(u
 
 /// Packs in-memory payloads into container bytes.
 pub fn pack_payloads(archive_version: u32, payloads: &[Payload<'_>]) -> Result<Vec<u8>> {
-    let mut slots = Vec::with_capacity(payloads.len());
-    for payload in payloads {
-        slots.push(Slot {
-            file_type: payload.file_type,
-            ram_ptr: payload.ram_ptr,
-            size: u32::try_from(payload.bytes.len()).map_err(|_| Error::InvalidArchive("entry exceeds 4 GiB"))?,
-            first4: first_word(payload.bytes),
-            source: Cursor::new(payload.bytes),
-        });
-    }
     let mut out = Vec::new();
-    write_archive(&mut out, archive_version, slots)?;
+    write_archive(&mut out, archive_version, payloads)?;
     Ok(out)
 }
 
 /// Packs the entries `manifest_path` names, resolved against its own folder.
-pub fn pack_manifest(output: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<()> {
+pub fn pack_manifest(output: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<PackReport> {
     let manifest_path = manifest_path.as_ref();
     let root = manifest_path.parent().unwrap_or(Path::new("."));
     pack_manifest_from(output, root, manifest_path)
 }
 
 /// Packs the entries `manifest_path` names, resolved against `folder`.
-pub fn pack_manifest_from(output: impl AsRef<Path>, folder: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<()> {
+pub fn pack_manifest_from(output: impl AsRef<Path>, folder: impl AsRef<Path>, manifest_path: impl AsRef<Path>) -> Result<PackReport> {
     let (inputs, archive_version) = manifest_entries(folder, manifest_path)?;
     pack(output, &inputs, archive_version)
 }
 
 /// Packs the regular files of `folder` in name order, typed by extension.
-pub fn pack_folder(output: impl AsRef<Path>, folder: impl AsRef<Path>, options: &PackFolderOptions) -> Result<()> {
+pub fn pack_folder(output: impl AsRef<Path>, folder: impl AsRef<Path>, options: &PackFolderOptions) -> Result<PackReport> {
     let mut inputs = Vec::new();
     for entry in fs::read_dir(folder.as_ref())? {
         let entry = entry?;

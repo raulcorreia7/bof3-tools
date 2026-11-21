@@ -1,8 +1,9 @@
 //! `assets.jsonl` and the by-kind summary.
 
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 
+use crate::Error;
 use crate::kind::{Handling, Kind};
 
 /// Keys of each `assets.jsonl` object, in column order.
@@ -105,12 +106,39 @@ impl Row {
     }
 }
 
+/// A payload, entry or sound item whose output could not be written.
+#[derive(Debug)]
+pub enum Failure {
+    /// A disc file that failed as a whole.
+    Payload { source: String, error: Error },
+    /// One entry of an archive.
+    Entry { source: String, slot: usize, error: Error },
+    /// The game tables of `ETC/GAME.EMI` entry 0.
+    GameTables { source: String, error: rebof3_formats::Error },
+    /// The sound library did not open.
+    SoundLibrary(Error),
+    /// One sound item that did not render.
+    SoundItem { id: String, error: Error },
+}
+
+impl fmt::Display for Failure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Payload { source, error } => write!(f, "{source}: {error}"),
+            Self::Entry { source, slot, error } => write!(f, "{source}#{slot}: {error}"),
+            Self::GameTables { source, error } => write!(f, "{source} entry 0 tables: {error}"),
+            Self::SoundLibrary(error) => write!(f, "sound: {error}"),
+            Self::SoundItem { id, error } => write!(f, "{id}: {error}"),
+        }
+    }
+}
+
 /// Everything a run produced.
 #[derive(Debug, Default)]
 pub struct Report {
     pub rows: Vec<Row>,
-    /// Payloads whose derived output could not be written, one line each.
-    pub failures: Vec<String>,
+    /// Payloads whose derived output could not be written.
+    pub failures: Vec<Failure>,
     /// Lines on kinds another tool owns or the run could not produce.
     pub notes: Vec<String>,
 }
