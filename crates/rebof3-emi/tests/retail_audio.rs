@@ -9,6 +9,7 @@
 
 mod support;
 
+use rebof3_emi::{TYPE_SEP, TYPE_VAB_BODY, TYPE_VAB_HEADER};
 use std::path::Path;
 
 use psx_formats::vab::Problem;
@@ -56,7 +57,7 @@ fn retail_audio_round_trips_byte_exactly() {
         for (index, entry) in archive.entries().iter().enumerate() {
             let where_ = format!("{}#{index}", path.display());
             match entry.file_type {
-                vab::HEADER_TYPE => {
+                TYPE_VAB_HEADER => {
                     counted.headers += 1;
                     counted.header_bytes += u64::from(entry.size);
                     if sample.is_none()
@@ -74,11 +75,11 @@ fn retail_audio_round_trips_byte_exactly() {
                         Err(problem) => failures.push(format!("{where_}: {problem}")),
                     }
                 }
-                vab::BODY_TYPE => {
+                TYPE_VAB_BODY => {
                     counted.bodies += 1;
                     counted.body_bytes += u64::from(entry.size);
                 }
-                sep::TYPE => {
+                TYPE_SEP => {
                     counted.packages += 1;
                     counted.package_bytes += u64::from(entry.size);
                     match check_package(path, index, &mut counted) {

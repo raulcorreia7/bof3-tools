@@ -12,7 +12,8 @@
 //!   (`UI_DrawWindow`: CLUT `(style << 5 | 0x10, 481)`).
 
 use psx_formats::gfx::texture::{Depth, texel_indices};
-use psx_formats::gfx::vram::{Descriptor, word_grid};
+use psx_formats::gfx::vram::word_grid;
+use rebof3_emi::upload;
 
 /// The glyph cell, in pixels: `UI_DrawTextGlyphs (exe/slus_004_22@0x8014F84C)` draws 8 by 12.
 pub const CELL_WIDTH: usize = 8;
@@ -46,7 +47,7 @@ impl Font {
     /// Builds the font from the three `FIRST.EMI` payloads. `sheet_load_argument` is the sheet entry's load
     /// argument. Returns `None` when the sheet is not a whole page or a palette is shorter than a cell.
     pub fn new(sheet: &[u8], sheet_load_argument: u32, text_palette: &[u8], frame_palette: &[u8]) -> Option<Self> {
-        let grid = word_grid(sheet, Descriptor::from_load_argument(sheet_load_argument)).ok()?;
+        let grid = word_grid(sheet, upload::descriptor(sheet_load_argument)).ok()?;
         let texels = texel_indices(&grid.words, Depth::Four);
         let width = grid.width * Depth::Four.texels_per_word();
         let (text, frame) = (words(text_palette), words(frame_palette));

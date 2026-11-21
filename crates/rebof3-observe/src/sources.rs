@@ -7,11 +7,12 @@
 //! entries that land in the palette arena (`EMI_LoadToRam`), whose words reach VRAM through
 //! `GFX_UploadPalette`.
 
+use rebof3_emi::{TYPE_VRAM, upload};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use psx_formats::gfx::texture::{Clut, Depth};
-use psx_formats::gfx::vram::{self, Descriptor, RECTANGLE_SIDE};
+use psx_formats::gfx::vram::{self, RECTANGLE_SIDE};
 use psx_machine::cdrom::CommandRecord;
 use psx_machine::gpu::VramRect as Rect;
 use rebof3_emi::texture::ResidentClutBlock;
@@ -130,7 +131,7 @@ impl Sources {
                 let Ok(payload) = archive.payload(&bytes, slot) else { continue };
                 let at = EntryRef { file, slot };
                 match table.file_type {
-                    vram::UPLOAD_TYPE => self.index_upload(at, table, payload),
+                    TYPE_VRAM => self.index_upload(at, table, payload),
                     TYPE_RAM => banks.extend(ResidentClutBlock::new(path.clone(), slot, table.ram_ptr, payload)),
                     _ => {}
                 }
@@ -142,7 +143,7 @@ impl Sources {
     }
 
     fn index_upload(&mut self, entry: EntryRef, table: &Entry, payload: &[u8]) {
-        let Ok(rectangles) = vram::decode(payload, Descriptor::from_load_argument(table.ram_ptr)) else { return };
+        let Ok(rectangles) = vram::decode(payload, upload::descriptor(table.ram_ptr)) else { return };
         for rectangle in rectangles {
             let key = (rectangle.x as u16, rectangle.y as u16, hash(&rectangle.words));
             self.chunks.entry(key).or_default().push(Chunk { entry, words: rectangle.words.into() });

@@ -124,6 +124,12 @@ impl From<rebof3_emi::Error> for Error {
     }
 }
 
+impl From<rebof3_emi::ContainerError> for Error {
+    fn from(error: rebof3_emi::ContainerError) -> Self {
+        rebof3_emi::Error::from(error).into()
+    }
+}
+
 impl From<psx_formats::Error> for Error {
     fn from(error: psx_formats::Error) -> Self {
         Self::Container(error.into())

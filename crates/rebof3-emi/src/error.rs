@@ -2,7 +2,6 @@
 
 use core::fmt;
 
-use crate::cue;
 #[cfg(feature = "std")]
 use crate::lz77;
 
@@ -20,15 +19,8 @@ pub enum Error {
         index: usize,
         count: usize,
     },
-    /// A cue table's size is not a whole number of cue records.
-    CueTableSize(usize),
-    /// A cue table holds more records than one bank chunk.
-    CueTableRecords(usize),
-    /// A cue record sets bits the format reserves.
-    CueRecord {
-        record: usize,
-        reason: &'static str,
-    },
+    /// The container table or a cue table is malformed.
+    Container(::emi::Error),
     /// A type-1 payload is shorter than its header.
     #[cfg(feature = "std")]
     Lz77Truncated,
@@ -73,13 +65,7 @@ impl fmt::Display for Error {
             Self::EntryOutOfRange { index, count } => {
                 write!(f, "entry index {index} is out of range (archive has {count} entries)")
             }
-            Self::CueTableSize(bytes) => {
-                write!(f, "cue table is {bytes} bytes; a cue record is {} bytes", cue::RECORD_BYTES)
-            }
-            Self::CueTableRecords(records) => {
-                write!(f, "cue table holds {records} records; one bank chunk holds {}", cue::CHUNK_RECORDS)
-            }
-            Self::CueRecord { record, reason } => write!(f, "cue record {record}: {reason}"),
+            Self::Container(error) => write!(f, "{error}"),
             #[cfg(feature = "std")]
             Self::Lz77Truncated => write!(f, "payload is shorter than the {}-byte type-1 header", lz77::HEADER),
             #[cfg(feature = "std")]
@@ -112,6 +98,7 @@ impl core::error::Error for Error {
         match self {
             Self::Io(error) => Some(error),
             Self::Format(error) => Some(error),
+            Self::Container(error) => Some(error),
             _ => None,
         }
     }
@@ -135,16 +122,7 @@ impl From<psx_formats::Error> for Error {
 
 impl From<::emi::Error> for Error {
     fn from(error: ::emi::Error) -> Self {
-        match error {
-            #[cfg(feature = "std")]
-            ::emi::Error::Io(error) => Self::Io(error),
-            ::emi::Error::Format(error) => Self::Format(error),
-            ::emi::Error::InvalidArchive(message) => Self::InvalidArchive(message),
-            ::emi::Error::EntryOutOfRange { index, count } => Self::EntryOutOfRange { index, count },
-            ::emi::Error::CueTableSize(bytes) => Self::CueTableSize(bytes),
-            ::emi::Error::CueTableRecords(records) => Self::CueTableRecords(records),
-            ::emi::Error::CueRecord { record, reason } => Self::CueRecord { record, reason },
-        }
+        Self::Container(error)
     }
 }
 

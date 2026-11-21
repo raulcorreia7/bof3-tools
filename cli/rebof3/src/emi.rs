@@ -2,8 +2,9 @@
 use crate::parse;
 use clap::Parser;
 use psx_formats::clut;
-use psx_formats::vram::{Descriptor, Plane, UPLOAD_TYPE, decode};
+use psx_formats::vram::{Plane, decode};
 use rebof3_emi::{Archive, PackEntry, PackFolderOptions, ensure_parent, entry_name, guess_type, manifest_entries, pack, pack_folder};
+use rebof3_emi::{TYPE_VRAM, upload};
 use rebof3_formats::coverage;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -158,7 +159,7 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
     if !options.dry_run {
         archive.extract_all(&output, options.typed).map_err(|error| error.to_string())?;
     }
-    let manifest = (options.print_manifest || options.manifest.is_some()).then(|| archive.manifest_json(options.typed));
+    let manifest = (options.print_manifest || options.manifest.is_some()).then(|| rebof3_emi::manifest::to_json(archive.version(), archive.entries(), options.typed));
     if options.print_manifest {
         println!("{}", manifest.as_deref().unwrap());
     }
@@ -605,12 +606,12 @@ fn print_uploads(archive: &Archive, retail: &[u8], page_set: &mut Plane, source:
     let mut dropped = 0;
     println!("{:<5} {:<22} {:<12} {:>8} {:>8}", "IDX", "DESCRIPTOR", "RECTANGLES", "BYTES", "DROPPED");
     for (index, entry) in archive.entries().iter().enumerate() {
-        if entry.file_type != UPLOAD_TYPE {
+        if entry.file_type != TYPE_VRAM {
             continue;
         }
         uploads += 1;
         let payload = &retail[entry.offset as usize..(entry.offset + entry.size as u64) as usize];
-        let descriptor = Descriptor::from_load_argument(entry.ram_ptr);
+        let descriptor = upload::descriptor(entry.ram_ptr);
         let decoded = decode(payload, descriptor).map_err(|error| format!("{}#{index}: {error}", source.display()))?;
         let skipped = page_set.blit(&decoded);
         rectangles += decoded.len();

@@ -3,8 +3,9 @@
 
 use psx_formats::gfx::texture::{self, Clut, Depth, texel_indices};
 use psx_formats::gfx::{clut, png, tim};
-use psx_formats::vram::{self, Descriptor};
+use psx_formats::vram;
 use rebof3_emi::Entry;
+use rebof3_emi::{TYPE_VRAM, upload};
 
 use crate::error::{Error, Result};
 use crate::identity::difference;
@@ -19,7 +20,7 @@ pub static UPLOAD: Description = Description {
     codec_state: "decode+encode",
     evidence: "wiki: formats/graphics#chunk-layout; descriptor from the load argument",
     extension: "img",
-    selector: Selector::Type(vram::UPLOAD_TYPE),
+    selector: Selector::Type(TYPE_VRAM),
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: Some(open),
@@ -28,7 +29,7 @@ pub static UPLOAD: Description = Description {
 
 /// Decodes the upload and encodes it again; `Err` names the first difference.
 fn round_trip(entry: &Entry, payload: &[u8]) -> Result<(), String> {
-    let rectangles = vram::decode(payload, Descriptor::from_load_argument(entry.ram_ptr)).map_err(|error| error.to_string())?;
+    let rectangles = vram::decode(payload, upload::descriptor(entry.ram_ptr)).map_err(|error| error.to_string())?;
     difference(&vram::encode(&rectangles), payload)
 }
 
@@ -59,7 +60,7 @@ fn open(site: &Site<'_>) -> Extras {
 
 /// The 16 bpp PNG view of the upload.
 fn derive(load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
-    let image = vram::upload_image(payload, Descriptor::from_load_argument(load_arg))?;
+    let image = vram::upload_image(payload, upload::descriptor(load_arg))?;
     let data = psx_formats::gfx::png::rgba_png(image.width, image.height, &image.rgba);
     Ok(vec![Derived { role: "png", extension: "png", data }])
 }
@@ -137,7 +138,7 @@ pub struct TextureWords {
 
 /// The words of a texture upload: where its rectangles land in VRAM and their row-major grid.
 pub fn texture_words(load_arg: u32, payload: &[u8]) -> Result<TextureWords> {
-    let descriptor = vram::Descriptor::from_load_argument(load_arg);
+    let descriptor = upload::descriptor(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let side = vram::RECTANGLE_SIDE as u32;
     Ok(TextureWords { x: u32::from(descriptor.column) * side, y: u32::from(descriptor.row) * side, width: grid.width, height: grid.height, words: grid.words })
@@ -169,7 +170,7 @@ pub struct ClutRow<'a> {
 /// The standard PS1 TIM file of a texture drawn with one CLUT row.
 pub fn texture_tim_of(load_arg: u32, payload: &[u8], clut: ClutRow) -> Result<Vec<u8>> {
     let ClutRow { bits, words, x: clut_x, y: clut_y } = clut;
-    let descriptor = vram::Descriptor::from_load_argument(load_arg);
+    let descriptor = upload::descriptor(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let mode = match bits {
         4 => tim::Mode::Four,
@@ -197,7 +198,7 @@ pub fn texture_tim_of(load_arg: u32, payload: &[u8], clut: ClutRow) -> Result<Ve
 /// This is the file for a texture no rule joins to a palette row: the header names no CLUT, because the
 /// game states none. The words are the words the disc stores, so [`import_tim`] returns the payload.
 pub fn texture_tim_direct(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
-    let descriptor = vram::Descriptor::from_load_argument(load_arg);
+    let descriptor = upload::descriptor(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let place = Placement::of(descriptor);
     let tim = tim::File {
@@ -231,7 +232,7 @@ impl Placement {
 
     /// The placement a load argument names.
     pub fn of_load_argument(load_arg: u32) -> Self {
-        Self::of(vram::Descriptor::from_load_argument(load_arg))
+        Self::of(upload::descriptor(load_arg))
     }
 
     /// The left edge in VRAM words.
@@ -330,7 +331,7 @@ pub fn indexed_images(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> Result<
     if rows.is_empty() {
         return Ok(Vec::new());
     }
-    let grid = vram::word_grid(payload, vram::Descriptor::from_load_argument(load_arg))?;
+    let grid = vram::word_grid(payload, upload::descriptor(load_arg))?;
     Ok(rows
         .iter()
         .map(|row| IndexedImage {
@@ -350,7 +351,7 @@ pub fn indexed_images(load_arg: u32, payload: &[u8], rows: &[RowUse]) -> Result<
 /// The 16 bpp view of a texture upload, as the export writes it (`<slot>.png`), from the payload and
 /// its load argument.
 pub fn texture_view_png(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
-    let image = vram::upload_image(payload, vram::Descriptor::from_load_argument(load_arg))?;
+    let image = vram::upload_image(payload, upload::descriptor(load_arg))?;
     Ok(png::rgba_png(image.width, image.height, &image.rgba))
 }
 
@@ -365,7 +366,7 @@ pub fn texture_row_png(load_arg: u32, payload: &[u8], bits: u32, palette: &[u16]
     if palette.len() != depth.colors() {
         return Err(Error::Import(format!("a {bits}-bit row holds {} color words, not {}", depth.colors(), palette.len())));
     }
-    let grid = vram::word_grid(payload, vram::Descriptor::from_load_argument(load_arg))?;
+    let grid = vram::word_grid(payload, upload::descriptor(load_arg))?;
     let indices = texel_indices(&grid.words, depth);
     let colors: Vec<[u8; 4]> = palette.iter().map(|&word| clut::word_to_view(word)).collect();
     let width = grid.width * depth.texels_per_word();

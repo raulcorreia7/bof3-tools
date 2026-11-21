@@ -2,10 +2,10 @@
 
 mod support;
 
+use rebof3_emi::{TYPE_SEP, TYPE_VAB_BODY, TYPE_VAB_HEADER};
 use std::fs;
 
 use psx_formats::fixtures::{tiny_bank, tiny_sep};
-use psx_formats::vab::{BODY_TYPE, HEADER_TYPE};
 use rebof3_emi::entry::{palette, sep};
 use rebof3_emi::fixtures::archive_at;
 
@@ -17,7 +17,7 @@ fn bank() -> Vec<u8> {
 /// An archive holding a VAB header and body, a SEP package and a palette.
 fn archive_bytes() -> Vec<u8> {
     let (header, body) = tiny_bank();
-    archive_at(&[(HEADER_TYPE, 0x8010_0000, &header), (BODY_TYPE, 0x8010_0000, &body), (psx_formats::sep::TYPE, 0, &tiny_sep()), (0, 0x8003_3800, &bank())])
+    archive_at(&[(TYPE_VAB_HEADER, 0x8010_0000, &header), (TYPE_VAB_BODY, 0x8010_0000, &body), (TYPE_SEP, 0, &tiny_sep()), (0, 0x8003_3800, &bank())])
 }
 
 /// The archive on disk, and its path.

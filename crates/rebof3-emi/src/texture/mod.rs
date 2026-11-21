@@ -32,8 +32,9 @@
 pub mod scene;
 pub mod suggest;
 
+use crate::upload;
 use psx_formats::gfx::texture::{Clut, Color, Depth, Tpage};
-use psx_formats::gfx::vram::{self, Descriptor};
+use psx_formats::gfx::vram;
 
 /// RAM address of the palette arena (`wiki: formats/area#palette-arena`).
 pub const ARENA_BASE: u32 = 0x8003_3800;
@@ -167,7 +168,7 @@ impl Sheet {
 /// The sheet a type-3 entry uploads, from its load argument and payload length, or `None`
 /// when the payload is not a whole number of rectangle rows.
 pub fn sheet(slot: usize, load_arg: u32, payload_bytes: usize) -> Option<Sheet> {
-    let descriptor = Descriptor::from_load_argument(load_arg);
+    let descriptor = upload::descriptor(load_arg);
     let per_row = usize::from(descriptor.chunks_per_row);
     let rectangles = payload_bytes / vram::RECTANGLE_BYTES;
     if per_row == 0 || rectangles == 0 || !rectangles.is_multiple_of(per_row) {

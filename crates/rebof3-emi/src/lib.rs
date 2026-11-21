@@ -23,9 +23,7 @@
 
 extern crate alloc;
 
-#[cfg(feature = "std")]
-#[cfg(feature = "std")]
-pub mod cue;
+pub use ::emi::cue;
 #[cfg(feature = "std")]
 pub mod disc;
 pub mod emi;
@@ -54,9 +52,10 @@ pub mod texture;
 #[cfg(feature = "std")]
 pub mod verify;
 
-pub use crate::emi::{Archive, Entry, TYPE_CUE, TYPE_LZ77};
+pub use crate::emi::{Archive, Entry, TYPE_CUE, TYPE_LZ77, TYPE_SEP, TYPE_VAB_BODY, TYPE_VAB_HEADER, TYPE_VRAM};
 #[cfg(feature = "std")]
-pub use crate::emi::{TYPE_VRAM, archives_under, ensure_parent, entry_name, read_entry, type_extension};
+pub use crate::emi::{archives_under, ensure_parent, entry_name, read_entry, type_extension, upload};
+pub use ::emi::Error as ContainerError;
 pub use error::{Error, Result};
 #[cfg(feature = "std")]
 pub use manifest::{ManifestInput, ParsedManifest, manifest_entries, parse_manifest};
