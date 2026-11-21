@@ -7,4 +7,4 @@ pub mod catalog;
 pub mod fixture;
 pub mod preview;
 pub mod project;
-pub mod schema;
+pub use rebof3_catalog::schema;

@@ -1,6 +1,6 @@
 # Library crates
 
-The libraries behind the `bof3` command: five crates in this workspace and the public
+The libraries behind the `bof3` command: six crates in this workspace and the public
 [bof3-player](https://github.com/raulcorreia7/bof3-player) repository, which supplies the audio,
 disc and bundled-names libraries.
 
@@ -10,6 +10,7 @@ disc and bundled-names libraries.
 | `rebof3-formats`| One module per entry format (codec, open files, description), the registry and the coverage table. |
 | `rebof3-assets` | The all-assets extractor: classify every file and EMI slot, write a tree. |
 | `rebof3-observe`| Runs the disc on a route in `psx-machine` and records how the game draws each texture. |
+| `rebof3-catalog`| The editor's rules over bytes: the game catalog, the table record layouts, the edit store and the rebuild plan. |
 | `rebof3-render` | Draws field scenes with the GPU's texturing rules, offscreen through OpenGL ES (the `gles` feature) or in software ([ADR 0003](adr/0003-area-3d-rendering.md)). |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 

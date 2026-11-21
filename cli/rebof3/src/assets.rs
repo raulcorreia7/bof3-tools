@@ -1317,7 +1317,7 @@ fn coverage_command(args: &[String]) -> Result<i32> {
     let current = env::current_dir()?;
     let image = match image {
         Some(image) => image,
-        None => find_disc_image(&current).map_err(Error::Usage)?,
+        None => find_disc_image(&current).map_err(|error| Error::Usage(error.to_string()))?,
     };
     let report = coverage::run(&image)?;
     println!("{:<17} {:>8} {:>10} {:>13} {:>13}  note", "kind", "entries", "both ways", "bytes", "both ways");
@@ -1400,7 +1400,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
     }
     let image = match arguments.image.clone() {
         Some(image) => Some(image),
-        None if !only_text => Some(find_disc_image(&base).map_err(Error::Usage)?),
+        None if !only_text => Some(find_disc_image(&base).map_err(|error| Error::Usage(error.to_string()))?),
         // The text kind can read an extracted disc without the image; it only loses the LBA.
         None => find_disc_image(&base).ok(),
     };

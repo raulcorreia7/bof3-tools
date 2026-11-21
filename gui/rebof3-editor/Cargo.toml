@@ -13,6 +13,7 @@ name = "bof3-edit"
 path = "src/main.rs"
 
 [dependencies]
+rebof3-catalog.workspace = true
 rebof3-emi = { workspace = true, features = ["std"] }
 rebof3-formats.workspace = true
 rebof3-assets.workspace = true

@@ -4876,6 +4876,7 @@ dependencies = [
  "rebof3-emi",
  "rebof3-formats",
  "rebof3-observe",
+ "serde",
  "serde_json",
  "sha2 0.11.1",
 ]
@@ -4907,6 +4908,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rebof3-catalog"
+version = "0.1.0"
+dependencies = [
+ "rebof3-emi",
+ "rebof3-formats",
+]
+
+[[package]]
 name = "rebof3-editor"
 version = "0.1.0"
 dependencies = [
@@ -4916,6 +4925,7 @@ dependencies = [
  "image",
  "psx-formats",
  "rebof3-assets",
+ "rebof3-catalog",
  "rebof3-emi",
  "rebof3-formats",
  "rebof3-observe",
@@ -4929,6 +4939,7 @@ name = "rebof3-emi"
 version = "0.2.0"
 dependencies = [
  "emi",
+ "psx-cd",
  "psx-formats",
  "rebof3-emi",
  "serde",

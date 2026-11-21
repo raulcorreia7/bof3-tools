@@ -1,35 +1,27 @@
 // SPDX-License-Identifier: MIT
-use psx_cd::{Entry, Image, checksum, metadata};
+use crate::parse;
+use clap::Parser;
+use psx_cd::{Entry, checksum, metadata};
 use std::env;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-/// Where the disc image lives, relative to the repository root.
-pub(crate) const IMAGE_DIR: &str = "inputs/external";
-/// Folders searched for the disc image, in order, when no `-i` is given.
-pub(crate) const IMAGE_DIRS: [&str; 2] = [IMAGE_DIR, "disk"];
+pub(crate) use rebof3_emi::disc::{IMAGE_DIR, find_image as find_disc_image};
 
-/// The disc image in the first of `IMAGE_DIRS` below `base` that holds one; the error names every
-/// folder searched. Shared by `assets` and `disc` so both find the same image.
-pub(crate) fn find_disc_image(base: &Path) -> Result<PathBuf, String> {
-    let mut reasons = Vec::new();
-    for directory in IMAGE_DIRS {
-        match psx_cd::discover_image(&base.join(directory)) {
-            Ok(path) => return Ok(path),
-            Err(error) => reasons.push(format!("{directory}: {error}")),
-        }
-    }
-    Err(format!("no disc image found ({})", reasons.join("; ")))
-}
-
-#[derive(Default)]
+#[derive(Parser)]
 struct Options {
+    #[arg(short, long)]
     input: Option<PathBuf>,
+    #[arg(short, long)]
     output: Option<PathBuf>,
+    #[arg(short = 'x', long)]
     extract: Option<PathBuf>,
+    #[arg(short, long)]
     project: Option<PathBuf>,
+    #[arg(short = 'r', long = "raw-root")]
     raw_root: Option<PathBuf>,
+    #[arg(short, long)]
     quiet: bool,
 }
 
@@ -69,7 +61,7 @@ fn run(args: Vec<OsString>) -> Result<i32, String> {
         }
         return Ok(EXIT_OK);
     }
-    let options = parse_options(&args[1..])?;
+    let options: Options = parse(&args[1..])?;
     let result = match command {
         "extract" => extract(options),
         "lba-json" => lba_json(options),
@@ -184,32 +176,6 @@ fn verify(options: Options) -> Result<i32, String> {
     Ok(EXIT_OK)
 }
 
-fn parse_options(args: &[OsString]) -> Result<Options, String> {
-    let mut options = Options::default();
-    let mut index = 0;
-    while index < args.len() {
-        let flag = args[index].to_str().ok_or("options must be valid UTF-8")?;
-        match flag {
-            "-q" | "--quiet" => options.quiet = true,
-            "-i" | "--input" | "-o" | "--output" | "-x" | "--extract" | "-p" | "--project" | "-r" | "--raw-root" => {
-                index += 1;
-                let value = PathBuf::from(args.get(index).ok_or_else(|| format!("option {flag} needs a value, for example -o build/disc; run `bof3 disc help` for the options"))?);
-                match flag {
-                    "-i" | "--input" => options.input = Some(value),
-                    "-o" | "--output" => options.output = Some(value),
-                    "-x" | "--extract" => options.extract = Some(value),
-                    "-p" | "--project" => options.project = Some(value),
-                    "-r" | "--raw-root" => options.raw_root = Some(value),
-                    _ => unreachable!(),
-                }
-            }
-            value => return Err(format!("unknown option: {value}; run `bof3 disc help` for the options")),
-        }
-        index += 1;
-    }
-    Ok(options)
-}
-
 fn reject(_options: &Options, invalid: &[(char, bool)]) -> Result<(), String> {
     if let Some((flag, _)) = invalid.iter().find(|(_, present)| *present) {
         return Err(format!("-{flag} is not valid with this command; run `bof3 disc help` for its options"));
@@ -230,11 +196,7 @@ pub(crate) fn extract_image(input: &Path, output: &Path) -> Result<usize, String
 }
 
 fn open_walk_extract(input: &Path, output: &Path, project: &Path) -> Result<Vec<Entry>, String> {
-    let mut image = Image::open(input).map_err(display_error(input))?;
-    let entries = image.entries().map_err(display_error(input))?;
-    image.extract(output).map_err(display_error(input))?;
-    metadata::write_project(project, &entries, input.file_name().and_then(|value| value.to_str()).unwrap_or("disc.bin")).map_err(|error| error.to_string())?;
-    Ok(entries)
+    rebof3_emi::disc::extract(input, output, project).map_err(|error| error.to_string())
 }
 
 const USAGE: &str = "\

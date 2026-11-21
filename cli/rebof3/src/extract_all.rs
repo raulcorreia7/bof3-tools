@@ -16,7 +16,8 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::assets::extract_command;
@@ -132,15 +133,15 @@ pub fn run(args: &[String]) -> Result<i32, String> {
     let chosen: Vec<&str> = STEPS.into_iter().filter(|step| arguments.steps.is_empty() || arguments.steps.iter().any(|s| s == step)).collect();
 
     let (mut records, previous) = load_previous(&context.out);
-    let mut files: Vec<Value> = previous.into_iter().filter(|f| !chosen.contains(&f["consumer"].as_str().unwrap_or(""))).collect();
+    let mut files: Vec<FileRecord> = previous.into_iter().filter(|f| !chosen.contains(&f.consumer.as_str())).collect();
     let mut failed = false;
     for step in &chosen {
         let (record, found) = run_step(&context, step, arguments.quiet);
-        failed |= record["status"] == "failed";
+        failed |= record.status == "failed";
         records.insert((*step).to_string(), record);
         files.extend(found);
     }
-    let ordered: Vec<Value> = STEPS.iter().filter_map(|step| records.remove(*step)).collect();
+    let ordered: Vec<StepRecord> = STEPS.iter().filter_map(|step| records.remove(*step)).collect();
     write_index(&context, &ordered, &files)?;
     if !arguments.quiet {
         println!("index: {}", context.out.join(INDEX_JSON).display());
@@ -148,7 +149,40 @@ pub fn run(args: &[String]) -> Result<i32, String> {
     Ok(i32::from(failed))
 }
 
-fn run_step(context: &Context, step: &str, quiet: bool) -> (Value, Vec<Value>) {
+/// One step's row of the index; fields stay in key order so the JSON is unchanged.
+#[derive(Serialize, Deserialize)]
+struct StepRecord {
+    bytes: u64,
+    failures: usize,
+    files: usize,
+    name: String,
+    note: String,
+    seconds: f64,
+    status: String,
+}
+
+/// One file's row of the index.
+#[derive(Serialize, Deserialize)]
+struct FileRecord {
+    compare: String,
+    consumer: String,
+    kind: String,
+    path: String,
+    peer: String,
+    sha256: String,
+    size: u64,
+}
+
+/// The index file.
+#[derive(Serialize)]
+struct Index<'a> {
+    consumers: &'a [StepRecord],
+    disc: String,
+    files: &'a [FileRecord],
+    root: String,
+}
+
+fn run_step(context: &Context, step: &str, quiet: bool) -> (StepRecord, Vec<FileRecord>) {
     let started = Instant::now();
     let outcome = match step {
         "disc" => disc_step(context),
@@ -159,7 +193,7 @@ fn run_step(context: &Context, step: &str, quiet: bool) -> (Value, Vec<Value>) {
     };
     let seconds = started.elapsed().as_secs_f64();
     let files = if outcome.skipped { Vec::new() } else { scan(context, step) };
-    let bytes: u64 = files.iter().map(|f| f["size"].as_u64().unwrap_or(0)).sum();
+    let bytes: u64 = files.iter().map(|f| f.size).sum();
     let status = if outcome.skipped {
         "skipped"
     } else if outcome.errors.is_empty() {
@@ -181,10 +215,7 @@ fn run_step(context: &Context, step: &str, quiet: bool) -> (Value, Vec<Value>) {
             println!("    ... {} more", outcome.errors.len() - SHOWN_ERRORS);
         }
     }
-    let record = json!({
-        "name": step, "status": status, "files": files.len(), "bytes": bytes,
-        "seconds": seconds, "failures": outcome.errors.len(), "note": outcome.note,
-    });
+    let record = StepRecord { name: step.to_string(), status: status.to_string(), files: files.len(), bytes, seconds, failures: outcome.errors.len(), note: outcome.note };
     (record, files)
 }
 
@@ -426,7 +457,7 @@ fn files_under(folder: &Path, found: &mut Vec<PathBuf>) {
 }
 
 /// Every file under `DIR/STEP` with its kind, size and sha256, sorted by path.
-fn scan(context: &Context, step: &str) -> Vec<Value> {
+fn scan(context: &Context, step: &str) -> Vec<FileRecord> {
     let root = context.folder(step);
     let mut paths = Vec::new();
     files_under(&root, &mut paths);
@@ -438,22 +469,27 @@ fn scan(context: &Context, step: &str) -> Vec<Value> {
         .map(|(path, digest)| {
             let relative = path.strip_prefix(&root).unwrap_or(path);
             let posix = relative.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/");
-            json!({
-                "consumer": step, "kind": kind_of(step, relative), "path": posix,
-                "size": fs::metadata(path).map_or(0, |m| m.len()), "sha256": digest,
-                "compare": NO_PEER, "peer": "",
-            })
+            FileRecord {
+                consumer: step.to_string(),
+                kind: kind_of(step, relative).to_string(),
+                path: posix,
+                size: fs::metadata(path).map_or(0, |m| m.len()),
+                sha256: digest,
+                compare: NO_PEER.to_string(),
+                peer: String::new(),
+            }
         })
         .collect()
 }
 
 /// Steps of an earlier run that this run does not repeat keep their rows.
-fn load_previous(out: &Path) -> (BTreeMap<String, Value>, Vec<Value>) {
+fn load_previous(out: &Path) -> (BTreeMap<String, StepRecord>, Vec<FileRecord>) {
     let Some(data) = fs::read_to_string(out.join(INDEX_JSON)).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else {
         return (BTreeMap::new(), Vec::new());
     };
-    let records = data["consumers"].as_array().map(|list| list.iter().filter_map(|c| Some((c["name"].as_str()?.to_string(), c.clone()))).collect()).unwrap_or_default();
-    (records, data["files"].as_array().cloned().unwrap_or_default())
+    let rows = |key: &str| data[key].as_array().cloned().unwrap_or_default();
+    let records = rows("consumers").into_iter().filter_map(|c| serde_json::from_value::<StepRecord>(c).ok()).map(|c| (c.name.clone(), c)).collect();
+    (records, rows("files").into_iter().filter_map(|f| serde_json::from_value(f).ok()).collect())
 }
 
 fn table(header: &[&str], rows: &[Vec<String>]) -> String {
@@ -462,34 +498,25 @@ fn table(header: &[&str], rows: &[Vec<String>]) -> String {
     lines.join("\n")
 }
 
-fn write_index(context: &Context, records: &[Value], files: &[Value]) -> Result<(), String> {
-    let index = json!({
-        "root": context.out.display().to_string(),
-        "disc": context.image.display().to_string(),
-        "consumers": records,
-        "files": files,
-    });
+fn write_index(context: &Context, records: &[StepRecord], files: &[FileRecord]) -> Result<(), String> {
+    let index = Index { consumers: records, disc: context.image.display().to_string(), files, root: context.out.display().to_string() };
     let write = |name: &str, text: String| {
         let path = context.out.join(name);
         fs::write(&path, text).map_err(|error| format!("{}: {error}. Pass -o with a writable folder.", path.display()))
     };
-    write(INDEX_JSON, index.to_string())?;
-    let cell = |record: &Value, key: &str| match &record[key] {
-        Value::String(text) => text.clone(),
-        Value::Number(number) if key == "seconds" => format!("{:.1}", number.as_f64().unwrap_or(0.0)),
-        other => other.to_string(),
-    };
+    write(INDEX_JSON, serde_json::to_string(&index).map_err(|error| error.to_string())?)?;
     let mut md = format!("# Extract index\n\nDisc: `{}`\n\n## Consumers\n\n", context.image.display());
     let header = ["consumer", "status", "files", "bytes", "seconds", "failures", "note"];
-    let rows: Vec<Vec<String>> = records.iter().map(|r| ["name", "status", "files", "bytes", "seconds", "failures", "note"].iter().map(|k| cell(r, k)).collect()).collect();
+    let rows: Vec<Vec<String>> =
+        records.iter().map(|r| vec![r.name.clone(), r.status.clone(), r.files.to_string(), r.bytes.to_string(), format!("{:.1}", r.seconds), r.failures.to_string(), r.note.clone()]).collect();
     md.push_str(&table(&header, &rows));
     for record in records {
-        let name = record["name"].as_str().unwrap_or("");
+        let name = record.name.as_str();
         let mut kinds: BTreeMap<&str, (u64, u64)> = BTreeMap::new();
-        for file in files.iter().filter(|f| f["consumer"] == name) {
-            let entry = kinds.entry(file["kind"].as_str().unwrap_or("")).or_default();
+        for file in files.iter().filter(|f| f.consumer == name) {
+            let entry = kinds.entry(file.kind.as_str()).or_default();
             entry.0 += 1;
-            entry.1 += file["size"].as_u64().unwrap_or(0);
+            entry.1 += file.size;
         }
         if kinds.is_empty() {
             continue;

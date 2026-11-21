@@ -28,6 +28,7 @@ rebof3-formats.workspace = true
 rebof3-observe.workspace = true
 psx-cd.workspace = true
 psx-formats = { workspace = true, features = ["std"] }
+serde.workspace = true
 serde_json.workspace = true
 sha2 = { workspace = true, optional = true }
 
