@@ -90,8 +90,7 @@ fn round_trips(area: &Area, bundle: &[u8]) -> usize {
         && let Ok(parsed) = EncounterBlock::parse(block)
     {
         for (row, encounter) in parsed.encounters.iter().enumerate() {
-            for slot in 0..ENCOUNTER_ENEMIES {
-                let enemy = encounter.enemies[slot];
+            for (slot, &enemy) in encounter.enemies.iter().enumerate() {
                 assert!(enemy == model::EMPTY_SLOT || usize::from(enemy) < parsed.enemies.len(), "every retail slot names one of the block's enemy records or is empty");
                 same("enemy", model::with_encounter(block, row, slot, enemy), block);
             }

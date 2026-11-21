@@ -28,7 +28,7 @@ image = { version = "0.25.10", default-features = false }
 cpal = "0.18.2"
 # The output resampler for a device that does not run at the library's 44.1 kHz. Pinned: its
 # majors come quickly and change the API.
-rubato = "=5.0.1"
+rubato = "=5.1.0"
 
 [features]
 default = ["gles"]
