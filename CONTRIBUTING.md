@@ -6,14 +6,8 @@ Issues and pull requests are welcome. All contributions follow the
 
 ## Set up
 
-Install the tools in the [README requirements](README.md#requirements): Rust 1.99 or later, GNU make,
-`cargo-deny` and the Linux libraries. Then:
-
-```sh
-git clone https://github.com/raulcorreia7/bof3-tools.git
-cd bof3-tools
-git switch -c fix/short-name
-```
+Install the [README requirements](README.md#requirements), clone the repository and branch from
+`main`.
 
 ## Checks
 
@@ -23,8 +17,7 @@ Run before every push:
 make check
 ```
 
-`make check` runs the format check, `cargo clippy`, `cargo deny` and the tests. CI runs the same checks
-on Linux and Windows, checks the minimum supported Rust version (`rust-version` in `Cargo.toml`) and
+CI runs the same checks on Linux and Windows, checks the minimum supported Rust version (`rust-version` in `Cargo.toml`) and
 builds the CLI. The release workflow also builds for macOS. A pull request that changes only docs runs
 the format check only.
 
@@ -41,10 +34,9 @@ Two variables name the retail data, for every crate:
 | `BOF3_DISC_DIR` | the extracted disc, the folder that holds `BIN/` (`bof3 disc extract`) |
 | `BOF3_DISC_IMAGE` | the disc's `.cue` sheet |
 
-A retail test skips with a message when its variable is unset, and fails with the path when the
-variable is set but wrong (no `BIN/` folder, missing cue sheet). A skip looks green, so a gate that
-must prove the retail results runs `make check-retail`: it sets `BOF3_REQUIRE_RETAIL=1`, which turns
-every skip into a failure, and runs the workspace tests.
+A retail test skips when its variable is unset and fails with the path when it is wrong. A skip
+looks green, so a gate that must prove the retail results runs `make check-retail`, which sets
+`BOF3_REQUIRE_RETAIL=1` so every skip fails.
 
 Do not commit game data, disc images, extracted assets, game text or build output (`build/`, `target/`, `bin/`).
 

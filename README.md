@@ -33,23 +33,18 @@ Release archives for Linux, macOS and Windows are on
 [Releases](https://github.com/raulcorreia7/bof3-tools/releases); each has a `.sha256` file to check with
 `sha256sum -c` (Linux) or `shasum -a 256 -c` (macOS).
 
-No game data is in this repository. Keep the disc dump outside Git.
-
-## Set up
-
-```sh
-git clone https://github.com/raulcorreia7/bof3-tools.git
-cd bof3-tools
-```
+Keep the disc dump outside Git.
 
 ## Build
 
 ```sh
+git clone https://github.com/raulcorreia7/bof3-tools.git
+cd bof3-tools
 make build
 ```
 
 `make build` builds the release workspace and links `bof3` and `bof3-edit` into `bin/`. For the
-command alone: `cargo build --release --locked -p rebof3`, which writes `target/release/bof3`.
+command alone: `cargo build --release --locked -p rebof3`.
 
 ## Run
 
@@ -111,17 +106,13 @@ make check
 retail disc skip without it; `make check-retail` runs them with `BOF3_DISC_DIR` (the extracted disc) and
 `BOF3_DISC_IMAGE` (the CUE sheet) set, and a skip fails ([CONTRIBUTING.md](CONTRIBUTING.md#test-data)).
 
-## Next
+## More
 
-- [Command line](docs/cli.md): every command, switch and example.
-- [Asset output](docs/assets.md): the folder layout and file kinds.
-- [Asset editor](docs/editor.md): the views, the game catalog and the format coverage.
-- [Crates](docs/crates.md): the libraries behind the command.
-- [C interface](docs/c-api.md): the C ABI over the libraries, its ownership rules and an example.
-- [CONTRIBUTING.md](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md) and the
-  [security policy](SECURITY.md).
-- Related projects: [bof3-player](https://github.com/raulcorreia7/bof3-player) plays the extracted
-  audio, and the [bof3 workspace](https://github.com/raulcorreia7/bof3) links all projects.
+[docs/cli.md](docs/cli.md) (commands), [docs/assets.md](docs/assets.md) (output layout),
+[docs/editor.md](docs/editor.md), [docs/crates.md](docs/crates.md), [docs/c-api.md](docs/c-api.md),
+[CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md). Related:
+[bof3-player](https://github.com/raulcorreia7/bof3-player) plays the extracted audio; the
+[bof3 workspace](https://github.com/raulcorreia7/bof3) links all projects.
 
 ## License
 

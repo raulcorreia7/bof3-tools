@@ -11,9 +11,6 @@ argument in hex. An entry no view changes keeps its stored bytes and its disc lo
 
 ## Run and views
 
-`bof3-edit` is a desktop editor for the disc's EMI archives. It runs on Linux (X11 and Wayland), macOS and
-Windows.
-
 ```sh
 bin/bof3-edit build/disc my-mod
 ```
@@ -48,9 +45,7 @@ each line opens the views below. [Game catalog](#game-catalog) says how the cata
 | Script  | area, battle and magic-effect script banks | each record's animation stream one op per line: `show` a frame for its ticks, `jump` to a labelled step; edit any operand or cell; add or remove a step at the end of a stream; export and import the bank as text |
 | Decoded | cue, scene, area, battle and magic-effect script, palette, LZ77 | the decoder's structured reading |
 
-Undo and redo cover every view (`Ctrl+Z`, `Ctrl+Y`); one undo takes back a whole drag or typed field. `Ctrl+S`
-saves, `Ctrl+E` exports, and closing with unsaved edits asks to save or discard them. The editor
-uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font
+`Ctrl+Z` and `Ctrl+Y` undo and redo; `Ctrl+S` saves and `Ctrl+E` exports. The editor uses the system's fonts; set `BOF3_EDIT_FONT` (and `BOF3_EDIT_MONO`) to the name of an installed font
 family to use another one.
 
 ## Game catalog
@@ -130,26 +125,18 @@ of the nearest folder above the disc folder. Results are a cache, never project 
 bof3-player revision (from `Cargo.lock`), another route text or another file layout is not read.
 `bof3 observe` writes the same file ([command line](cli.md#observe)).
 
-The `new-game` route runs 8,100 frames in about 16 s in a release build (one thread): 14 entries
-in 6 archives, 53 depth and row pairs, 41 of their rows named. It reads `BOSS/BOSS001` for the first
-battle and never `BATTLE/BATL_DRA`, which only battle overlay 15 streams (`Battle_LoadDraArchive`);
-that archive needs a route that reaches a normal battle. Where a rule and a draw both name a row
-(14 rows), 10 agree. The terrain rule also names rows 485 and 487 for `AREA024` slot 7 at page (448, 256),
-from 54 and 13 of its tile descriptors; the route's frames draw only the commoner rows 486 and 488. The
-rule reads the grid records and the record words the object patch lists swap in (`func_801576FC`). The
-depths agree everywhere.
+The `new-game` route runs 8,100 frames in about 16 s in a release build: 14 entries in 6 archives.
+It reads `BOSS/BOSS001` for the first battle and never `BATTLE/BATL_DRA`, which only battle overlay
+15 streams (`Battle_LoadDraArchive`); that archive needs a route that reaches a normal battle. Where
+a rule and a draw both name a row (14 rows), 10 agree; the depths agree everywhere.
 
 ## Shell
 
-| Feature | State | Gap |
-| ------- | ----- | --- |
-| Undo and redo | every view, through the project; a drag, a typed field or an import is one step, and undo closes an open field | none |
-| Unsaved edits | the status line says `unsaved`; closing the project or the window asks to save or discard them | none |
-| Malformed entries | each view reports a decoder error | none; a test draws every view of every format over an empty, a short and a noise payload |
+Undo and redo cover every view; a drag, a typed field or an import is one step. The status line says
+`unsaved`, and closing the project or the window asks to save or discard. Each view reports a decoder
+error for a malformed entry; a test draws every view of every format over an empty, a short and a
+noise payload.
 
-Playback opens the output device at the library's 44.1 kHz when the device offers it. A device that
-does not gets the clip resampled with [rubato](https://crates.io/crates/rubato)'s FFT resampler, a
-band-limited sinc filter.
-
-Not EMI entries, so out of scope: XA audio, STR video and CD-DA tracks. The `bof3` command line
-handles them.
+Playback opens the output device at 44.1 kHz when it offers that, else resamples the clip with
+[rubato](https://crates.io/crates/rubato). XA audio, STR video and CD-DA tracks are not EMI entries
+and stay with the `bof3` command line.
