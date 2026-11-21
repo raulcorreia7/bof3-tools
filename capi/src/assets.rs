@@ -9,7 +9,7 @@ use assets_lib::codec::{self, Direction, Index};
 use assets_lib::kind::{AudioFormat, Kind, Mode, Selection};
 use assets_lib::report::Report;
 
-use crate::error::{guarded, invalid, rebof3_status, unsupported, usage};
+use crate::error::{Failure, guarded, invalid, rebof3_status, unsupported, usage};
 use crate::ffi::{input, optional_out, optional_utf8, out_ref, utf8};
 use crate::{rebof3_buffer, rebof3_string};
 
@@ -267,6 +267,58 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
     }
 }
 
+/// Runs the extraction `options` select and returns its `assets.jsonl` and summary text.
+///
+/// # Safety
+/// The pointers of `options` must be readable for their lengths.
+unsafe fn extract_report(options: &rebof3_assets_options) -> Result<(String, String), Failure> {
+    let image = unsafe { utf8(options.image_path, options.image_path_len, "image_path")? };
+    let out_dir = unsafe { utf8(options.output_dir, options.output_dir_len, "output_dir")? };
+    let kinds = unsafe { optional_utf8(options.kinds, options.kinds_len, "kinds")? };
+    let text_disc = unsafe { optional_utf8(options.text_disc, options.text_disc_len, "text_disc")? };
+    let selection = match kinds {
+        Some(kinds) => Selection::parse(kinds)?,
+        None => Selection::all(),
+    };
+    let selection = selection.with_mode(mode_of(options.mode)).with_audio(audio_of(options.audio));
+    let explicit_text = kinds.is_some() && selection.contains(Kind::Text);
+    if explicit_text && text_disc.is_none() {
+        return Err(usage("the text kind needs text_disc"));
+    }
+    let wants_text = if kinds.is_some() { explicit_text } else { text_disc.is_some() };
+    let write = options.write != 0;
+    let out = PathBuf::from(out_dir);
+    let image = PathBuf::from(image);
+    let jobs = if options.jobs == 0 { std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) } else { options.jobs };
+    let only_text = selection.is_only(Kind::Text);
+    let mut report =
+        if only_text { Report::default() } else { assets_lib::extract::run(&assets_lib::extract::Options { image: image.clone(), out: out.clone(), selection: selection.clone(), write, jobs })? };
+    if wants_text {
+        let disc = text_disc.ok_or_else(|| usage("the text kind needs text_disc"))?;
+        let text = assets_lib::text::extract_with(&assets_lib::text::Options {
+            disc: PathBuf::from(disc),
+            out: out.clone(),
+            image: Some(image),
+            raw: selection.mode().writes("raw", true),
+            modern: selection.mode().writes("json", true),
+            write,
+            list: false,
+        })?;
+        report.rows.extend(text.rows);
+        report.failures.extend(text.failures);
+        report.notes.extend(text.notes);
+    }
+    report.sort();
+    let jsonl = report.jsonl();
+    let summary = report.summary();
+    if write {
+        std::fs::create_dir_all(&out)?;
+        std::fs::write(out.join(assets_lib::extract::TABLE_FILE), &jsonl)?;
+        std::fs::write(out.join(assets_lib::extract::SUMMARY_FILE), &summary)?;
+    }
+    Ok((jsonl, summary))
+}
+
 /// Runs the selected asset extraction and returns its `assets.jsonl` and summary.
 ///
 /// # Safety
@@ -276,53 +328,9 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
 pub unsafe extern "C" fn rebof3_assets_extract(options: *const rebof3_assets_options, report_jsonl: *mut rebof3_string, summary: *mut rebof3_string) -> rebof3_status {
     match guarded(|| {
         let options = unsafe { options.as_ref() }.ok_or_else(|| invalid("the options pointer is NULL"))?;
-        let image = unsafe { utf8(options.image_path, options.image_path_len, "image_path")? };
-        let out_dir = unsafe { utf8(options.output_dir, options.output_dir_len, "output_dir")? };
-        let kinds = unsafe { optional_utf8(options.kinds, options.kinds_len, "kinds")? };
-        let text_disc = unsafe { optional_utf8(options.text_disc, options.text_disc_len, "text_disc")? };
         let report_out = unsafe { optional_out(report_jsonl) };
         let summary_out = unsafe { optional_out(summary) };
-
-        let selection = match kinds {
-            Some(kinds) => Selection::parse(kinds)?,
-            None => Selection::all(),
-        };
-        let selection = selection.with_mode(mode_of(options.mode)).with_audio(audio_of(options.audio));
-        let explicit_text = kinds.is_some() && selection.contains(Kind::Text);
-        if explicit_text && text_disc.is_none() {
-            return Err(usage("the text kind needs text_disc"));
-        }
-        let wants_text = if kinds.is_some() { explicit_text } else { text_disc.is_some() };
-        let write = options.write != 0;
-        let out = PathBuf::from(out_dir);
-        let image = PathBuf::from(image);
-        let jobs = if options.jobs == 0 { std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) } else { options.jobs };
-        let only_text = selection.is_only(Kind::Text);
-        let mut report =
-            if only_text { Report::default() } else { assets_lib::extract::run(&assets_lib::extract::Options { image: image.clone(), out: out.clone(), selection: selection.clone(), write, jobs })? };
-        if wants_text {
-            let disc = text_disc.ok_or_else(|| usage("the text kind needs text_disc"))?;
-            let text = assets_lib::text::extract_with(&assets_lib::text::Options {
-                disc: PathBuf::from(disc),
-                out: out.clone(),
-                image: Some(image),
-                raw: selection.mode().writes("raw", true),
-                modern: selection.mode().writes("json", true),
-                write,
-                list: false,
-            })?;
-            report.rows.extend(text.rows);
-            report.failures.extend(text.failures);
-            report.notes.extend(text.notes);
-        }
-        report.sort();
-        let jsonl = report.jsonl();
-        let summary = report.summary();
-        if write {
-            std::fs::create_dir_all(&out)?;
-            std::fs::write(out.join(assets_lib::extract::TABLE_FILE), &jsonl)?;
-            std::fs::write(out.join(assets_lib::extract::SUMMARY_FILE), &summary)?;
-        }
+        let (jsonl, summary) = unsafe { extract_report(options)? };
         if let Some(report_out) = report_out {
             *report_out = rebof3_string::from_string(jsonl);
         }
