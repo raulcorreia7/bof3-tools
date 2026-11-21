@@ -52,6 +52,9 @@ fn retail_textures_round_trip_byte_exactly() {
     files_under(&texture_root, &mut files);
     let stored_count = files.iter().filter(|path| path.extension().is_some_and(|ext| ext == "img")).count();
 
+    let mut palette_files = Vec::new();
+    files_under(&palette_root, &mut palette_files);
+    let banks: Vec<Vec<u8>> = palette_files.iter().filter(|path| path.extension().is_some_and(|ext| ext == "clut")).map(|path| fs::read(path).unwrap()).collect();
     let (mut views, mut indexed, mut failures) = (0, 0, Vec::new());
     for path in &files {
         let Some(stem) = path.file_name().and_then(|name| name.to_str()).and_then(|name| name.strip_suffix(".png")) else {
@@ -74,12 +77,8 @@ fn retail_textures_round_trip_byte_exactly() {
                 if texture.payload != stored {
                     failures.push(format!("{}: the indexed row does not return its stored bytes", path.display()));
                 }
-                let relative = path.parent().unwrap().strip_prefix(&texture_root).unwrap();
-                let mut banks = Vec::new();
-                files_under(&palette_root.join(relative), &mut banks);
-                let found = banks.iter().filter_map(|bank| fs::read(bank).ok()).any(|bytes| holds_run(&bytes, &texture.palette));
-                if !found {
-                    failures.push(format!("{}: its CLUT row is not in a CLUT block of its archive", path.display()));
+                if !banks.iter().any(|bytes| holds_run(bytes, &texture.palette)) {
+                    failures.push(format!("{}: its CLUT row is in no CLUT block (a row may come from another archive's block)", path.display()));
                 }
             }
             (Ok(other), _) => failures.push(format!("{}: imported as {other:?}, not its kind", path.display())),
@@ -87,8 +86,6 @@ fn retail_textures_round_trip_byte_exactly() {
         }
     }
 
-    let mut palette_files = Vec::new();
-    files_under(&palette_root, &mut palette_files);
     let mut palettes = 0;
     for json_path in palette_files.iter().filter(|path| path.extension().is_some_and(|ext| ext == "json")) {
         palettes += 1;
@@ -102,8 +99,7 @@ fn retail_textures_round_trip_byte_exactly() {
         }
     }
     assert!(palettes > 0, "no palette JSON under {}", palette_root.display());
-    let banks = palette_files.iter().filter(|path| path.extension().is_some_and(|ext| ext == "clut")).count();
-    assert_eq!(palettes, banks, "every CLUT block has a JSON");
+    assert_eq!(palettes, banks.len(), "every CLUT block has a JSON");
     eprintln!("palette round trip: {palettes} banks return their stored bytes");
 
     assert!(views > 0, "no texture view under {}", texture_root.display());
