@@ -154,7 +154,7 @@ impl Renderer {
             if prefer_gles {
                 return match gles::Gles::new() {
                     Ok(gles) => Self { gles: Some(gles), fallback: None },
-                    Err(error) => Self { gles: None, fallback: Some(error) },
+                    Err(error) => Self { gles: None, fallback: Some(error.to_string()) },
                 };
             }
             Self { gles: None, fallback: Some("the software renderer was chosen".into()) }
@@ -183,7 +183,7 @@ impl Renderer {
                 Ok(frame) => return frame,
                 Err(error) => {
                     self.gles = None;
-                    self.fallback = Some(error);
+                    self.fallback = Some(error.to_string());
                 }
             }
         }
@@ -215,7 +215,7 @@ pub fn draw_order(scene: &Scene, camera: &Camera) -> Vec<usize> {
 
 /// The pickable primitive nearest the camera under frame pixel `x`, `y` of a `width` x `height`
 /// frame: its id and its view depth. Overlays that ignore depth win over the rest.
-pub fn pick(scene: &Scene, camera: &Camera, width: usize, height: usize, x: f32, y: f32) -> Option<u32> {
+pub fn pick(scene: &Scene, camera: &Camera, (width, height): (usize, usize), [x, y]: [f32; 2]) -> Option<u32> {
     let mut best: Option<(bool, f32, u32)> = None;
     for primitive in &scene.primitives {
         let Some(id) = primitive.id else { continue };
@@ -253,7 +253,7 @@ mod tests {
     fn the_nearest_primitive_is_picked() {
         let camera = Camera::looking_down_z(100.0);
         let scene = Scene { primitives: vec![square(10.0, 1, [255; 4]), square(5.0, 2, [255; 4])], ..Scene::default() };
-        assert_eq!(pick(&scene, &camera, 64, 64, 32.0, 32.0), Some(2));
-        assert_eq!(pick(&scene, &camera, 64, 64, 0.0, 0.0), None, "outside both squares");
+        assert_eq!(pick(&scene, &camera, (64, 64), [32.0, 32.0]), Some(2));
+        assert_eq!(pick(&scene, &camera, (64, 64), [0.0, 0.0]), None, "outside both squares");
     }
 }

@@ -1,6 +1,6 @@
 //! The game tables as open files: one JSON per table out, and a table's JSON back over its stored bytes.
 
-use super::{GameTables, PAYLOAD_START, TABLES, Table};
+use super::{GameTableError, GameTables, PAYLOAD_START, TABLES, Table};
 use crate::error::{Error, Result};
 
 /// The JSON file of each table, in table order: the table's name and its records as an array.
@@ -42,13 +42,13 @@ pub fn import(table: &str, json: &[u8], base: &[u8]) -> Result<Vec<u8>> {
         return Err(Error::Import(format!("{table} is {} records of {} bytes; its stored bytes are {}", descriptor.count, descriptor.record, base.len())));
     }
     match table {
-        "items" => rebuild(descriptor, json, base, super::put_item),
-        "vital-items" => rebuild(descriptor, json, base, super::put_vital_item),
-        "weapons" => rebuild(descriptor, json, base, super::put_weapon),
-        "armor" => rebuild(descriptor, json, base, super::put_armor),
-        "accessories" => rebuild(descriptor, json, base, super::put_accessory),
-        "shops" => rebuild(descriptor, json, base, super::put_shop),
-        "abilities" => rebuild(descriptor, json, base, super::put_ability),
+        "items" => rebuild(descriptor, json, base, infallible(super::put_item)),
+        "vital-items" => rebuild(descriptor, json, base, infallible(super::put_vital_item)),
+        "weapons" => rebuild(descriptor, json, base, infallible(super::put_weapon)),
+        "armor" => rebuild(descriptor, json, base, infallible(super::put_armor)),
+        "accessories" => rebuild(descriptor, json, base, infallible(super::put_accessory)),
+        "shops" => rebuild(descriptor, json, base, infallible(super::put_shop)),
+        "abilities" => rebuild(descriptor, json, base, infallible(super::put_ability)),
         "level-growth" => rebuild(descriptor, json, base, super::put_growth),
         _ => Err(Error::Import(format!("{table} has no writer"))),
     }
@@ -63,8 +63,16 @@ pub fn import_in_payload(table: &str, json: &[u8], payload: &[u8]) -> Result<Vec
     import(table, json, base)
 }
 
+/// A writer that cannot fail, as one that can.
+fn infallible<T>(put: fn(&mut [u8], &T)) -> impl Fn(&mut [u8], &T) -> Result<(), GameTableError> {
+    move |record, value| {
+        put(record, value);
+        Ok(())
+    }
+}
+
 /// Parses a table's JSON records and writes each one over its base record.
-fn rebuild<T: serde::de::DeserializeOwned>(table: Table, json: &[u8], base: &[u8], put: fn(&mut [u8], &T) -> std::result::Result<(), String>) -> Result<Vec<u8>> {
+fn rebuild<T: serde::de::DeserializeOwned>(table: Table, json: &[u8], base: &[u8], put: impl Fn(&mut [u8], &T) -> Result<(), GameTableError>) -> Result<Vec<u8>> {
     let records: Vec<T> = serde_json::from_slice(json).map_err(|error| Error::Import(format!("{} JSON: {error}", table.name)))?;
     if records.len() != table.count {
         return Err(Error::Import(format!("{} has {} records; the table has {}", table.name, records.len(), table.count)));

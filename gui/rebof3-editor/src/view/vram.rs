@@ -14,7 +14,7 @@ use psx_formats::gfx::png;
 use psx_formats::gfx::texture::Clut;
 use psx_formats::gfx::vram::{VRAM_HEIGHT, VRAM_WIDTH};
 use rebof3_emi::replay::scenes::{self, Kind as SceneKind, Scene};
-use rebof3_emi::replay::{Kind, Region, Vram};
+use rebof3_emi::replay::{Kind, Rect, Region, Vram};
 use rebof3_formats::clut::color_rgba;
 
 use super::Entry;
@@ -104,7 +104,7 @@ fn decode(vram: &Vram, region: &Region, bits: Bits, clut: Option<Clut>) -> (Vec<
         }
         Some(depth) => {
             let colors = clut.map(|clut| vram.clut_words(clut, depth)).unwrap_or_default();
-            let pixels = vram.texels(x, y, width, height, depth).into_iter().map(|index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word))).collect();
+            let pixels = vram.texels(Rect { x, y, width, height }, depth).into_iter().map(|index| colors.get(usize::from(index)).map_or([0; 4], |&word| color_rgba(word))).collect();
             (pixels, width * depth.texels_per_word())
         }
     }

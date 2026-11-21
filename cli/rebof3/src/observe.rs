@@ -7,9 +7,10 @@ use std::ffi::OsString;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::time::Instant;
 
 use rebof3_observe::compare::{self, Comparison, Verdict};
-use rebof3_observe::{Observation, Progress, Route, cache};
+use rebof3_observe::{Observation, ObserveInput, Progress, Route, cache};
 
 use crate::disc::{IMAGE_DIR, find_disc_image};
 
@@ -84,7 +85,8 @@ fn run(args: Vec<OsString>) -> Result<(), String> {
         }
         None => {
             let quiet = options.quiet;
-            let observation = rebof3_observe::run(&image, &route, &disc_sha, |progress: Progress| {
+            let started = Instant::now();
+            let mut observation = rebof3_observe::run(ObserveInput { image: &image, route: &route, disc_sha: &disc_sha }, |progress: Progress| {
                 if !quiet && progress.frame.is_multiple_of(PROGRESS_FRAMES) {
                     eprint!("\rframe {} of {}", progress.frame, progress.frames);
                     let _ = std::io::stderr().flush();
@@ -92,6 +94,7 @@ fn run(args: Vec<OsString>) -> Result<(), String> {
                 true
             })
             .map_err(|error| error.to_string())?;
+            observation.seconds = started.elapsed().as_secs_f64();
             if !quiet {
                 eprintln!();
             }

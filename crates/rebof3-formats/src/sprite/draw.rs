@@ -31,7 +31,7 @@ use psx_formats::gfx::texture::{Clut, Depth};
 
 use super::{Animation, Cell, Frame, Image, Palette};
 use crate::error::{Error, Result};
-use rebof3_emi::replay::{Kind, Vram, Writer};
+use rebof3_emi::replay::{Kind, Rect, Vram, Writer};
 use rebof3_emi::texture::ARENA_VRAM_ROW;
 
 /// The address of `g_SpriteSizes` (`exe/slus_004_22@0x8017F53C`): one width and height per shape.
@@ -277,7 +277,7 @@ impl Stage {
 
         let sheet_writer = Writer::Named(format!("sprite frame sheet {sheet}"));
         let (x, y) = placement.sheet_origin();
-        vram.load_image(x, y, usize::from(image.width), usize::from(image.height), &image.words(), sheet_writer.clone());
+        vram.load_image(Rect { x, y, width: usize::from(image.width), height: usize::from(image.height) }, &image.words(), sheet_writer.clone());
         Self { vram, placement, staged: Some((sheet_writer, palette_writer)) }
     }
 

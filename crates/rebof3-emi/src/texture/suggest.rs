@@ -68,7 +68,7 @@ impl Suggestion {
 pub fn suggest(vram: &Vram, words: &[u16], width: usize, height: usize, archive: &str) -> Suggestion {
     let depths = depth_scores(words, width, height);
     let indexed = depths.iter().find_map(|score| score.depth).unwrap_or(Depth::Four);
-    let cluts = clut_candidates(vram, words, width, height, indexed, archive);
+    let cluts = clut_candidates(vram, Grid { words, width, height }, indexed, archive);
     Suggestion { depths, cluts }
 }
 
@@ -88,8 +88,20 @@ pub fn depth_scores(words: &[u16], width: usize, height: usize) -> Vec<DepthScor
     scores
 }
 
+/// A row-major grid of VRAM words: a texture's upload.
+#[derive(Clone, Copy, Debug)]
+pub struct Grid<'a> {
+    /// `width * height` words.
+    pub words: &'a [u16],
+    /// Width in words.
+    pub width: usize,
+    /// Height in rows.
+    pub height: usize,
+}
+
 /// The rows of the palette band one entry wrote, scored for the texture at `depth`, best first.
-pub fn clut_candidates(vram: &Vram, words: &[u16], width: usize, height: usize, depth: Depth, archive: &str) -> Vec<Candidate> {
+pub fn clut_candidates(vram: &Vram, grid: Grid, depth: Depth, archive: &str) -> Vec<Candidate> {
+    let Grid { words, width, height } = grid;
     let colors = depth.colors();
     let row = width * depth.texels_per_word();
     let indices = texels(words, width, height, depth);
@@ -227,7 +239,7 @@ mod tests {
         vram.upload_palette();
 
         let words = banded(Depth::Four);
-        let ranked = clut_candidates(&vram, &words, 16, 32, Depth::Four, "BIN/OWN.EMI");
+        let ranked = clut_candidates(&vram, Grid { words: &words, width: 16, height: 32 }, Depth::Four, "BIN/OWN.EMI");
         assert_eq!(ranked.len(), 2, "only fully written rows are candidates");
         assert_eq!((ranked[0].clut.x, ranked[0].clut.y), (0, 480));
     }

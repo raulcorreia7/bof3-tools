@@ -831,7 +831,7 @@ mod tests {
         let frame = rebof3_render::software::draw(&scene, &camera, 160, 120);
         let drawn = frame.rgba.chunks(4).filter(|pixel| pixel[..3] != BACKGROUND[..3]).count();
         assert!(drawn > 100, "the terrain covers part of the frame ({drawn} pixels)");
-        let centre = rebof3_render::pick(&scene, &camera, 160, 120, 80.0, 60.0);
+        let centre = rebof3_render::pick(&scene, &camera, (160, 120), [80.0, 60.0]);
         assert!(matches!(centre.and_then(Hit::of_id), Some(Hit::Quad(_))), "{centre:?}");
     }
 

@@ -23,7 +23,6 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 
 use psx_formats::gfx::texture::{Clut, Depth};
 use psx_machine::Machine;
@@ -153,7 +152,7 @@ pub struct Observation {
     pub player_revision: String,
     /// Frames run.
     pub frames: u64,
-    /// Seconds the run took.
+    /// Seconds the run took, as the shell that timed it sets them: [`run`] leaves 0.
     pub seconds: f64,
     /// The EMI files the game read, in the order it first read them.
     pub files: Vec<String>,
@@ -192,6 +191,17 @@ pub struct Progress {
     pub frames: u64,
 }
 
+/// What a run needs: the disc image, the route to play, and the data track's hash that names the disc.
+#[derive(Clone, Copy, Debug)]
+pub struct ObserveInput<'a> {
+    /// The disc image: a `.cue` sheet or a data track.
+    pub image: &'a Path,
+    /// The buttons to press.
+    pub route: &'a Route,
+    /// The SHA-256 of the data track ([`disc_sha`]).
+    pub disc_sha: &'a str,
+}
+
 /// Boots the disc image at `image`, plays `route` and records what the game drew.
 ///
 /// `progress` is called after every frame; returning `false` stops the run with
@@ -201,8 +211,8 @@ pub struct Progress {
 ///
 /// [`Error::Disc`] when the image does not boot, [`Error::Halt`] when the game stops the machine,
 /// [`Error::Cancelled`] when `progress` says stop.
-pub fn run(image: &Path, route: &Route, disc_sha: &str, mut progress: impl FnMut(Progress) -> bool) -> Result<Observation, Error> {
-    let started = Instant::now();
+pub fn run(input: ObserveInput, mut progress: impl FnMut(Progress) -> bool) -> Result<Observation, Error> {
+    let ObserveInput { image, route, disc_sha } = input;
     let mut machine = Machine::boot_image(image).map_err(|error| Error::Disc(error.to_string()))?;
     let disc = psx_cd::Image::open(image).map_err(|error| Error::Disc(error.to_string()))?;
     let mut recorder = Recorder::new(Sources::new(disc).map_err(|error| Error::Disc(error.to_string()))?);
@@ -252,7 +262,7 @@ pub fn run(image: &Path, route: &Route, disc_sha: &str, mut progress: impl FnMut
         disc_sha: disc_sha.to_string(),
         player_revision: PLAYER_REVISION.to_string(),
         frames: machine.frame(),
-        seconds: started.elapsed().as_secs_f64(),
+        seconds: 0.0,
         files: recorder.sources.files.iter().map(|file| file.path.clone()).collect(),
         uploads: recorder.uploads.total,
         attributed_uploads: recorder.uploads.attributed,
@@ -266,16 +276,36 @@ pub const IMAGE_VARIABLE: &str = "BOF3_DISC_IMAGE";
 /// The folders that hold the disc image below a project root, the ones `bof3 disc extract` searches.
 const IMAGE_FOLDERS: [&str; 2] = ["inputs/external", "disk"];
 
-/// The disc image for an extracted disc folder: the one `BOF3_DISC_IMAGE` names, else the image in
+/// Why no disc image was found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImageError {
+    /// The configured image is not a file.
+    NotAFile(PathBuf),
+    /// No image is configured or in the folders above the disc.
+    NotFound(PathBuf),
+}
+
+impl fmt::Display for ImageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotAFile(image) => write!(f, "{IMAGE_VARIABLE}={} is not a file", image.display()),
+            Self::NotFound(disc) => write!(f, "no disc image: set {IMAGE_VARIABLE} to the .cue sheet, or put it in {} above {}", IMAGE_FOLDERS.join(" or "), disc.display()),
+        }
+    }
+}
+
+impl std::error::Error for ImageError {}
+
+/// The disc image for an extracted disc folder: `configured` (the shell's `BOF3_DISC_IMAGE`), else the image in
 /// `inputs/external/` or `disk/` of the nearest folder above `disc` that has one.
 ///
 /// # Errors
 ///
-/// A sentence that says where it looked.
-pub fn find_image(disc: &Path) -> Result<PathBuf, String> {
-    if let Some(image) = std::env::var_os(IMAGE_VARIABLE).filter(|value| !value.is_empty()) {
+/// [`ImageError`] when the configured image is not a file or none is found.
+pub fn find_image(disc: &Path, configured: Option<std::ffi::OsString>) -> Result<PathBuf, ImageError> {
+    if let Some(image) = configured.filter(|value| !value.is_empty()) {
         let image = PathBuf::from(image);
-        return if image.is_file() { Ok(image) } else { Err(format!("{IMAGE_VARIABLE}={} is not a file", image.display())) };
+        return if image.is_file() { Ok(image) } else { Err(ImageError::NotAFile(image)) };
     }
     for folder in disc.ancestors() {
         for below in IMAGE_FOLDERS {
@@ -284,7 +314,7 @@ pub fn find_image(disc: &Path) -> Result<PathBuf, String> {
             }
         }
     }
-    Err(format!("no disc image: set {IMAGE_VARIABLE} to the .cue sheet, or put it in {} above {}", IMAGE_FOLDERS.join(" or "), disc.display()))
+    Err(ImageError::NotFound(disc.to_path_buf()))
 }
 
 /// The SHA-256 of a disc image's data track: the file a `.cue` sheet names for its first data

@@ -28,7 +28,7 @@ use rebof3_formats::Format;
 use rebof3_formats::clut::color_rgba;
 use rebof3_formats::joins::joined_rows;
 use rebof3_formats::vram::{self as texture_vram, TextureWords, texture_words};
-use rebof3_observe::{Observation, Palette, Progress, Route, cache};
+use rebof3_observe::{Observation, ObserveInput, Palette, Progress, Route, cache};
 
 use super::palette::{SWATCH, SWATCH_GAP, words as words_of};
 use super::{Entry, Menu, editing_menu};
@@ -364,7 +364,7 @@ fn look_up(editor: &Editor, cx: &mut Context<Editor>) {
     *state.looked_up.borrow_mut() = Some(project.folder.clone());
     let (disc, root) = (project.disc.clone(), project.folder.clone());
     let task = cx.background_executor().spawn(async move {
-        let image = rebof3_observe::find_image(&disc)?;
+        let image = rebof3_observe::find_image(&disc, std::env::var_os(rebof3_observe::IMAGE_VARIABLE)).map_err(|error| error.to_string())?;
         let sha = rebof3_observe::disc_sha(&image).map_err(|error| error.to_string())?;
         let cached = cache::load_all(&root, &sha);
         Ok::<_, String>((image, sha, cached))
@@ -406,10 +406,12 @@ fn run_route(editor: &mut Editor, route: Route, cx: &mut Context<Editor>) {
 
     let result = finished.clone();
     std::thread::spawn(move || {
-        let run = rebof3_observe::run(&image, &route, &sha, |progress: Progress| {
+        let started = std::time::Instant::now();
+        let run = rebof3_observe::run(ObserveInput { image: &image, route: &route, disc_sha: &sha }, |progress: Progress| {
             frame.store(progress.frame, Ordering::Relaxed);
             !cancel.load(Ordering::Relaxed)
         })
+        .map(|observation| Observation { seconds: started.elapsed().as_secs_f64(), ..observation })
         .and_then(|observation| cache::store(&root, &observation).map(|_| observation))
         .map_err(|error| error.to_string());
         if let Ok(mut slot) = result.lock() {
@@ -857,7 +859,7 @@ fn tim(entry: &Entry<'_>, state: &State) -> Result<Vec<u8>, String> {
     }
     .ok_or("This palette row has no place in VRAM; pick another row or export at 16 bits.")?;
     let words = palette(entry, state, depth);
-    texture_vram::texture_tim_of(entry.load_arg(), entry.payload(), depth.bits(), &words, clut.x, clut.y).map_err(|error| error.to_string())
+    texture_vram::texture_tim_of(entry.load_arg(), entry.payload(), texture_vram::ClutRow { bits: depth.bits(), words: &words, x: clut.x, y: clut.y }).map_err(|error| error.to_string())
 }
 
 /// Reads a TIM into entry `key`: its image words become the payload and its image place the load

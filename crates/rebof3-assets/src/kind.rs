@@ -109,10 +109,7 @@ impl Kind {
     /// Parses one `--only` name.
     pub fn parse(name: &str) -> Result<Self> {
         let name = Self::canonical(name);
-        Self::ALL.iter().copied().find(|kind| kind.name() == name).ok_or_else(|| {
-            let valid: Vec<&str> = Self::ALL.iter().map(|kind| kind.name()).collect();
-            Error::Usage(format!("unknown kind {name:?}; the kinds are {}", valid.join(", ")))
-        })
+        Self::ALL.iter().copied().find(|kind| kind.name() == name).ok_or_else(|| Error::UnknownKind(name.to_string()))
     }
 }
 
@@ -139,7 +136,7 @@ impl AudioFormat {
             "wav" => Ok(Self::Wav),
             "flac" => Ok(Self::Flac),
             "ogg" => Ok(Self::Ogg),
-            other => Err(Error::Usage(format!("unknown audio format {other:?}; the formats are wav, flac and ogg"))),
+            other => Err(Error::UnknownAudioFormat(other.to_string())),
         }
     }
 
@@ -172,7 +169,7 @@ impl Mode {
         match name {
             "raw" => Ok(Self::Raw),
             "modern" => Ok(Self::Modern),
-            other => Err(Error::Usage(format!("unknown mode {other:?}; the modes are raw and modern"))),
+            other => Err(Error::UnknownMode(other.to_string())),
         }
     }
 
@@ -226,7 +223,7 @@ impl Selection {
     pub fn parse(list: &str) -> Result<Self> {
         let kinds = list.split(',').map(str::trim).filter(|name| !name.is_empty()).map(Kind::parse).collect::<Result<Vec<_>>>()?;
         if kinds.is_empty() {
-            return Err(Error::Usage("--only needs at least one kind".into()));
+            return Err(Error::NoKinds);
         }
         Ok(Self { kinds, mode: Mode::Both, audio: AudioFormat::Wav })
     }

@@ -196,7 +196,7 @@ fn retail_joins_and_the_suggestion_scorer() {
         eight_bit_hits += usize::from(depths.contains(&8));
         // Baseline: the first row the texture's own archive wrote, at the suggested depth.
         if let Some(best) = suggestion.best() {
-            let mut rows = suggest::clut_candidates(&vram, &grid.words, grid.width, grid.height, best.depth, archive);
+            let mut rows = suggest::clut_candidates(&vram, suggest::Grid { words: &grid.words, width: grid.width, height: grid.height }, best.depth, archive);
             rows.retain(|row| row.palette.as_entry().is_some_and(|(owner, _)| owner == archive));
             rows.sort_by_key(|row| (row.clut.y, row.clut.x));
             if let Some(first) = rows.first() {

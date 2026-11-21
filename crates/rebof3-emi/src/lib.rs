@@ -57,6 +57,6 @@ pub use crate::emi::{Archive, Entry, TYPE_CUE, TYPE_LZ77};
 pub use crate::emi::{TYPE_VRAM, archives_under, ensure_parent, entry_name, read_entry, type_extension};
 pub use error::{Error, Result};
 #[cfg(feature = "std")]
-pub use manifest::manifest_entries;
+pub use manifest::{ManifestInput, ParsedManifest, manifest_entries, parse_manifest};
 #[cfg(feature = "std")]
-pub use pack::{PackEntry, PackFolderOptions, Payload, glob_match, guess_type, pack, pack_folder, pack_manifest, pack_manifest_from, pack_payloads};
+pub use pack::{PackEntry, PackFolderOptions, PackReport, Payload, glob_match, guess_type, pack, pack_folder, pack_manifest, pack_manifest_from, pack_payloads};

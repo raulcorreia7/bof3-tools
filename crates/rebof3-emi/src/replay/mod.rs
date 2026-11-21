@@ -121,6 +121,19 @@ pub enum Step {
 }
 
 /// A rectangle of VRAM one entry wrote.
+/// A rectangle of VRAM words: the top-left word and the size.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Rect {
+    /// The left edge in words.
+    pub x: usize,
+    /// The top edge in rows.
+    pub y: usize,
+    /// The width in words.
+    pub width: usize,
+    /// The height in rows.
+    pub height: usize,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Region {
     /// Left edge in VRAM words.
@@ -304,11 +317,11 @@ impl Vram {
         self.pending = true;
     }
 
-    /// `LoadImage`: writes `width`×`height` words, row-major, at `x`, `y`, clipped to VRAM.
-    pub fn load_image(&mut self, x: usize, y: usize, width: usize, height: usize, words: &[u16], writer: Writer) {
+    /// `LoadImage`: writes the row-major `words` of `rect`, clipped to VRAM.
+    pub fn load_image(&mut self, rect: Rect, words: &[u16], writer: Writer) {
         let owner = self.owner(writer, Kind::Image);
         let owners = vec![owner; words.len()];
-        self.write_rect(x, y, width, height, words, &owners);
+        self.write_rect(rect.x, rect.y, rect.width, rect.height, words, &owners);
     }
 
     /// The word at column `x`, row `y`, or 0 outside VRAM.
@@ -369,7 +382,8 @@ impl Vram {
 
     /// The texel indices of the `width`×`height` word rectangle at `x`, `y`, read at `depth`,
     /// row-major, `width * depth.texels_per_word()` per row. Words outside VRAM read zero.
-    pub fn texels(&self, x: usize, y: usize, width: usize, height: usize, depth: Depth) -> Vec<u8> {
+    pub fn texels(&self, rect: Rect, depth: Depth) -> Vec<u8> {
+        let Rect { x, y, width, height } = rect;
         let mut indices = Vec::with_capacity(width * height * depth.texels_per_word());
         for row in y..y + height {
             let words: Vec<u16> = (x..x + width).map(|column| self.word(column, row)).collect();
@@ -383,7 +397,8 @@ impl Vram {
     /// texture window. A 4-bit texel is the `u % 4`-th nibble of word `u / 4`, an 8-bit texel the
     /// `u % 2`-th byte of word `u / 2`, low first. Coordinates wrap at the VRAM edges, as the GPU's
     /// do.
-    pub fn fetch(&self, page_x: u16, page_y: u16, clut: Clut, depth: Depth, u: u8, v: u8) -> u16 {
+    pub fn fetch(&self, page: [u16; 2], clut: Clut, depth: Depth, uv: [u8; 2]) -> u16 {
+        let ([page_x, page_y], [u, v]) = (page, uv);
         let per_word = depth.texels_per_word();
         let bits = depth.bits() as usize;
         let x = (usize::from(page_x) + usize::from(u) / per_word) % VRAM_WIDTH;
@@ -551,16 +566,16 @@ mod tests {
     fn a_fetch_reads_a_texel_through_its_clut() {
         let mut vram = Vram::new();
         // Word 0x4321 holds 4-bit texels 1, 2, 3, 4 and 8-bit texels 0x21, 0x43.
-        vram.load_image(320, 256, 1, 1, &[0x4321], Writer::Named("page".into()));
+        vram.load_image(Rect { x: 320, y: 256, width: 1, height: 1 }, &[0x4321], Writer::Named("page".into()));
         let colors: Vec<u16> = (0..256).map(|index| 0x1000 + index).collect();
-        vram.load_image(0, 483, 256, 1, &colors, Writer::Named("clut".into()));
+        vram.load_image(Rect { x: 0, y: 483, width: 256, height: 1 }, &colors, Writer::Named("clut".into()));
         let clut = Clut::new(0, 483).unwrap();
-        assert_eq!(vram.fetch(320, 256, clut, Depth::Four, 0, 0), 0x1001);
-        assert_eq!(vram.fetch(320, 256, clut, Depth::Four, 3, 0), 0x1004);
-        assert_eq!(vram.fetch(320, 256, clut, Depth::Eight, 1, 0), 0x1043);
-        assert_eq!(vram.fetch(320, 256, clut, Depth::Eight, 2, 0), 0x1000, "the next word is unwritten");
-        vram.load_image(0, 0, 1, 1, &[0x0021], Writer::Named("origin".into()));
-        assert_eq!(vram.fetch(1023, 511, clut, Depth::Eight, 2, 1), 0x1021, "u and v wrap to the origin");
+        assert_eq!(vram.fetch([320, 256], clut, Depth::Four, [0, 0]), 0x1001);
+        assert_eq!(vram.fetch([320, 256], clut, Depth::Four, [3, 0]), 0x1004);
+        assert_eq!(vram.fetch([320, 256], clut, Depth::Eight, [1, 0]), 0x1043);
+        assert_eq!(vram.fetch([320, 256], clut, Depth::Eight, [2, 0]), 0x1000, "the next word is unwritten");
+        vram.load_image(Rect { x: 0, y: 0, width: 1, height: 1 }, &[0x0021], Writer::Named("origin".into()));
+        assert_eq!(vram.fetch([1023, 511], clut, Depth::Eight, [2, 1]), 0x1021, "u and v wrap to the origin");
     }
 
     #[test]
@@ -653,14 +668,14 @@ mod tests {
     fn texels_read_a_page_at_a_depth() {
         let mut vram = Vram::new();
         load(&mut vram, "A.EMI", &[upload(0, 0, 0x4321)]);
-        assert_eq!(vram.texels(0, 0, 1, 1, Depth::Four), [1, 2, 3, 4]);
-        assert_eq!(vram.texels(0, 0, 1, 1, Depth::Eight), [0x21, 0x43]);
+        assert_eq!(vram.texels(Rect { x: 0, y: 0, width: 1, height: 1 }, Depth::Four), [1, 2, 3, 4]);
+        assert_eq!(vram.texels(Rect { x: 0, y: 0, width: 1, height: 1 }, Depth::Eight), [0x21, 0x43]);
     }
 
     #[test]
     fn load_image_clips_at_the_right_edge_and_names_its_writer() {
         let mut vram = Vram::new();
-        vram.load_image(1022, 0, 4, 2, &[1, 2, 3, 4, 5, 6, 7, 8], Writer::Named("test".into()));
+        vram.load_image(Rect { x: 1022, y: 0, width: 4, height: 2 }, &[1, 2, 3, 4, 5, 6, 7, 8], Writer::Named("test".into()));
         assert_eq!((vram.word(1022, 0), vram.word(1023, 0), vram.word(1023, 1)), (1, 2, 6));
         assert_eq!(vram.writer(1023, 1), Some(&Writer::Named("test".into())));
     }
