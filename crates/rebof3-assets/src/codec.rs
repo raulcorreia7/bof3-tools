@@ -87,6 +87,29 @@ impl Op {
         self
     }
 
+    /// Runs the conversion after checking that `job` carries what the op takes, and nothing else.
+    pub fn run_checked(&self, kind: &str, job: &Job<'_>) -> Result<Vec<u8>> {
+        let fail = |message: String| Err(crate::error::Error::Job(message));
+        if self.named != job.name.is_some() {
+            return fail(if self.named { self.needs_input.into() } else { format!("the {kind} conversion takes no name") });
+        }
+        match (self.companion_flag, self.files >= 2, job.companion.is_some()) {
+            (Some(flag), _, false) => return fail(flag.missing.into()),
+            (None, true, false) => return fail(self.needs_input.into()),
+            (None, false, true) => return fail(format!("the {kind} conversion takes no companion")),
+            _ => {}
+        }
+        match (self.index, job.index) {
+            (Index::No, Some(_)) => return fail(format!("the {kind} conversion takes no index")),
+            (Index::Required(missing), None) => return fail(missing.into()),
+            _ => {}
+        }
+        if !self.load_arg && job.load_arg.is_some() {
+            return fail(format!("the {kind} conversion takes no load argument"));
+        }
+        (self.run)(job)
+    }
+
     /// The default extension of the output file for `index`.
     pub fn extension_for(&self, index: Option<u32>) -> String {
         self.extension.replace("{index}", &index.unwrap_or(0).to_string())

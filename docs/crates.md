@@ -11,7 +11,7 @@ disc and bundled-names libraries.
 | `rebof3-assets` | The all-assets extractor: classify every file and EMI slot, write a tree. |
 | `rebof3-observe`| Runs the disc on a route in `psx-machine` and records how the game draws each texture. |
 | `rebof3-catalog`| The editor's rules over bytes: the game catalog, the table record layouts, the edit store and the rebuild plan. |
-| `rebof3-render` | Draws field scenes with the GPU's texturing rules, offscreen through OpenGL ES (the `gles` feature) or in software ([ADR 0003](adr/0003-area-3d-rendering.md)). |
+| `psx-render` | Draws field scenes with the GPU's texturing rules, offscreen through OpenGL ES (the `gles` feature) or in software ([ADR 0003](adr/0003-area-3d-rendering.md)). |
 | `rebof3`        | The `bof3` command line; argument parsing and printing only.              |
 
 The C interface is `capi/` (`rebof3-capi`): it wraps the library crates and is not part of the

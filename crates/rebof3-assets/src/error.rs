@@ -34,6 +34,8 @@ pub enum Error {
     UnknownMode(String),
     /// An `--only` list with no kind.
     NoKinds,
+    /// A conversion job that does not fit its op.
+    Job(String),
     /// A worker thread stopped before its work was sent.
     WorkerStopped,
 }
@@ -56,6 +58,7 @@ impl fmt::Display for Error {
             Self::UnknownAudioFormat(name) => write!(f, "unknown audio format {name:?}; the formats are wav, flac and ogg"),
             Self::UnknownMode(name) => write!(f, "unknown mode {name:?}; the modes are raw and modern"),
             Self::NoKinds => f.write_str("--only needs at least one kind"),
+            Self::Job(message) => f.write_str(message),
             Self::WorkerStopped => f.write_str("a worker thread stopped early"),
         }
     }

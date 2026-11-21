@@ -83,6 +83,7 @@ folder's `emi.json`.
 `pack FOLDER -J [FILE]` loads and validates every named entry once, before it reads a payload or
 creates the output. The manifest supplies each entry's type, RAM pointer and the archive version.
 Without `-J`, `pack` guesses the type from the extension and loses the load addresses.
+`extract -J` also writes each entry's `format` and `kind` from the format registry; `pack` ignores them.
 
 - A name that is absolute, has a parent-directory component, is missing, is not a regular file, or
   resolves outside the canonical input folder (a symlink escape) fails the run with exit 2 and a

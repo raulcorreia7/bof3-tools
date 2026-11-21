@@ -15,7 +15,7 @@ It is a Cargo workspace with one CLI, `bof3`, and one editor, `bof3-edit`. Read 
 | `capi/`                  | The C ABI over the library crates                                | [docs/c-api.md](docs/c-api.md)             |
 | `crates/rebof3-catalog/` | The editor's catalog, record layouts and edit store, with no GUI and no file access | [docs/crates.md](docs/crates.md) |
 | `crates/rebof3-observe/` | The disc run on a route: how the game draws each texture       | [docs/crates.md](docs/crates.md#rebof3-observe) |
-| `crates/rebof3-render/`  | Field scenes drawn offscreen with OpenGL ES or in software       | [ADR 0003](docs/adr/0003-area-3d-rendering.md) |
+| `crates/psx-render/`  | Field scenes drawn offscreen with OpenGL ES or in software       | [ADR 0003](docs/adr/0003-area-3d-rendering.md) |
 | `gui/rebof3-editor/`     | The `bof3-edit` asset editor: browse, view and edit EMI entries  | [docs/editor.md](docs/editor.md)           |
 | `Cargo.toml`             | Workspace members and the pinned `bof3player` crates         | [docs/crates.md](docs/crates.md)      |
 | `Makefile`               | `build`, `test`, `format`, `lint`, `check`, `clean`              | `make help`                                |

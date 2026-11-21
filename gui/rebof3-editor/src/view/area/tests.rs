@@ -125,7 +125,7 @@ fn every_retail_area_reads_renders_and_round_trips() {
         let layers = Layers { codes: true, ..Layers::default() };
         let camera = View::overview(&area).camera(&area);
         let scene = model::scene(&area, layers, &camera, None);
-        let frame = rebof3_render::software::draw(&scene, &camera, FRAME.0, FRAME.1);
+        let frame = psx_render::software::draw(&scene, &camera, FRAME.0, FRAME.1);
         let drawn = frame.rgba.chunks(4).filter(|pixel| pixel[..3] != BACKGROUND[..3]).count();
         coverage.rendered += usize::from(drawn > 0);
 

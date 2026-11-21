@@ -4,7 +4,7 @@
 //! The view reads the map bundle and its siblings (the battle grid, the area program's setup stream,
 //! the scene table and the encounter block), the executable's field tables (`SLUS_004.22`) and the
 //! VRAM of the area's own scene ([`model::Area::read`]). It builds a renderer scene
-//! ([`model::scene`]) and draws it offscreen with `rebof3_render` (OpenGL ES when a context opens,
+//! ([`model::scene`]) and draws it offscreen with `psx_render` (OpenGL ES when a context opens,
 //! else the software path), then paints the frame as one image (`docs/adr/0003-area-3d-rendering.md`).
 //!
 //! Every edit writes a whole new payload through [`Editor::rewrite_entry`], so it is one undo step and
@@ -18,12 +18,12 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::{AnyElement, Bounds, Context, Corners, Div, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, RenderImage, ScrollWheelEvent, canvas, div, prelude::*, px};
+use psx_render::{Backend, Camera, Renderer, Scene};
 use rebof3_emi::replay::scenes;
 use rebof3_emi::text::codec::name_text;
 use rebof3_formats::encounter::ENCOUNTER_ENEMIES;
 use rebof3_formats::field::{FACINGS, GAME_CODE};
 use rebof3_formats::map::draw::{Face, TileField};
-use rebof3_render::{Backend, Camera, Renderer, Scene};
 
 use self::model::{Area, Hit, Layers, Sources, View};
 use super::scene::Replayed;
@@ -337,7 +337,7 @@ fn frame_size(width: f32, height: f32) -> (usize, usize) {
 }
 
 /// A frame as an image gpui paints: BGRA rows.
-fn render_image(frame: rebof3_render::Frame) -> Option<Arc<RenderImage>> {
+fn render_image(frame: psx_render::Frame) -> Option<Arc<RenderImage>> {
     let mut bytes = frame.rgba;
     for pixel in bytes.as_chunks_mut::<4>().0 {
         pixel.swap(0, 2);
@@ -393,7 +393,7 @@ fn hit_at(editor: &Editor, position: Point<Pixels>) -> Option<Hit> {
     }
     let x = f32::from(position.x - bounds.origin.x) / width * drawn.size.0 as f32;
     let y = f32::from(position.y - bounds.origin.y) / height * drawn.size.1 as f32;
-    let id = rebof3_render::pick(&drawn.scene, &drawn.camera, drawn.size, [x, y])?;
+    let id = psx_render::pick(&drawn.scene, &drawn.camera, drawn.size, [x, y])?;
     Hit::of_id(id)
 }
 

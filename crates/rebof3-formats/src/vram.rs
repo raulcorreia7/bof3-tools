@@ -3,7 +3,7 @@
 
 use psx_formats::gfx::texture::{self, Clut, Depth, texel_indices};
 use psx_formats::gfx::{clut, png, tim};
-use psx_formats::vram;
+use psx_formats::vram::{self, Placement};
 use rebof3_emi::Entry;
 use rebof3_emi::{TYPE_VRAM, upload};
 
@@ -200,64 +200,13 @@ pub fn texture_tim_of(load_arg: u32, payload: &[u8], clut: ClutRow) -> Result<Ve
 pub fn texture_tim_direct(load_arg: u32, payload: &[u8]) -> Result<Vec<u8>> {
     let descriptor = upload::descriptor(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
-    let place = Placement::of(descriptor);
+    let place = descriptor;
     let tim = tim::File {
         mode: tim::Mode::Fifteen,
         clut: None,
         image: tim::Block { x: place.x(), y: place.y(), width: u16::try_from(grid.width).unwrap_or(u16::MAX), height: u16::try_from(grid.height).unwrap_or(u16::MAX), words: grid.words },
     };
     Ok(tim.write())
-}
-
-/// Where a type-3 upload lands: the three fields of its load argument (`wiki: formats/graphics`). The
-/// upload is whole 32-by-32-word rectangles on a 32-word, 32-row grid, `chunks_per_row` of them to a row.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Placement {
-    /// The first rectangle's column, in 32-word units (6 bits; VRAM holds 32).
-    pub column: u8,
-    /// The first rectangle's row, in 32-row units (5 bits; VRAM holds 16).
-    pub row: u8,
-    /// Rectangles per row.
-    pub chunks_per_row: u8,
-}
-
-/// The bits of a load argument the placement owns: column, row and rectangles per row.
-const PLACEMENT_BITS: u32 = 0x3f1f_3f00;
-
-impl Placement {
-    /// The placement a load argument names.
-    pub fn of(descriptor: vram::Descriptor) -> Self {
-        Self { column: descriptor.column, row: descriptor.row, chunks_per_row: descriptor.chunks_per_row }
-    }
-
-    /// The placement a load argument names.
-    pub fn of_load_argument(load_arg: u32) -> Self {
-        Self::of(upload::descriptor(load_arg))
-    }
-
-    /// The left edge in VRAM words.
-    pub fn x(self) -> u16 {
-        u16::from(self.column) * vram::RECTANGLE_SIDE as u16
-    }
-
-    /// The top edge in VRAM rows.
-    pub fn y(self) -> u16 {
-        u16::from(self.row) * vram::RECTANGLE_SIDE as u16
-    }
-
-    /// `base` with this placement in the bits it owns; every other bit of `base` stays.
-    pub fn load_argument(self, base: u32) -> u32 {
-        base & !PLACEMENT_BITS | u32::from(self.column) << 24 | u32::from(self.row) << 16 | u32::from(self.chunks_per_row) << 8
-    }
-
-    /// The same upload with its top-left rectangle at VRAM `column` and `row` (32-word and 32-row units),
-    /// or `None` when `rectangles` of it would leave the frame buffer.
-    pub fn moved(self, column: u8, row: u8, rectangles: usize) -> Option<Self> {
-        let per_row = usize::from(self.chunks_per_row).max(1);
-        let rows = rectangles.div_ceil(per_row);
-        let fits = usize::from(column) + per_row <= vram::VRAM_WIDTH / vram::RECTANGLE_SIDE && usize::from(row) + rows <= vram::VRAM_HEIGHT / vram::RECTANGLE_SIDE;
-        fits.then_some(Self { column, row, ..self })
-    }
 }
 
 /// The CLUT block of a TIM: its place in VRAM and its color words.
@@ -460,7 +409,7 @@ mod tests {
         let back = import_tim(&tim).unwrap();
         assert_eq!(back.payload, sheet());
         assert_eq!(back.depth, Some(Depth::Four));
-        assert_eq!(back.placement.load_argument(LOAD), LOAD);
+        assert_eq!(upload::load_argument(back.placement, LOAD), LOAD);
         assert_eq!(back.clut.expect("the CLUT").words, row(4));
     }
 
@@ -480,7 +429,7 @@ mod tests {
         file.image.x = 64;
         file.image.y = 32;
         let back = import_tim(&file.write()).unwrap();
-        assert_eq!(back.placement.load_argument(base), 0x0201_0100 | 0x00c0_00ff);
+        assert_eq!(upload::load_argument(back.placement, base), 0x0201_0100 | 0x00c0_00ff);
     }
 
     #[test]
@@ -495,7 +444,7 @@ mod tests {
 
     #[test]
     fn a_move_stays_in_the_frame_buffer() {
-        let place = Placement::of_load_argument(LOAD);
+        let place = upload::descriptor(LOAD);
         assert_eq!(place.moved(30, 14, 2).map(|moved| (moved.column, moved.row)), Some((30, 14)));
         assert_eq!(place.moved(32, 14, 2), None, "column 32 is past the right edge");
         assert_eq!(place.moved(30, 15, 2), None, "two rows from row 15 leave the bottom");

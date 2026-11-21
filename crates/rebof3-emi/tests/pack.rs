@@ -28,7 +28,7 @@ fn repacks_an_extracted_manifest() {
     let extracted = root.join("extracted");
     archive.extract_all(&extracted, true).unwrap();
     let manifest = extracted.join("emi.json");
-    fs::write(&manifest, manifest::to_json(archive.version(), archive.entries(), true)).unwrap();
+    fs::write(&manifest, manifest::to_json(archive.version(), archive.entries(), true, &[])).unwrap();
     let repacked = root.join("repacked.emi");
     pack_manifest(&repacked, &manifest).unwrap();
     assert_eq!(fs::read(repacked).unwrap(), support::fixture());
