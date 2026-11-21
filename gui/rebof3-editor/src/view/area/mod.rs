@@ -393,7 +393,7 @@ fn hit_at(editor: &Editor, position: Point<Pixels>) -> Option<Hit> {
     }
     let x = f32::from(position.x - bounds.origin.x) / width * drawn.size.0 as f32;
     let y = f32::from(position.y - bounds.origin.y) / height * drawn.size.1 as f32;
-    let id = rebof3_render::pick(&drawn.scene, &drawn.camera, drawn.size.0, drawn.size.1, x, y)?;
+    let id = rebof3_render::pick(&drawn.scene, &drawn.camera, drawn.size, [x, y])?;
     Hit::of_id(id)
 }
 

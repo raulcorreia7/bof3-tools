@@ -106,6 +106,50 @@ void main() {
 }
 "#;
 
+/// Why the OpenGL ES backend does not open or draw.
+#[derive(Debug)]
+pub enum GlesError {
+    /// An EGL call failed: what it was doing and EGL's reason.
+    Egl(&'static str, String),
+    /// EGL has no display.
+    NoDisplay,
+    /// EGL has no OpenGL ES 3 configuration.
+    NoConfig,
+    /// OpenGL could not make an object.
+    Object(String),
+    /// A shader does not compile; the driver's log.
+    Shader(String),
+    /// The program does not link; the driver's log.
+    Link(String),
+    /// OpenGL ES reports this error code.
+    Gl(u32),
+    /// The framebuffer object is incomplete.
+    Incomplete,
+}
+
+impl std::fmt::Display for GlesError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Egl(what, reason) => write!(f, "{what}: {reason}"),
+            Self::NoDisplay => f.write_str("EGL has no display"),
+            Self::NoConfig => f.write_str("EGL has no OpenGL ES 3 configuration"),
+            Self::Object(reason) => f.write_str(reason),
+            Self::Shader(log) => write!(f, "a shader does not compile: {log}"),
+            Self::Link(log) => write!(f, "the program does not link: {log}"),
+            Self::Gl(code) => write!(f, "OpenGL ES reports error {code:#06X}"),
+            Self::Incomplete => f.write_str("the framebuffer object is incomplete"),
+        }
+    }
+}
+
+impl std::error::Error for GlesError {}
+
+impl From<String> for GlesError {
+    fn from(reason: String) -> Self {
+        Self::Object(reason)
+    }
+}
+
 /// An open context and what it keeps between frames.
 pub struct Gles {
     egl: egl::DynamicInstance<egl::EGL1_5>,
@@ -124,21 +168,21 @@ pub struct Gles {
 
 impl Gles {
     /// Opens an offscreen OpenGL ES 3.0 context.
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> Result<Self, GlesError> {
         // SAFETY: the library is the platform's EGL, loaded by name; its entry points are the EGL 1.5
         // functions the binding declares.
-        let egl = unsafe { load() }.map_err(|error| format!("EGL is not available: {error}"))?;
+        let egl = unsafe { load() }.map_err(|error| GlesError::Egl("EGL is not available", error.to_string()))?;
         let display = open_display(&egl)?;
-        egl.initialize(display).map_err(|error| format!("EGL does not initialize: {error}"))?;
-        egl.bind_api(egl::OPENGL_ES_API).map_err(|error| format!("EGL has no OpenGL ES: {error}"))?;
+        egl.initialize(display).map_err(|error| GlesError::Egl("EGL does not initialize", error.to_string()))?;
+        egl.bind_api(egl::OPENGL_ES_API).map_err(|error| GlesError::Egl("EGL has no OpenGL ES", error.to_string()))?;
         let attributes = [egl::RENDERABLE_TYPE, egl::OPENGL_ES3_BIT, egl::SURFACE_TYPE, egl::PBUFFER_BIT, egl::NONE];
-        let config = egl.choose_first_config(display, &attributes).map_err(|error| error.to_string())?.ok_or("EGL has no OpenGL ES 3 configuration")?;
-        let context = egl.create_context(display, config, None, &[egl::CONTEXT_MAJOR_VERSION, 3, egl::NONE]).map_err(|error| format!("EGL makes no OpenGL ES 3 context: {error}"))?;
+        let config = egl.choose_first_config(display, &attributes).map_err(|error| GlesError::Egl("EGL has no configuration", error.to_string()))?.ok_or(GlesError::NoConfig)?;
+        let context = egl.create_context(display, config, None, &[egl::CONTEXT_MAJOR_VERSION, 3, egl::NONE]).map_err(|error| GlesError::Egl("EGL makes no OpenGL ES 3 context", error.to_string()))?;
         let surface = if egl.make_current(display, None, None, Some(context)).is_ok() {
             None
         } else {
-            let surface = egl.create_pbuffer_surface(display, config, &[egl::WIDTH, 16, egl::HEIGHT, 16, egl::NONE]).map_err(|error| format!("EGL makes no pbuffer: {error}"))?;
-            egl.make_current(display, Some(surface), Some(surface), Some(context)).map_err(|error| format!("EGL cannot make the context current: {error}"))?;
+            let surface = egl.create_pbuffer_surface(display, config, &[egl::WIDTH, 16, egl::HEIGHT, 16, egl::NONE]).map_err(|error| GlesError::Egl("EGL makes no pbuffer", error.to_string()))?;
+            egl.make_current(display, Some(surface), Some(surface), Some(context)).map_err(|error| GlesError::Egl("EGL cannot make the context current", error.to_string()))?;
             Some(surface)
         };
         // SAFETY: the context is current on this thread, and every name resolves through EGL.
@@ -148,7 +192,7 @@ impl Gles {
     }
 
     /// Compiles the program and makes the VRAM texture and the vertex buffer.
-    unsafe fn build(egl: egl::DynamicInstance<egl::EGL1_5>, display: egl::Display, context: egl::Context, surface: Option<egl::Surface>, gl: Arc<glow::Context>) -> Result<Self, String> {
+    unsafe fn build(egl: egl::DynamicInstance<egl::EGL1_5>, display: egl::Display, context: egl::Context, surface: Option<egl::Surface>, gl: Arc<glow::Context>) -> Result<Self, GlesError> {
         // SAFETY: the caller made the context current.
         unsafe {
             let program = gl.create_program()?;
@@ -157,7 +201,7 @@ impl Gles {
                 gl.shader_source(shader, source);
                 gl.compile_shader(shader);
                 if !gl.get_shader_compile_status(shader) {
-                    return Err(format!("a shader does not compile: {}", gl.get_shader_info_log(shader)));
+                    return Err(GlesError::Shader(gl.get_shader_info_log(shader)));
                 }
                 gl.attach_shader(program, shader);
             }
@@ -166,7 +210,7 @@ impl Gles {
             }
             gl.link_program(program);
             if !gl.get_program_link_status(program) {
-                return Err(format!("the program does not link: {}", gl.get_program_info_log(program)));
+                return Err(GlesError::Link(gl.get_program_info_log(program)));
             }
             let vram = gl.create_texture()?;
             gl.bind_texture(glow::TEXTURE_2D, Some(vram));
@@ -191,13 +235,13 @@ impl Gles {
     }
 
     /// Draws `scene` through `camera` into a `width` x `height` frame.
-    pub fn draw(&mut self, scene: &Scene, camera: &Camera, width: usize, height: usize) -> Result<Frame, String> {
-        self.egl.make_current(self.display, self.surface, self.surface, Some(self.context)).map_err(|error| format!("EGL cannot make the context current: {error}"))?;
+    pub fn draw(&mut self, scene: &Scene, camera: &Camera, width: usize, height: usize) -> Result<Frame, GlesError> {
+        self.egl.make_current(self.display, self.surface, self.surface, Some(self.context)).map_err(|error| GlesError::Egl("EGL cannot make the context current", error.to_string()))?;
         // SAFETY: the context is current, and every object used was made in it.
         unsafe { self.draw_current(scene, camera, width.max(1), height.max(1)) }
     }
 
-    unsafe fn draw_current(&mut self, scene: &Scene, camera: &Camera, width: usize, height: usize) -> Result<Frame, String> {
+    unsafe fn draw_current(&mut self, scene: &Scene, camera: &Camera, width: usize, height: usize) -> Result<Frame, GlesError> {
         // SAFETY: the caller made the context current.
         unsafe {
             let gl = Arc::clone(&self.gl);
@@ -280,7 +324,7 @@ impl Gles {
             }
             let error = gl.get_error();
             if error != glow::NO_ERROR {
-                return Err(format!("OpenGL ES reports error {error:#06X}"));
+                return Err(GlesError::Gl(error));
             }
             // OpenGL's first row is the bottom one.
             let row = width * 4;
@@ -296,7 +340,7 @@ impl Gles {
     }
 
     /// Makes the framebuffer object of the frame's size current.
-    unsafe fn bind_target(&mut self, width: usize, height: usize) -> Result<(), String> {
+    unsafe fn bind_target(&mut self, width: usize, height: usize) -> Result<(), GlesError> {
         // SAFETY: the caller made the context current.
         unsafe {
             let gl = &self.gl;
@@ -322,7 +366,7 @@ impl Gles {
             gl.renderbuffer_storage(glow::RENDERBUFFER, glow::DEPTH_COMPONENT24, width as i32, height as i32);
             gl.framebuffer_renderbuffer(glow::FRAMEBUFFER, glow::DEPTH_ATTACHMENT, glow::RENDERBUFFER, Some(depth));
             if gl.check_framebuffer_status(glow::FRAMEBUFFER) != glow::FRAMEBUFFER_COMPLETE {
-                return Err("the framebuffer object is incomplete".into());
+                return Err(GlesError::Incomplete);
             }
             self.target = Some((width, height, framebuffer, colour, depth));
             Ok(())
@@ -330,7 +374,7 @@ impl Gles {
     }
 
     /// One texture per scene image, for this frame.
-    unsafe fn upload_images(&self, scene: &Scene) -> Result<Vec<glow::Texture>, String> {
+    unsafe fn upload_images(&self, scene: &Scene) -> Result<Vec<glow::Texture>, GlesError> {
         // SAFETY: the caller made the context current.
         unsafe {
             let gl = &self.gl;
@@ -393,7 +437,7 @@ impl Drop for Gles {
 }
 
 /// Loads the platform's EGL library.
-unsafe fn load() -> Result<egl::DynamicInstance<egl::EGL1_5>, String> {
+unsafe fn load() -> Result<egl::DynamicInstance<egl::EGL1_5>, GlesError> {
     let names: &[&str] = if cfg!(windows) { &["libEGL.dll"] } else { &["libEGL.so.1", "libEGL.so"] };
     let mut last = String::from("no library name");
     for name in names {
@@ -403,11 +447,11 @@ unsafe fn load() -> Result<egl::DynamicInstance<egl::EGL1_5>, String> {
             Err(error) => last = format!("{name}: {error}"),
         }
     }
-    Err(last)
+    Err(GlesError::Egl("EGL is not available", last))
 }
 
 /// Mesa's surfaceless display when the platform offers it, else the default display.
-fn open_display(egl: &egl::DynamicInstance<egl::EGL1_5>) -> Result<egl::Display, String> {
+fn open_display(egl: &egl::DynamicInstance<egl::EGL1_5>) -> Result<egl::Display, GlesError> {
     let extensions = egl.query_string(None, egl::EXTENSIONS).map(|text| text.to_string_lossy().into_owned());
     if extensions.is_ok_and(|text| text.contains("EGL_MESA_platform_surfaceless")) {
         // SAFETY: the surfaceless platform takes no native display.
@@ -416,7 +460,7 @@ fn open_display(egl: &egl::DynamicInstance<egl::EGL1_5>) -> Result<egl::Display,
         }
     }
     // SAFETY: the default display needs no native handle.
-    unsafe { egl.get_display(egl::DEFAULT_DISPLAY) }.ok_or_else(|| "EGL has no display".into())
+    unsafe { egl.get_display(egl::DEFAULT_DISPLAY) }.ok_or(GlesError::NoDisplay)
 }
 
 /// Sets the blend equation of the GPU's semi-transparency mode (psx-spx, "GPU Texpage Attribute").

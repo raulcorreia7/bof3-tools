@@ -88,7 +88,7 @@ pub fn prepare(editor: &mut Editor) {
     let (window, window_size) = shown_page
         .map(|page| {
             let size = laid.placement.kind.size();
-            png(&render::window(&font, page, size, laid.placement.framed, usize::MAX, BACKDROP))
+            png(&render::window(&font, page, render::Window { size, framed: laid.placement.framed, glyphs: usize::MAX, backdrop: BACKDROP }))
         })
         .unzip();
     let answers = shown_page.and_then(|page| match &page.end {

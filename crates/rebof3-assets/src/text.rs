@@ -21,7 +21,7 @@ use rebof3_formats::{Format, classify};
 
 use crate::error::{Error, Result};
 use crate::kind::Kind;
-use crate::report::{Report, Row};
+use crate::report::{Failure, Report, Row};
 use source::PayloadSource;
 
 /// Directory of the text tree below the output directory.
@@ -94,7 +94,7 @@ pub fn extract(disc: &Path, out: &Path, write: bool) -> Result<Report> {
 /// Writes what `options` selects.
 pub fn extract_with(options: &Options) -> Result<Report> {
     if !options.disc.is_dir() {
-        return Err(Error::Text(format!("no extracted disc at {}; pass --text-disc DIR with the tree `bof3 disc extract` wrote", options.disc.display())));
+        return Err(Error::NoTextDisc(options.disc.clone()));
     }
     let mut report = Report::default();
     let mut archives = Vec::new();
@@ -111,7 +111,7 @@ pub fn extract_with(options: &Options) -> Result<Report> {
                 dropped += counts.dropped;
                 skipped += counts.skipped;
             }
-            Err(error) => report.failures.push(format!("{source}: {error}")),
+            Err(error) => report.failures.push(Failure::Payload { source, error }),
         }
     }
     if options.modern && options.write {
@@ -189,7 +189,7 @@ fn archive_rows(path: &Path, source: &str, options: &Options, lba: Option<u32>, 
                 continue;
             }
             Err(error) => {
-                report.failures.push(format!("{}#{slot}: {error}", source.source));
+                report.failures.push(Failure::Entry { source: source.source.clone(), slot, error });
                 continue;
             }
         };
@@ -324,7 +324,7 @@ fn write_index(options: &Options, index: &mut [IndexRow], report: &mut Report) -
     index.sort_by(|left, right| (&left.source, &left.id).cmp(&(&right.source, &right.id)));
     let mut jsonl = String::new();
     for row in index.iter() {
-        let line = serde_json::to_string(row).map_err(|error| Error::Text(error.to_string()))?;
+        let line = serde_json::to_string(row).map_err(Error::TextIndex)?;
         jsonl.push_str(&line);
         jsonl.push('\n');
     }

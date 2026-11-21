@@ -23,7 +23,7 @@ use rebof3_formats::{self as classify, Format, classify};
 use crate::decode::derive;
 use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Selection};
-use crate::report::{DERIVED_TABLE, RENDERED_ITEM, Report, Row};
+use crate::report::{DERIVED_TABLE, Failure, RENDERED_ITEM, Report, Row};
 use crate::sound;
 use rebof3_formats::joins::joined_rows_in;
 use rebof3_formats::registry::Site;
@@ -128,7 +128,7 @@ pub fn run(options: &Options) -> Result<Report> {
 }
 
 fn send(sender: &std::sync::mpsc::SyncSender<Job>, source: String, bytes: Vec<u8>) -> Result<()> {
-    sender.send(Job { source, bytes }).map_err(|_| Error::Usage("a worker thread stopped early".into()))
+    sender.send(Job { source, bytes }).map_err(|_| Error::WorkerStopped)
 }
 
 fn worker(receiver: &Mutex<Receiver<Job>>, options: &Options, report: &Mutex<Report>, resident: &[ResidentClutBlock]) {
@@ -139,7 +139,7 @@ fn worker(receiver: &Mutex<Receiver<Job>>, options: &Options, report: &Mutex<Rep
         };
         let mut local = Report::default();
         if let Err(error) = process(&job, options, &mut local, resident) {
-            local.failures.push(format!("{}: {error}", job.source));
+            local.failures.push(Failure::Payload { source: job.source.clone(), error });
         }
         let mut shared = report.lock().expect("report lock");
         shared.rows.append(&mut local.rows);
@@ -361,14 +361,14 @@ fn game_table_rows(job: &Job, entry: &rebof3_emi::Entry, payload: &[u8], options
     let files = match rebof3_formats::game_tables::open::files(payload) {
         Ok(files) => files,
         Err(error) => {
-            report.failures.push(format!("{} entry 0 tables: {error}", job.source));
+            report.failures.push(Failure::GameTables { source: job.source.clone(), error });
             return Ok(());
         }
     };
     let stored = match rebof3_formats::game_tables::open::stored(payload) {
         Ok(stored) => stored,
         Err(error) => {
-            report.failures.push(format!("{} entry 0 tables: {error}", job.source));
+            report.failures.push(Failure::GameTables { source: job.source.clone(), error });
             return Ok(());
         }
     };
@@ -433,7 +433,7 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
     let library = match sound::open(image) {
         Ok(library) => library,
         Err(error) => {
-            report.failures.push(format!("sound: {error}"));
+            report.failures.push(Failure::SoundLibrary(error));
             return Ok(());
         }
     };

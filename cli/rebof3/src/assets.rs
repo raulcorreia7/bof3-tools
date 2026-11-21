@@ -18,7 +18,30 @@ use rebof3_assets::import;
 use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
 use rebof3_assets::sprites;
 use rebof3_assets::text::{self, DEFAULT_DISC};
-use rebof3_assets::{Error, Result};
+
+/// What a `bof3 assets` command reports: a mistake in the command line, or the library's error.
+#[derive(Debug)]
+pub enum Error {
+    Usage(String),
+    Assets(rebof3_assets::Error),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Usage(message) => f.write_str(message),
+            Self::Assets(error) => error.fmt(f),
+        }
+    }
+}
+
+impl<E: Into<rebof3_assets::Error>> From<E> for Error {
+    fn from(error: E) -> Self {
+        Self::Assets(error.into())
+    }
+}
+
+type Result<T, E = Error> = std::result::Result<T, E>;
 use rebof3_formats::map::terrain;
 use rebof3_formats::vab::soundfont;
 use rebof3_formats::vram::TextureImport;
@@ -1067,7 +1090,7 @@ fn import_sprite_sheet(args: &[String]) -> Result<i32> {
 /// The cell sizes from the executable `--exe` names.
 fn sprite_sizes(exe: Option<&Path>, verb: &str) -> Result<sprites::SpriteSizes> {
     let exe = exe.ok_or_else(|| Error::Usage(format!("{verb} needs --exe, the executable SLUS_004.22")))?;
-    sprites::sprite_sizes(&read_file(exe)?)
+    Ok(sprites::sprite_sizes(&read_file(exe)?)?)
 }
 
 /// `bof3 assets import texture PNG [-o OUT] [--palette OUT]`: reads a texture PNG that `export` wrote back
@@ -1431,7 +1454,7 @@ fn add_text(report: &mut rebof3_assets::report::Report, arguments: &Arguments, b
             report.notes.extend(text.notes);
             Ok(())
         }
-        Err(error) if only_text => Err(error),
+        Err(error) if only_text => Err(error.into()),
         Err(error) => {
             report.notes.push(format!("text skipped: {error}"));
             Ok(())

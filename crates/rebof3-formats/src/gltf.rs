@@ -43,12 +43,25 @@ const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 /// Writes a `.glb` with one mesh named `name`. Every vertex has one position and one texture
 /// coordinate, and every index names one of them. Returns `None` when there is no triangle.
 pub fn glb(name: &str, positions: &[[f32; 3]], uvs: &[[f32; 2]], primitives: &[Primitive], materials: &[&str]) -> Option<Vec<u8>> {
-    glb_with(name, positions, uvs, None, primitives, materials, &[])
+    glb_with(name, Geometry { positions, uvs, colours: None }, primitives, materials, &[])
 }
 
-/// Writes a `.glb` like [`glb`], with an RGBA vertex colour per vertex (`COLOR_0`, floats 0 to 1) when
-/// `colours` is given, and `nodes` as more root nodes after the mesh's node.
-pub fn glb_with(name: &str, positions: &[[f32; 3]], uvs: &[[f32; 2]], colours: Option<&[[f32; 4]]>, primitives: &[Primitive], materials: &[&str], nodes: &[Node]) -> Option<Vec<u8>> {
+/// The vertex attributes of a mesh: one position and one texture coordinate each, and an RGBA colour
+/// (`COLOR_0`, floats 0 to 1) when `colours` is given.
+#[derive(Clone, Copy, Debug)]
+pub struct Geometry<'a> {
+    /// One position per vertex.
+    pub positions: &'a [[f32; 3]],
+    /// One texture coordinate per vertex.
+    pub uvs: &'a [[f32; 2]],
+    /// One colour per vertex, if any.
+    pub colours: Option<&'a [[f32; 4]]>,
+}
+
+/// Writes a `.glb` like [`glb`], with `geometry`'s colours when it has them, and `nodes` as more root
+/// nodes after the mesh's node.
+pub fn glb_with(name: &str, geometry: Geometry, primitives: &[Primitive], materials: &[&str], nodes: &[Node]) -> Option<Vec<u8>> {
+    let Geometry { positions, uvs, colours } = geometry;
     if positions.is_empty() || primitives.iter().all(|primitive| primitive.indices.is_empty()) {
         return None;
     }

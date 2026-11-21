@@ -4,7 +4,7 @@
 mod support;
 
 use rebof3_observe::compare::{Verdict, against_rules};
-use rebof3_observe::{Route, disc_sha, run};
+use rebof3_observe::{ObserveInput, Route, disc_sha, run};
 
 /// EMI files the route reads.
 const FILES_READ: usize = 14;
@@ -23,7 +23,7 @@ fn the_new_game_route_proves_texture_depths_and_rows() {
     let Some(image) = support::retail_image() else { return };
     let route = Route::built_in("new-game").expect("the built-in route parses");
     let sha = disc_sha(&image).expect("the disc image hashes");
-    let observation = run(&image, &route, &sha, |_| true).expect("the route runs without a halt");
+    let observation = run(ObserveInput { image: &image, route: &route, disc_sha: &sha }, |_| true).expect("the route runs without a halt");
     eprintln!(
         "{} frames in {:.1} s: {} uploads, {} from an entry, {} textured draws",
         observation.frames, observation.seconds, observation.uploads, observation.attributed_uploads, observation.textured_draws

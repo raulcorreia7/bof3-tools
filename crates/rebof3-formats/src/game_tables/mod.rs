@@ -251,6 +251,23 @@ fn growth(record: &[u8]) -> Growth {
     }
 }
 
+/// A table record that cannot be written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameTableError {
+    /// A growth stat above 15: each is a nibble.
+    GrowthNibble,
+}
+
+impl std::fmt::Display for GameTableError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GrowthNibble => f.write_str("a growth stat is a nibble, from 0 to 15"),
+        }
+    }
+}
+
+impl std::error::Error for GameTableError {}
+
 /// Writes a name into a record: its stored bytes, colour codes included.
 fn put_name(record: &mut [u8], name: &[u8; NAME_BYTES]) {
     record[..NAME_BYTES].copy_from_slice(name);
@@ -261,62 +278,56 @@ fn put_price(record: &mut [u8], at: usize, price: u16) {
 }
 
 /// Writes one item's named bytes into its record. Bytes no field names keep their stored values.
-pub fn put_item(record: &mut [u8], item: &Item) -> std::result::Result<(), String> {
+pub fn put_item(record: &mut [u8], item: &Item) {
     put_name(record, &item.name);
     record[0x0c] = item.flags;
     put_price(record, 0x10, item.price);
-    Ok(())
 }
 
 /// Writes one vital item's name into its record.
-pub fn put_vital_item(record: &mut [u8], item: &VitalItem) -> std::result::Result<(), String> {
+pub fn put_vital_item(record: &mut [u8], item: &VitalItem) {
     put_name(record, &item.name);
-    Ok(())
 }
 
 /// Writes one weapon's named bytes into its record.
-pub fn put_weapon(record: &mut [u8], weapon: &Weapon) -> std::result::Result<(), String> {
+pub fn put_weapon(record: &mut [u8], weapon: &Weapon) {
     put_name(record, &weapon.name);
     record[0x0c] = weapon.equipability;
     record[0x0f] = weapon.element;
     record[0x10] = weapon.weight;
     record[0x12] = weapon.power;
     put_price(record, 0x16, weapon.price);
-    Ok(())
 }
 
 /// Writes one armor piece's named bytes into its record.
-pub fn put_armor(record: &mut [u8], armor: &Armor) -> std::result::Result<(), String> {
+pub fn put_armor(record: &mut [u8], armor: &Armor) {
     put_name(record, &armor.name);
     record[0x0c] = armor.equipability;
     record[0x0e] = armor.equip_type;
     record[0x0f] = armor.weight;
     record[0x10] = armor.power;
     put_price(record, 0x14, armor.price);
-    Ok(())
 }
 
 /// Writes one accessory's named bytes into its record.
-pub fn put_accessory(record: &mut [u8], accessory: &Accessory) -> std::result::Result<(), String> {
+pub fn put_accessory(record: &mut [u8], accessory: &Accessory) {
     put_name(record, &accessory.name);
     record[0x0c] = accessory.equipability;
     record[0x0f] = accessory.weight;
     put_price(record, 0x12, accessory.price);
-    Ok(())
 }
 
 /// Writes one shop's stock into its record.
-pub fn put_shop(record: &mut [u8], shop: &Shop) -> std::result::Result<(), String> {
+pub fn put_shop(record: &mut [u8], shop: &Shop) {
     record[0] = shop.count;
     for (slot, stock) in shop.slots.iter().enumerate() {
         record[1 + 2 * slot] = stock.item_type;
         record[2 + 2 * slot] = stock.item_index;
     }
-    Ok(())
 }
 
 /// Writes one ability's named bytes into its record.
-pub fn put_ability(record: &mut [u8], ability: &Ability) -> std::result::Result<(), String> {
+pub fn put_ability(record: &mut [u8], ability: &Ability) {
     put_name(record, &ability.name);
     record[0x0c] = ability.flags;
     record[0x0d] = ability.r#type;
@@ -324,13 +335,12 @@ pub fn put_ability(record: &mut [u8], ability: &Ability) -> std::result::Result<
     record[0x0f] = ability.power;
     record[0x10] = ability.element;
     record[0x11] = ability.ability_flags;
-    Ok(())
 }
 
 /// Writes one level's growth into its record. The four stats are nibbles, so each must be 15 or less.
-pub fn put_growth(record: &mut [u8], growth: &Growth) -> std::result::Result<(), String> {
+pub fn put_growth(record: &mut [u8], growth: &Growth) -> Result<(), GameTableError> {
     if [growth.power, growth.defense, growth.agility, growth.intellect].iter().any(|&stat| stat > 0x0F) {
-        return Err("a growth stat is a nibble, from 0 to 15".into());
+        return Err(GameTableError::GrowthNibble);
     }
     record[0..2].copy_from_slice(&growth.exp.to_le_bytes());
     record[2] = growth.hp;

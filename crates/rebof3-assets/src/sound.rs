@@ -20,6 +20,7 @@ use psx_cd::ReadSeek;
 
 use crate::error::{Error, Result};
 use crate::kind::{AudioFormat, Kind, Mode};
+use crate::report::Failure;
 
 /// Rendered clips queued per worker before the workers wait for the writer.
 const QUEUE_PER_WORKER: usize = 2;
@@ -64,12 +65,19 @@ pub fn open(image: &Path) -> Result<Library<'static>> {
 /// render on all cores. Each file goes to `emit` in catalog order as soon as it and the
 /// items before it are rendered, so the run holds a few clips at a time. The result is one line
 /// per item that could not be rendered, in catalog order.
-pub fn render(library: &Library<'_>, wanted: impl Fn(Kind) -> bool, mode: Mode, container: AudioFormat, emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<String>> {
+pub fn render(library: &Library<'_>, wanted: impl Fn(Kind) -> bool, mode: Mode, container: AudioFormat, emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<Failure>> {
     let jobs = thread::available_parallelism().map_or(1, NonZeroUsize::get);
     render_with_jobs(library, wanted, mode, container, jobs, emit)
 }
 
-pub(crate) fn render_with_jobs(library: &Library<'_>, wanted: impl Fn(Kind) -> bool, mode: Mode, container: AudioFormat, jobs: usize, mut emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<String>> {
+pub(crate) fn render_with_jobs(
+    library: &Library<'_>,
+    wanted: impl Fn(Kind) -> bool,
+    mode: Mode,
+    container: AudioFormat,
+    jobs: usize,
+    mut emit: impl FnMut(Clip) -> Result<()>,
+) -> Result<Vec<Failure>> {
     let work: Vec<(&Item, Kind)> = library
         .catalog()
         .items()
@@ -80,7 +88,7 @@ pub(crate) fn render_with_jobs(library: &Library<'_>, wanted: impl Fn(Kind) -> b
         .collect();
     let workers = jobs.min(work.len()).max(1);
     let next = AtomicUsize::new(0);
-    let (sender, receiver) = sync_channel::<(usize, std::result::Result<Clip, String>)>(workers * QUEUE_PER_WORKER);
+    let (sender, receiver) = sync_channel::<(usize, std::result::Result<Clip, Failure>)>(workers * QUEUE_PER_WORKER);
     let mut failures = Vec::new();
     thread::scope(|scope| -> Result<()> {
         for _ in 0..workers {
@@ -92,7 +100,7 @@ pub(crate) fn render_with_jobs(library: &Library<'_>, wanted: impl Fn(Kind) -> b
                     let Some(&(item, kind)) = work.get(index) else {
                         return;
                     };
-                    let result = clip(library, item, kind, mode, container).map_err(|error| format!("{}: {error}", item.id));
+                    let result = clip(library, item, kind, mode, container).map_err(|error| Failure::SoundItem { id: item.id.to_string(), error });
                     if sender.send((index, result)).is_err() {
                         return;
                     }
@@ -307,7 +315,7 @@ impl Sounds {
     pub fn pcm(&self, index: usize) -> Result<Pcm> {
         let item = self.catalog_item(index)?;
         if !matches!(item.kind, ItemKind::Sample | ItemKind::Xa) {
-            return Err(Error::Audio(format!("{} has no PCM sample data", item.id)));
+            return Err(Error::NoPcm(item.id.to_string()));
         }
         let mut player = self.library.player(item).map_err(audio)?;
         let samples = player.render_all().map_err(audio)?;
@@ -318,13 +326,13 @@ impl Sounds {
     pub fn midi(&self, index: usize) -> Result<Vec<u8>> {
         let item = self.catalog_item(index)?;
         if item.kind != ItemKind::Music {
-            return Err(Error::Audio(format!("{} is not a music item", item.id)));
+            return Err(Error::NotMusic(item.id.to_string()));
         }
         self.library.export_midi(item).map_err(audio)
     }
 
     fn catalog_item(&self, index: usize) -> Result<&Item> {
-        self.library.catalog().items().get(index).ok_or_else(|| Error::Audio(format!("no sound item {index}")))
+        self.library.catalog().items().get(index).ok_or(Error::NoSoundItem(index))
     }
 }
 
@@ -343,7 +351,7 @@ pub fn sequence_pcm(path: &str, archive: &[u8], sequence: u32, seconds: f64) -> 
         .items()
         .iter()
         .find(|item| item.kind == ItemKind::Music && item.path == path && item.index == sequence)
-        .ok_or_else(|| Error::Audio(format!("{path} has no playable sequence {sequence}")))?;
+        .ok_or_else(|| Error::NoSequence { path: path.to_string(), sequence })?;
     let mut player = library.player(item).map_err(audio)?;
 
     let (sample_rate, channels) = (player.sample_rate(), player.channels());
@@ -362,5 +370,5 @@ pub fn sequence_pcm(path: &str, archive: &[u8], sequence: u32, seconds: f64) -> 
 }
 
 fn audio(error: bof3player::Error) -> Error {
-    Error::Audio(error.to_string())
+    Error::Audio(error)
 }

@@ -149,13 +149,26 @@ pub fn texture_words(load_arg: u32, payload: &[u8]) -> Result<TextureWords> {
 /// The game stores no TIM, but a texture and its palette are what a TIM
 /// holds, so the file is exact: the words are the words the disc stores.
 pub fn texture_tim(load_arg: u32, payload: &[u8], row: &RowUse) -> Result<Vec<u8>> {
-    texture_tim_of(load_arg, payload, row.depth.bits(), &row.words, row.clut.x, row.clut.y)
+    texture_tim_of(load_arg, payload, ClutRow { bits: row.depth.bits(), words: &row.words, x: row.clut.x, y: row.clut.y })
 }
 
-/// The standard PS1 TIM file of a texture drawn with one CLUT row: `bits` is
-/// 4 or 8, `words` is the row's color words, and `clut_x` and `clut_y` are the
-/// row's place in the frame buffer.
-pub fn texture_tim_of(load_arg: u32, payload: &[u8], bits: u32, words: &[u16], clut_x: u16, clut_y: u16) -> Result<Vec<u8>> {
+/// A CLUT row a texture is drawn with: `bits` is 4 or 8, `words` is the row's color words, and `x` and `y` are
+/// the row's place in the frame buffer.
+#[derive(Clone, Copy, Debug)]
+pub struct ClutRow<'a> {
+    /// The texel depth in bits.
+    pub bits: u32,
+    /// The row's color words.
+    pub words: &'a [u16],
+    /// The row's left edge in VRAM words.
+    pub x: u16,
+    /// The row's VRAM line.
+    pub y: u16,
+}
+
+/// The standard PS1 TIM file of a texture drawn with one CLUT row.
+pub fn texture_tim_of(load_arg: u32, payload: &[u8], clut: ClutRow) -> Result<Vec<u8>> {
+    let ClutRow { bits, words, x: clut_x, y: clut_y } = clut;
     let descriptor = vram::Descriptor::from_load_argument(load_arg);
     let grid = vram::word_grid(payload, descriptor)?;
     let mode = match bits {
@@ -436,7 +449,7 @@ mod tests {
 
     #[test]
     fn a_joined_texture_goes_through_a_tim_and_back() {
-        let tim = texture_tim_of(LOAD, &sheet(), 4, &row(4), 160, 483).unwrap();
+        let tim = texture_tim_of(LOAD, &sheet(), ClutRow { bits: 4, words: &row(4), x: 160, y: 483 }).unwrap();
         let file = tim::File::read(&tim).unwrap();
         assert_eq!(file.mode, tim::Mode::Four);
         assert_eq!((file.image.x, file.image.y, file.image.width, file.image.height), (704, 256, 32, 64));

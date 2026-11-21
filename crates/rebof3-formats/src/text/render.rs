@@ -82,8 +82,23 @@ enum Blend {
     Add,
 }
 
-/// Draws the first `glyphs` glyphs of `page` in a window of `size`, over `backdrop`. `framed` draws the frame.
-pub fn window(font: &Font, page: &Page, size: (i32, i32), framed: bool, glyphs: usize, backdrop: [u8; 3]) -> Rgba {
+/// How a window is drawn: its `size`, whether `framed` draws the frame, how many `glyphs` of the page show, and
+/// the `backdrop` colour behind it.
+#[derive(Clone, Copy, Debug)]
+pub struct Window {
+    /// The window's size in pixels.
+    pub size: (i32, i32),
+    /// Whether the frame is drawn.
+    pub framed: bool,
+    /// How many glyphs of the page show.
+    pub glyphs: usize,
+    /// The colour behind the window.
+    pub backdrop: [u8; 3],
+}
+
+/// Draws the first `glyphs` glyphs of `page` in `window`.
+pub fn window(font: &Font, page: &Page, window: Window) -> Rgba {
+    let Window { size, framed, glyphs, backdrop } = window;
     let mut canvas = Canvas::new(size.0 + 2 * MARGIN, size.1 + 2 * MARGIN, backdrop);
     if framed {
         frame(font, &mut canvas, size);

@@ -116,7 +116,11 @@ impl From<rebof3_assets::Error> for Failure {
                 Self { status, message: inner.to_string() }
             }
             rebof3_assets::Error::Formats(inner) => Self::from(inner),
-            rebof3_assets::Error::Usage(message) | rebof3_assets::Error::Text(message) => Self { status: rebof3_status::Usage, message },
+            rebof3_assets::Error::UnknownKind(_)
+            | rebof3_assets::Error::UnknownAudioFormat(_)
+            | rebof3_assets::Error::UnknownMode(_)
+            | rebof3_assets::Error::NoKinds
+            | rebof3_assets::Error::NoTextDisc(_) => Self { status: rebof3_status::Usage, message: error.to_string() },
             other => Self { status: rebof3_status::Format, message: other.to_string() },
         }
     }
