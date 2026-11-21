@@ -10,10 +10,14 @@ fn the_committed_header_is_current() {
     let mut generated = Vec::new();
     bindings.write(&mut generated);
     let header = manifest.join("include/rebof3_capi.h");
+    let shared = manifest.join("include/psx_capi.h");
     if std::env::var_os("UPDATE_HEADER").is_some() {
         std::fs::write(&header, &generated).expect("header written");
+        std::fs::write(&shared, psx_capi::HEADER).expect("shared header written");
         return;
     }
+    let committed_shared = std::fs::read_to_string(&shared).expect("the shared header is readable").replace("\r\n", "\n");
+    assert_eq!(committed_shared, psx_capi::HEADER, "include/psx_capi.h is stale; run `UPDATE_HEADER=1 cargo test -p rebof3-capi --test header`");
     let generated = String::from_utf8(generated).expect("cbindgen writes UTF-8");
     // A Windows checkout may hold the header with CRLF; the generator writes LF.
     let committed = std::fs::read_to_string(&header).expect("the committed header is readable").replace("\r\n", "\n");

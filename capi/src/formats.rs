@@ -5,10 +5,8 @@ use std::sync::LazyLock;
 
 use rebof3_formats::Format;
 
-use crate::emi::{entry_from_view, rebof3_emi_entry};
-use crate::error::{Failure, guarded, invalid, rebof3_status, unsupported};
-use crate::ffi::{array, input, out_ref, utf8};
-use crate::rebof3_buffer;
+use crate::error::{Failure, guarded, invalid, unsupported};
+use psx_capi::{array, free_buffer, handle_ref, input, out_ref, owned_buffer, psx_buffer, psx_emi_entry, psx_status, utf8};
 
 /// The format of one entry, in the registry's order.
 #[repr(C)]
@@ -67,6 +65,8 @@ impl rebof3_format {
 }
 
 /// What one format is: its names, its state and the asset kind it is written under.
+///
+/// Borrowed: the strings are NUL-terminated and live for the process.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct rebof3_format_info {
@@ -78,12 +78,11 @@ pub struct rebof3_format_info {
     pub kind: *const c_char,
 }
 
-/// The PNG and JSON of a character sprite sheet.
+/// The PNG and JSON of a character sprite sheet. Free it with `rebof3_sprite_sheet_free`.
 #[repr(C)]
-#[derive(Debug)]
 pub struct rebof3_sprite_sheet {
-    pub json: rebof3_buffer,
-    pub png: rebof3_buffer,
+    pub json: psx_buffer,
+    pub png: psx_buffer,
 }
 
 const FORMAT_COUNT: usize = 21;
@@ -106,7 +105,6 @@ struct InfoStrings {
     kind: CString,
 }
 
-/// The NUL-terminated metadata of every format, valid for the process.
 static INFO_STRINGS: LazyLock<[InfoStrings; FORMAT_COUNT]> = LazyLock::new(|| {
     std::array::from_fn(|index| {
         let description = Format::ALL[index].describe();
@@ -127,26 +125,23 @@ static INFO_STRINGS: LazyLock<[InfoStrings; FORMAT_COUNT]> = LazyLock::new(|| {
 /// `entry` must be a readable record and `payload` must point to `payload_len` readable bytes;
 /// `out_format` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_format_classify(entry: *const rebof3_emi_entry, payload: *const u8, payload_len: usize, out_format: *mut rebof3_format) -> rebof3_status {
-    match guarded(|| {
-        let entry = unsafe { entry.as_ref() }.ok_or_else(|| invalid("the entry pointer is NULL"))?;
+pub unsafe extern "C" fn rebof3_format_classify(entry: *const psx_emi_entry, payload: *const u8, payload_len: usize, out_format: *mut rebof3_format) -> psx_status {
+    guarded(|| {
+        let entry = unsafe { handle_ref(entry, "entry")? };
         let payload = unsafe { input(payload, payload_len, "payload")? };
         let out_format = unsafe { out_ref(out_format, "out_format")? };
-        *out_format = format_value(rebof3_formats::classify(&entry_from_view(entry), payload));
+        *out_format = format_value(rebof3_formats::classify(&rebof3_emi::Entry::from(entry), payload));
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
-/// Reads one format's metadata. The strings are static and NUL-terminated.
+/// Reads one format's metadata.
 ///
 /// # Safety
 /// `out_info` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_format_info_of(format: rebof3_format, out_info: *mut rebof3_format_info) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_format_describe(format: rebof3_format, out_info: *mut rebof3_format_info) -> psx_status {
+    guarded(|| {
         let index = format as usize;
         let _ = format_of(format)?;
         let out_info = unsafe { out_ref(out_info, "out_info")? };
@@ -160,161 +155,150 @@ pub unsafe extern "C" fn rebof3_format_info_of(format: rebof3_format, out_info: 
             kind: info.kind.as_ptr(),
         };
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes the 16 bpp PNG view of a type-3 VRAM upload.
 ///
 /// # Safety
-/// `payload` must point to `payload_len` readable bytes and `out` must be writable.
+/// `payload` must point to `payload_len` readable bytes and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_texture_png(load_arg: u32, payload: *const u8, payload_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_texture_export_png(load_arg: u32, payload: *const u8, payload_len: usize, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let payload = unsafe { input(payload, payload_len, "payload")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::vram::texture_view_png(load_arg, payload)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::vram::texture_view_png(load_arg, payload)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes the 15 bpp TIM file of a type-3 VRAM upload.
 ///
 /// # Safety
-/// `payload` must point to `payload_len` readable bytes and `out` must be writable.
+/// `payload` must point to `payload_len` readable bytes and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_texture_tim(load_arg: u32, payload: *const u8, payload_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_texture_export_tim(load_arg: u32, payload: *const u8, payload_len: usize, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let payload = unsafe { input(payload, payload_len, "payload")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::vram::texture_tim_direct(load_arg, payload)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::vram::texture_tim_direct(load_arg, payload)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes the indexed PNG of a texture read in one palette row.
 ///
 /// # Safety
 /// `payload` must point to `payload_len` readable bytes, `palette` must point to `palette_len`
-/// readable 16-bit words, and `out` must be writable.
+/// readable 16-bit words, and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_texture_row_png(load_arg: u32, payload: *const u8, payload_len: usize, bits: u32, palette: *const u16, palette_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_texture_export_row_png(
+    load_arg: u32,
+    payload: *const u8,
+    payload_len: usize,
+    bits: u32,
+    palette: *const u16,
+    palette_len: usize,
+    out_bytes: *mut psx_buffer,
+) -> psx_status {
+    guarded(|| {
         let payload = unsafe { input(payload, payload_len, "payload")? };
         let palette = unsafe { array(palette, palette_len, "palette")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::vram::texture_row_png(load_arg, payload, bits, palette)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::vram::texture_row_png(load_arg, payload, bits, palette)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes the JSON of a CLUT block.
 ///
 /// # Safety
-/// `payload` must point to `payload_len` readable bytes and `out` must be writable.
+/// `payload` must point to `payload_len` readable bytes and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_palette_json(payload: *const u8, payload_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_palette_export_json(payload: *const u8, payload_len: usize, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let payload = unsafe { input(payload, payload_len, "payload")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::clut::export(payload)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::clut::export(payload)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes the swatch-strip PNG of a CLUT block.
 ///
 /// # Safety
-/// `payload` must point to `payload_len` readable bytes and `out` must be writable.
+/// `payload` must point to `payload_len` readable bytes and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_palette_swatch_png(payload: *const u8, payload_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_palette_export_swatch(payload: *const u8, payload_len: usize, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let payload = unsafe { input(payload, payload_len, "payload")? };
-        let out = unsafe { out_ref(out, "out")? };
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
         let derive = Format::ClutBlock.describe().derive.ok_or_else(|| unsupported("the CLUT block format has no derived files"))?;
         let png = derive(0, payload)?.into_iter().find(|file| file.role == "png").ok_or_else(|| unsupported("the CLUT block format has no PNG"))?;
-        *out = rebof3_buffer::from_vec(png.data);
+        *out_bytes = owned_buffer(png.data);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes one VAG stream as a 44.1 kHz mono 16-bit WAVE file.
 ///
 /// # Safety
-/// `vag` must point to `vag_len` readable bytes and `out` must be writable.
+/// `vag` must point to `vag_len` readable bytes and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_vag_wav(vag: *const u8, vag_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_vag_export_wav(vag: *const u8, vag_len: usize, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let vag = unsafe { input(vag, vag_len, "vag")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::vab::vag::vag_wav(vag)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::vab::vag::vag_wav(vag)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes one sample of a VAB bank as a 44.1 kHz mono 16-bit WAVE file.
 ///
 /// # Safety
-/// `header` and `body` must point to their readable lengths and `out` must be writable.
+/// `header` and `body` must point to their readable lengths and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_vab_vag_wav(header: *const u8, header_len: usize, body: *const u8, body_len: usize, index: u32, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_vab_export_wav(header: *const u8, header_len: usize, body: *const u8, body_len: usize, index: u32, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let header = unsafe { input(header, header_len, "header")? };
         let body = unsafe { input(body, body_len, "body")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::vab::vag::vab_vag_wav(header, body, index)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::vab::vag::vab_vag_wav(header, body, index)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes a VAB bank as a SoundFont 2 file.
 ///
 /// # Safety
 /// `header` and `body` must point to their readable lengths, `title` must point to `title_len`
-/// readable UTF-8 bytes, and `out` must be writable.
+/// readable UTF-8 bytes, and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_soundfont(header: *const u8, header_len: usize, body: *const u8, body_len: usize, title: *const c_char, title_len: usize, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_vab_export_soundfont(
+    header: *const u8,
+    header_len: usize,
+    body: *const u8,
+    body_len: usize,
+    title: *const c_char,
+    title_len: usize,
+    out_bytes: *mut psx_buffer,
+) -> psx_status {
+    guarded(|| {
         let header = unsafe { input(header, header_len, "header")? };
         let body = unsafe { input(body, body_len, "body")? };
         let title = unsafe { utf8(title, title_len, "title")? };
-        let out = unsafe { out_ref(out, "out")? };
-        *out = rebof3_buffer::from_vec(rebof3_formats::vab::soundfont::export(header, body, title)?);
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
+        *out_bytes = owned_buffer(rebof3_formats::vab::soundfont::export(header, body, title)?);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Writes the PNG and JSON of one character sprite section.
 ///
 /// # Safety
 /// `sprites` and `executable` must point to their readable lengths, `image_name` must point to
-/// `image_name_len` readable UTF-8 bytes, and `out` must be writable.
+/// `image_name_len` readable UTF-8 bytes, and `out_sheet` must be writable.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rebof3_sprite_sheet_export(
     sprites: *const u8,
@@ -325,38 +309,30 @@ pub unsafe extern "C" fn rebof3_sprite_sheet_export(
     palette: u32,
     image_name: *const c_char,
     image_name_len: usize,
-    out: *mut rebof3_sprite_sheet,
-) -> rebof3_status {
-    match guarded(|| {
+    out_sheet: *mut rebof3_sprite_sheet,
+) -> psx_status {
+    guarded(|| {
         let sprites = unsafe { input(sprites, sprites_len, "sprites")? };
         let executable = unsafe { input(executable, executable_len, "executable")? };
         let image_name = unsafe { utf8(image_name, image_name_len, "image_name")? };
-        let out = unsafe { out_ref(out, "out")? };
+        let out_sheet = unsafe { out_ref(out_sheet, "out_sheet")? };
         let sprites = rebof3_formats::sprite::decode(sprites)?;
         let sizes = rebof3_formats::sprite::SpriteSizes::from_executable(executable)?;
         let sheet = rebof3_formats::sprite::export(&sprites, section as usize, palette as usize, &sizes, image_name)?;
-        *out = rebof3_sprite_sheet { json: rebof3_buffer::from_vec(sheet.json), png: rebof3_buffer::from_vec(sheet.png) };
+        *out_sheet = rebof3_sprite_sheet { json: owned_buffer(sheet.json), png: owned_buffer(sheet.png) };
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
-/// Releases the two buffers of a sprite sheet.
+/// Frees the two buffers of a sprite sheet and zeroes them.
 ///
 /// # Safety
 /// `sheet` must be NULL or a sheet this library returned, not yet freed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rebof3_sprite_sheet_free(sheet: *mut rebof3_sprite_sheet) {
-    if sheet.is_null() {
-        return;
-    }
-    let sheet = unsafe { &mut *sheet };
-    unsafe {
-        crate::release_buffer(&mut sheet.json);
-        crate::release_buffer(&mut sheet.png);
-    }
+    let Some(sheet) = (unsafe { sheet.as_mut() }) else { return };
+    free_buffer(&mut sheet.json);
+    free_buffer(&mut sheet.png);
 }
 
 #[cfg(test)]

@@ -9,14 +9,13 @@ use assets_lib::codec::{self, Direction, Index};
 use assets_lib::kind::{AudioFormat, Kind, Mode, Selection};
 use assets_lib::report::Report;
 
-use crate::error::{Failure, guarded, invalid, rebof3_status, unsupported, usage};
-use crate::ffi::{input, optional_out, optional_utf8, out_ref, utf8};
-use crate::{rebof3_buffer, rebof3_string};
+use psx_capi::{handle_ref, input, opt_out, opt_utf8, out_ref, owned_buffer, owned_string, psx_buffer, psx_status, psx_string, utf8};
+
+use crate::error::{Failure, guarded, invalid, unsupported, usage};
 
 /// The direction of a codec conversion.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-// The variants are passed in from C, which the Rust dead-code pass cannot see.
 #[allow(dead_code)]
 pub enum rebof3_direction {
     Export = 0,
@@ -35,7 +34,6 @@ pub enum rebof3_index {
 /// Which outputs an extraction writes.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-// The variants are passed in from C, which the Rust dead-code pass cannot see.
 #[allow(dead_code)]
 pub enum rebof3_mode {
     Both = 0,
@@ -46,7 +44,6 @@ pub enum rebof3_mode {
 /// The container rendered audio is written in.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-// The variants are passed in from C, which the Rust dead-code pass cannot see.
 #[allow(dead_code)]
 pub enum rebof3_audio {
     Wav = 0,
@@ -55,6 +52,8 @@ pub enum rebof3_audio {
 }
 
 /// The files and options of one codec conversion.
+///
+/// Borrowed: read during the call only.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct rebof3_assets_job {
@@ -69,18 +68,22 @@ pub struct rebof3_assets_job {
 }
 
 /// One codec and the direction's requirements.
+///
+/// Borrowed: the strings live for the process.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct rebof3_assets_codec {
     pub kind: *const c_char,
     pub files: u32,
-    pub named: u32,
-    pub load_arg: u32,
+    pub named: bool,
+    pub load_arg: bool,
     pub index: rebof3_index,
     pub extension: *const c_char,
 }
 
 /// The inputs and outputs of an asset extraction.
+///
+/// Borrowed: read during the call only. `jobs` 0 uses every core; `write` false plans the run.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct rebof3_assets_options {
@@ -94,8 +97,7 @@ pub struct rebof3_assets_options {
     pub text_disc_len: usize,
     pub mode: rebof3_mode,
     pub audio: rebof3_audio,
-    pub write: u32,
-    pub reserved: u32,
+    pub write: bool,
     pub jobs: usize,
 }
 
@@ -163,27 +165,24 @@ unsafe fn optional_u32(pointer: *const u32) -> Option<u32> {
 /// # Safety
 /// `out_count` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_assets_codec_count(out_count: *mut usize) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_assets_codec_count(out_count: *mut usize) -> psx_status {
+    guarded(|| {
         let out_count = unsafe { out_ref(out_count, "out_count")? };
         *out_count = codec::CODECS.len();
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Reads one codec's requirements in one direction.
 ///
 /// # Safety
-/// `kind` must point to `kind_len` readable UTF-8 bytes and `out` must be writable.
+/// `kind` must point to `kind_len` readable UTF-8 bytes and `out_codec` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_assets_codec_info(kind: *const c_char, kind_len: usize, direction: rebof3_direction, out: *mut rebof3_assets_codec) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_assets_codec_info(kind: *const c_char, kind_len: usize, direction: rebof3_direction, out_codec: *mut rebof3_assets_codec) -> psx_status {
+    guarded(|| {
         let kind = unsafe { utf8(kind, kind_len, "kind")? };
         let direction = direction_of(direction);
-        let out = unsafe { out_ref(out, "out")? };
+        let out_codec = unsafe { out_ref(out_codec, "out_codec")? };
         let codec = codec::find(kind).ok_or_else(|| unsupported(format!("no codec named {kind:?}")))?;
         let op = codec.op(direction).ok_or_else(|| unsupported(format!("{kind:?} has no {} conversion", direction_name(direction))))?;
         let position = codec::CODECS.iter().position(|candidate| candidate.kind == codec.kind).expect("find returns a codec of CODECS");
@@ -193,40 +192,37 @@ pub unsafe extern "C" fn rebof3_assets_codec_info(kind: *const c_char, kind_len:
             Direction::Import => strings.import.as_ref(),
         }
         .expect("the op exists");
-        *out = rebof3_assets_codec {
+        *out_codec = rebof3_assets_codec {
             kind: strings.kind.as_ptr(),
             files: u32::try_from(op.files).unwrap_or(u32::MAX),
-            named: u32::from(op.named),
-            load_arg: u32::from(op.load_arg),
+            named: op.named,
+            load_arg: op.load_arg,
             index: index_value(op.index),
             extension: extension.as_ptr(),
         };
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Runs one codec conversion from the supplied bytes.
 ///
 /// # Safety
 /// `kind` must point to `kind_len` readable UTF-8 bytes, `job` must be a readable job whose
-/// pointers are readable for their lengths, and `out` must be writable.
+/// pointers are readable for their lengths, and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: usize, direction: rebof3_direction, job: *const rebof3_assets_job, out: *mut rebof3_buffer) -> rebof3_status {
-    match guarded(|| {
+pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: usize, direction: rebof3_direction, job: *const rebof3_assets_job, out_bytes: *mut psx_buffer) -> psx_status {
+    guarded(|| {
         let kind = unsafe { utf8(kind, kind_len, "kind")? };
         let direction = direction_of(direction);
-        let job = unsafe { job.as_ref() }.ok_or_else(|| invalid("the job pointer is NULL"))?;
-        let out = unsafe { out_ref(out, "out")? };
+        let job = unsafe { handle_ref(job, "job")? };
+        let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
         let codec = codec::find(kind).ok_or_else(|| unsupported(format!("no codec named {kind:?}")))?;
         let op = codec.op(direction).ok_or_else(|| unsupported(format!("{kind:?} has no {} conversion", direction_name(direction))))?;
         if job.input.is_null() {
             return Err(invalid(op.needs_input));
         }
         let input_bytes = unsafe { input(job.input, job.input_len, "job input")? };
-        let name = unsafe { optional_utf8(job.name, job.name_len, "job name")? };
+        let name = unsafe { opt_utf8(job.name, job.name_len, "job name")? };
         let companion = if job.companion.is_null() && job.companion_len == 0 { None } else { Some(unsafe { input(job.companion, job.companion_len, "job companion")? }) };
         let index = unsafe { optional_u32(job.index) };
         let load_arg = unsafe { optional_u32(job.load_arg) };
@@ -259,12 +255,9 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
         }
         let job = codec::Job { name, input: input_bytes, companion, index, load_arg };
         let bytes = (op.run)(&job)?;
-        *out = rebof3_buffer::from_vec(bytes);
+        *out_bytes = owned_buffer(bytes);
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }
 
 /// Runs the extraction `options` select and returns its `assets.jsonl` and summary text.
@@ -274,8 +267,8 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
 unsafe fn extract_report(options: &rebof3_assets_options) -> Result<(String, String), Failure> {
     let image = unsafe { utf8(options.image_path, options.image_path_len, "image_path")? };
     let out_dir = unsafe { utf8(options.output_dir, options.output_dir_len, "output_dir")? };
-    let kinds = unsafe { optional_utf8(options.kinds, options.kinds_len, "kinds")? };
-    let text_disc = unsafe { optional_utf8(options.text_disc, options.text_disc_len, "text_disc")? };
+    let kinds = unsafe { opt_utf8(options.kinds, options.kinds_len, "kinds")? };
+    let text_disc = unsafe { opt_utf8(options.text_disc, options.text_disc_len, "text_disc")? };
     let selection = match kinds {
         Some(kinds) => Selection::parse(kinds)?,
         None => Selection::all(),
@@ -286,7 +279,7 @@ unsafe fn extract_report(options: &rebof3_assets_options) -> Result<(String, Str
         return Err(usage("the text kind needs text_disc"));
     }
     let wants_text = if kinds.is_some() { explicit_text } else { text_disc.is_some() };
-    let write = options.write != 0;
+    let write = options.write;
     let out = PathBuf::from(out_dir);
     let image = PathBuf::from(image);
     let jobs = if options.jobs == 0 { std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) } else { options.jobs };
@@ -309,14 +302,10 @@ unsafe fn extract_report(options: &rebof3_assets_options) -> Result<(String, Str
         report.notes.extend(text.notes);
     }
     report.sort();
-    let jsonl = report.jsonl();
-    let summary = report.summary();
     if write {
-        std::fs::create_dir_all(&out)?;
-        std::fs::write(out.join(assets_lib::extract::TABLE_FILE), &jsonl)?;
-        std::fs::write(out.join(assets_lib::extract::SUMMARY_FILE), &summary)?;
+        report.write_tables(&out)?;
     }
-    Ok((jsonl, summary))
+    Ok((report.jsonl(), report.summary()))
 }
 
 /// Runs the selected asset extraction and returns its `assets.jsonl` and summary.
@@ -325,21 +314,18 @@ unsafe fn extract_report(options: &rebof3_assets_options) -> Result<(String, Str
 /// `options` must be a readable options record whose pointers are readable for their lengths;
 /// the out pointers may be NULL to skip that result.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_assets_extract(options: *const rebof3_assets_options, report_jsonl: *mut rebof3_string, summary: *mut rebof3_string) -> rebof3_status {
-    match guarded(|| {
-        let options = unsafe { options.as_ref() }.ok_or_else(|| invalid("the options pointer is NULL"))?;
-        let report_out = unsafe { optional_out(report_jsonl) };
-        let summary_out = unsafe { optional_out(summary) };
+pub unsafe extern "C" fn rebof3_assets_extract(options: *const rebof3_assets_options, out_report: *mut psx_string, out_summary: *mut psx_string) -> psx_status {
+    guarded(|| {
+        let options = unsafe { handle_ref(options, "options")? };
+        let report_out = unsafe { opt_out(out_report) };
+        let summary_out = unsafe { opt_out(out_summary) };
         let (jsonl, summary) = unsafe { extract_report(options)? };
         if let Some(report_out) = report_out {
-            *report_out = rebof3_string::from_string(jsonl);
+            *report_out = owned_string(jsonl);
         }
         if let Some(summary_out) = summary_out {
-            *summary_out = rebof3_string::from_string(summary);
+            *summary_out = owned_string(summary);
         }
         Ok(())
-    }) {
-        Ok(()) => rebof3_status::Ok,
-        Err(status) => status,
-    }
+    })
 }

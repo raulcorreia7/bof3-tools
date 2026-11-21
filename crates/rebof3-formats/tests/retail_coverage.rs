@@ -19,11 +19,11 @@ const ARCHIVES: usize = 880;
 const CODEC_ENTRIES: usize = 4_955;
 const CODEC_BYTES: u64 = 213_643_148;
 /// Entries and bytes whose layout is documented without a codec.
-const SPECIFIED_ENTRIES: usize = 788;
-const SPECIFIED_BYTES: u64 = 21_400_121;
-/// The remainder: no entry without an owner, the code images, the reservations.
-const UNKNOWN_ENTRIES: usize = 0;
-const UNKNOWN_BYTES: u64 = 0;
+const SPECIFIED_ENTRIES: usize = 785;
+const SPECIFIED_BYTES: u64 = 21_295_349;
+/// The remainder: the three `BMAGIC/KAIZAR_*` blocks, the code images, the reservations.
+const UNKNOWN_ENTRIES: usize = 3;
+const UNKNOWN_BYTES: u64 = 104_772;
 const CODE_ENTRIES: usize = 548;
 const CODE_BYTES: u64 = 14_694_370;
 const RESERVE_ENTRIES: usize = 53;

@@ -8,7 +8,7 @@ unsafe extern "C" {
 
 #[test]
 fn the_c_smoke_test_passes() {
-    assert_eq!(rebof3_capi::smoke_anchor(), 1);
+    assert_eq!(rebof3_capi::smoke_anchor(), 2);
     let status = unsafe { rebof3_smoke_run() };
     assert_eq!(status, 0, "the C smoke test failed");
 }

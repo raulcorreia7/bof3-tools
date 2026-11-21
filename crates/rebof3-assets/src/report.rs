@@ -132,6 +132,13 @@ impl Report {
         out
     }
 
+    /// Writes [`crate::extract::TABLE_FILE`] and [`crate::extract::SUMMARY_FILE`] into `directory`.
+    pub fn write_tables(&self, directory: &std::path::Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(directory)?;
+        std::fs::write(directory.join(crate::extract::TABLE_FILE), self.jsonl())?;
+        std::fs::write(directory.join(crate::extract::SUMMARY_FILE), self.summary())
+    }
+
     /// Payloads per kind. A payload with several outputs counts once.
     fn payloads(&self) -> BTreeMap<Kind, Tally> {
         let mut tallies: BTreeMap<Kind, Tally> = BTreeMap::new();

@@ -448,7 +448,8 @@ mod tests {
                     editor.archive.as_ref().expect("the archive loads").formats.clone()
                 });
                 if name == "noise" && archive == ARCHIVE {
-                    for format in Format::ALL.iter().filter(|format| **format != Format::Reserve) {
+                    // Noise holds no palette tables, so it never classifies as character sprites.
+                    for format in Format::ALL.iter().filter(|format| !matches!(format, Format::Reserve | Format::CharacterSprites)) {
                         assert!(formats.contains(format), "{format:?} has no entry");
                     }
                 }
