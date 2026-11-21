@@ -9,6 +9,7 @@
 resolver = "3"
 members = [
     "capi",
+    "crates/rebof3-catalog",
     "crates/rebof3-emi",
     "crates/rebof3-formats",
     "crates/rebof3-assets",
@@ -34,6 +35,7 @@ categories = ["command-line-utilities", "game-development", "parser-implementati
 publish = false
 
 [workspace.dependencies]
+rebof3-catalog = { path = "crates/rebof3-catalog", version = "0.1.0" }
 rebof3-formats = { path = "crates/rebof3-formats", version = "0.2.0" }
 rebof3-assets = { path = "crates/rebof3-assets", version = "0.2.0" }
 rebof3-observe = { path = "crates/rebof3-observe", version = "0.1.0" }

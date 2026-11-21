@@ -371,7 +371,7 @@ fn shown_area(editor: &mut Editor) -> Option<Rc<Area>> {
 /// Keeps the scene replay current across an edit of this view: the view writes the bundle, the battle
 /// grid, the area program and the encounter block, and the replay reads none of them for the VRAM.
 fn keep_replay(editor: &mut Editor, before: u64) {
-    let after = editor.project.as_ref().map_or(before, Project::revision);
+    let after = editor.project.as_ref().map_or(before, |project| project.revision());
     if let Some((_, revision)) = editor.views.area.sources.replay.as_mut()
         && *revision == before
     {
@@ -380,7 +380,7 @@ fn keep_replay(editor: &mut Editor, before: u64) {
 }
 
 fn revision(editor: &Editor) -> u64 {
-    editor.project.as_ref().map_or(0, Project::revision)
+    editor.project.as_ref().map_or(0, |project| project.revision())
 }
 
 /// What is under a window position.

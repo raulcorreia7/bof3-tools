@@ -256,7 +256,7 @@ impl Editor {
 
     /// Whether the project holds edits the project folder does not.
     pub fn has_unsaved_edits(&self) -> bool {
-        self.project.as_ref().is_some_and(Project::is_dirty)
+        self.project.as_ref().is_some_and(|project| project.is_dirty())
     }
 
     /// Runs `then` when no edit would be lost: at once when every edit is saved, otherwise after the user

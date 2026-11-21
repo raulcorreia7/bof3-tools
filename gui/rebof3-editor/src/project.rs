@@ -4,83 +4,40 @@
 //! The disc files are only ever read. An edit is the whole new payload of one entry, kept in memory and
 //! saved as `edits/<archive>/<index>.bin` in the project folder. A placement edit is a new load argument for
 //! one entry (where a texture or palette lands in VRAM), saved as `edits/<archive>/<index>.load` in hex.
-//! Export rebuilds each edited archive with [`rebof3_emi::pack::rebuild_placed`] into `disc/<archive>` in
+//! The edit store is [`Edits`]; this is its shell: the disc folder, the cache of read archives and the files of the
+//! project folder. Export rebuilds each edited archive with [`rebof3_emi::pack::rebuild_placed`] into `disc/<archive>` in
 //! the project folder and reads it back to prove the rebuild holds exactly the edited payloads and load
 //! arguments.
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use rebof3_emi::{Archive, Entry};
-use rebof3_formats::{Format, classify};
-
-/// One archive of the disc: its path relative to the disc folder, with `/` separators.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ArchivePath(pub String);
-
-impl ArchivePath {
-    /// The folder part (`WORLD02`) and the file name (`AREA105.EMI`).
-    pub fn split(&self) -> (&str, &str) {
-        self.0.rsplit_once('/').unwrap_or(("", &self.0))
-    }
-}
-
-/// An edit's key: the archive and the entry index.
-pub type Key = (ArchivePath, usize);
-
-/// An archive read from the disc, with each entry's format.
-pub struct Loaded {
-    pub path: ArchivePath,
-    pub bytes: Arc<Vec<u8>>,
-    pub archive: Archive,
-    pub formats: Vec<Format>,
-}
-
-impl Loaded {
-    pub fn entries(&self) -> &[Entry] {
-        self.archive.entries()
-    }
-
-    /// The payload the disc stores for entry `index`.
-    pub fn original(&self, index: usize) -> &[u8] {
-        self.archive.payload(&self.bytes, index).unwrap_or(&[])
-    }
-}
-
-/// What a change touched, and its state before the step (`None` when the entry had no edit).
-enum Before {
-    Payload(Option<Vec<u8>>),
-    Load(Option<u32>),
-}
-
-/// One entry's part of an undo step: the entry, and its edit before the step.
-struct Change {
-    key: Key,
-    before: Before,
-}
-
-/// One undoable step: every entry a gesture, a typed field or an import changed, in the order it first
-/// changed them.
-type Step = Vec<Change>;
+pub use rebof3_catalog::archive::{ArchivePath, Key, Loaded};
+pub use rebof3_catalog::edits::Edits;
 
 pub struct Project {
     pub disc: PathBuf,
     pub folder: PathBuf,
     pub archives: Vec<ArchivePath>,
-    edits: BTreeMap<Key, Vec<u8>>,
-    saved: BTreeMap<Key, Vec<u8>>,
-    /// The load arguments the project changes, by entry.
-    loads: BTreeMap<Key, u32>,
-    saved_loads: BTreeMap<Key, u32>,
-    undo: Vec<Step>,
-    redo: Vec<Step>,
-    /// The step that collects the changes while a gesture lasts.
-    open: Option<Step>,
+    edits: Edits,
     cache: BTreeMap<ArchivePath, Arc<Loaded>>,
-    /// Counts every change to the edits, so a view can tell when what it derived is stale.
-    revision: u64,
+}
+
+impl Deref for Project {
+    type Target = Edits;
+
+    fn deref(&self) -> &Edits {
+        &self.edits
+    }
+}
+
+impl DerefMut for Project {
+    fn deref_mut(&mut self) -> &mut Edits {
+        &mut self.edits
+    }
 }
 
 impl Project {
@@ -99,20 +56,7 @@ impl Project {
             return Err(format!("no .EMI archives under {}", disc.display()));
         }
         archives.sort();
-        let mut project = Self {
-            disc,
-            folder,
-            archives,
-            edits: BTreeMap::new(),
-            saved: BTreeMap::new(),
-            loads: BTreeMap::new(),
-            saved_loads: BTreeMap::new(),
-            undo: Vec::new(),
-            redo: Vec::new(),
-            open: None,
-            cache: BTreeMap::new(),
-            revision: 0,
-        };
+        let mut project = Self { disc, folder, archives, edits: Edits::default(), cache: BTreeMap::new() };
         project.load_edits();
         Ok(project)
     }
@@ -123,14 +67,7 @@ impl Project {
             return Ok(loaded.clone());
         }
         let bytes = fs::read(self.disc.join(&path.0)).map_err(|error| format!("{}: {error}", path.0))?;
-        let archive = Archive::parse(&bytes).map_err(|error| format!("{}: {error}", path.0))?;
-        let formats = (0..archive.entries().len())
-            .map(|index| {
-                let payload = archive.payload(&bytes, index).unwrap_or(&[]);
-                classify(&archive.entries()[index], payload)
-            })
-            .collect();
-        let loaded = Arc::new(Loaded { path: path.clone(), bytes: Arc::new(bytes), archive, formats });
+        let loaded = Arc::new(Loaded::parse(path.clone(), bytes).map_err(|error| format!("{}: {error}", path.0))?);
         self.cache.insert(path.clone(), loaded.clone());
         Ok(loaded)
     }
@@ -138,187 +75,6 @@ impl Project {
     /// An archive that [`Project::load`] has read already.
     pub fn loaded(&self, path: &ArchivePath) -> Option<&Loaded> {
         self.cache.get(path).map(Arc::as_ref)
-    }
-
-    /// The current payload of an entry: its edit, or the disc's bytes.
-    pub fn payload<'a>(&'a self, loaded: &'a Loaded, index: usize) -> &'a [u8] {
-        match self.edits.get(&(loaded.path.clone(), index)) {
-            Some(bytes) => bytes,
-            None => loaded.original(index),
-        }
-    }
-
-    pub fn is_edited(&self, key: &Key) -> bool {
-        self.edits.contains_key(key) || self.loads.contains_key(key)
-    }
-
-    pub fn archive_is_edited(&self, path: &ArchivePath) -> bool {
-        self.edits.keys().chain(self.loads.keys()).any(|(archive, _)| archive == path)
-    }
-
-    /// The load argument of an entry: the project's placement, or the disc's.
-    pub fn load_arg(&self, loaded: &Loaded, index: usize) -> u32 {
-        self.loads.get(&(loaded.path.clone(), index)).copied().unwrap_or_else(|| loaded.entries().get(index).map_or(0, |entry| entry.ram_ptr))
-    }
-
-    /// The table entries of an archive with the project's placements: what a loader replay reads.
-    pub fn entries_of(&self, loaded: &Loaded) -> Vec<Entry> {
-        let mut entries = loaded.entries().to_vec();
-        for ((archive, index), load_arg) in &self.loads {
-            if *archive == loaded.path
-                && let Some(entry) = entries.get_mut(*index)
-            {
-                entry.ram_ptr = *load_arg;
-            }
-        }
-        entries
-    }
-
-    /// Sets the load argument of an entry. The disc's own value drops the placement.
-    pub fn set_load_arg(&mut self, loaded: &Loaded, index: usize, load_arg: u32) {
-        let key = (loaded.path.clone(), index);
-        let original = loaded.entries().get(index).map(|entry| entry.ram_ptr);
-        let next = (Some(load_arg) != original).then_some(load_arg);
-        if self.loads.get(&key) == next.as_ref() {
-            return;
-        }
-        let before = self.replace_load(&key, next);
-        self.record(Change { key, before: Before::Load(before) });
-    }
-
-    /// A number that changes whenever an edit is made, undone or dropped.
-    pub fn revision(&self) -> u64 {
-        self.revision
-    }
-
-    pub fn edit_count(&self) -> usize {
-        self.edits.keys().chain(self.loads.keys()).collect::<std::collections::BTreeSet<_>>().len()
-    }
-
-    /// True when the in-memory edits differ from the saved ones.
-    pub fn is_dirty(&self) -> bool {
-        self.edits != self.saved || self.loads != self.saved_loads
-    }
-
-    /// Sets the payload of an entry. A payload equal to the disc's drops the edit.
-    pub fn set(&mut self, loaded: &Loaded, index: usize, bytes: Vec<u8>) {
-        let key = (loaded.path.clone(), index);
-        let next = (bytes.as_slice() != loaded.original(index)).then_some(bytes);
-        if self.edits.get(&key) == next.as_ref() {
-            return;
-        }
-        let before = self.replace(&key, next);
-        self.record(Change { key, before: Before::Payload(before) });
-    }
-
-    /// Sets the payloads of several entries of one archive as one undo step.
-    pub fn set_together(&mut self, loaded: &Loaded, payloads: Vec<(usize, Vec<u8>)>) {
-        let gesture = self.open.is_some();
-        if !gesture {
-            self.begin_step();
-        }
-        for (index, bytes) in payloads {
-            self.set(loaded, index, bytes);
-        }
-        if !gesture {
-            self.end_step();
-        }
-    }
-
-    /// Drops the edits of an entry, so it reads the disc's bytes and load argument again.
-    pub fn revert(&mut self, key: &Key) {
-        if self.edits.contains_key(key) {
-            let before = self.replace(key, None);
-            self.record(Change { key: key.clone(), before: Before::Payload(before) });
-        }
-        if self.loads.contains_key(key) {
-            let before = self.replace_load(key, None);
-            self.record(Change { key: key.clone(), before: Before::Load(before) });
-        }
-    }
-
-    /// Starts a step that collects every change until [`Project::end_step`], so one undo takes back a
-    /// whole drag or a whole typed field. A step still open ends first.
-    pub fn begin_step(&mut self) {
-        self.end_step();
-        self.open = Some(Step::new());
-    }
-
-    /// Ends the open step. A step that changed nothing leaves no undo step.
-    pub fn end_step(&mut self) {
-        if let Some(step) = self.open.take().filter(|step| !step.is_empty()) {
-            self.undo.push(step);
-        }
-    }
-
-    /// Adds a change to the open step, or makes it a step of its own. A step keeps the first state of
-    /// each entry it changed.
-    fn record(&mut self, change: Change) {
-        self.redo.clear();
-        let same = |earlier: &Change| earlier.key == change.key && std::mem::discriminant(&earlier.before) == std::mem::discriminant(&change.before);
-        match self.open.as_mut() {
-            Some(step) if step.iter().any(same) => {}
-            Some(step) => step.push(change),
-            None => self.undo.push(vec![change]),
-        }
-    }
-
-    pub fn can_undo(&self) -> bool {
-        !self.undo.is_empty() || self.open.as_ref().is_some_and(|step| !step.is_empty())
-    }
-
-    pub fn can_redo(&self) -> bool {
-        !self.redo.is_empty()
-    }
-
-    pub fn undo(&mut self) {
-        self.end_step();
-        if let Some(step) = self.undo.pop() {
-            let back = self.apply(step);
-            self.redo.push(back);
-        }
-    }
-
-    pub fn redo(&mut self) {
-        self.end_step();
-        if let Some(step) = self.redo.pop() {
-            let back = self.apply(step);
-            self.undo.push(back);
-        }
-    }
-
-    /// Puts each entry of `step` back to its recorded state, last change first. Returns the step that
-    /// undoes this one.
-    fn apply(&mut self, step: Step) -> Step {
-        let mut back: Step = step
-            .into_iter()
-            .rev()
-            .map(|change| {
-                let before = match change.before {
-                    Before::Payload(bytes) => Before::Payload(self.replace(&change.key, bytes)),
-                    Before::Load(load_arg) => Before::Load(self.replace_load(&change.key, load_arg)),
-                };
-                Change { key: change.key, before }
-            })
-            .collect();
-        back.reverse();
-        back
-    }
-
-    fn replace(&mut self, key: &Key, next: Option<Vec<u8>>) -> Option<Vec<u8>> {
-        self.revision += 1;
-        match next {
-            Some(bytes) => self.edits.insert(key.clone(), bytes),
-            None => self.edits.remove(key),
-        }
-    }
-
-    fn replace_load(&mut self, key: &Key, next: Option<u32>) -> Option<u32> {
-        self.revision += 1;
-        match next {
-            Some(load_arg) => self.loads.insert(key.clone(), load_arg),
-            None => self.loads.remove(key),
-        }
     }
 
     fn edits_folder(&self) -> PathBuf {
@@ -334,7 +90,8 @@ impl Project {
     }
 
     fn load_edits(&mut self) {
-        for archive in self.archives.clone() {
+        let (mut payloads, mut loads) = (BTreeMap::new(), BTreeMap::new());
+        for archive in &self.archives {
             let folder = self.edits_folder().join(&archive.0);
             let Ok(files) = fs::read_dir(&folder) else { continue };
             for file in files.flatten() {
@@ -344,117 +101,61 @@ impl Project {
                 match path.extension().and_then(|extension| extension.to_str()) {
                     Some("bin") => {
                         if let Ok(bytes) = fs::read(&path) {
-                            self.edits.insert((archive.clone(), index), bytes);
+                            payloads.insert((archive.clone(), index), bytes);
                         }
                     }
                     Some("load") => {
                         let load = fs::read_to_string(&path).ok().and_then(|text| u32::from_str_radix(text.trim().trim_start_matches("0x"), 16).ok());
                         if let Some(load) = load {
-                            self.loads.insert((archive.clone(), index), load);
+                            loads.insert((archive.clone(), index), load);
                         }
                     }
                     _ => {}
                 }
             }
         }
-        self.saved = self.edits.clone();
-        self.saved_loads = self.loads.clone();
+        self.edits.restore(payloads, loads);
     }
 
     /// Writes every edit to the project folder and removes the files of dropped edits.
     pub fn save(&mut self) -> Result<usize, String> {
-        for key in self.saved.keys() {
-            if !self.edits.contains_key(key) {
-                let _ = fs::remove_file(self.edit_file(key));
-            }
+        let (payloads, loads) = self.edits.dropped();
+        for key in &payloads {
+            let _ = fs::remove_file(self.edit_file(key));
         }
-        for key in self.saved_loads.keys() {
-            if !self.loads.contains_key(key) {
-                let _ = fs::remove_file(self.load_file(key));
-            }
+        for key in &loads {
+            let _ = fs::remove_file(self.load_file(key));
         }
-        for (key, bytes) in &self.edits {
-            let file = self.edit_file(key);
-            if let Some(parent) = file.parent() {
-                fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-            }
-            fs::write(&file, bytes).map_err(|error| format!("{}: {error}", file.display()))?;
+        for (key, bytes) in self.edits.payloads() {
+            write_file(&self.edit_file(key), bytes)?;
         }
-        for (key, load_arg) in &self.loads {
-            let file = self.load_file(key);
-            if let Some(parent) = file.parent() {
-                fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-            }
-            fs::write(&file, format!("{load_arg:#010x}\n")).map_err(|error| format!("{}: {error}", file.display()))?;
+        for (key, load_arg) in self.edits.loads() {
+            write_file(&self.load_file(key), format!("{load_arg:#010x}\n").as_bytes())?;
         }
-        self.saved = self.edits.clone();
-        self.saved_loads = self.loads.clone();
-        Ok(self.edit_count())
-    }
-
-    /// The bytes of an archive as the project has it now: the disc's archive rebuilt with the archive's
-    /// edits, or the disc's bytes when it has none.
-    pub fn current_archive(&self, loaded: &Loaded) -> Result<Vec<u8>, String> {
-        let replace: Vec<(usize, &[u8])> = self.edits.iter().filter(|((archive, _), _)| *archive == loaded.path).map(|((_, index), bytes)| (*index, bytes.as_slice())).collect();
-        let placed = self.placed(&loaded.path);
-        if replace.is_empty() && placed.is_empty() {
-            return Ok(loaded.bytes.to_vec());
-        }
-        rebof3_emi::pack::rebuild_placed(&loaded.bytes, &replace, &placed).map_err(|error| format!("{}: {error}", loaded.path.0))
-    }
-
-    /// The load arguments the project changes in an archive, by entry.
-    fn placed(&self, path: &ArchivePath) -> Vec<(usize, u32)> {
-        self.loads.iter().filter(|((archive, _), _)| archive == path).map(|((_, index), load)| (*index, *load)).collect()
+        self.edits.mark_saved();
+        Ok(self.edits.edit_count())
     }
 
     /// Rebuilds every edited archive into `disc/` in the project folder, and checks that each rebuilt
     /// archive reads back with the edited payloads and the disc's other payloads.
     pub fn export(&mut self) -> Result<Vec<PathBuf>, String> {
-        let mut by_archive: BTreeMap<ArchivePath, Vec<(usize, Vec<u8>)>> = BTreeMap::new();
-        for ((archive, index), bytes) in &self.edits {
-            by_archive.entry(archive.clone()).or_default().push((*index, bytes.clone()));
-        }
-        for (archive, _) in self.loads.keys() {
-            by_archive.entry(archive.clone()).or_default();
-        }
         let mut written = Vec::new();
-        for (archive, replaced) in by_archive {
-            let loaded = self.load(&archive)?;
-            let replace: Vec<(usize, &[u8])> = replaced.iter().map(|(index, bytes)| (*index, bytes.as_slice())).collect();
-            let placed = self.placed(&archive);
-            let rebuilt = rebof3_emi::pack::rebuild_placed(&loaded.bytes, &replace, &placed).map_err(|error| format!("{}: {error}", archive.0))?;
-            verify(&loaded, &rebuilt, &replace, &placed).map_err(|error| format!("{}: {error}", archive.0))?;
-            let file = self.folder.join("disc").join(&archive.0);
-            if let Some(parent) = file.parent() {
-                fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-            }
-            fs::write(&file, &rebuilt).map_err(|error| format!("{}: {error}", file.display()))?;
+        for plan in self.edits.plan() {
+            let loaded = self.load(&plan.archive)?;
+            let file = self.folder.join("disc").join(&plan.archive.0);
+            write_file(&file, &plan.rebuild(&loaded)?)?;
             written.push(file);
         }
         Ok(written)
     }
 }
 
-/// Checks a rebuilt archive: same entries, the replaced payloads where they were replaced, the disc's
-/// payloads everywhere else, and the placed load arguments where they were placed.
-fn verify(loaded: &Loaded, rebuilt: &[u8], replace: &[(usize, &[u8])], placed: &[(usize, u32)]) -> Result<(), String> {
-    let archive = Archive::parse(rebuilt).map_err(|error| format!("rebuilt archive does not parse: {error}"))?;
-    if archive.entries().len() != loaded.entries().len() {
-        return Err("rebuilt archive has a different entry count".into());
+/// Writes `bytes` to `file`, making its folder first.
+fn write_file(file: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
-    for index in 0..loaded.entries().len() {
-        let expected = replace.iter().find(|(at, _)| *at == index).map_or(loaded.original(index), |(_, bytes)| bytes);
-        let actual = archive.payload(rebuilt, index).map_err(|error| error.to_string())?;
-        if actual != expected {
-            return Err(format!("entry {index} reads back different bytes"));
-        }
-        let load = placed.iter().find(|(at, _)| *at == index).map_or(loaded.entries()[index].ram_ptr, |(_, load)| *load);
-        if archive.entries()[index].ram_ptr != load {
-            return Err(format!("entry {index} reads back a different load argument"));
-        }
-    }
-    Ok(())
+    fs::write(file, bytes).map_err(|error| format!("{}: {error}", file.display()))
 }
 
 fn collect_archives(root: &Path, folder: &Path, archives: &mut Vec<ArchivePath>) {
@@ -474,6 +175,8 @@ fn collect_archives(root: &Path, folder: &Path, archives: &mut Vec<ArchivePath>)
 
 #[cfg(test)]
 mod tests {
+    use rebof3_emi::Archive;
+
     use super::*;
     use crate::fixture::{ARCHIVE, Disc, Entry};
 
