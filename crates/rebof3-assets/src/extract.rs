@@ -290,23 +290,7 @@ fn process(job: &Job, options: &Options, report: &mut Report, resident: &[Reside
 
 /// A whole disc file, copied unchanged.
 fn file_rows(job: &Job, kind: Kind, note: &str, options: &Options, report: &mut Report) -> Result<()> {
-    let base = Row {
-        source: job.source.clone(),
-        slot: None,
-        offset: 0,
-        size: job.bytes.len() as u64,
-        file_type: None,
-        load_arg: None,
-        format: FILE_FORMAT,
-        kind,
-        state: FILE_STATE,
-        role: "raw",
-        output: None,
-        bytes: 0,
-        sha256: String::new(),
-        evidence: String::new(),
-        note: note.to_string(),
-    };
+    let base = Row { size: job.bytes.len() as u64, note: note.to_string(), ..Row::new(job.source.clone(), FILE_FORMAT, kind, FILE_STATE, "raw") };
     let output = Output { role: "raw", path: format!("{}/{}", kind.name(), job.source), data: Cow::Borrowed(&job.bytes), evidence: String::new() };
     write_output(&base, output, options, report)
 }
@@ -329,47 +313,15 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
         if !options.selection.contains(kind) {
             continue;
         }
-        let base = Row {
-            source: job.source.clone(),
-            slot: Some(slot),
-            offset: entry.offset,
-            size: u64::from(entry.size),
-            file_type: Some(entry.file_type),
-            load_arg: Some(entry.ram_ptr),
-            format: format.name(),
-            kind,
-            state: format.state().label(),
-            role: "raw",
-            output: None,
-            bytes: 0,
-            sha256: String::new(),
-            evidence: String::new(),
-            note: String::new(),
-        };
+        let base = Row::new(job.source.clone(), format.name(), kind, format.state().label(), "raw").at_slot(slot, entry);
         if format == Format::Reserve {
             let mut row = base;
             row.role = "none";
             report.rows.push(row);
             continue;
         }
-        let raw_extension = classify::extension(format);
-        let name = |tag: &str, extension: &str| format!("{}/{stem}/{slot}{tag}.{extension}", kind.name());
-        let mut outputs = vec![Output { role: "raw", path: name("", raw_extension), data: Cow::Borrowed(payload), evidence: String::new() }];
-        let mut note = String::new();
-        if options.write {
-            match derive(format, entry.ram_ptr, payload) {
-                Ok(derived) => outputs.extend(derived.into_iter().map(|file| Output { role: file.role, path: name("", file.extension), data: Cow::Owned(file.data), evidence: String::new() })),
-                Err(error) => note = format!("derived output skipped: {error}"),
-            }
-            if let Some(open) = format.describe().open {
-                let site = Site { stem, slot, entries: archive.entries(), payloads: &payloads, rows: rows.get(&slot).map_or(&[], Vec::as_slice) };
-                let opened = open(&site);
-                outputs.extend(opened.files.into_iter().map(|file| Output { role: file.role, path: name(&file.tag, file.extension), data: Cow::Owned(file.data), evidence: file.evidence }));
-                if let Some(skipped) = opened.skipped {
-                    note = skipped;
-                }
-            }
-        }
+        let site = Site { stem, slot, entries: archive.entries(), payloads: &payloads, rows: rows.get(&slot).map_or(&[], Vec::as_slice) };
+        let (outputs, note) = slot_outputs(&site, format, entry, kind, options.write);
         for (position, output) in outputs.into_iter().enumerate() {
             let mut row = base.clone();
             if position == 0 {
@@ -379,6 +331,28 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
         }
     }
     Ok(())
+}
+
+/// The raw payload of one slot and, when writing, its derived and opened files, with the note on any that were skipped.
+fn slot_outputs<'a>(site: &Site<'a>, format: Format, entry: &rebof3_emi::Entry, kind: Kind, write: bool) -> (Vec<Output<'a>>, String) {
+    let payload = site.payloads[site.slot];
+    let name = |tag: &str, extension: &str| format!("{}/{}/{}{tag}.{extension}", kind.name(), site.stem, site.slot);
+    let mut outputs = vec![Output { role: "raw", path: name("", classify::extension(format)), data: Cow::Borrowed(payload), evidence: String::new() }];
+    let mut note = String::new();
+    if write {
+        match derive(format, entry.ram_ptr, payload) {
+            Ok(derived) => outputs.extend(derived.into_iter().map(|file| Output { role: file.role, path: name("", file.extension), data: Cow::Owned(file.data), evidence: String::new() })),
+            Err(error) => note = format!("derived output skipped: {error}"),
+        }
+        if let Some(open) = format.describe().open {
+            let opened = open(site);
+            outputs.extend(opened.files.into_iter().map(|file| Output { role: file.role, path: name(&file.tag, file.extension), data: Cow::Owned(file.data), evidence: file.evidence }));
+            if let Some(skipped) = opened.skipped {
+                note = skipped;
+            }
+        }
+    }
+    (outputs, note)
 }
 
 /// Writes the fixed game tables of entry 0 of `ETC/GAME.EMI` as one JSON file per table. The entry
@@ -400,23 +374,7 @@ fn game_table_rows(job: &Job, entry: &rebof3_emi::Entry, payload: &[u8], options
     };
     let stem = job.source.strip_suffix(&format!(".{EMI_EXTENSION}")).unwrap_or(&job.source);
     for ((name, data), (table, bytes)) in files.into_iter().zip(stored) {
-        let base = Row {
-            source: job.source.clone(),
-            slot: Some(0),
-            offset: entry.offset,
-            size: u64::from(entry.size),
-            file_type: Some(entry.file_type),
-            load_arg: Some(entry.ram_ptr),
-            format: DERIVED_TABLE,
-            kind: Kind::DataTable,
-            state: "codec",
-            role: "json",
-            output: None,
-            bytes: 0,
-            sha256: String::new(),
-            evidence: String::new(),
-            note: String::new(),
-        };
+        let base = Row::new(job.source.clone(), DERIVED_TABLE, Kind::DataTable, "codec", "json").at_slot(0, entry);
         // The stored bytes are the table's span of the disc file: `offset` and `size` locate them in the archive.
         let original = Row { offset: table.archive_offset as u64, size: bytes.len() as u64, ..base.clone() };
         let output = Output { role: "raw", path: format!("{}/{stem}/{name}.bin", Kind::DataTable.name()), data: Cow::Borrowed(bytes), evidence: String::new() };
@@ -486,23 +444,7 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
         options.selection.audio(),
         options.jobs,
         |clip| {
-            let base = Row {
-                source: clip.source,
-                slot: None,
-                offset: 0,
-                size: 0,
-                file_type: None,
-                load_arg: None,
-                format: RENDERED_ITEM,
-                kind: clip.kind,
-                state: "codec",
-                role: "raw",
-                output: None,
-                bytes: 0,
-                sha256: String::new(),
-                evidence: String::new(),
-                note: String::new(),
-            };
+            let base = Row::new(clip.source, RENDERED_ITEM, clip.kind, "codec", "raw");
             let output = Output { role: clip.extension, path: clip.output.clone(), data: Cow::Owned(clip.bytes), evidence: clip.evidence.clone() };
             write_output(&base, output, options, report)?;
             if let Some(midi) = clip.midi {
@@ -522,6 +464,44 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
     Ok(())
 }
 
+/// Writes the wanted forms of every audio track; returns the files written and the scratch directory to remove.
+fn write_cdda_tracks(sheet: &cue::Sheet, directory: &Path, audio: AudioFormat, raw: bool, converted: bool) -> Result<(Vec<PathBuf>, Option<PathBuf>)> {
+    let mut written = Vec::new();
+    let mut temporary = None;
+    if raw {
+        written.extend(cue::extract_raw_audio_tracks(sheet, directory)?);
+    }
+    if converted {
+        if audio == AudioFormat::Wav {
+            written.extend(cue::extract_audio_tracks(sheet, directory)?);
+        } else {
+            // The cue layer writes WAVE; convert each finished track and keep only the chosen file.
+            let source = directory.join(".wav-source");
+            cue::extract_audio_tracks(sheet, &source)?;
+            temporary = Some(source.clone());
+            for track in sheet.tracks.iter().filter(|track| track.mode == cue::TrackMode::Audio) {
+                written.push(convert_wav_track(&source, directory, track.number, audio)?);
+            }
+        }
+    }
+    Ok((written, temporary))
+}
+
+/// Re-encodes one extracted WAVE track into `directory` in the chosen audio format.
+fn convert_wav_track(source: &Path, directory: &Path, number: u8, audio: AudioFormat) -> Result<PathBuf> {
+    let wav = fs::read(source.join(format!("track{number:02}.wav")))?;
+    let info = psx_formats::wav::parse(&wav)?;
+    let start = info.data_offset as usize;
+    let end = start + info.data_bytes as usize;
+    let pcm: Vec<i16> = wav[start..end].as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes(*pair)).collect();
+    let title = format!("Track {number:02}");
+    let tags = bof3player::export::Tags { title: &title, artist: "Breath of Fire III", album: "Breath of Fire III", track: Some(u32::from(number)), loop_start: None, loop_length: None };
+    let bytes = sound::encode(audio, &pcm, info.rate, info.channels, &tags)?;
+    let path = directory.join(format!("track{number:02}.{}", audio.extension()));
+    fs::write(&path, bytes)?;
+    Ok(path)
+}
+
 /// The audio tracks of the CUE sheet: the sectors as the disc stores them (`.pcm`) and the
 /// selected audio container.
 fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Result<()> {
@@ -530,44 +510,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
     let audio = options.selection.audio();
     let audio_extension = audio.extension();
     let forms = [("raw", "pcm"), (audio_extension, audio_extension)].map(|(role, extension)| (role, extension, mode.writes(role, true)));
-    let mut written = Vec::new();
-    let mut temporary = None;
-    if options.write {
-        if forms[0].2 {
-            written.extend(cue::extract_raw_audio_tracks(sheet, &directory)?);
-        }
-        if forms[1].2 {
-            if audio == AudioFormat::Wav {
-                written.extend(cue::extract_audio_tracks(sheet, &directory)?);
-            } else {
-                // The cue layer writes WAVE; convert each finished track and keep only the chosen file.
-                let source = directory.join(".wav-source");
-                cue::extract_audio_tracks(sheet, &source)?;
-                temporary = Some(source.clone());
-                for track in sheet.tracks.iter().filter(|track| track.mode == cue::TrackMode::Audio) {
-                    let wav_path = source.join(format!("track{:02}.wav", track.number));
-                    let wav = fs::read(&wav_path)?;
-                    let info = psx_formats::wav::parse(&wav)?;
-                    let start = info.data_offset as usize;
-                    let end = start + info.data_bytes as usize;
-                    let pcm: Vec<i16> = wav[start..end].as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes(*pair)).collect();
-                    let title = format!("Track {:02}", track.number);
-                    let tags = bof3player::export::Tags {
-                        title: &title,
-                        artist: "Breath of Fire III",
-                        album: "Breath of Fire III",
-                        track: Some(u32::from(track.number)),
-                        loop_start: None,
-                        loop_length: None,
-                    };
-                    let bytes = sound::encode(audio, &pcm, info.rate, info.channels, &tags)?;
-                    let path = directory.join(format!("track{:02}.{audio_extension}", track.number));
-                    fs::write(&path, bytes)?;
-                    written.push(path);
-                }
-            }
-        }
-    }
+    let (written, temporary) = if options.write { write_cdda_tracks(sheet, &directory, audio, forms[0].2, forms[1].2)? } else { (Vec::new(), None) };
     for (position, track) in sheet.tracks.iter().enumerate().filter(|(_, track)| track.mode == cue::TrackMode::Audio) {
         let stem = format!("track{:02}", track.number);
         let size = cue::audio_track_range(sheet, position).map_or(0, |(start, end)| (end - start) * cue::AUDIO_SECTOR_SIZE);
@@ -583,23 +526,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
             } else {
                 (0, String::new())
             };
-            report.rows.push(Row {
-                source: stem.clone(),
-                slot: None,
-                offset: 0,
-                size,
-                file_type: None,
-                load_arg: None,
-                format: FILE_FORMAT,
-                kind: Kind::Cdda,
-                state: FILE_STATE,
-                role,
-                output: Some(format!("{}/{name}", Kind::Cdda.name())),
-                bytes,
-                sha256,
-                evidence: String::new(),
-                note: String::new(),
-            });
+            report.rows.push(Row { size, output: Some(format!("{}/{name}", Kind::Cdda.name())), bytes, sha256, ..Row::new(stem.clone(), FILE_FORMAT, Kind::Cdda, FILE_STATE, role) });
         }
     }
     if let Some(source) = temporary {
