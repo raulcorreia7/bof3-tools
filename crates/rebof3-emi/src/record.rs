@@ -1,13 +1,4 @@
-//! Fixed-offset field readers for the game's table records, shared by the format modules.
-
-/// The little-endian halfword at `at`.
-///
-/// # Panics
-///
-/// Panics when the record ends before `at + 2`; callers slice whole records first.
-pub fn u16_at(record: &[u8], at: usize) -> u16 {
-    u16::from_le_bytes(bytes(record, at))
-}
+//! Fixed-offset field reader for the game's table records.
 
 /// The `N` bytes at `at`.
 ///

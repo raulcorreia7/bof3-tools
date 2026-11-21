@@ -279,6 +279,6 @@ pub(super) fn import_seq(args: &[String]) -> Result<i32> {
     let default = first.with_extension("bin");
     let files = parts.iter().map(|(path, id)| -> Result<(Vec<u8>, u16)> { Ok((read_file(path)?, *id)) }).collect::<Result<Vec<_>>>()?;
     let borrowed: Vec<(&[u8], u16)> = files.iter().map(|(bytes, id)| (bytes.as_slice(), *id)).collect();
-    write_output(&args.output.unwrap_or(default), &rebof3_formats::sep::psyq::import_seq(&borrowed)?)?;
+    write_output(&args.output.unwrap_or(default), &psx_formats::sep::seq::package(&borrowed)?.encode())?;
     Ok(EXIT_OK)
 }

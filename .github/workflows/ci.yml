@@ -69,6 +69,7 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: rustup component add rustfmt
       - run: cargo fmt --all --check
+      - run: python3 scripts/check-layers.py
       - if: needs.changes.outputs.code == 'true'
         run: rustup component add clippy
       - if: needs.changes.outputs.code == 'true'

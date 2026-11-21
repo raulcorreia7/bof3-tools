@@ -17,7 +17,7 @@
 //!
 //! The two tables are read from `ETC/GAME.EMI` entry 0, the code image that holds them.
 
-use rebof3_emi::record::u16_at;
+use psx_formats::bytes::u16_le;
 use rebof3_emi::text::codec::name_text;
 
 use crate::animation::Animation;
@@ -102,7 +102,7 @@ pub fn place(block: &[u8], scenes: Option<&SceneTable>, encounter: usize, offset
         let (x, y) = turn((dx + FRONT_CELLS, dy), direction);
         let record = ENEMY_BASE + enemy * ENEMY_BYTES;
         let fields = block.get(record..record + ENEMY_BYTES).ok_or_else(|| Error::Formation(format!("slot {slot} names enemy {enemy}, past the block")))?;
-        let scene_id = u16_at(fields, SCENE_ID_AT);
+        let scene_id = u16_le(fields, SCENE_ID_AT);
         let scene = scenes.and_then(|table| table.records().iter().find(|record| record.id == scene_id).copied());
         placed.push(Placed { slot, enemy, name: name_text(&fields[..NAME_BYTES]), scene_id, scene, x, y });
     }

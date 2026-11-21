@@ -10,6 +10,7 @@
 
 use super::font::{CELL_HEIGHT, CELL_WIDTH, Font, TILE_SIDE, TILE_TOP, message_cell, number_cell};
 use super::layout::{Choice, GLYPH_ADVANCE, Glyph, Page, Shape};
+use psx_formats::gfx::color::expanded;
 
 /// The frame's outer margin, in pixels (the outer line sits two pixels outside the window).
 pub const MARGIN: i32 = 2;
@@ -70,7 +71,14 @@ impl Canvas {
     }
 
     fn rgba(&self) -> Rgba {
-        let pixels = self.words.iter().flat_map(|c| [c[0] << 3 | c[0] >> 2, c[1] << 3 | c[1] >> 2, c[2] << 3 | c[2] >> 2, 255]).collect();
+        let pixels = self
+            .words
+            .iter()
+            .flat_map(|c| {
+                let [red, green, blue] = expanded(u16::from(c[0]) | u16::from(c[1]) << 5 | u16::from(c[2]) << 10);
+                [red, green, blue, 255]
+            })
+            .collect();
         Rgba { width: self.width as usize, height: self.height as usize, pixels }
     }
 }

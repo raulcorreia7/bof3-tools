@@ -16,7 +16,9 @@ use std::sync::Arc;
 use glow::HasContext;
 use khronos_egl as egl;
 
-use crate::{Blend, Camera, Depth, Frame, Primitive, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, draw_order};
+use psx_formats::gfx::texture::{Color, Depth};
+
+use crate::{Blend, Camera, Frame, Primitive, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, draw_order};
 
 /// Mesa's surfaceless EGL platform (`EGL_MESA_platform_surfaceless`).
 const PLATFORM_SURFACELESS_MESA: egl::Enum = 0x31DD;
@@ -509,12 +511,12 @@ fn vertex(floats: &mut Vec<f32>, primitive: &Primitive, camera: &Camera, corner:
         Texture::None => ([0.0; 2], 0.0, [0.0; 2], [0.0; 2], 0.0),
         Texture::Vram { page, clut, depth, uvs } => {
             let bits = match depth {
-                Depth::Four => 4.0,
-                Depth::Eight => 8.0,
-                Depth::Fifteen => 15.0,
+                Color::Indexed(Depth::Four) => 4.0,
+                Color::Indexed(Depth::Eight) => 8.0,
+                Color::Direct15 => 15.0,
             };
             let [u, v] = uvs[corner];
-            ([f32::from(u), f32::from(v)], 1.0, page.map(f32::from), clut.map(f32::from), bits)
+            ([f32::from(u), f32::from(v)], 1.0, page.map(f32::from), [f32::from(clut.x), f32::from(clut.y)], bits)
         }
         Texture::Image { uvs, .. } => (uvs[corner], 2.0, [0.0; 2], [0.0; 2], 0.0),
     };
