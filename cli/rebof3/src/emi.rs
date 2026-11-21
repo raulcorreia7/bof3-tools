@@ -159,7 +159,12 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
     if !options.dry_run {
         archive.extract_all(&output, options.typed).map_err(|error| error.to_string())?;
     }
-    let manifest = (options.print_manifest || options.manifest.is_some()).then(|| rebof3_emi::manifest::to_json(archive.version(), archive.entries(), options.typed));
+    let manifest = if options.print_manifest || options.manifest.is_some() {
+        let container = fs::read(&source).map_err(|error| error.to_string())?;
+        Some(rebof3_formats::registry::manifest_json(&archive, &container, options.typed))
+    } else {
+        None
+    };
     if options.print_manifest {
         println!("{}", manifest.as_deref().unwrap());
     }

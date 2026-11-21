@@ -1,5 +1,5 @@
 [package]
-name = "rebof3-render"
+name = "psx-render"
 description = "Draws Breath of Fire III field scenes as the PlayStation GPU does: a software rasterizer, and OpenGL ES behind a feature"
 version = "0.2.0"
 edition.workspace = true

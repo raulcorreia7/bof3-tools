@@ -870,7 +870,7 @@ fn import_tim(editor: &mut Editor, key: &(ArchivePath, usize), bytes: &[u8]) -> 
     let project = editor.project.as_mut().ok_or("no project is open")?;
     let loaded = project.load(archive)?;
     let current = project.load_arg(&loaded, *index);
-    let load_arg = texture.placement.load_argument(current);
+    let load_arg = rebof3_emi::upload::load_argument(texture.placement, current);
     editor.begin_step();
     let written = editor.rewrite_entry(archive, *index, |_| Ok(texture.payload.clone()));
     if written.is_ok()

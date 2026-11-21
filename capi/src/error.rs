@@ -31,6 +31,7 @@ impl From<rebof3_assets::Error> for Failure {
                 Self(Fail::new(status, inner.to_string()))
             }
             rebof3_assets::Error::Formats(inner) => inner.into(),
+            rebof3_assets::Error::Job(message) => invalid(message),
             rebof3_assets::Error::UnknownKind(_)
             | rebof3_assets::Error::UnknownAudioFormat(_)
             | rebof3_assets::Error::UnknownMode(_)

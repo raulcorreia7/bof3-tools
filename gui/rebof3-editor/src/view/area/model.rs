@@ -3,6 +3,8 @@
 //! only the edited bytes differ, so an untouched entry rebuilds byte for byte.
 
 use psx_formats::gfx::texture::Color;
+use psx_render::math::{self, rot_matrix};
+use psx_render::{Blend, Camera, Primitive, Scene, Texture};
 use rebof3_emi::replay::Vram;
 use rebof3_emi::texture::scene::resolve;
 use rebof3_formats::encounter::{ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, EncounterBlock, put_encounter};
@@ -14,8 +16,6 @@ use rebof3_formats::map::draw::{CELL_UNITS, Face, GAME_CAMERA, Quad, Tile, TileF
 use rebof3_formats::map::terrain::{self, HEIGHT_SCALE};
 use rebof3_formats::map::{CELL_BYTES, MapBundle};
 use rebof3_formats::scene::{SceneRecord, SceneTable};
-use rebof3_render::math::{self, rot_matrix};
-use rebof3_render::{Blend, Camera, Primitive, Scene, Texture};
 use serde_json::json;
 
 /// The load addresses of the area entries the view reads beside the bundle: the packed battle grid
@@ -825,10 +825,10 @@ mod tests {
         let camera = View::overview(&area).camera(&area);
         let scene = scene(&area, Layers::default(), &camera, None);
         assert_eq!(scene.primitives.len(), 4);
-        let frame = rebof3_render::software::draw(&scene, &camera, 160, 120);
+        let frame = psx_render::software::draw(&scene, &camera, 160, 120);
         let drawn = frame.rgba.chunks(4).filter(|pixel| pixel[..3] != BACKGROUND[..3]).count();
         assert!(drawn > 100, "the terrain covers part of the frame ({drawn} pixels)");
-        let centre = rebof3_render::pick(&scene, &camera, (160, 120), [80.0, 60.0]);
+        let centre = psx_render::pick(&scene, &camera, (160, 120), [80.0, 60.0]);
         assert!(matches!(centre.and_then(Hit::of_id), Some(Hit::Quad(_))), "{centre:?}");
     }
 

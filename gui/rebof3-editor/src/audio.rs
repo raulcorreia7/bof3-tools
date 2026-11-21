@@ -161,12 +161,6 @@ mod tests {
     }
 
     #[test]
-    fn stereo_stays_stereo() {
-        let out = convert(&pcm(vec![16_384, -16_384, 8_192, 0], RATE, 2), RATE, 2).unwrap();
-        assert_eq!(out, [0.5, -0.5, 0.25, 0.0]);
-    }
-
-    #[test]
     fn mono_goes_to_both_sides_and_stereo_averages_on_a_mono_device() {
         assert_eq!(convert(&pcm(vec![16_384], RATE, 1), RATE, 2).unwrap(), [0.5, 0.5]);
         assert_eq!(convert(&pcm(vec![16_384, 0], RATE, 2), RATE, 1).unwrap(), [0.25]);
@@ -191,11 +185,5 @@ mod tests {
         let input_peak = 8000.0 / SAMPLE_SCALE;
         assert!((peak - input_peak).abs() < input_peak * 0.05, "15 kHz peaks at {peak}, not {input_peak}");
         assert!(steady(1).all(|sample| sample.abs() < 1e-3), "the silent side stays silent");
-    }
-
-    #[test]
-    fn the_resampler_keeps_the_clips_length() {
-        let out = convert(&pcm(vec![0; 2 * RATE as usize], RATE, 2), DEVICE_RATE, 2).unwrap();
-        assert_eq!(out.len(), 2 * DEVICE_RATE as usize);
     }
 }

@@ -3,7 +3,6 @@
 use std::ffi::c_char;
 
 use psx_capi::{array, handle_ref, input, map_emi, out_ref, owned_buffer, owned_string, path_arg, psx_buffer, psx_emi, psx_status, psx_string};
-use rebof3_emi::manifest;
 use rebof3_emi::pack::{self, Payload};
 
 use crate::error::guarded;
@@ -75,7 +74,7 @@ pub unsafe extern "C" fn rebof3_emi_extract_all(archive: *const psx_emi, directo
 pub unsafe extern "C" fn rebof3_emi_manifest_json(archive: *const psx_emi, typed: bool, out_json: *mut psx_string) -> psx_status {
     guarded(|| {
         let archive = unsafe { handle_ref(archive, "archive")? };
-        *unsafe { out_ref(out_json, "out_json")? } = owned_string(manifest::to_json(archive.archive.version(), archive.archive.entries(), typed));
+        *unsafe { out_ref(out_json, "out_json")? } = owned_string(rebof3_formats::registry::manifest_json(&archive.archive, &archive.bytes, typed));
         Ok(())
     })
 }

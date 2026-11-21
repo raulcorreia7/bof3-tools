@@ -22,7 +22,7 @@ bof3player = { workspace = true, features = ["std"] }
 psx-formats = { workspace = true, features = ["std"] }
 serde_json.workspace = true
 gpui.workspace = true
-rebof3-render.workspace = true
+psx-render.workspace = true
 # The frame type gpui paints a rendered image from.
 image = { version = "0.25.10", default-features = false }
 cpal = "0.18.2"
@@ -33,7 +33,7 @@ rubato = "=5.1.0"
 [features]
 default = ["gles"]
 # Draws the area view through offscreen OpenGL ES when a context opens; the software path always builds.
-gles = ["rebof3-render/gles"]
+gles = ["psx-render/gles"]
 
 [lints]
 workspace = true

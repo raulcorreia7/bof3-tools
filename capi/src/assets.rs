@@ -226,35 +226,8 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
         let companion = if job.companion.is_null() && job.companion_len == 0 { None } else { Some(unsafe { input(job.companion, job.companion_len, "job companion")? }) };
         let index = unsafe { optional_u32(job.index) };
         let load_arg = unsafe { optional_u32(job.load_arg) };
-        if op.named && name.is_none() {
-            return Err(invalid(op.needs_input));
-        }
-        if !op.named && name.is_some() {
-            return Err(invalid(format!("the {kind} conversion takes no name")));
-        }
-        if op.files >= 2 && companion.is_none() {
-            return Err(invalid(op.needs_input));
-        }
-        if let Some(flag) = op.companion_flag {
-            if companion.is_none() {
-                return Err(invalid(flag.missing));
-            }
-        } else if op.files < 2 && companion.is_some() {
-            return Err(invalid(format!("the {kind} conversion takes no companion")));
-        }
-        if op.index == Index::No && index.is_some() {
-            return Err(invalid(format!("the {kind} conversion takes no index")));
-        }
-        if let Index::Required(missing) = op.index
-            && index.is_none()
-        {
-            return Err(invalid(missing));
-        }
-        if !op.load_arg && load_arg.is_some() {
-            return Err(invalid(format!("the {kind} conversion takes no load argument")));
-        }
         let job = codec::Job { name, input: input_bytes, companion, index, load_arg };
-        let bytes = (op.run)(&job)?;
+        let bytes = op.run_checked(kind, &job)?;
         *out_bytes = owned_buffer(bytes);
         Ok(())
     })

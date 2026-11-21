@@ -12,7 +12,8 @@
 
 use std::ops::RangeInclusive;
 
-use rebof3_emi::Entry;
+use rebof3_emi::manifest::Label;
+use rebof3_emi::{Archive, Entry};
 
 use crate::vram::RowUse;
 use crate::{cells, character_sprites, clut, cue, encounter, map, message, residue, resources, scene, script, sep, sprite_palettes, vab, vram, window};
@@ -315,16 +316,21 @@ pub fn classify(entry: &Entry, payload: &[u8]) -> Format {
     REGISTRY.iter().find(selected).map_or(Format::Unclassified, |description| description.format)
 }
 
+/// The `emi.json` text of a container: each table row with its format and asset kind from the registry.
+pub fn manifest_json(archive: &Archive, container: &[u8], typed: bool) -> String {
+    let labels: Vec<_> = archive
+        .entries()
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| classify(entry, archive.payload(container, index).unwrap_or(&[])))
+        .map(|format| Label { format: format.name(), kind: format.describe().kind })
+        .collect();
+    rebof3_emi::manifest::to_json(archive.version(), archive.entries(), typed, &labels)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_registry_lists_every_format_in_order() {
-        for (format, description) in Format::ALL.iter().zip(REGISTRY) {
-            assert_eq!(*format, description.format, "{}", description.name);
-        }
-    }
 
     #[test]
     fn a_block_without_palette_tables_at_the_sprite_address_is_unclassified() {

@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-09
-- Applies to: `rebof3-render` (new), `bof3-edit` (the area view's `3D` tab)
+- Applies to: `psx-render` (new), `bof3-edit` (the area view's `3D` tab)
 
 ## Context
 
@@ -26,7 +26,7 @@ Linux or Windows: `Window::paint_surface` is `#[cfg(target_os = "macos")]` and t
 
 ## Decision
 
-`rebof3-render` draws a `Scene` (VRAM words plus quads with PSX texture, colour and blend state)
+`psx-render` draws a `Scene` (VRAM words plus quads with PSX texture, colour and blend state)
 for a `Camera` into an RGBA `Frame`, through one of two backends:
 
 - **OpenGL ES 3.0 offscreen**, behind the `gles` cargo feature. It uses `glow` 0.18.0 for the GL
@@ -44,7 +44,7 @@ for a `Camera` into an RGBA `Frame`, through one of two backends:
 `Renderer::new` tries OpenGL ES and falls back to software when no context opens, recording the
 reason. A failed draw also falls back. The editor paints the frame with `paint_image` in a
 `canvas`, and drops the frame it replaces from the atlas with `drop_image`. Picking
-(`rebof3_render::pick`) is a CPU ray test over the scene. It does not depend on the backend, and
+(`psx_render::pick`) is a CPU ray test over the scene. It does not depend on the backend, and
 neither do the logs, the VRAM readback or the tests.
 
 The editor turns the backend on through its own `gles` feature (on by default). The view has a
@@ -52,7 +52,7 @@ The editor turns the backend on through its own `gles` feature (on by default). 
 
 ## Evidence
 
-- Parity: `crates/rebof3-render/tests/backends.rs` draws one scene through both backends. The
+- Parity: `crates/psx-render/tests/backends.rs` draws one scene through both backends. The
   scene has an opaque 8-bit quad at neutral shade, a shaded 4-bit quad, an 8-bit quad in blend
   mode 0 whose CLUT sets STP on every odd index, and an image with alpha. At 320 x 240 the frames
   differ in 39 of 76,800 pixels. The test bounds the share at 0.5% and skips when no EGL display

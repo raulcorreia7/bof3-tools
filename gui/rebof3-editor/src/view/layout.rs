@@ -19,7 +19,6 @@ use std::rc::Rc;
 use gpui::{AnyElement, Context, Div, Hsla, ParentElement, Styled, div, prelude::*, px, rgba};
 use rebof3_emi::replay::{Kind as WriteKind, Writer};
 use rebof3_emi::texture::{ARENA_BASE, ARENA_BYTES, ARENA_ROW_WORDS, ARENA_VRAM_ROW, ClutBlock, clut_at, sheet};
-use rebof3_formats::vram::Placement;
 use rebof3_formats::{Format, classify};
 
 use super::Entry;
@@ -250,7 +249,7 @@ pub fn moved(project: &Project, placed: &Placed, step: Step) -> Result<u32, Stri
     match placed.kind {
         Kind::Code => Err(placed.note.clone()),
         Kind::Texture => {
-            let place = Placement::of_load_argument(load_arg);
+            let place = rebof3_emi::upload::descriptor(load_arg);
             let (dx, dy) = match step {
                 Step::Left => (-1, 0),
                 Step::Right => (1, 0),
@@ -264,7 +263,7 @@ pub fn moved(project: &Project, placed: &Placed, step: Step) -> Result<u32, Stri
                 .ok()
                 .zip(u8::try_from(row).ok())
                 .and_then(|(column, row)| place.moved(column, row, rectangles))
-                .map(|place| place.load_argument(load_arg))
+                .map(|place| rebof3_emi::upload::load_argument(place, load_arg))
                 .ok_or_else(|| "a step that way leaves the frame buffer".to_string())
         }
         Kind::Palette => {

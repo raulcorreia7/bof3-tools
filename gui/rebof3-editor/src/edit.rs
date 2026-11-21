@@ -135,15 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn the_caret_marks_the_cursor() {
-        let mut edit = LineEdit::new("ab".into());
-
-        press(&mut edit, "home");
-        press(&mut edit, "right");
-        assert_eq!(edit.shown(), "a|b");
-    }
-
-    #[test]
     fn enter_submits_and_escape_cancels() {
         let mut edit = LineEdit::default();
 

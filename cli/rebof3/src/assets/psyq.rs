@@ -6,7 +6,8 @@ use std::path::PathBuf;
 
 use super::{Error, Result};
 use clap::Parser;
-use rebof3_formats::vram::{self, Placement};
+use psx_formats::vram::Placement;
+use rebof3_formats::vram;
 
 use super::write_output;
 use super::{EXIT_OK, color_words, create_parent, number, optional_number, parse, read_file, single, with_extension_of};
@@ -216,7 +217,12 @@ pub(super) fn import_tim(args: &[String]) -> Result<i32> {
     let Placement { column, row, chunks_per_row } = texture.placement;
     let depth = texture.depth.map_or("15-bit".to_string(), |depth| format!("{}-bit", depth.bits()));
     println!("wrote {} ({depth} image)", out.display());
-    println!("  image at ({}, {}), {chunks_per_row} rectangles per row: load argument {:#010x}", texture.placement.x(), texture.placement.y(), texture.placement.load_argument(base.unwrap_or(0)));
+    println!(
+        "  image at ({}, {}), {chunks_per_row} rectangles per row: load argument {:#010x}",
+        texture.placement.x(),
+        texture.placement.y(),
+        rebof3_emi::upload::load_argument(texture.placement, base.unwrap_or(0))
+    );
     println!("  column {column}, row {row}");
     if let Some(path) = args.palette {
         let clut = texture.clut.ok_or_else(|| Error::Usage("--palette needs a TIM with a CLUT block; this one has none".into()))?;

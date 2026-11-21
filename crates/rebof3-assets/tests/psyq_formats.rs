@@ -11,7 +11,7 @@ use std::fs;
 use psx_formats::sep::{Package, seq};
 use rebof3_emi::{Archive, texture};
 use rebof3_formats::joins::joined_rows;
-use rebof3_formats::vram::{self, Placement};
+use rebof3_formats::vram;
 use rebof3_formats::{Format, classify, clut, vab};
 
 /// One archive of the disc: its entries and payloads.
@@ -65,8 +65,8 @@ fn retail_joined_textures_round_trip_through_tim() {
                 let back = vram::import_tim(&tim).expect("the TIM reads back");
                 let name = format!("{} #{slot} at {:?}", disc.path, row.clut);
                 assert_eq!(back.payload, disc.payloads[slot], "{name}: the texture");
-                assert_eq!(back.placement, Placement::of_load_argument(entry.ram_ptr), "{name}: the placement");
-                assert_eq!(back.placement.load_argument(entry.ram_ptr), entry.ram_ptr, "{name}: the load argument");
+                assert_eq!(back.placement, rebof3_emi::upload::descriptor(entry.ram_ptr), "{name}: the placement");
+                assert_eq!(rebof3_emi::upload::load_argument(back.placement, entry.ram_ptr), entry.ram_ptr, "{name}: the load argument");
                 assert_eq!(back.depth, Some(row.depth), "{name}: the depth");
                 let block = back.clut.expect("a CLUT block");
                 assert_eq!((block.x, block.y), (row.clut.x, row.clut.y), "{name}: the CLUT place");
@@ -101,7 +101,7 @@ fn retail_uploads_round_trip_through_a_plain_tim() {
             let back = vram::import_tim(&tim).expect("the TIM reads back");
             let name = format!("{} #{slot}", disc.path);
             assert_eq!(back.payload, disc.payloads[slot], "{name}");
-            assert_eq!(back.placement.load_argument(entry.ram_ptr), entry.ram_ptr, "{name}");
+            assert_eq!(rebof3_emi::upload::load_argument(back.placement, entry.ram_ptr), entry.ram_ptr, "{name}");
             assert!(back.clut.is_none() && back.depth.is_none(), "{name}: a plain TIM has no CLUT");
         }
     }

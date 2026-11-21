@@ -2,7 +2,7 @@
 //! with no GPU or Mesa) the comparison skips and says why.
 
 use psx_formats::gfx::texture::{Clut, Color, Depth};
-use rebof3_render::{Backend, Blend, Camera, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, software};
+use psx_render::{Backend, Blend, Camera, Image, NEUTRAL_SHADE, Primitive, Renderer, STP_BIT, Scene, Texture, VRAM_HEIGHT, VRAM_WIDTH, software};
 
 /// A VRAM with an 8-bit page at (64, 0) whose texel at `(u, v)` is `(u + v) & 0xFF`, a 4-bit page at
 /// (128, 0) whose texel is `u & 15`, and a CLUT row 480 mapping index `i` to a colour with bit 15 on

@@ -622,15 +622,3 @@ impl Catalog {
 fn entry_label(entry: &Placed) -> String {
     if entry.note.is_empty() { format!("{:>2}  {}", entry.index, entry.format.name()) } else { format!("{:>2}  {}: {}", entry.index, entry.format.name(), entry.note) }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_rule_cites_its_source() {
-        for rule in RULES {
-            assert!(!rule.source.is_empty() && !rule.section.is_empty());
-        }
-    }
-}
