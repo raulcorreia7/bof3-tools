@@ -33,7 +33,7 @@ struct ManifestEntry {
 }
 
 /// The manifest text for a container with `entries`.
-pub(crate) fn to_json(archive_version: u32, entries: &[Entry], typed: bool) -> String {
+pub fn to_json(archive_version: u32, entries: &[Entry], typed: bool) -> String {
     let manifest = Manifest {
         archive_version,
         entries: entries

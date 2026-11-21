@@ -15,7 +15,7 @@ use std::ops::RangeInclusive;
 use rebof3_emi::Entry;
 
 use crate::vram::RowUse;
-use crate::{cells, character_sprites, clut, cue, encounter, map, message, residue, resources, scene, script, sep, vab, vram, window};
+use crate::{cells, character_sprites, clut, cue, encounter, map, message, residue, resources, scene, script, sep, sprite_palettes, vab, vram, window};
 
 /// The entry type of a code or data image: the load address picks the format.
 pub const TYPE_DATA: u16 = 0;
@@ -304,12 +304,15 @@ pub fn extension(format: Format) -> &'static str {
 }
 
 /// The format one entry belongs to: its file type and load address, with an all-zero payload
-/// counted as a reservation wherever it sits.
+/// counted as a reservation wherever it sits. A block at the character-sprites address counts as
+/// character sprites only when it holds the palette tables; the three `BMAGIC/KAIZAR_*` blocks there
+/// open with `u32 4` and a cell stream instead, and stay unclassified.
 pub fn classify(entry: &Entry, payload: &[u8]) -> Format {
     if entry.file_type == TYPE_DATA && payload.iter().all(|byte| *byte == 0) {
         return Format::Reserve;
     }
-    REGISTRY.iter().find(|description| description.selector.matches(entry)).map_or(Format::Unclassified, |description| description.format)
+    let selected = |description: &&&Description| description.selector.matches(entry) && (description.format != Format::CharacterSprites || sprite_palettes::parse(payload).is_ok());
+    REGISTRY.iter().find(selected).map_or(Format::Unclassified, |description| description.format)
 }
 
 #[cfg(test)]
@@ -321,5 +324,13 @@ mod tests {
         for (format, description) in Format::ALL.iter().zip(REGISTRY) {
             assert_eq!(*format, description.format, "{}", description.name);
         }
+    }
+
+    #[test]
+    fn a_block_without_palette_tables_at_the_sprite_address_is_unclassified() {
+        // The head of BMAGIC/KAIZAR_D.EMI entry 0: `u32 4`, then a word past the payload.
+        let payload = [4, 0, 0, 0, 6, 0, 0x5c, 0x15, 0x54, 0x4f, 6, 6];
+        let entry = Entry { size: payload.len() as u32, offset: 0, ram_ptr: 0x8003_b800, first4: 4, file_type: 0 };
+        assert_eq!(classify(&entry, &payload), Format::Unclassified);
     }
 }

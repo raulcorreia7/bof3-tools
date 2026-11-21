@@ -749,7 +749,7 @@ dependencies = [
 [[package]]
 name = "bof3player"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "emi",
  "psx-audio",
@@ -876,6 +876,24 @@ dependencies = [
  "syn 2.0.119",
  "tempfile",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "cbindgen"
+version = "0.29.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ecb53484c9c167ba674026b656d8a27d7657a58e6066aa902bfb1a4aa00ae20"
+dependencies = [
+ "heck 0.5.0",
+ "indexmap",
+ "log",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 2.0.119",
+ "tempfile",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
@@ -1680,7 +1698,7 @@ dependencies = [
 [[package]]
 name = "emi"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "psx-formats",
  "serde",
@@ -1772,7 +1790,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2379,7 +2397,7 @@ dependencies = [
  "bytemuck",
  "calloop",
  "calloop-wayland-source",
- "cbindgen",
+ "cbindgen 0.28.0",
  "cocoa 0.26.0",
  "cocoa-foundation 0.2.0",
  "core-foundation 0.10.0",
@@ -4483,7 +4501,7 @@ dependencies = [
 [[package]]
 name = "psx-audio"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "flacenc",
  "psx-cd",
@@ -4492,9 +4510,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "psx-capi"
+version = "0.1.3"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
+dependencies = [
+ "emi",
+ "psx-formats",
+]
+
+[[package]]
 name = "psx-cd"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "md-5 0.11.0",
  "psx-formats",
@@ -4507,7 +4534,7 @@ dependencies = [
 [[package]]
 name = "psx-formats"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "png 0.18.1",
  "serde",
@@ -4517,7 +4544,7 @@ dependencies = [
 [[package]]
 name = "psx-machine"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "psx-cd",
 ]
@@ -4614,7 +4641,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4870,8 +4897,9 @@ dependencies = [
 name = "rebof3-capi"
 version = "0.1.0"
 dependencies = [
- "cbindgen",
+ "cbindgen 0.29.4",
  "cc",
+ "psx-capi",
  "rebof3-assets",
  "rebof3-capi",
  "rebof3-emi",
@@ -5178,7 +5206,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5739,7 +5767,7 @@ dependencies = [
 [[package]]
 name = "stacksafe-macro"
 version = "0.1.4"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "proc-macro-error3",
  "quote",
@@ -6022,7 +6050,7 @@ dependencies = [
 [[package]]
 name = "taffy"
 version = "0.9.0"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb#c2fdc2687053f20b0d5e39f2165c5ddb25cc58bb"
 dependencies = [
  "arrayvec",
  "grid",
@@ -6061,10 +6089,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand 2.5.0",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6256,6 +6284,21 @@ dependencies = [
 
 [[package]]
 name = "toml"
+version = "0.9.12+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf92845e79fc2e2def6a5d828f0801e29a2f8acc037becc5ab08595c7d5e9863"
+dependencies = [
+ "indexmap",
+ "serde_core",
+ "serde_spanned 1.1.3",
+ "toml_datetime 0.7.5+spec-1.1.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow 0.7.15",
+]
+
+[[package]]
+name = "toml"
 version = "1.2.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5426cb1b964690d913f6c5c1a1ae0b42f428ec506bb4d452876d7a209c9bca3b"
@@ -6276,6 +6319,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22cddaf88f4fbc13c51aebbf5f8eceb5c7c5a9da2ac40a13519eb5b0a0e8f11c"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.7.5+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92e1cfed4a3038bc5a127e35a2d360f145e1f4b971b551a2ba5fd7aedf7e1347"
+dependencies = [
+ "serde_core",
 ]
 
 [[package]]
@@ -6979,7 +7031,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
