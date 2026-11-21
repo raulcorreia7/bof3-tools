@@ -4849,6 +4849,7 @@ dependencies = [
  "rebof3-emi",
  "rebof3-formats",
  "rebof3-observe",
+ "serde",
  "serde_json",
  "sha2 0.11.1",
 ]
@@ -4910,6 +4911,7 @@ name = "rebof3-emi"
 version = "0.2.0"
 dependencies = [
  "emi",
+ "psx-cd",
  "psx-formats",
  "rebof3-emi",
  "serde",

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+use crate::parse;
+use clap::Parser;
 use psx_formats::clut;
 use psx_formats::vram::{Descriptor, Plane, UPLOAD_TYPE, decode};
 use rebof3_emi::{Archive, PackEntry, PackFolderOptions, ensure_parent, entry_name, guess_type, manifest_entries, pack, pack_folder};
@@ -68,52 +70,49 @@ fn args_prefixed(rest: &[OsString], first: &str) -> Vec<OsString> {
     std::iter::once(OsString::from(first)).chain(rest.iter().cloned()).collect()
 }
 
-#[derive(Default)]
-struct ExtractOptions {
+/// `bof3 emi extract`.
+#[derive(Parser)]
+struct ExtractArgs {
+    #[arg(short = 'e', long = "extensions", visible_alias = "typed-extensions")]
     typed: bool,
+    #[arg(short, long)]
     quiet: bool,
+    #[arg(short, long = "dry-run")]
     dry_run: bool,
+    #[arg(long)]
     print_manifest: bool,
-    manifest: Option<Option<PathBuf>>,
+    #[arg(short, long)]
     input: Option<PathBuf>,
+    #[arg(short, long)]
     output: Option<PathBuf>,
+    #[arg(short = 'n', long = "index")]
     explicit_index: Option<usize>,
+    #[arg(short = 'J', long = "manifest-json", num_args = 0..=1)]
+    manifest: Option<Option<PathBuf>>,
     positionals: Vec<OsString>,
 }
 
-fn run_extract(args: &[OsString]) -> Result<i32, String> {
-    let mut options = ExtractOptions::default();
-    let mut index = 0;
-    while index < args.len() {
-        let value = args[index].to_str();
-        match value {
-            Some("-e" | "--extensions" | "--typed-extensions") => options.typed = true,
-            Some("-q" | "--quiet") => options.quiet = true,
-            Some("-d" | "--dry-run") => options.dry_run = true,
-            Some("--print-manifest") => options.print_manifest = true,
-            Some("-i" | "--input") => {
-                index += 1;
-                options.input = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some("-o" | "--output") => {
-                index += 1;
-                options.output = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some("-n" | "--index") => {
-                index += 1;
-                options.explicit_index = Some(parse_num(require_arg(args, index, value.unwrap())?, "extract index")?);
-            }
-            Some("-J" | "--manifest-json") => {
-                let path = optional_option_value(args, &mut index);
-                options.manifest = Some(path.map(PathBuf::from));
-            }
-            Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `bof3 emi --help`"));
-            }
-            _ => options.positionals.push(args[index].clone()),
-        }
-        index += 1;
+/// The one archive a command takes, from `-i` or the only positional.
+fn archive_of(command: &str, input: Option<PathBuf>, mut positionals: Vec<PathBuf>) -> Result<PathBuf, String> {
+    if input.is_some() && !positionals.is_empty() || positionals.len() > 1 {
+        return Err(format!("{command} takes one archive: drop the extra -i or positional; run `bof3 emi {command} --help`."));
     }
+    input.or(positionals.pop()).ok_or_else(|| format!("{command} needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi {command} --help`."))
+}
+
+/// The archive and the entry index of `clut`, `vab` and `sep`: `-i ARCHIVE INDEX` or `ARCHIVE INDEX`.
+fn archive_and_index(command: &str, input: Option<PathBuf>, positionals: &[OsString]) -> Result<(PathBuf, usize), String> {
+    let (archive, index) = match (input, positionals) {
+        (Some(input), [index]) => (input, index),
+        (None, [archive, index]) => (PathBuf::from(archive), index),
+        (Some(_), _) => return Err(format!("{command} takes one index: pass it as INDEX; run `bof3 emi {command} --help`.")),
+        (None, _) => return Err(format!("{command} needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi {command} --help`.")),
+    };
+    Ok((archive, parse_num(index, &format!("{command} entry index"))?))
+}
+
+fn run_extract(args: &[OsString]) -> Result<i32, String> {
+    let options: ExtractArgs = parse(args)?;
     let positional_index = match (&options.input, options.positionals.len()) {
         (Some(_), 0) => None,
         (Some(_), 1) => Some(parse_num(&options.positionals[0], "extract index")?),
@@ -179,7 +178,33 @@ fn run_extract(args: &[OsString]) -> Result<i32, String> {
     Ok(EXIT_OK)
 }
 
-#[derive(Default)]
+/// `bof3 emi pack`.
+#[derive(Parser)]
+struct PackArgs {
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+    #[arg(short, long = "dry-run")]
+    dry_run: bool,
+    #[arg(short, long)]
+    quiet: bool,
+    #[arg(short = 'k', long = "keep-original", overrides_with = "no_keep")]
+    _keep: bool,
+    #[arg(short = 'K', long = "no-keep", overrides_with = "_keep")]
+    no_keep: bool,
+    #[arg(short = 't', long = "type")]
+    default_type: Option<u16>,
+    #[arg(short = 'I', long)]
+    include: Vec<String>,
+    #[arg(short = 'X', long)]
+    exclude: Vec<String>,
+    #[arg(short = 'J', long = "manifest-json", num_args = 0..=1)]
+    manifest: Option<Option<PathBuf>>,
+    #[arg(short, long = "input", num_args = 1..)]
+    inputs: Vec<PathBuf>,
+    folder: Vec<PathBuf>,
+}
+
+/// What `pack` does, as the arguments name it.
 struct PackOptions {
     output: Option<PathBuf>,
     dry_run: bool,
@@ -193,59 +218,22 @@ struct PackOptions {
 }
 
 fn parse_pack_args(args: &[OsString]) -> Result<PackOptions, String> {
-    let mut options = PackOptions { keep: true, ..PackOptions::default() };
-    let mut index = 0;
-    while index < args.len() {
-        let value = args[index].to_str().ok_or("pack arguments must be valid UTF-8")?;
-        match value {
-            "-o" | "--output" => {
-                index += 1;
-                options.output = Some(PathBuf::from(require_arg(args, index, value)?));
-            }
-            "-d" | "--dry-run" => options.dry_run = true,
-            "-q" | "--quiet" => {}
-            "-k" | "--keep-original" => options.keep = true,
-            "-K" | "--no-keep" => options.keep = false,
-            "-t" | "--type" => {
-                index += 1;
-                options.default_type = Some(parse_num(require_arg(args, index, value)?, "type")?);
-            }
-            "-I" | "--include" | "-X" | "--exclude" => {
-                index += 1;
-                let pattern = require_arg(args, index, value)?.to_string_lossy().into_owned();
-                if value == "-I" || value == "--include" {
-                    options.include.push(pattern);
-                } else {
-                    options.exclude.push(pattern);
-                }
-            }
-            "-J" | "--manifest-json" => {
-                options.manifest = Some(optional_option_value(args, &mut index).map(PathBuf::from));
-            }
-            "-i" | "--input" => {
-                let start = index + 1;
-                index = start;
-                while index < args.len() && !is_option(&args[index]) {
-                    let path = PathBuf::from(&args[index]);
-                    options.inputs.push(PackEntry { file_type: guess_type(&path).or(options.default_type).unwrap_or(255), path, ram_ptr: 0 });
-                    index += 1;
-                }
-                if index == start {
-                    return Err("--input requires at least one file".into());
-                }
-                index -= 1;
-            }
-            value if value.starts_with('-') => return Err(format!("unknown option {value}")),
-            _ => {
-                if options.folder.is_some() || !options.inputs.is_empty() {
-                    return Err(format!("unexpected positional in pack mode: {value}"));
-                }
-                options.folder = Some(PathBuf::from(&args[index]));
-            }
-        }
-        index += 1;
+    let args: PackArgs = parse(args)?;
+    if args.folder.len() > 1 || (!args.folder.is_empty() && !args.inputs.is_empty()) {
+        return Err(format!("unexpected positional in pack mode: {}", args.folder[args.folder.len() - 1].display()));
     }
-    Ok(options)
+    let inputs = args.inputs.into_iter().map(|path| PackEntry { file_type: guess_type(&path).or(args.default_type).unwrap_or(255), path, ram_ptr: 0 }).collect();
+    Ok(PackOptions {
+        output: args.output,
+        dry_run: args.dry_run,
+        keep: !args.no_keep,
+        default_type: args.default_type,
+        include: args.include,
+        exclude: args.exclude,
+        manifest: args.manifest,
+        folder: args.folder.into_iter().next(),
+        inputs,
+    })
 }
 
 fn run_pack(args: &[OsString]) -> Result<i32, String> {
@@ -374,23 +362,6 @@ fn cleanup_inputs(owned: Vec<PathBuf>, folder: Option<&Path>) -> Result<(), Stri
         fs::remove_file(&path).map_err(|error| format!("cannot remove {}: {error}", path.display()))?;
     }
     Ok(())
-}
-
-fn optional_option_value(args: &[OsString], index: &mut usize) -> Option<OsString> {
-    let next = args.get(*index + 1)?;
-    if is_option(next) {
-        return None;
-    }
-    *index += 1;
-    Some(next.clone())
-}
-
-fn is_option(value: &OsStr) -> bool {
-    value.to_string_lossy().starts_with('-')
-}
-
-fn require_arg<'a>(args: &'a [OsString], index: usize, option: &str) -> Result<&'a OsStr, String> {
-    args.get(index).map(OsString::as_os_str).ok_or_else(|| format!("{option} requires an argument"))
 }
 
 fn parse_num<T: FromStr>(value: &OsStr, label: &str) -> Result<T, String> {
@@ -559,33 +530,19 @@ fn print_usage() {
     print!("{USAGE}");
 }
 
+/// `bof3 emi list`.
+#[derive(Parser)]
+struct ListArgs {
+    #[arg(short, long)]
+    input: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+    archive: Vec<PathBuf>,
+}
+
 fn run_list(args: &[OsString]) -> Result<i32, String> {
-    let mut source = None;
-    let mut json = false;
-    let mut index = 0;
-    while index < args.len() {
-        let value = args[index].to_str().unwrap_or("");
-        match value {
-            "-i" | "--input" => {
-                index += 1;
-                let path = require_arg(args, index, value)?;
-                if source.replace(PathBuf::from(path)).is_some() {
-                    return Err("list takes one archive: drop the extra -i or positional; run `bof3 emi list --help`.".into());
-                }
-            }
-            "--json" => json = true,
-            value if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `bof3 emi list --help`"));
-            }
-            _ => {
-                if source.replace(PathBuf::from(&args[index])).is_some() {
-                    return Err("list takes one archive: drop the extra argument; run `bof3 emi list --help`.".into());
-                }
-            }
-        }
-        index += 1;
-    }
-    let source = source.ok_or_else(|| "list needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi list --help`.".to_string())?;
+    let ListArgs { input, json, archive } = parse(args)?;
+    let source = archive_of("list", input, archive)?;
     let archive = Archive::open(&source).map_err(|error| format!("cannot read {}: {error}; check the path, or run `bof3 emi list --help`", source.display()))?;
     if json {
         let entries: Vec<serde_json::Value> = archive
@@ -613,62 +570,31 @@ fn run_list(args: &[OsString]) -> Result<i32, String> {
     Ok(EXIT_OK)
 }
 
-#[derive(Default)]
-struct VramOptions {
+/// `bof3 emi vram`.
+#[derive(Parser)]
+struct VramArgs {
+    #[arg(short, long)]
+    input: Option<PathBuf>,
+    #[arg(short, long)]
     output: Option<PathBuf>,
-    source: Option<PathBuf>,
+    archive: Vec<PathBuf>,
 }
-
-const VRAM_USAGE: &str = "bof3 emi vram needs an archive: pass it with -i ARCHIVE or as the only positional; run `bof3 emi vram --help`.";
 
 /// Decodes an archive's type-3 uploads into one page set, optionally as PNG.
 fn run_vram(args: &[OsString]) -> Result<i32, String> {
-    let options = vram_options(args)?;
-    let source = options.source.ok_or(VRAM_USAGE)?;
+    let VramArgs { input, output, archive } = parse(args)?;
+    let source = archive_of("vram", input, archive)?;
     let archive = Archive::open(&source).map_err(|error| format!("cannot read {}: {error}; check the path, or run `bof3 emi list {}`", source.display(), source.display()))?;
     let retail = fs::read(&source).map_err(|error| format!("cannot read {}: {error}; check the path and its permissions", source.display()))?;
     let mut page_set = Plane::new();
     print_uploads(&archive, &retail, &mut page_set, &source)?;
-    if let Some(output) = options.output {
+    if let Some(output) = output {
         ensure_parent(&output).map_err(|error| error.to_string())?;
         page_set.write_png(&output).map_err(|error| format!("{}: {error}", output.display()))?;
         eprintln!("wrote {}", output.display());
     }
 
     Ok(EXIT_OK)
-}
-
-/// Parses the `vram` arguments.
-fn vram_options(args: &[OsString]) -> Result<VramOptions, String> {
-    let mut options = VramOptions::default();
-    let mut index = 0;
-    while index < args.len() {
-        let value = args[index].to_str();
-        match value {
-            Some("-i" | "--input") => {
-                index += 1;
-                let path = PathBuf::from(require_arg(args, index, value.unwrap())?);
-                if options.source.replace(path).is_some() {
-                    return Err("vram takes one archive: drop the extra -i or positional; run `bof3 emi vram --help`.".into());
-                }
-            }
-            Some("-o" | "--output") => {
-                index += 1;
-                options.output = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `bof3 emi vram --help`"));
-            }
-            _ => {
-                if options.source.replace(PathBuf::from(&args[index])).is_some() {
-                    return Err("vram takes one archive: drop the extra argument; run `bof3 emi vram --help`.".into());
-                }
-            }
-        }
-        index += 1;
-    }
-
-    Ok(options)
 }
 
 /// Places every type-3 entry of the archive into `page_set`, printing one row
@@ -698,48 +624,21 @@ fn print_uploads(archive: &Archive, retail: &[u8], page_set: &mut Plane, source:
     Ok(())
 }
 
+/// `bof3 emi clut`.
+#[derive(Parser)]
+struct ClutArgs {
+    #[arg(short, long)]
+    input: Option<PathBuf>,
+    #[arg(short, long)]
+    json: Option<PathBuf>,
+    #[arg(short, long)]
+    png: Option<PathBuf>,
+    positionals: Vec<OsString>,
+}
+
 fn run_clut(args: &[OsString]) -> Result<i32, String> {
-    let mut json: Option<PathBuf> = None;
-    let mut png: Option<PathBuf> = None;
-    let mut input: Option<PathBuf> = None;
-    let mut positionals: Vec<&OsString> = Vec::new();
-    let mut index = 0;
-    while index < args.len() {
-        let value = args[index].to_str();
-        match value {
-            Some("-i" | "--input") => {
-                index += 1;
-                input = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some("-j" | "--json") => {
-                index += 1;
-                json = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some("-p" | "--png") => {
-                index += 1;
-                png = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `bof3 emi clut --help`"));
-            }
-            _ => positionals.push(&args[index]),
-        }
-        index += 1;
-    }
-    let entry_index = match (&input, positionals.len()) {
-        (Some(_), 1) => parse_num(positionals[0], "clut entry index")?,
-        (Some(_), _) => {
-            return Err("clut takes one index: pass it as INDEX; run `bof3 emi clut --help`.".into());
-        }
-        (None, 2) => parse_num(positionals[1], "clut entry index")?,
-        (None, _) => {
-            return Err("clut needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi clut --help`.".into());
-        }
-    };
-    let source = match input {
-        Some(input) => input,
-        None => PathBuf::from(positionals[0]),
-    };
+    let ClutArgs { input, json, png, positionals } = parse(args)?;
+    let (source, entry_index) = archive_and_index("clut", input, &positionals)?;
     let palette = rebof3_emi::entry::palette(&source, entry_index)
         .map_err(|error| format!("cannot read {}#{entry_index}: {error}; run `bof3 emi list {}` to see the entry table", source.display(), source.display()))?;
     if let Some(path) = json {
@@ -763,41 +662,25 @@ fn run_clut(args: &[OsString]) -> Result<i32, String> {
     Ok(EXIT_OK)
 }
 
-/// Audio verbs take the same two positionals; `--dump` widens the output.
-fn audio_args<'a>(args: &'a [OsString], command: &str) -> Result<(bool, Vec<&'a OsString>), String> {
-    let mut dump = false;
-    let mut positionals: Vec<&'a OsString> = Vec::new();
-    let mut index = 0;
-    while index < args.len() {
-        let arg = &args[index];
-        match arg.to_str() {
-            Some("--dump") => dump = true,
-            Some("-i" | "--input") => {
-                index += 1;
-                let value = args.get(index).ok_or_else(|| format!("-i/--input needs an archive; run `bof3 emi {command} --help`."))?;
-                if positionals.is_empty() {
-                    positionals.push(value);
-                } else {
-                    return Err(format!("{command} takes one archive: drop the extra -i or positional; run `bof3 emi {command} --help`."));
-                }
-            }
-            Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `bof3 emi {command} --help`"));
-            }
-            _ => positionals.push(arg),
-        }
-        index += 1;
-    }
-    if positionals.len() != 2 {
-        return Err(format!("{command} needs an archive and an index: use `-i ARCHIVE INDEX` or `ARCHIVE INDEX`; run `bof3 emi {command} --help`."));
-    }
-    Ok((dump, positionals))
+/// `bof3 emi vab` and `bof3 emi sep`.
+#[derive(Parser)]
+struct AudioArgs {
+    #[arg(short, long)]
+    input: Option<PathBuf>,
+    #[arg(long)]
+    dump: bool,
+    positionals: Vec<OsString>,
+}
+
+/// The archive, the entry index and `--dump` of an audio verb.
+fn audio_args(args: &[OsString], command: &str) -> Result<(bool, PathBuf, usize), String> {
+    let AudioArgs { input, dump, positionals } = parse(args)?;
+    let (archive, index) = archive_and_index(command, input, &positionals)?;
+    Ok((dump, archive, index))
 }
 
 fn run_vab(args: &[OsString]) -> Result<i32, String> {
-    let (dump, positionals) = audio_args(args, "vab")?;
-    let source = PathBuf::from(positionals[0]);
-    let index = parse_num(positionals[1], "vab entry index")?;
+    let (dump, source, index) = audio_args(args, "vab")?;
     let bank = rebof3_emi::entry::vab(&source, index).map_err(|error| format!("{}: {error}", source.display()))?;
     if dump {
         print!("{}", bank.dump());
@@ -821,9 +704,7 @@ fn run_vab(args: &[OsString]) -> Result<i32, String> {
 }
 
 fn run_sep(args: &[OsString]) -> Result<i32, String> {
-    let (dump, positionals) = audio_args(args, "sep")?;
-    let source = PathBuf::from(positionals[0]);
-    let index = parse_num(positionals[1], "sep entry index")?;
+    let (dump, source, index) = audio_args(args, "sep")?;
     let package = rebof3_emi::entry::sep(&source, index).map_err(|error| format!("{}: {error}", source.display()))?;
     if dump {
         print!("{}", package.dump());
@@ -858,35 +739,26 @@ fn report_problems(problems: impl Iterator<Item = String>) -> i32 {
 /// relative to the working directory.
 const COVERAGE_CORPUS: &str = "raw/disc/BIN";
 
+/// `bof3 emi coverage`.
+#[derive(Parser)]
+struct CoverageArgs {
+    #[arg(short = 'i', long = "input", visible_aliases = ["corpus"], short_alias = 'c')]
+    corpus: Option<PathBuf>,
+    #[arg(short = 'o', long = "output", visible_aliases = ["jsonl"], short_alias = 'j')]
+    jsonl: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+    positional: Vec<OsString>,
+}
+
 /// Prints the format coverage scoreboard over the retail archives and, with
 /// `--jsonl`, writes it as the coverage table.
 fn run_coverage(args: &[OsString]) -> Result<i32, String> {
-    let mut corpus = PathBuf::from(COVERAGE_CORPUS);
-    let mut jsonl: Option<PathBuf> = None;
-    let mut json = false;
-    let mut index = 0;
-    while index < args.len() {
-        let value = args[index].to_str();
-        match value {
-            Some("-i" | "--input" | "--corpus" | "-c") => {
-                index += 1;
-                corpus = PathBuf::from(require_arg(args, index, value.unwrap())?);
-            }
-            Some("-o" | "--output" | "--jsonl" | "-j") => {
-                index += 1;
-                jsonl = Some(PathBuf::from(require_arg(args, index, value.unwrap())?));
-            }
-            Some("--json") => json = true,
-            Some(value) if value.starts_with('-') => {
-                return Err(format!("unknown option {value}; run `bof3 emi coverage --help`"));
-            }
-            _ => {
-                return Err("coverage takes no positional: pass the archive folder with -i DIR; run `bof3 emi coverage --help`.".into());
-            }
-        }
-        index += 1;
+    let CoverageArgs { corpus, jsonl, json, positional } = parse(args)?;
+    if !positional.is_empty() {
+        return Err("coverage takes no positional: pass the archive folder with -i DIR; run `bof3 emi coverage --help`.".into());
     }
-
+    let corpus = corpus.unwrap_or_else(|| PathBuf::from(COVERAGE_CORPUS));
     let report = coverage::check(&corpus).map_err(|error| format!("cannot read the archives under {}: {error}; pass the folder with -i DIR", corpus.display()))?;
     if json {
         print!("{}", report.jsonl());

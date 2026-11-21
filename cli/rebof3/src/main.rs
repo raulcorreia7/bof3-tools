@@ -91,3 +91,14 @@ fn main() -> ExitCode {
         }
     }
 }
+
+/// Parses `args` into `T`; a parse error is clap's first line.
+pub(crate) fn parse<T: clap::Parser>(args: &[OsString]) -> Result<T, String> {
+    let command = T::command().no_binary_name(true).disable_help_flag(true).disable_version_flag(true).args_override_self(true);
+    let usage = |error: clap::Error| {
+        let text = error.to_string();
+        let line = text.lines().next().unwrap_or_default();
+        line.strip_prefix("error: ").unwrap_or(line).to_string()
+    };
+    T::from_arg_matches(&command.try_get_matches_from(args).map_err(usage)?).map_err(usage)
+}

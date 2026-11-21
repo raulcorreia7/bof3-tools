@@ -26,6 +26,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 #[cfg(feature = "std")]
 pub mod cue;
+#[cfg(feature = "std")]
+pub mod disc;
 pub mod emi;
 #[cfg(feature = "std")]
 pub mod entry;
