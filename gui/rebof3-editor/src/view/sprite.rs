@@ -306,10 +306,12 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 /// What the reader of the sprites proves.
 fn reader_note(reader: Reader) -> String {
     match reader {
-        Reader::Field => "Party sprites: Party_LoadMemberSprite places it and loads palette 0.".into(),
+        Reader::Field => "Party sprites: Party_LoadMemberSprite places it and loads palette 0; func_8019C664 loads the leader's palette 1.".into(),
         Reader::Battle => "Battle sprites: Battle_LoadPartySprites streams it and Party_BuildBattlers places it through \
                            Party_LoadMemberSprite, palette 0; the battle slot moves it in VRAM, not its colours."
             .into(),
+        Reader::Form => "Form sprites: Battle_StartCharacterLoad streams it and func_801E7634 loads palette 0.".into(),
+        Reader::Camp => "Camp menu sprites: func_801E3EC4 places it through Party_LoadMemberSprite, palette 0.".into(),
         Reader::Unknown => "No traced loader reads this archive; drawn with the field placement.".into(),
     }
 }
@@ -319,7 +321,7 @@ fn palette_line(state: &State, section: &Section, reader: Reader, cx: &mut Conte
     let shown = state.colours();
     let mut line = div().flex().flex_wrap().items_center().gap(px(GAP)).child("Palette");
     for palette in 0..section.palettes.len() {
-        let label = if reader.palette() == Some(palette) { format!("{palette} (loaded)") } else { palette.to_string() };
+        let label = if reader.palettes().contains(&palette) { format!("{palette} (loaded)") } else { palette.to_string() };
         line = line.child(tab(("palette", palette), label, shown == Colours::Palette(palette)).on_click(cx.listener(move |editor, _, _, cx| {
             editor.views.sprite.palette = Some(palette);
             cx.notify();

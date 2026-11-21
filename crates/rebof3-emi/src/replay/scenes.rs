@@ -5,8 +5,8 @@
 //! and named in the function's doc comment; it stands in until those loaders run themselves. What
 //! the loads write comes only from the archives' tables ([`Vram::load`](super::Vram::load)).
 //!
-//! Not listed: the party archives (`PL`, `BPLD`, `BPLU`), which write no VRAM or palette arena;
-//! `SCENA17` and `ENDKANJI`, whose loaders are not read; and leftovers of an earlier screen,
+//! Not listed: the party archives (`PL`, `BPLD`, `BPLU`), which write no VRAM or palette arena,
+//! and leftovers of an earlier screen,
 //! which depend on the route the player took. A scene starts from the cleared frame buffer.
 
 use super::Step;
@@ -15,6 +15,9 @@ use super::Step;
 pub const FIRST: &str = "BIN/ETC/FIRST.EMI";
 /// The title screen's archive (`EMI_SLOT_DEMO`).
 pub const DEMO: &str = "BIN/ETC/DEMO.EMI";
+/// The ending's scenario overlay (`EMI_SLOT_SCENA + 17`) and the kanji it streams (`EMI_SLOT_ENDKANJI`).
+pub const SCENA17: &str = "BIN/SCENARIO/SCENA17.EMI";
+pub const ENDKANJI: &str = "BIN/ETC/ENDKANJI.EMI";
 /// The battle archive below scenario 8 (`EMI_SLOT_BATTLE`).
 pub const BATTLE: &str = "BIN/BATTLE/BATTLE.EMI";
 
@@ -41,6 +44,8 @@ pub enum Kind {
     Battle,
     /// A spell or summon effect in battle.
     Effect,
+    /// The ending, scenario 17.
+    Ending,
 }
 
 impl Kind {
@@ -55,6 +60,7 @@ impl Kind {
             Kind::Village => "Fairy Village",
             Kind::Battle => "Battle",
             Kind::Effect => "Battle effect",
+            Kind::Ending => "Ending",
         }
     }
 }
@@ -173,10 +179,20 @@ pub fn in_battle(base: Scene, archive: &str) -> Option<Scene> {
     Some(base.then(kind, name, steps))
 }
 
+/// The ending: `Scene_LoadOverlay` streams `SCENA17` and `Scene_EnterSaveArea (scenario/scena17/00)` runs
+/// `GFX_ResetPalette`; `func_801F77B4` then streams `ENDKANJI` with no palette step.
+pub fn ending(kanji: bool) -> Scene {
+    let scene = frontend().then(Kind::Ending, "Ending".into(), [Step::Load(SCENA17.into()), Step::ResetPalette, Step::UploadPalette]);
+    if kanji { scene.then(Kind::Ending, "Ending: ENDKANJI".into(), [Step::Load(ENDKANJI.into())]) } else { scene }
+}
+
 /// Every default scene the disc's archives allow, field areas first.
 pub fn catalog<'a>(archives: impl IntoIterator<Item = &'a str>) -> Vec<Scene> {
     let archives: Vec<&str> = archives.into_iter().collect();
     let mut scenes = vec![frontend(), title()];
+    if archives.contains(&SCENA17) {
+        scenes.extend([ending(false), ending(true)]);
+    }
     for &archive in &archives {
         if area_id(archive).is_some() {
             scenes.push(field(archive));
@@ -208,6 +224,9 @@ pub fn home(archive: &str) -> Option<Scene> {
     }
     if archive == DEMO {
         return Some(title());
+    }
+    if archive == SCENA17 || archive == ENDKANJI {
+        return Some(ending(archive == ENDKANJI));
     }
     if area_id(archive).is_some() {
         return Some(field(archive));

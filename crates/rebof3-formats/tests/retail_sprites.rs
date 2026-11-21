@@ -70,7 +70,14 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
         decoded += 1;
         let reader = Reader::of(place.split('#').next().unwrap_or(&place));
         if reader.palette().is_some() {
-            let counts = proven.entry(if reader == Reader::Battle { "battle" } else { "field" }).or_default();
+            let counts = proven
+                .entry(match reader {
+                    Reader::Battle => "battle",
+                    Reader::Form => "form",
+                    Reader::Camp => "camp",
+                    _ => "field",
+                })
+                .or_default();
             counts.0 += 1;
             counts.1 += sprites.sections.len();
             counts.2 += sprites.sections.iter().flat_map(|section| &section.animations).map(|a| a.frames.len()).sum::<usize>();
@@ -133,4 +140,6 @@ fn every_retail_character_sprites_round_trips_and_stitches() {
     assert!(decoded > 0 && imported == sections, "{decoded} sprites, {imported} of {sections} sheets");
     assert_eq!(proven.get("battle"), Some(&(38, 114, 18310)), "battle sprites drawn with the palette their reader loads");
     assert_eq!(proven.get("field"), Some(&(19, 57, 14892)), "field sprites drawn with the palette their reader loads");
+    assert_eq!(proven.get("form"), Some(&(83, 99, 11065)), "form sprites drawn with the palette their reader loads");
+    assert_eq!(proven.get("camp"), Some(&(1, 3, 687)), "camp sprites drawn with the palette their reader loads");
 }

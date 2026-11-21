@@ -55,7 +55,7 @@ pub fn joined_rows_in(source: &str, entries: &[rebof3_emi::Entry], payloads: &[&
         push_row(&mut rows, source, join);
     }
     for bundle in &bundles {
-        for join in draw::terrain_joins(source, &bundle.records, &sheets, &blocks) {
+        for join in draw::terrain_joins(source, &bundle.descriptors(), &sheets, &blocks) {
             push_row(&mut rows, source, join);
         }
     }

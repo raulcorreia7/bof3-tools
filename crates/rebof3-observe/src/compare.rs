@@ -165,7 +165,7 @@ impl Disc {
                 if classify(entry, payload) == Format::AreaMapBundle
                     && let Ok(bundle) = MapBundle::decode(payload)
                 {
-                    descriptors.extend(bundle.records);
+                    descriptors.extend(bundle.descriptors());
                 }
             }
         }
