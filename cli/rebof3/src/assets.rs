@@ -868,22 +868,34 @@ fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
         return Err(Error::Usage(format!("{verb} needs a kind, for example texture; run `bof3 assets {verb} --help`")));
     };
     let kind = &Kind::canonical(kind).to_string();
-    match (direction, kind.as_str()) {
-        (Direction::Export, "texture") => return export_texture(rest),
-        (Direction::Export, "tim") => return psyq::export_tim(rest),
-        (Direction::Import, "tim") => return psyq::import_tim(rest),
-        (Direction::Import, "vab") => return psyq::import_vab(rest),
-        (Direction::Import, "seq") => return psyq::import_seq(rest),
-        (Direction::Export, "terrain") => return terrain_command(rest),
-        (Direction::Export, "sprite-sheet") => return export_sprite_sheet(rest),
-        (Direction::Import, "sprite-sheet") => return import_sprite_sheet(rest),
-        (Direction::Import, "texture") => return import_texture(rest),
-        (Direction::Import, "emi") => return import_emi(rest),
-        (Direction::Import, "sequence") => return import_sequence(rest),
-        (Direction::Import, "disc") => return import_disc(rest),
-        (Direction::Import, "soundfont") => return import_soundfont(rest),
-        _ => {}
+    if let Some(done) = bespoke_convert(direction, kind, rest) {
+        return done;
     }
+    run_codec_op(direction, kind, rest)
+}
+
+/// The kinds with their own command rather than a codec op; `None` when `kind` has none.
+fn bespoke_convert(direction: Direction, kind: &str, rest: &[String]) -> Option<Result<i32>> {
+    Some(match (direction, kind) {
+        (Direction::Export, "texture") => export_texture(rest),
+        (Direction::Export, "tim") => psyq::export_tim(rest),
+        (Direction::Import, "tim") => psyq::import_tim(rest),
+        (Direction::Import, "vab") => psyq::import_vab(rest),
+        (Direction::Import, "seq") => psyq::import_seq(rest),
+        (Direction::Export, "terrain") => terrain_command(rest),
+        (Direction::Export, "sprite-sheet") => export_sprite_sheet(rest),
+        (Direction::Import, "sprite-sheet") => import_sprite_sheet(rest),
+        (Direction::Import, "texture") => import_texture(rest),
+        (Direction::Import, "emi") => import_emi(rest),
+        (Direction::Import, "sequence") => import_sequence(rest),
+        (Direction::Import, "disc") => import_disc(rest),
+        (Direction::Import, "soundfont") => import_soundfont(rest),
+        _ => return None,
+    })
+}
+
+/// Converts one file through the codec op of `kind`.
+fn run_codec_op(direction: Direction, kind: &str, rest: &[String]) -> Result<i32> {
     let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(

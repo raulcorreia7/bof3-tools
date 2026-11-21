@@ -192,7 +192,7 @@ struct PackOptions {
     inputs: Vec<PackEntry>,
 }
 
-fn run_pack(args: &[OsString]) -> Result<i32, String> {
+fn parse_pack_args(args: &[OsString]) -> Result<PackOptions, String> {
     let mut options = PackOptions { keep: true, ..PackOptions::default() };
     let mut index = 0;
     while index < args.len() {
@@ -245,7 +245,12 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
         }
         index += 1;
     }
-    let output = options.output.ok_or("pack requires -o <archive.EMI>")?;
+    Ok(options)
+}
+
+fn run_pack(args: &[OsString]) -> Result<i32, String> {
+    let options = parse_pack_args(args)?;
+    let output = options.output.clone().ok_or("pack requires -o <archive.EMI>")?;
     if options.folder.is_some() && !options.inputs.is_empty() {
         return Err("pack accepts either a folder or -i inputs, not both".into());
     }
@@ -256,53 +261,62 @@ fn run_pack(args: &[OsString]) -> Result<i32, String> {
     // The containment root the folder modes validated their inputs against; the
     // cleanup rechecks every path against it. `-i` inputs have no folder: the
     // caller named those files, so their scope stays caller-selected.
-    let mut cleanup_root: Option<PathBuf> = None;
-    let packed_paths = if let Some(folder) = options.folder {
-        if !folder.is_dir() {
-            return Err(format!("input folder does not exist: {}", folder.display()));
-        }
-        cleanup_root = Some(fs::canonicalize(&folder).map_err(|error| format!("{}: {error}", folder.display()))?);
-        if let Some(requested) = options.manifest {
-            let manifest = requested.unwrap_or_else(|| folder.join("emi.json"));
-            // The manifest loads and validates once; these entries serve the
-            // pack, the dry run and the cleanup, which never rereads it.
-            let (entries, archive_version) = manifest_entries(&folder, &manifest).map_err(|error| format!("cannot read the manifest {}: {error}; pass -J FILE or drop -J", manifest.display()))?;
-            if !options.dry_run {
-                pack(&output, &entries, archive_version).map_err(|error| error.to_string())?;
+    let (keep, dry_run) = (options.keep, options.dry_run);
+    let (packed_paths, cleanup_root) = match options.folder.clone() {
+        Some(folder) => {
+            if !folder.is_dir() {
+                return Err(format!("input folder does not exist: {}", folder.display()));
             }
-            entries.into_iter().map(|entry| entry.path).collect()
-        } else {
-            let mut exclude = options.exclude;
-            if !exclude.iter().any(|pattern| pattern == "emi.json") {
-                exclude.push("emi.json".into());
-            }
-            let folder_options = PackFolderOptions { default_type: options.default_type, include_patterns: options.include, exclude_patterns: exclude };
-            let paths = enumerate_paths(&folder, &folder_options)?;
-            if !options.dry_run {
-                pack_folder(&output, &folder, &folder_options).map_err(|error| error.to_string())?;
-            }
-            paths
+            let root = fs::canonicalize(&folder).map_err(|error| format!("{}: {error}", folder.display()))?;
+            (pack_from_folder(&output, &folder, options)?, Some(root))
         }
-    } else {
-        if options.inputs.is_empty() {
-            return Err("no input files or folder provided".into());
-        }
-        for input in &options.inputs {
-            let metadata = fs::metadata(&input.path).map_err(|error| format!("{}: {error}", input.path.display()))?;
-            if !metadata.is_file() {
-                return Err(format!("{} is not a regular file", input.path.display()));
-            }
-        }
-        let paths = options.inputs.iter().map(|entry| entry.path.clone()).collect();
-        if !options.dry_run {
-            pack(&output, &options.inputs, 0).map_err(|error| error.to_string())?;
-        }
-        paths
+        None => (pack_from_inputs(&output, &options)?, None),
     };
-    if !options.keep && !options.dry_run {
+    if !keep && !dry_run {
         cleanup_inputs(packed_paths, cleanup_root.as_deref())?;
     }
     Ok(EXIT_OK)
+}
+
+/// Packs a folder, by its manifest or by its selected files; returns the packed paths.
+fn pack_from_folder(output: &Path, folder: &Path, options: PackOptions) -> Result<Vec<PathBuf>, String> {
+    if let Some(requested) = options.manifest {
+        let manifest = requested.unwrap_or_else(|| folder.join("emi.json"));
+        // The manifest loads and validates once; these entries serve the
+        // pack, the dry run and the cleanup, which never rereads it.
+        let (entries, archive_version) = manifest_entries(folder, &manifest).map_err(|error| format!("cannot read the manifest {}: {error}; pass -J FILE or drop -J", manifest.display()))?;
+        if !options.dry_run {
+            pack(output, &entries, archive_version).map_err(|error| error.to_string())?;
+        }
+        return Ok(entries.into_iter().map(|entry| entry.path).collect());
+    }
+    let mut exclude = options.exclude;
+    if !exclude.iter().any(|pattern| pattern == "emi.json") {
+        exclude.push("emi.json".into());
+    }
+    let folder_options = PackFolderOptions { default_type: options.default_type, include_patterns: options.include, exclude_patterns: exclude };
+    let paths = enumerate_paths(folder, &folder_options)?;
+    if !options.dry_run {
+        pack_folder(output, folder, &folder_options).map_err(|error| error.to_string())?;
+    }
+    Ok(paths)
+}
+
+/// Packs the files named with `-i`; returns their paths.
+fn pack_from_inputs(output: &Path, options: &PackOptions) -> Result<Vec<PathBuf>, String> {
+    if options.inputs.is_empty() {
+        return Err("no input files or folder provided".into());
+    }
+    for input in &options.inputs {
+        let metadata = fs::metadata(&input.path).map_err(|error| format!("{}: {error}", input.path.display()))?;
+        if !metadata.is_file() {
+            return Err(format!("{} is not a regular file", input.path.display()));
+        }
+    }
+    if !options.dry_run {
+        pack(output, &options.inputs, 0).map_err(|error| error.to_string())?;
+    }
+    Ok(options.inputs.iter().map(|entry| entry.path.clone()).collect())
 }
 
 fn enumerate_paths(folder: &Path, options: &PackFolderOptions) -> Result<Vec<PathBuf>, String> {
