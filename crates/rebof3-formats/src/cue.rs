@@ -34,6 +34,6 @@ fn round_trip(_entry: &Entry, payload: &[u8]) -> Result<(), String> {
 /// The cue records as JSON. The record is `EmiCue` in `decomp/include/audio/cue.h`, the one C
 /// definition of a cue record; its format is `wiki: formats/audio#emi-type-8-cue-records`.
 fn derive(_load_arg: u32, payload: &[u8]) -> Result<Vec<Derived>> {
-    let data = CueTable::decode(payload)?.json().into_bytes();
+    let data = CueTable::decode(payload).map_err(rebof3_emi::Error::from)?.json().into_bytes();
     Ok(vec![Derived { role: "json", extension: "json", data }])
 }

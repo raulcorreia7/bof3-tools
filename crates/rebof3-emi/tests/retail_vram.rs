@@ -6,10 +6,11 @@
 //! `bof3 emi vram -o <page.png> <archive.EMI>` dumps one archive's page set as
 //! a raw 16-bit PNG for a visual check.
 
+use rebof3_emi::{TYPE_VRAM, upload};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use psx_formats::vram::{Descriptor, Plane, Rectangle, UPLOAD_TYPE, decode, encode};
+use psx_formats::vram::{Descriptor, Plane, Rectangle, decode, encode};
 use psx_formats::vram::{RECTANGLE_BYTES, RECTANGLE_SIDE, VRAM_HEIGHT, VRAM_WIDTH};
 use rebof3_emi::Archive;
 
@@ -71,11 +72,11 @@ fn check_archive(path: &Path, report: &mut Report, page_set: &mut Plane) {
     let retail = fs::read(path).expect("read retail archive");
     let archive = Archive::open(path).expect("open retail archive");
     for (index, entry) in archive.entries().iter().enumerate() {
-        if entry.file_type != UPLOAD_TYPE {
+        if entry.file_type != TYPE_VRAM {
             continue;
         }
         let payload = payload_of(&retail, entry.offset, entry.size);
-        let descriptor = Descriptor::from_load_argument(entry.ram_ptr);
+        let descriptor = upload::descriptor(entry.ram_ptr);
         if let Err(reason) = check_upload(payload, descriptor, page_set, report) {
             report.failures.push(format!("{}#{index}: {reason}", path.display()));
         }

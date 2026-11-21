@@ -1,8 +1,9 @@
 //! The SEP sequence package (entry type 10): the sequences of one sound bank
 //! (`wiki: formats/audio`).
 
-use psx_formats::sep::{self, Package};
+use psx_formats::sep::Package;
 use rebof3_emi::Entry;
+use rebof3_emi::TYPE_SEP;
 
 use crate::identity::difference;
 use crate::registry::{Description, Format, RoundTrip, Selector, State};
@@ -18,7 +19,7 @@ pub static PACKAGE: Description = Description {
     codec_state: "decode+encode",
     evidence: "wiki: formats/audio; 13-byte headers tile 119/119",
     extension: "seq",
-    selector: Selector::Type(sep::TYPE),
+    selector: Selector::Type(TYPE_SEP),
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
     open: None,

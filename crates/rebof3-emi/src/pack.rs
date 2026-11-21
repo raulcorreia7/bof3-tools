@@ -1,6 +1,7 @@
 //! Writing containers: byte-exact repacking of an extracted folder, a manifest
 //! or an explicit file list (`wiki: formats/emi#padding`).
 
+use crate::{TYPE_SEP, TYPE_VAB_BODY, TYPE_VAB_HEADER};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -8,7 +9,6 @@ use std::path::{Path, PathBuf};
 use crate::emi::{Archive, HEADER_SIZE, MAGIC, SECTOR_SIZE, TOC_ENTRY_SIZE, align_sector, ensure_parent};
 use crate::error::{Error, Result};
 use crate::manifest::manifest_entries;
-use psx_formats::{sep, vab};
 
 /// TOC padding value and the byte that fills the space between the TOC and the
 /// first payload in the US `Breath of Fire III (USA)` archives.
@@ -195,9 +195,9 @@ pub fn guess_type(path: impl AsRef<Path>) -> Option<u16> {
     };
     match extension.to_string_lossy().to_ascii_lowercase().as_str() {
         "img" | "tim" => Some(crate::emi::TYPE_VRAM),
-        "vh" => Some(vab::HEADER_TYPE),
-        "vb" => Some(vab::BODY_TYPE),
-        "seq" | "mid" => Some(sep::TYPE),
+        "vh" => Some(TYPE_VAB_HEADER),
+        "vb" => Some(TYPE_VAB_BODY),
+        "seq" | "mid" => Some(TYPE_SEP),
         "lz77" => Some(crate::emi::TYPE_LZ77),
         "emi8" => Some(crate::emi::TYPE_CUE),
         "bin" | "dat" | "clut" | "map" | "emi0" => Some(0),

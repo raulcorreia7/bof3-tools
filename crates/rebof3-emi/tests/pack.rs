@@ -2,7 +2,7 @@ mod support;
 
 use std::fs;
 
-use rebof3_emi::{Archive, PackEntry, pack, pack_manifest};
+use rebof3_emi::{Archive, PackEntry, manifest, pack, pack_manifest};
 
 #[test]
 fn packs_and_roundtrips_entries_byte_exactly() {
@@ -28,7 +28,7 @@ fn repacks_an_extracted_manifest() {
     let extracted = root.join("extracted");
     archive.extract_all(&extracted, true).unwrap();
     let manifest = extracted.join("emi.json");
-    fs::write(&manifest, archive.manifest_json(true)).unwrap();
+    fs::write(&manifest, manifest::to_json(archive.version(), archive.entries(), true)).unwrap();
     let repacked = root.join("repacked.emi");
     pack_manifest(&repacked, &manifest).unwrap();
     assert_eq!(fs::read(repacked).unwrap(), support::fixture());

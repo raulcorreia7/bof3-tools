@@ -1,8 +1,9 @@
 //! The VAB bank (entry types 6 and 7): the header with its programs and tones, and the body of
 //! ADPCM samples that shares the header's load argument (`wiki: formats/audio#bank-layout`).
 
-use psx_formats::vab::{self, Bank};
+use psx_formats::vab::Bank;
 use rebof3_emi::Entry;
+use rebof3_emi::{TYPE_VAB_BODY, TYPE_VAB_HEADER};
 
 use crate::error::Error;
 use crate::registry::{Description, Extra, Extras, Format, RoundTrip, Selector, Site, State, classify};
@@ -93,7 +94,7 @@ pub static HEADER: Description = Description {
     codec_state: "decode+encode",
     evidence: "wiki: formats/audio#bank-layout; paired by load argument",
     extension: "vh",
-    selector: Selector::Type(vab::HEADER_TYPE),
+    selector: Selector::Type(TYPE_VAB_HEADER),
     round_trip: RoundTrip::Bank,
     derive: None,
     open: Some(open),
@@ -109,7 +110,7 @@ pub static BODY: Description = Description {
     codec_state: "decode+encode",
     evidence: "wiki: formats/audio#bank-layout; carried by its header",
     extension: "vb",
-    selector: Selector::Type(vab::BODY_TYPE),
+    selector: Selector::Type(TYPE_VAB_BODY),
     round_trip: RoundTrip::Bank,
     derive: None,
     open: None,
@@ -130,7 +131,7 @@ pub fn round_trip(header: &[u8], body: &[u8]) -> Result<(), String> {
 
 /// Whether `entry` is the header of a bank.
 pub fn is_header(entry: &Entry) -> bool {
-    entry.file_type == vab::HEADER_TYPE
+    entry.file_type == TYPE_VAB_HEADER
 }
 
 #[cfg(test)]
@@ -138,7 +139,7 @@ mod tests {
     use super::*;
 
     fn bank() -> (Vec<u8>, Vec<u8>) {
-        vab::encode_bank(3, &[], &[vec![0u8; 16], vec![1u8; 32]]).expect("a bank")
+        psx_formats::vab::encode_bank(3, &[], &[vec![0u8; 16], vec![1u8; 32]]).expect("a bank")
     }
 
     #[test]

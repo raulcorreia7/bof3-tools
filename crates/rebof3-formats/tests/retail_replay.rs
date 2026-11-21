@@ -7,6 +7,7 @@
 
 mod support;
 
+use rebof3_emi::upload;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -144,7 +145,7 @@ type Rows = std::collections::BTreeSet<(u32, u16, u16)>;
 /// joins with the joins hidden.
 #[test]
 fn retail_joins_and_the_suggestion_scorer() {
-    use psx_formats::gfx::vram::{Descriptor, word_grid};
+    use psx_formats::gfx::vram::word_grid;
     use rebof3_emi::texture::{scene as joins, suggest};
     use rebof3_formats::map::MapBundle;
     use rebof3_formats::{Format, classify};
@@ -187,7 +188,7 @@ fn retail_joins_and_the_suggestion_scorer() {
         let (bytes, table) = &disc.archives[archive];
         let entry = &table.entries()[*slot];
         let payload = table.payload(bytes, *slot).expect("the payload");
-        let grid = word_grid(payload, Descriptor::from_load_argument(entry.ram_ptr)).expect("the grid");
+        let grid = word_grid(payload, upload::descriptor(entry.ram_ptr)).expect("the grid");
         let home = scenes::home(archive).expect("a home scene");
         let vram = disc.replay(&home);
         let suggestion = suggest::suggest(&vram, &grid.words, grid.width, grid.height, archive);

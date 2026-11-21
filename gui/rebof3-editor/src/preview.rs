@@ -6,9 +6,10 @@
 use bof3player::catalog::{Item, Kind as ItemKind};
 use bof3player::{Library, MemorySource, NoNaming};
 use psx_formats::sep::{Event, Package, Sequence};
-use psx_formats::{sep, vab};
+use psx_formats::vab;
 use rebof3_assets::sound::Pcm;
 use rebof3_emi::pack::{Payload, pack_payloads};
+use rebof3_emi::{TYPE_SEP, TYPE_VAB_BODY, TYPE_VAB_HEADER};
 
 /// The path a preview archive goes by in the library; it names the catalog ids only.
 const PREVIEW_PATH: &str = "PREVIEW.EMI";
@@ -110,9 +111,9 @@ fn one_note(program: u8, note: u8, hold: u32) -> Sequence {
 
 /// An archive of one bank and, when given, one sequence package: the bank is the archive's bank 0.
 fn bank_archive(header: &[u8], body: &[u8], package: Option<&[u8]>) -> Result<Vec<u8>, String> {
-    let mut payloads = vec![Payload { bytes: header, file_type: vab::HEADER_TYPE, ram_ptr: 0 }, Payload { bytes: body, file_type: vab::BODY_TYPE, ram_ptr: 0 }];
+    let mut payloads = vec![Payload { bytes: header, file_type: TYPE_VAB_HEADER, ram_ptr: 0 }, Payload { bytes: body, file_type: TYPE_VAB_BODY, ram_ptr: 0 }];
     if let Some(bytes) = package {
-        payloads.push(Payload { bytes, file_type: sep::TYPE, ram_ptr: 0 });
+        payloads.push(Payload { bytes, file_type: TYPE_SEP, ram_ptr: 0 });
     }
     pack_payloads(PREVIEW_ARCHIVE_VERSION, &payloads).map_err(|error| error.to_string())
 }

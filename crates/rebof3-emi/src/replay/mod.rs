@@ -29,10 +29,11 @@
 
 pub mod scenes;
 
+use crate::{TYPE_VRAM, upload};
 use std::collections::BTreeMap;
 
 use psx_formats::gfx::texture::{self, Clut, Color, Depth, texel_indices};
-use psx_formats::gfx::vram::{self, Descriptor, VRAM_HEIGHT, VRAM_WIDTH};
+use psx_formats::gfx::vram::{self, VRAM_HEIGHT, VRAM_WIDTH};
 
 use crate::Entry;
 use crate::texture::{ARENA_BASE, ARENA_BYTES, ARENA_ROW_WORDS, ARENA_VRAM_ROW};
@@ -241,7 +242,7 @@ impl Vram {
         for (slot, (entry, payload)) in entries.iter().zip(payloads).enumerate() {
             let writer = Writer::entry(archive, slot);
             match entry.file_type {
-                vram::UPLOAD_TYPE => self.upload(writer, entry.ram_ptr, payload),
+                TYPE_VRAM => self.upload(writer, entry.ram_ptr, payload),
                 TYPE_RAM => self.write_ram(writer, entry.ram_ptr, payload),
                 kind if TYPES_LZ77.contains(&kind) => {
                     if overlaps_arena(entry.ram_ptr, payload.len())
@@ -465,7 +466,7 @@ impl Vram {
     }
 
     fn upload(&mut self, writer: Writer, load_arg: u32, payload: &[u8]) {
-        let Ok(rectangles) = vram::decode(payload, Descriptor::from_load_argument(load_arg)) else {
+        let Ok(rectangles) = vram::decode(payload, upload::descriptor(load_arg)) else {
             return;
         };
         let owner = self.owner(writer, Kind::Upload);

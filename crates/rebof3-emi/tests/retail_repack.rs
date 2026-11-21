@@ -9,7 +9,7 @@ mod support;
 
 use std::fs;
 
-use rebof3_emi::{Archive, archives_under, pack_manifest, verify};
+use rebof3_emi::{Archive, archives_under, manifest, pack_manifest, verify};
 
 #[test]
 fn retail_repack_is_byte_identical() {
@@ -25,7 +25,7 @@ fn retail_repack_is_byte_identical() {
         let archive = Archive::open(path).unwrap();
         let entries = work.join("entries");
         archive.extract_all(&entries, true).unwrap();
-        fs::write(entries.join("emi.json"), archive.manifest_json(true)).unwrap();
+        fs::write(entries.join("emi.json"), manifest::to_json(archive.version(), archive.entries(), true)).unwrap();
         let repacked = work.join("repacked.EMI");
         pack_manifest(&repacked, entries.join("emi.json")).unwrap();
         if fs::read(path).unwrap() != fs::read(&repacked).unwrap() {
