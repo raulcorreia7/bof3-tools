@@ -19,7 +19,9 @@
 //! `Battle_LoadBattleArchive` (`emi/etc/game/00@0x80197C94`) then runs `Party_BuildBattlers(PARTY_ORDER_BATTLE)`,
 //! which calls `Party_LoadMemberSprite` for every battle slot. The battle overlay reloads character sprites mid-battle
 //! (`func_801E7948`, `emi/battle/battle/03@0x801E7948`) and stages palette 0 again for the slot at
-//! `GAME_PALETTE_STAGE + slot * 0x40` (`func_801E7634`, `func_801E7BA0`, `func_801E8684`). The slot, and
+//! `GAME_PALETTE_STAGE + slot * 0x40` (`func_801E7634`, `func_801E7BA0`, `func_801E8684`); a form bank of
+//! `BPLCHAR` (`DRG`, `RYU`, ...) that `Battle_StartCharacterLoad` streams is staged the same way, palette 0
+//! of the battler's section. The slot, and
 //! so the sheet row and CLUT, is the member's place in the battle order, a run-time choice that moves the
 //! sprite in VRAM but not its colours; a status fade (`func_801DDAB4`, status bit `0x80`) tints it at run
 //! time.
@@ -54,6 +56,8 @@ pub const FIELD_PALETTE_STAGE: u32 = 0x8003_5600;
 const FIELD_PALETTE_STRIDE: u32 = 0x40;
 /// The palette `Party_LoadMemberSprite` stages: `GFX_LoadPalette(..., 0)`.
 pub const FIELD_PALETTE: usize = 0;
+/// The palette `func_8019C664` stages from the leader's record (`g_Game.members[0]` `+0x4C`).
+pub const LEADER_PALETTE: usize = 1;
 
 /// `page << 6`: a texture page is 64 words wide.
 const PAGE_WORDS_SHIFT: u32 = 6;
@@ -197,6 +201,10 @@ pub enum Reader {
     /// Battle character sprites: `Battle_LoadPartySprites` streams it and `Party_BuildBattlers(PARTY_ORDER_BATTLE)`
     /// places it through `Party_LoadMemberSprite`, palette [`FIELD_PALETTE`]; see the module documentation.
     Battle,
+    /// A `BPLCHAR` form bank: `Battle_StartCharacterLoad` streams it and `func_801E7634` stages palette [`FIELD_PALETTE`].
+    Form,
+    /// `ETC/START.EMI` entry 7: the camp menu's `func_801E3EC4` places it through `Party_LoadMemberSprite`, palette [`FIELD_PALETTE`].
+    Camp,
     /// No traced loader streams the archive.
     Unknown,
 }
@@ -211,14 +219,27 @@ impl Reader {
             Reader::Field
         } else if numbered(PARTY_BATTLE_DOWN) || numbered(PARTY_BATTLE_UP) {
             Reader::Battle
+        } else if path.contains("/BPLCHAR/") {
+            Reader::Form
+        } else if path.ends_with("/ETC/START.EMI") {
+            Reader::Camp
         } else {
             Reader::Unknown
         }
     }
 
+    /// The palettes the game stages for the reader, the default first.
+    pub fn palettes(self) -> &'static [usize] {
+        match self {
+            Reader::Field => &[FIELD_PALETTE, LEADER_PALETTE],
+            Reader::Battle | Reader::Form | Reader::Camp => &[FIELD_PALETTE],
+            Reader::Unknown => &[],
+        }
+    }
+
     /// The palette the reader loads, when it is traced.
     pub fn palette(self) -> Option<usize> {
-        matches!(self, Reader::Field | Reader::Battle).then_some(FIELD_PALETTE)
+        self.palettes().first().copied()
     }
 }
 
@@ -561,10 +582,12 @@ mod tests {
         assert_eq!(Reader::of("BIN/PLCHAR/PL012.EMI"), Reader::Field);
         assert_eq!(Reader::of("BIN/BPLCHAR/BPLD012.EMI"), Reader::Battle);
         assert_eq!(Reader::of("BIN/BPLCHAR/BPLU27A.EMI"), Reader::Battle);
-        assert_eq!(Reader::of("BIN/ETC/START.EMI"), Reader::Unknown);
+        assert_eq!(Reader::of("BIN/ETC/START.EMI"), Reader::Camp);
+        assert_eq!(Reader::of("BIN/BPLCHAR/DRG00_00.EMI"), Reader::Form);
         assert_eq!(Reader::of("BIN/ETC/PLATE.EMI"), Reader::Unknown, "a name that only starts like a family");
         assert_eq!(Reader::Field.palette(), Some(FIELD_PALETTE));
         assert_eq!(Reader::Battle.palette(), Some(FIELD_PALETTE));
+        assert_eq!(Reader::Field.palettes(), [FIELD_PALETTE, LEADER_PALETTE]);
         assert_eq!(Reader::Unknown.palette(), None);
     }
 }

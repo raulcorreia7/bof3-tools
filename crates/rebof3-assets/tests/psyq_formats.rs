@@ -44,7 +44,7 @@ fn read_disc() -> Option<Vec<Disc>> {
     )
 }
 
-/// Every joined row: 968 rows of 239 textures. The TIM holds the texture's page, the row's depth and
+/// Every joined row: 970 rows of 239 textures. The TIM holds the texture's page, the row's depth and
 /// its CLUT place; reading it back gives the texture, the placement and the row, and splicing the row
 /// into the CLUT block that holds it gives the block.
 #[test]
@@ -82,7 +82,7 @@ fn retail_joined_textures_round_trip_through_tim() {
             }
         }
     }
-    assert_eq!((textures, rows, spliced), (239, 968, 968), "joined textures, rows and blocks spliced");
+    assert_eq!((textures, rows, spliced), (239, 970, 970), "joined textures, rows and blocks spliced");
 }
 
 /// Every texture upload, joined or not, as a 15-bit TIM without a CLUT: 593 uploads.

@@ -113,8 +113,7 @@ fn retail_scenes_replay_and_place_every_upload() {
     eprintln!("{uploads} uploads; {} placed; unplaced {unplaced:?}; no scene {homeless:?}", placed.len());
     // FIRST's entry 12, (832, 256) four rectangles wide, covers all of entry 4 at (896, 256).
     assert_eq!(unplaced, ["BIN/ETC/FIRST.EMI #4"], "uploads no scene shows");
-    // `SCENA17` and `ENDKANJI` have no default scene: their loaders are not read.
-    assert_eq!(homeless, ["BIN/ETC/ENDKANJI.EMI", "BIN/SCENARIO/SCENA17.EMI"]);
+    assert!(homeless.is_empty(), "archives with no default scene: {homeless:?}");
 }
 
 /// The joins the archive-only rule proves (`texture::joins`) hold in the replayed VRAM too.
@@ -167,7 +166,7 @@ fn retail_joins_and_the_suggestion_scorer() {
                 if classify(entry, payload) == Format::AreaMapBundle
                     && let Ok(bundle) = MapBundle::decode(payload)
                 {
-                    descriptors.extend(bundle.records);
+                    descriptors.extend(bundle.descriptors());
                 }
             }
         }

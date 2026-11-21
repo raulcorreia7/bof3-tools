@@ -270,6 +270,25 @@ struct Layout {
 }
 
 impl MapBundle {
+    /// Every tile descriptor the bundle draws: the grid records and the record words the object patch lists put in their place (`func_801576FC`).
+    pub fn descriptors(&self) -> Vec<u32> {
+        let mut words = self.records.clone();
+        for object in &self.objects {
+            let mut patch = object.words.as_slice();
+            while let Some(&head) = patch.first() {
+                let (values, size) = match head >> 24 {
+                    0 => (1..3, 3),
+                    1 => (1..2, 2),
+                    2 => (0..0, 3),
+                    _ => (0..0, 2),
+                };
+                words.extend(patch.get(values).unwrap_or(&[]));
+                patch = patch.get(size..).unwrap_or(&[]);
+            }
+        }
+        words
+    }
+
     /// Reads a map bundle payload.
     pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
         let width = *bytes.first().ok_or(Error::MapBundleTooShort(0))?;

@@ -59,7 +59,7 @@ pub fn replay(project: &mut Project, scene: &Scene) -> Rc<Replayed> {
             if classify(entry, payload) == Format::AreaMapBundle
                 && let Ok(bundle) = MapBundle::decode(payload)
             {
-                descriptors.extend(bundle.records);
+                descriptors.extend(bundle.descriptors());
             }
         }
     }
