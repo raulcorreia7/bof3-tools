@@ -64,12 +64,12 @@ counts and its comparison with the rules. The editor and `bof3 observe` use it.
 
 The all-assets extractor: reads the disc through `psx-cd`, classifies every file and every EMI slot
 with `rebof3-emi`, and writes one tree of assets plus `assets.jsonl` and `summary.txt`. The output
-layout and the round trips are in [assets](assets.md); the kinds and joins are in the
+layout and the round trips are in [assets](assets.md); the types and joins are in the
 [asset extraction format page](https://raulcorreia7.github.io/bof3-wiki/formats/assets.html). The
 tests run synthetic disc cases and, when the retail image is present, a pinned inventory of every
-kind and a digest of every stored byte; the retail cases skip without the disc.
+type and a digest of every stored byte; the retail cases skip without the disc.
 
 The `codec` module is the table of conversions between stored bytes and an open form: one row
-per kind, with an export and an import op that name their files, options, error texts, default
+per type, with an export and an import op that name their files, options, error texts, default
 extension and function. `bof3 assets export` and `import` parse their arguments with `clap` and
-run the row of the kind named; their `--help` texts are hand-written.
+run the row of the type named; their `--help` texts are hand-written.

@@ -2,17 +2,17 @@
 //!
 //! `Actor_SelectScriptBank` (`exe/slus_004_22@0x8014DC08`) queues the record `table + table[n]` for
 //! upload, and `GFX_UpdateTransferQueue` (`exe/slus_004_22@0x8014E6D0`) reads it as a rectangle and a
-//! kind:
+//! type:
 //!
 //! | Offset | Size | Field | Meaning |
 //! | -----: | ---: | ----- | ------- |
 //! | `0x00` | 2 | `width` | rectangle width in VRAM words |
 //! | `0x02` | 2 | `height` | rectangle height in rows |
-//! | `0x04` | 4 | `kind` | 1: `GFX_ExpandRgb555`, 2: `GFX_DecodeLzss`, otherwise a plain `LoadImage` |
-//! | `0x08` | - | `body` | the words (kind 0), the packed texels (kind 1), or a byte count and the LZSS stream (kind 2) |
+//! | `0x04` | 4 | `storage_type` | 1: `GFX_ExpandRgb555`, 2: `GFX_DecodeLzss`, otherwise a plain `LoadImage` |
+//! | `0x08` | - | `body` | the words (type 0), the packed texels (type 1), or a byte count and the LZSS stream (type 2) |
 //!
 //! The rectangle holds `width * height * 2` bytes: one 8-bit texel per byte, since the field draw sets
-//! the 8-bit texture mode (`Area_DrawObjectSprite`, `tpage` depth from work `+0x28`). Kind 1 packs six
+//! the 8-bit texture mode (`Area_DrawObjectSprite`, `tpage` depth from work `+0x28`). Type 1 packs six
 //! 5-bit texels in each word, at bits 0, 5, 10, 16, 21 and 26 (`GFX_ExpandRgb555`,
 //! `exe/slus_004_22@0x8014E7F8`), so it holds indices into one 32-colour palette.
 
@@ -20,7 +20,7 @@ use rebof3_emi::lzss;
 
 use crate::error::{Error, Result};
 
-/// Bytes before the body: width, height and kind.
+/// Bytes before the body: width, height and type.
 pub const HEADER_BYTES: usize = 8;
 /// Bytes of the byte count before an LZSS stream.
 const LZSS_COUNT_BYTES: usize = 4;
@@ -36,20 +36,20 @@ pub const PACKED_MAX: u8 = PACKED_MASK as u8;
 /// Records are laid out on word boundaries.
 const ALIGN: usize = 4;
 
-/// How a record stores its texels: the `kind` word `GFX_UpdateTransferQueue` switches on.
+/// How a record stores its texels: the `storage_type` word `GFX_UpdateTransferQueue` switches on.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Encoding {
     /// The texel bytes as `LoadImage` takes them.
     Raw,
-    /// Six 5-bit texels per word (`GFX_ExpandRgb555`, kind 1).
+    /// Six 5-bit texels per word (`GFX_ExpandRgb555`, type 1).
     Packed,
-    /// An LZSS stream after the byte count (`GFX_DecodeLzss`, kind 2).
+    /// An LZSS stream after the byte count (`GFX_DecodeLzss`, type 2).
     Lzss,
 }
 
 impl Encoding {
-    /// The kind word of a record.
-    pub fn kind(self) -> u32 {
+    /// The type word of a record.
+    pub fn storage_type(self) -> u32 {
         match self {
             Self::Raw => 0,
             Self::Packed => 1,
@@ -57,9 +57,9 @@ impl Encoding {
         }
     }
 
-    /// The encoding of a kind word: `GFX_UpdateTransferQueue` uploads any kind but 1 and 2 as raw words.
-    pub fn of_kind(kind: u32) -> Self {
-        match kind {
+    /// The encoding of a type word: `GFX_UpdateTransferQueue` uploads any type but 1 and 2 as raw words.
+    pub fn of_type(storage_type: u32) -> Self {
+        match storage_type {
             1 => Self::Packed,
             2 => Self::Lzss,
             _ => Self::Raw,
@@ -85,8 +85,8 @@ pub struct Image {
     pub height: u16,
     /// How the record stores the texels.
     pub encoding: Encoding,
-    /// The kind word as stored; a raw record keeps any kind but 1 and 2.
-    kind: u32,
+    /// The type word as stored; a raw record keeps any type but 1 and 2.
+    storage_type: u32,
     /// One 8-bit index per texel, row-major.
     texels: Vec<u8>,
     /// The record's bytes as stored, up to the next record, while the texels are unchanged.
@@ -98,8 +98,8 @@ impl Image {
     /// unchanged image encodes to it again.
     pub fn decode(span: &[u8]) -> Result<Self> {
         let [width, height] = [half(span, 0)?, half(span, 2)?];
-        let kind = word(span, 4)?;
-        let encoding = Encoding::of_kind(kind);
+        let storage_type = word(span, 4)?;
+        let encoding = Encoding::of_type(storage_type);
         let count = usize::from(width) * usize::from(height) * TEXELS_PER_WORD;
         let body = &span[HEADER_BYTES..];
 
@@ -111,12 +111,12 @@ impl Image {
                 lzss::decode(stream, count)?.0
             }
         };
-        Ok(Self { width, height, encoding, kind, texels, stored: Some(span.to_vec()) })
+        Ok(Self { width, height, encoding, storage_type, texels, stored: Some(span.to_vec()) })
     }
 
     /// A new image of `width` words by `height` rows, stored as `encoding`.
     pub fn new(width: u16, height: u16, encoding: Encoding, texels: Vec<u8>) -> Result<Self> {
-        let image = Self { width, height, encoding, kind: encoding.kind(), texels: Vec::new(), stored: None };
+        let image = Self { width, height, encoding, storage_type: encoding.storage_type(), texels: Vec::new(), stored: None };
         if texels.len() != image.texel_count() {
             return Err(Error::CharacterSprites(format!("a {}x{} sheet holds {} texels, not {}", image.texel_width(), height, image.texel_count(), texels.len())));
         }
@@ -183,7 +183,7 @@ impl Image {
         let mut out = Vec::with_capacity(HEADER_BYTES + body.len() + ALIGN);
         out.extend(self.width.to_le_bytes());
         out.extend(self.height.to_le_bytes());
-        out.extend(encoding.kind().to_le_bytes());
+        out.extend(encoding.storage_type().to_le_bytes());
         out.extend(body);
         out.resize(out.len().next_multiple_of(ALIGN), 0);
         out
@@ -202,9 +202,9 @@ impl Image {
         }
     }
 
-    /// The kind word the record stores.
-    pub fn kind(&self) -> u32 {
-        self.kind
+    /// The type word the record stores.
+    pub fn storage_type(&self) -> u32 {
+        self.storage_type
     }
 }
 
@@ -263,7 +263,7 @@ mod tests {
             let mut record = image.encode();
             // Force the encoding under test by rewriting the record from its body.
             record.truncate(HEADER_BYTES);
-            record[4..8].copy_from_slice(&encoding.kind().to_le_bytes());
+            record[4..8].copy_from_slice(&encoding.storage_type().to_le_bytes());
             record.extend(image.body(encoding).expect("the texels fit"));
             let decoded = Image::decode(&record).expect("decodes");
             assert_eq!(decoded.texels(), &texels[..], "{encoding:?}");

@@ -58,7 +58,7 @@ int rebof3_smoke_run(void) {
     if (check(rebof3_format_classify(&entry, payload, payload_len, &format) == PSX_STATUS_OK && format == REBOF3_FORMAT_CLUT_BLOCK, "classify")) return 1;
     rebof3_format_info info;
     memset(&info, 0, sizeof info);
-    if (check(rebof3_format_describe(format, &info) == PSX_STATUS_OK && info.name != NULL && strcmp(info.extension, "clut") == 0 && strcmp(info.kind, "palette") == 0, "format info")) return 1;
+    if (check(rebof3_format_describe(format, &info) == PSX_STATUS_OK && info.name != NULL && strcmp(info.extension, "clut") == 0 && strcmp(info.asset_type, "palette") == 0, "format info")) return 1;
     psx_buffer palette_png;
     memset(&palette_png, 0, sizeof palette_png);
     if (check(rebof3_palette_export_swatch(payload, payload_len, &palette_png) == PSX_STATUS_OK && palette_png.data != NULL && palette_png.len > 8 && palette_png.data[0] == 0x89 && memcmp(palette_png.data + 1, "PNG", 3) == 0, "palette png")) return 1;
@@ -78,7 +78,7 @@ int rebof3_smoke_run(void) {
     rebof3_assets_codec codec;
     memset(&codec, 0, sizeof codec);
     if (check(rebof3_assets_codec_info("palette", 7, REBOF3_DIRECTION_EXPORT, &codec) == PSX_STATUS_OK, "codec info")) return 1;
-    if (check(codec.kind != NULL && strcmp(codec.kind, "palette") == 0 && codec.extension != NULL && strcmp(codec.extension, "json") == 0 && codec.files == 1 && !codec.named && !codec.load_arg && codec.index == REBOF3_INDEX_NONE, "codec fields")) return 1;
+    if (check(codec.asset_type != NULL && strcmp(codec.asset_type, "palette") == 0 && codec.extension != NULL && strcmp(codec.extension, "json") == 0 && codec.files == 1 && !codec.named && !codec.load_arg && codec.index == REBOF3_INDEX_NONE, "codec fields")) return 1;
     rebof3_assets_job job;
     memset(&job, 0, sizeof job);
     job.input = payload;
@@ -87,7 +87,7 @@ int rebof3_smoke_run(void) {
     memset(&converted, 0, sizeof converted);
     if (check(rebof3_assets_convert("palette", 7, REBOF3_DIRECTION_EXPORT, &job, &converted) == PSX_STATUS_OK && converted.data != NULL && converted.len > 0 && converted.data[0] == '{', "assets convert")) return 1;
     psx_buffer_free(&converted);
-    if (check(rebof3_assets_convert("no-such-kind", strlen("no-such-kind"), REBOF3_DIRECTION_EXPORT, &job, &converted) == PSX_STATUS_UNSUPPORTED, "unknown codec")) return 1;
+    if (check(rebof3_assets_convert("no-such-type", strlen("no-such-type"), REBOF3_DIRECTION_EXPORT, &job, &converted) == PSX_STATUS_UNSUPPORTED, "unknown codec")) return 1;
     if (check(rebof3_assets_extract(NULL, NULL, NULL) == PSX_STATUS_INVALID_ARGUMENT, "extract null options")) return 1;
 
     psx_buffer rebuilt;

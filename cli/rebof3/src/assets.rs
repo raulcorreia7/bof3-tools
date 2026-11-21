@@ -15,9 +15,9 @@ use rebof3_assets::coverage;
 use rebof3_assets::disc;
 use rebof3_assets::extract::{self, Options, SUMMARY_FILE, TABLE_FILE};
 use rebof3_assets::import;
-use rebof3_assets::kind::{AudioFormat, Kind, Mode, Selection};
 use rebof3_assets::sprites;
 use rebof3_assets::text::{self, DEFAULT_DISC};
+use rebof3_assets::types::{AssetType, AudioFormat, Mode, Selection};
 
 /// What a `bof3 assets` command reports: a mistake in the command line, or the library's error.
 #[derive(Debug)]
@@ -63,8 +63,8 @@ Usage: bof3 assets <COMMAND> [OPTIONS]
 Commands:
   extract      write the disc's assets, one file per asset
   extract-all  every asset of the disc, one folder per step, plus index.json
-  coverage     report which kinds rebuild their own bytes
-  kinds        list the asset kinds and what each writes
+  coverage     report which types rebuild their own bytes
+  types        list the asset types and what each writes
   terrain      write one map bundle's terrain as glTF or OBJ
   soundfont    write one VAB bank as a SoundFont 2 file
   tables       write the game tables of ETC/GAME.EMI entry 0 as JSON
@@ -75,7 +75,7 @@ Commands:
 Common switches:
   -i, --input PATH   disc .cue or image (default: the image in inputs/external, then ./disk)
   -o, --output PATH  file or folder to write (default: beside the input)
-      --only KINDS    comma-separated kinds, for example texture,palette
+      --only TYPES    comma-separated types, for example texture,palette
       --mode MODE     raw, modern or both (default: both)
       --list          classify only, write nothing
   -q, --quiet         no summary on stdout
@@ -89,20 +89,20 @@ Examples:
 const EXTRACT_HELP: &str = "\
 bof3 assets extract: write the disc's assets, one file per asset.
 
-Usage: bof3 assets extract [-i IMAGE] [-o DIR] [--only KINDS] [--mode MODE]
+Usage: bof3 assets extract [-i IMAGE] [-o DIR] [--only TYPES] [--mode MODE]
                              [--audio-format FMT] [--list] [--jobs N]
                              [--text-disc DIR] [-q]
 
   -i, --input IMAGE       CUE sheet or image (default: the one in inputs/external, then ./disk)
   -o, --output DIR        output folder (default: build/game-assets)
-      --only KINDS        comma-separated kinds, for example texture,palette
-                          (default: every kind)
+      --only TYPES        comma-separated types, for example texture,palette
+                          (default: every asset_type)
       --mode MODE         raw writes the stored bytes, modern the conversion,
                           both writes each (default: both)
       --audio-format FMT  wav, flac or ogg (default: wav)
       --list              classify everything and write nothing (default: off)
       --jobs N            worker threads (default: every core)
-      --text-disc DIR     extracted disc the text kind reads (default: build/disc)
+      --text-disc DIR     extracted disc the text asset_type reads (default: build/disc)
   -q, --quiet             skip the summary on stdout (default: off)
 
 Examples:
@@ -112,7 +112,7 @@ Examples:
 ";
 
 const COVERAGE_HELP: &str = "\
-bof3 assets coverage: report which kinds rebuild their own bytes.
+bof3 assets coverage: report which types rebuild their own bytes.
 
 Usage: bof3 assets coverage [-i IMAGE]
 
@@ -122,13 +122,13 @@ Example:
   bof3 assets coverage -i \"Breath of Fire III (USA).cue\"
 ";
 
-const KINDS_HELP: &str = "\
-bof3 assets kinds: list the asset kinds and what each writes.
+const TYPES_HELP: &str = "\
+bof3 assets types: list the asset types and what each writes.
 
-Usage: bof3 assets kinds
+Usage: bof3 assets types
 
 Example:
-  bof3 assets kinds
+  bof3 assets types
 ";
 
 const TERRAIN_HELP: &str = "\
@@ -188,9 +188,9 @@ Example:
 const EXPORT_HELP: &str = "\
 bof3 assets export: write one asset's open form from its stored bytes.
 
-Usage: bof3 assets export <KIND> ...
+Usage: bof3 assets export <TYPE> ...
 
-Kinds:
+Types:
   texture         PNG view, or an indexed PNG in one palette row
   tim                a texture as a TIM file, with its CLUT when you give one
   palette            a CLUT block as JSON
@@ -208,7 +208,7 @@ Kinds:
   character-sprites  the character sprites' palette tables as JSON
   sprite-sheet       a character sprites section as a PNG sheet and Aseprite JSON
 
-Every kind has focused help: bof3 assets export <KIND> --help.
+Every asset type has focused help: bof3 assets export <TYPE> --help.
 Export switches: -o/--output OUT, --load-arg HEX, --depth 4|8, --palette CLUT_BLOCK,
 --palette-offset WORDS, --index N.
 
@@ -219,9 +219,9 @@ Example:
 const IMPORT_HELP: &str = "\
 bof3 assets import: read one asset's open form back into its stored bytes.
 
-Usage: bof3 assets import <KIND> ...
+Usage: bof3 assets import <TYPE> ...
 
-Kinds:
+Types:
   texture            a PNG view or indexed PNG back into a payload
   tim                a TIM file back into a payload and its palette
   palette            palette JSON back into color words
@@ -245,7 +245,7 @@ Kinds:
   character-sprites  palette JSON back into character sprites
   sprite-sheet       a PNG sheet and Aseprite JSON back into character sprites
 
-Every kind has focused help: bof3 assets import <KIND> --help.
+Every asset type has focused help: bof3 assets import <TYPE> --help.
 Import switches: -o/--output OUT, --payload PATH, --palette OUT, --base BLOCK,
 --entry INDEX=FILE, --file PATH=FILE.
 
@@ -658,8 +658,8 @@ Example:
   bof3 assets import sprite-sheet ryu.json --payload PL012-3.lz77 --exe SLUS_004.22 -o PL012-3.new.lz77
 ";
 
-fn export_help(kind: &str) -> &'static str {
-    match kind {
+fn export_help(asset_type: &str) -> &'static str {
+    match asset_type {
         "texture" => EXPORT_TEXTURE_HELP,
         "tim" => psyq::EXPORT_TIM_HELP,
         "vab" => psyq::EXPORT_VAB_HELP,
@@ -680,8 +680,8 @@ fn export_help(kind: &str) -> &'static str {
     }
 }
 
-fn import_help(kind: &str) -> &'static str {
-    match kind {
+fn import_help(asset_type: &str) -> &'static str {
+    match asset_type {
         "texture" => IMPORT_TEXTURE_HELP,
         "tim" => psyq::IMPORT_TIM_HELP,
         "vab" => psyq::IMPORT_VAB_HELP,
@@ -736,9 +736,9 @@ fn run(args: Vec<OsString>) -> Result<i32> {
     let rest: Vec<String> = rest.to_vec();
     let help = help_hint(first, &rest);
     let result = match first.as_str() {
-        "kinds" => {
-            for kind in Kind::ALL {
-                println!("{:<17} {:<9} {}", kind.name(), kind.handling().label(), kind.about());
+        "types" => {
+            for asset_type in AssetType::ALL {
+                println!("{:<17} {:<9} {}", asset_type.name(), asset_type.handling().label(), asset_type.about());
             }
             Ok(EXIT_OK)
         }
@@ -762,9 +762,9 @@ fn run(args: Vec<OsString>) -> Result<i32> {
 /// The focused help command for a verb and its first argument.
 fn help_hint(verb: &str, rest: &[String]) -> String {
     if matches!(verb, "export" | "import")
-        && let Some(kind) = rest.iter().find(|argument| !argument.starts_with('-'))
+        && let Some(asset_type) = rest.iter().find(|argument| !argument.starts_with('-'))
     {
-        return format!("bof3 assets {verb} {kind}");
+        return format!("bof3 assets {verb} {asset_type}");
     }
     format!("bof3 assets {verb}")
 }
@@ -784,9 +784,9 @@ fn help_for(args: &[String]) -> String {
         ("soundfont", _) => SOUNDFONT_HELP.to_string(),
         ("tables", _) => TABLES_HELP.to_string(),
         ("encounters", _) => ENCOUNTERS_HELP.to_string(),
-        ("kinds", _) => KINDS_HELP.to_string(),
-        ("export", Some(kind)) => export_help(Kind::canonical(kind)).to_string(),
-        ("import", Some(kind)) => import_help(Kind::canonical(kind)).to_string(),
+        ("types", _) => TYPES_HELP.to_string(),
+        ("export", Some(asset_type)) => export_help(AssetType::canonical(asset_type)).to_string(),
+        ("import", Some(asset_type)) => import_help(AssetType::canonical(asset_type)).to_string(),
         ("export", None) => EXPORT_HELP.to_string(),
         ("import", None) => IMPORT_HELP.to_string(),
         _ => USAGE.to_string(),
@@ -867,7 +867,7 @@ fn pair<'a>(value: &'a str, flag: &str, shape: &str) -> Result<(&'a str, &'a str
     value.split_once('=').ok_or_else(|| Error::Usage(format!("{flag} needs {shape}, not {value:?}")))
 }
 
-/// The arguments of the table-driven conversions (`export` and `import` of a kind in
+/// The arguments of the table-driven conversions (`export` and `import` of a type in
 /// [`codec::CODECS`]): files, `-o`, and the options an op may take.
 #[derive(Parser)]
 struct Convert {
@@ -884,22 +884,22 @@ struct Convert {
     load_arg: Option<String>,
 }
 
-/// `bof3 assets export|import KIND ...`: the verbs that convert one asset to or from its open form.
+/// `bof3 assets export|import TYPE ...`: the verbs that convert one asset to or from its open form.
 fn convert_command(direction: Direction, args: &[String]) -> Result<i32> {
     let verb = if direction == Direction::Export { "export" } else { "import" };
-    let Some((kind, rest)) = args.split_first() else {
-        return Err(Error::Usage(format!("{verb} needs a kind, for example texture; run `bof3 assets {verb} --help`")));
+    let Some((asset_type, rest)) = args.split_first() else {
+        return Err(Error::Usage(format!("{verb} needs a type, for example texture; run `bof3 assets {verb} --help`")));
     };
-    let kind = &Kind::canonical(kind).to_string();
-    if let Some(done) = bespoke_convert(direction, kind, rest) {
+    let asset_type = &AssetType::canonical(asset_type).to_string();
+    if let Some(done) = bespoke_convert(direction, asset_type, rest) {
         return done;
     }
-    run_codec_op(direction, kind, rest)
+    run_codec_op(direction, asset_type, rest)
 }
 
-/// The kinds with their own command rather than a codec op; `None` when `kind` has none.
-fn bespoke_convert(direction: Direction, kind: &str, rest: &[String]) -> Option<Result<i32>> {
-    Some(match (direction, kind) {
+/// The types with their own command rather than a codec op; `None` when `asset_type` has none.
+fn bespoke_convert(direction: Direction, asset_type: &str, rest: &[String]) -> Option<Result<i32>> {
+    Some(match (direction, asset_type) {
         (Direction::Export, "texture") => export_texture(rest),
         (Direction::Export, "tim") => psyq::export_tim(rest),
         (Direction::Import, "tim") => psyq::import_tim(rest),
@@ -917,15 +917,15 @@ fn bespoke_convert(direction: Direction, kind: &str, rest: &[String]) -> Option<
     })
 }
 
-/// Converts one file through the codec op of `kind`.
-fn run_codec_op(direction: Direction, kind: &str, rest: &[String]) -> Result<i32> {
-    let Some(op) = codec::find(kind).and_then(|codec| codec.op(direction)) else {
+/// Converts one file through the codec op of `asset_type`.
+fn run_codec_op(direction: Direction, asset_type: &str, rest: &[String]) -> Result<i32> {
+    let Some(op) = codec::find(asset_type).and_then(|codec| codec.op(direction)) else {
         return Err(Error::Usage(match direction {
             Direction::Export => format!(
-                "export has no {kind:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-sprites and sprite-sheet"
+                "export has no {asset_type:?} direction; run `bof3 assets export --help` for texture, tim, palette, terrain, vag, vab, sequence, seq, sep, message, message-po, script, strings, characters, character-sprites and sprite-sheet"
             ),
             Direction::Import => {
-                format!("import has no {kind:?} direction; run `bof3 assets import --help` for the supported kinds")
+                format!("import has no {asset_type:?} direction; run `bof3 assets import --help` for the supported types")
             }
         }));
     };
@@ -1310,8 +1310,8 @@ struct CoverageArgs {
     image: Option<PathBuf>,
 }
 
-/// `bof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per kind, the entries and bytes that
-/// export and import to their own bytes, against the kind's total. Kinds without a round trip report zero.
+/// `bof3 assets coverage [-i IMAGE]`: reads every EMI entry of the disc and prints, per type, the entries and bytes that
+/// export and import to their own bytes, against the type's total. Types without a round trip report zero.
 fn coverage_command(args: &[String]) -> Result<i32> {
     let image = parse::<CoverageArgs>(args)?.image;
     let current = env::current_dir()?;
@@ -1320,19 +1320,19 @@ fn coverage_command(args: &[String]) -> Result<i32> {
         None => find_disc_image(&current).map_err(|error| Error::Usage(error.to_string()))?,
     };
     let report = coverage::run(&image)?;
-    println!("{:<17} {:>8} {:>10} {:>13} {:>13}  note", "kind", "entries", "both ways", "bytes", "both ways");
+    println!("{:<17} {:>8} {:>10} {:>13} {:>13}  note", "type", "entries", "both ways", "bytes", "both ways");
     let (mut entries, mut bytes, mut both_entries, mut both_bytes) = (0, 0, 0, 0);
-    for kind in Kind::ALL {
-        let Some(line) = report.kinds.get(kind) else { continue };
-        if *kind != Kind::DataTable {
+    for asset_type in AssetType::ALL {
+        let Some(line) = report.types.get(asset_type) else { continue };
+        if *asset_type != AssetType::DataTable {
             entries += line.entries;
             bytes += line.bytes;
             both_entries += line.both_entries;
             both_bytes += line.both_bytes;
         }
-        let note = if coverage::has_round_trip(*kind) { "" } else { "no round trip yet" };
-        let note = if *kind == Kind::DataTable { "game tables of ETC/GAME.EMI entry 0 and START.EMI's characters" } else { note };
-        println!("{:<17} {:>8} {:>10} {:>13} {:>13}  {note}", kind.name(), line.entries, line.both_entries, line.bytes, line.both_bytes);
+        let note = if coverage::has_round_trip(*asset_type) { "" } else { "no round trip yet" };
+        let note = if *asset_type == AssetType::DataTable { "game tables of ETC/GAME.EMI entry 0 and START.EMI's characters" } else { note };
+        println!("{:<17} {:>8} {:>10} {:>13} {:>13}  {note}", asset_type.name(), line.entries, line.both_entries, line.bytes, line.both_bytes);
     }
     let text = report.text;
     println!("{:<17} {:>8} {:>10} {:>13} {:>13}  strings and message tables", "text", text.entries, text.both_entries, text.bytes, text.both_bytes);
@@ -1392,7 +1392,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
     let base = env::current_dir()?;
     let out = arguments.out.clone().unwrap_or_else(|| base.join(DEFAULT_OUT));
     let write = !arguments.list;
-    let only_text = arguments.selection.is_only(Kind::Text);
+    let only_text = arguments.selection.is_only(AssetType::Text);
 
     let started = Instant::now();
     if write {
@@ -1401,7 +1401,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
     let image = match arguments.image.clone() {
         Some(image) => Some(image),
         None if !only_text => Some(find_disc_image(&base).map_err(|error| Error::Usage(error.to_string()))?),
-        // The text kind can read an extracted disc without the image; it only loses the LBA.
+        // The text type can read an extracted disc without the image; it only loses the LBA.
         None => find_disc_image(&base).ok(),
     };
     let mut report = if only_text {
@@ -1416,7 +1416,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
         };
         extract::run(&options)?
     };
-    if arguments.selection.contains(Kind::Text) {
+    if arguments.selection.contains(AssetType::Text) {
         add_text(&mut report, &arguments, &base, &out, image.as_deref(), write)?;
     }
     report.sort();
@@ -1435,7 +1435,7 @@ pub(crate) fn extract_command(args: &[String]) -> Result<i32> {
     Ok(if report.failures.is_empty() { EXIT_OK } else { EXIT_FAILURES })
 }
 
-/// Extracts the `text` kind from the extracted disc, or notes why it did not run.
+/// Extracts the `text` type from the extracted disc, or notes why it did not run.
 fn add_text(report: &mut rebof3_assets::report::Report, arguments: &Arguments, base: &Path, out: &Path, image: Option<&Path>, write: bool) -> Result<()> {
     let mode = arguments.selection.mode();
     let raw = mode.writes("raw", true);
@@ -1444,7 +1444,7 @@ fn add_text(report: &mut rebof3_assets::report::Report, arguments: &Arguments, b
         report.notes.push("text: this mode writes no text files".into());
         return Ok(());
     }
-    let only_text = arguments.selection.is_only(Kind::Text);
+    let only_text = arguments.selection.is_only(AssetType::Text);
     let disc = arguments.text_disc.clone().unwrap_or_else(|| base.join(DEFAULT_DISC));
     let options = text::Options { disc, out: out.to_path_buf(), image: image.map(Path::to_path_buf), raw, modern, write, list: arguments.list };
     match text::extract_with(&options) {

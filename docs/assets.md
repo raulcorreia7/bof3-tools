@@ -12,7 +12,7 @@ sample's waveform data `vag`, a sequence package `seq`, an LZ77 blob `lz77`, and
 `emi8`. Other entries carry the EMI type tag `emi0`. `assets.jsonl` records the source and the SHA-256
 of every file.
 
-| Kind              | Original file                                                      | Viewable file                                                             |
+| Type              | Original file                                                      | Viewable file                                                             |
 | ----------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
 | `texture`         | `texture/<disc path>/<slot>.img`                                   | `<slot>.png` (16 bpp), `<slot>.clut-<x>-<y>.png` (an indexed row), `.tim` |
 | `palette`         | `palette/<disc path>/<slot>.clut`                                  | `<slot>.json`, `<slot>.png` (swatch strip)                                |
@@ -31,7 +31,7 @@ of every file.
 | `xa-audio`        | the `.STR` file as stored                                          | `.wav`                                                                    |
 | `text`            | `text/<disc path>/<slot>.bin`                                      | `<slot>.json`, `<slot>.txt`, `text/index.jsonl`                           |
 
-`assets kinds` lists every kind with its handling: `decoded` (stored bytes and a derived file), `raw`
+`assets types` lists every type with its handling: `decoded` (stored bytes and a derived file), `raw`
 (stored bytes only) or `none`.
 
 The `.vab` file is the sound bank as one file: the header followed by the body. The `.vag` file holds a
@@ -43,10 +43,10 @@ stores no TIM of its own.
 ## Modes
 
 `--mode raw` writes the bytes the disc stores. `--mode modern` writes the conversion to an open format.
-No flag writes both. A kind with no conversion has nothing to add in `modern`, so its stored bytes are
+No flag writes both. A type with no conversion has nothing to add in `modern`, so its stored bytes are
 its modern output too.
 
-| Kind                                                                                                                                               | `--mode raw`                 | `--mode modern`                                    |
+| Type                                                                                                                                               | `--mode raw`                 | `--mode modern`                                    |
 | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------- |
 | `texture`                                                                                                                                          | `.img`                       | `.png`, `.tim`                                     |
 | `palette`                                                                                                                                          | `.clut`                      | `.json`, `.png`                                    |
@@ -65,16 +65,16 @@ its modern output too.
 ## Catalog
 
 `assets.jsonl` has one object per output file with the keys `source`, `slot`, `offset`, `size`,
-`type`, `load_arg`, `format`, `kind`, `state`, `role`, `output`, `bytes`, `sha256`, `evidence` and
+`type`, `load_arg`, `format`, `asset_type`, `state`, `role`, `output`, `bytes`, `sha256`, `evidence` and
 `note`. `role` is `raw` for the stored bytes (`vab` and `vag` are also the disc's own bytes); a derived
 file names its format (`png`, `tim`, `json`, `obj`, `mtl`, `glb`, `sf2`, `wav` or `midi`; `script` for a script
-table's ops as text). `kind` is the
-asset kind and `format` is the entry's format. `evidence` names the loader evidence behind a derived
+table's ops as text). `asset_type` is the
+asset type and `format` is the entry's format. `evidence` names the loader evidence behind a derived
 file. A derived file of one entry carries the same `source` and `slot` as that entry.
 
 ## Text
 
-For every payload that holds text, the `text` kind writes three files below
+For every payload that holds text, the `text` type writes three files below
 `text/<disc path without .EMI>/`:
 
 | File          | Contents                                                         |
@@ -83,7 +83,7 @@ For every payload that holds text, the `text` kind writes three files below
 | `<slot>.json` | one row per string, with its source chain                        |
 | `<slot>.txt`  | one line per string: `offset<TAB>id<TAB>text`, the offset in hex |
 
-`text/index.jsonl` indexes the run with `source`, `kind`, `id`, `ram` and `text`. Its `source` is
+`text/index.jsonl` indexes the run with `source`, `asset_type`, `id`, `ram` and `text`. Its `source` is
 `<disc path>#<slot>+<offset>`, so a line found with `grep` names the bytes that produced it. The scan
 keeps a payload only when it holds text; `--list` prints each payload it drops. The string
 encoding and the tables are in the [text page](https://raulcorreia7.github.io/bof3-wiki/data/text.html).
@@ -162,7 +162,7 @@ every byte the open form does not name.
   address; a changed payload moves the entries after it. `import disc CUE --file PATH=FILE -o DIR` writes
   a patched copy of the disc; a replacement file cannot grow past its last sector.
 
-Cue tables, area cells, actor definitions, XA and STR streams and CDDA tracks have no import verb. An import verb that does not exist for a kind fails with a usage error.
+Cue tables, area cells, actor definitions, XA and STR streams and CDDA tracks have no import verb. An import verb that does not exist for a type fails with a usage error.
 
 ## Psy-Q files
 
@@ -194,20 +194,20 @@ repository does not run those tools.
   `import seq FILE.seq:ID...` check the file against the package rules and write a package. The SEQ
   version word is written as 1: the manual gives no value for it.
 
-An unchanged file of each kind comes back byte for byte.
+An unchanged file of each type comes back byte for byte.
 
 ## Round-trip coverage
 
-`assets coverage` reads every EMI entry on the disc and prints one line per kind: the entries and
-bytes of the kind, and the part that exports and imports to its own bytes. It measures four kinds:
+`assets coverage` reads every EMI entry on the disc and prints one line per type: the entries and
+bytes of the type, and the part that exports and imports to its own bytes. It measures four types:
 `area-message`, `area-encounters`, `data-table` (the game tables and the characters) and `text` (the
 strings and the message tables together). A fifth line counts the palette tables of the character
-sprites against their decoded bytes. Every other kind prints `no round trip yet` and zero; the note
-means the command does not measure the kind, not that the tool cannot write it back.
+sprites against their decoded bytes. Every other type prints `no round trip yet` and zero; the note
+means the command does not measure the type, not that the tool cannot write it back.
 
-The other kinds round trip through their own commands. Results over the retail disc:
+The other types round trip through their own commands. Results over the retail disc:
 
-| Kind or path                                     | Result                                        | Verdict  |
+| Type or path                                     | Result                                        | Verdict  |
 | ------------------------------------------------ | --------------------------------------------- | -------- |
 | EMI archive, `emi extract -J` then `emi pack -J` | 880 of 880 archives                           | lossless |
 | EMI archive, `emi pack` without `-J`             | entry types and load addresses are lost       | lossy    |

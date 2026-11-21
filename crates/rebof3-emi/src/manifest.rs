@@ -23,12 +23,12 @@ struct Manifest {
 
 #[derive(Serialize)]
 struct ManifestEntry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    asset_type: Option<&'static str>,
     first4: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     format: Option<&'static str>,
     index: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    kind: Option<&'static str>,
     name: String,
     ram_ptr: u32,
     size: u32,
@@ -36,13 +36,13 @@ struct ManifestEntry {
     file_type: u16,
 }
 
-/// What a format registry says an entry is: its format name and asset kind.
+/// What a format registry says an entry is: its format name and asset type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Label {
     /// The registry's format name.
     pub format: &'static str,
-    /// The asset kind the format's files are written under.
-    pub kind: &'static str,
+    /// The asset type the format's files are written under.
+    pub asset_type: &'static str,
 }
 
 /// The manifest text for a container with `entries`; `labels` holds one label per entry, or is empty.
@@ -53,10 +53,10 @@ pub fn to_json(archive_version: u32, entries: &[Entry], typed: bool, labels: &[L
             .iter()
             .enumerate()
             .map(|(index, entry)| ManifestEntry {
+                asset_type: labels.get(index).map(|label| label.asset_type),
                 first4: entry.first4,
                 format: labels.get(index).map(|label| label.format),
                 index,
-                kind: labels.get(index).map(|label| label.kind),
                 name: entry_name(index, entry.file_type, typed),
                 ram_ptr: entry.ram_ptr,
                 size: entry.size,

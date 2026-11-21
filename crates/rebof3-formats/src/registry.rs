@@ -202,8 +202,8 @@ pub struct Description {
     pub derive: Option<Derive>,
     /// The files the format opens beside the stored bytes when it extracts an archive.
     pub open: Option<Open>,
-    /// The asset kind the format's files are written under: the name of `rebof3_assets::Kind`.
-    pub kind: &'static str,
+    /// The asset type the format's files are written under: the name of `rebof3_assets::AssetType`.
+    pub asset_type: &'static str,
 }
 
 /// The extension of an entry whose container is the game's own: the EMI entry with its type tag.
@@ -316,14 +316,14 @@ pub fn classify(entry: &Entry, payload: &[u8]) -> Format {
     REGISTRY.iter().find(selected).map_or(Format::Unclassified, |description| description.format)
 }
 
-/// The `emi.json` text of a container: each table row with its format and asset kind from the registry.
+/// The `emi.json` text of a container: each table row with its format and asset type from the registry.
 pub fn manifest_json(archive: &Archive, container: &[u8], typed: bool) -> String {
     let labels: Vec<_> = archive
         .entries()
         .iter()
         .enumerate()
         .map(|(index, entry)| classify(entry, archive.payload(container, index).unwrap_or(&[])))
-        .map(|format| Label { format: format.name(), kind: format.describe().kind })
+        .map(|format| Label { format: format.name(), asset_type: format.describe().asset_type })
         .collect();
     rebof3_emi::manifest::to_json(archive.version(), archive.entries(), typed, &labels)
 }

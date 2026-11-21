@@ -58,7 +58,7 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
                     pages += 1;
                     choices += usize::from(matches!(page.end, PageEnd::Choice(_)));
                     runtime += page.runtime.len();
-                    wide += usize::from(page.line_widths().iter().any(|&w| w > laid.placement.kind.size().0));
+                    wide += usize::from(page.line_widths().iter().any(|&w| w > laid.placement.event_type.size().0));
                     for glyph in &page.glyphs {
                         if let Shape::Byte(byte) = glyph.shape
                             && !glyph.animated
@@ -67,7 +67,7 @@ fn every_retail_message_lays_out_renders_and_rebuilds() {
                             missing_glyphs.insert(byte);
                         }
                     }
-                    let image = render::window(&font, page, render::Window { size: laid.placement.kind.size(), framed: laid.placement.framed, glyphs: usize::MAX, backdrop: [0; 3] });
+                    let image = render::window(&font, page, render::Window { size: laid.placement.event_type.size(), framed: laid.placement.framed, glyphs: usize::MAX, backdrop: [0; 3] });
                     blank += usize::from(image.pixels.chunks(4).all(|p| p[..3] == image.pixels[..3]));
                 }
             }

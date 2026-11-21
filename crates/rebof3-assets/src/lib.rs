@@ -2,7 +2,7 @@
 //!
 //! [`extract::run`] reads the disc through `psx-cd`, classifies each file and
 //! each EMI slot with `rebof3-emi`, and writes one tree of assets plus
-//! `assets.jsonl`. [`kind`] lists the kinds, [`report`] the table and summary,
+//! `assets.jsonl`. [`asset_type`] lists the types, [`report`] the table and summary,
 //! [`terrain`] the area meshes, [`gltf`] the binary glTF writer, [`tables`] the
 //! fixed data tables, [`text`] the game's text (the codec, the message tables and the
 //! strings of the extracted disc), [`sprites`] the character sprites' palettes,
@@ -15,11 +15,11 @@ pub mod disc;
 pub mod error;
 pub mod extract;
 pub mod import;
-pub mod kind;
 pub mod report;
 pub mod sound;
 pub mod sprites;
 pub mod tables;
 pub mod text;
+pub mod types;
 
 pub use error::{Error, Result};

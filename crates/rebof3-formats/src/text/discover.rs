@@ -2,7 +2,7 @@
 //! that the Rust tools find the same strings with the same spans.
 //!
 //! A message table holds its own offset table, and its records are its strings ([`table_records`]). Any other payload
-//! holds two kinds of string. A fixed-width name table holds names at a stride, found by the lattice search. Other
+//! holds two types of string. A fixed-width name table holds names at a stride, found by the lattice search. Other
 //! text is a record that ends at its terminator, or at the pointer table that reaches it ([`strings`]). The rules
 //! and the evidence for them are in `wiki: data/text`.
 
@@ -41,9 +41,9 @@ const TABLE_SAMPLE: usize = 64;
 /// Consecutive image pointers that make a pointer table.
 const POINTER_WORDS: usize = 2;
 
-/// What kind of string a [`Found`] is.
+/// What type of string a [`Found`] is.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Kind {
+pub enum FoundType {
     /// A record of a message table, delimited by the table's offset table.
     Message,
     /// A name in a fixed-width table whose records are `stride` bytes apart.
@@ -57,7 +57,7 @@ pub enum Kind {
 pub struct Found {
     pub start: usize,
     pub end: usize,
-    pub kind: Kind,
+    pub string_type: FoundType,
 }
 
 /// The records of a message table that holds text, or `None` for any other payload and for a table whose records
@@ -83,7 +83,7 @@ pub fn table_records(payload: &[u8]) -> Option<Vec<Found>> {
         if length - usize::from(terminated) < MIN_LENGTH {
             continue;
         }
-        found.push(Found { start, end: start + length, kind: Kind::Message });
+        found.push(Found { start, end: start + length, string_type: FoundType::Message });
     }
     Some(found)
 }
@@ -100,11 +100,11 @@ pub fn strings(payload: &[u8], base: Option<u32>) -> Vec<Found> {
             continue;
         }
         if is_text_record(&payload[start..end]) {
-            found.push(Found { start, end, kind: Kind::Record });
+            found.push(Found { start, end, string_type: FoundType::Record });
         }
     }
     for (&start, &(length, stride)) in &fields {
-        found.push(Found { start, end: start + length, kind: Kind::Field { stride } });
+        found.push(Found { start, end: start + length, string_type: FoundType::Field { stride } });
     }
     found.sort_by_key(|string| string.start);
     found

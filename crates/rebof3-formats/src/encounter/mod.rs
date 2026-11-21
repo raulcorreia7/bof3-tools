@@ -31,7 +31,7 @@ pub static TABLE: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: Some(open_files),
-    kind: "area-encounters",
+    asset_type: "area-encounters",
 };
 
 /// The sources behind the encounter JSON.

@@ -1,4 +1,4 @@
-//! Export then import, byte for byte, over the texture kind of the retail disc.
+//! Export then import, byte for byte, over the texture type of the retail disc.
 //!
 //! The test skips when no disc image is present. Point `BOF3_DISC_IMAGE` at its
 //! cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use rebof3_assets::extract::{self, Options};
 use rebof3_assets::import;
-use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
+use rebof3_assets::types::{AssetType, Selection};
 use rebof3_formats::game_tables::{PAYLOAD_START, TABLES};
 use rebof3_formats::vram::TextureImport;
 
@@ -81,7 +81,7 @@ fn retail_textures_round_trip_byte_exactly() {
                     failures.push(format!("{}: its CLUT row is in no CLUT block (a row may come from another archive's block)", path.display()));
                 }
             }
-            (Ok(other), _) => failures.push(format!("{}: imported as {other:?}, not its kind", path.display())),
+            (Ok(other), _) => failures.push(format!("{}: imported as {other:?}, not its type", path.display())),
             (Err(error), _) => failures.push(format!("{}: {error}", path.display())),
         }
     }
@@ -149,7 +149,7 @@ fn retail_vags_round_trip_through_adpcm() {
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
     // A bank's header and body are two slots of one archive; the report pairs them by source and load argument.
-    let is_bank = |row: &&Row| row.role == "raw" && row.kind == Kind::AudioBank;
+    let is_bank = |row: &&Row| row.role == "raw" && row.asset_type == AssetType::AudioBank;
     let (mut vags, mut identical, mut failures) = (0, 0, Vec::new());
     for header_row in report.rows.iter().filter(is_bank).filter(|row| row.file_type == Some(6)) {
         let body_row =
@@ -202,13 +202,20 @@ fn retail_tables_round_trip_byte_exactly() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    // The eight tables are in entry 0 of ETC/GAME.EMI, which the code kind writes as its stored bytes.
-    let entry = report.rows.iter().find(|row| row.kind == Kind::Code && row.role == "raw" && row.source == "BIN/ETC/GAME.EMI" && row.slot == Some(0)).expect("ETC/GAME.EMI entry 0 is written as code");
+    // The eight tables are in entry 0 of ETC/GAME.EMI, which the code type writes as its stored bytes.
+    let entry = report
+        .rows
+        .iter()
+        .find(|row| row.asset_type == AssetType::Code && row.role == "raw" && row.source == "BIN/ETC/GAME.EMI" && row.slot == Some(0))
+        .expect("ETC/GAME.EMI entry 0 is written as code");
     let payload = fs::read(dir.join(entry.output.as_deref().unwrap())).unwrap();
     for table in TABLES {
         let suffix = format!("/{}.json", table.name);
-        let json_row =
-            report.rows.iter().find(|row| row.kind == Kind::DataTable && row.output.as_deref().is_some_and(|path| path.ends_with(&suffix))).unwrap_or_else(|| panic!("{} has a JSON file", table.name));
+        let json_row = report
+            .rows
+            .iter()
+            .find(|row| row.asset_type == AssetType::DataTable && row.output.as_deref().is_some_and(|path| path.ends_with(&suffix)))
+            .unwrap_or_else(|| panic!("{} has a JSON file", table.name));
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
         let start = table.archive_offset - PAYLOAD_START;
         let stored = &payload[start..start + table.count * table.record];
@@ -227,12 +234,15 @@ fn retail_encounters_round_trip_byte_exactly() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let blocks: Vec<&Row> = report.rows.iter().filter(|row| row.kind == Kind::AreaEncounters && row.role == "raw").collect();
+    let blocks: Vec<&Row> = report.rows.iter().filter(|row| row.asset_type == AssetType::AreaEncounters && row.role == "raw").collect();
     assert!(!blocks.is_empty(), "no encounter block was written");
     let mut failures = Vec::new();
     for block in &blocks {
-        let json_row =
-            report.rows.iter().find(|row| row.kind == Kind::AreaEncounters && row.role == "json" && row.source == block.source && row.slot == block.slot).expect("every encounter block has its JSON");
+        let json_row = report
+            .rows
+            .iter()
+            .find(|row| row.asset_type == AssetType::AreaEncounters && row.role == "json" && row.source == block.source && row.slot == block.slot)
+            .expect("every encounter block has its JSON");
         let stored = fs::read(dir.join(block.output.as_deref().unwrap())).unwrap();
         let json = fs::read(dir.join(json_row.output.as_deref().unwrap())).unwrap();
         if rebof3_formats::encounter::open::import(&json, &stored).ok().as_deref() != Some(stored.as_slice()) {
@@ -255,7 +265,7 @@ fn retail_map_layouts_round_trip_byte_exactly() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let bundles: Vec<&Row> = report.rows.iter().filter(|row| row.kind == Kind::AreaMap && row.role == "raw").collect();
+    let bundles: Vec<&Row> = report.rows.iter().filter(|row| row.asset_type == AssetType::AreaMap && row.role == "raw").collect();
     assert!(!bundles.is_empty(), "no map bundle was written");
     let mut failures = Vec::new();
     for bundle in &bundles {
@@ -263,7 +273,11 @@ fn retail_map_layouts_round_trip_byte_exactly() {
             .rows
             .iter()
             .find(|row| {
-                row.kind == Kind::AreaMap && row.role == "json" && row.source == bundle.source && row.slot == bundle.slot && row.output.as_deref().is_some_and(|path| path.ends_with(".layout.json"))
+                row.asset_type == AssetType::AreaMap
+                    && row.role == "json"
+                    && row.source == bundle.source
+                    && row.slot == bundle.slot
+                    && row.output.as_deref().is_some_and(|path| path.ends_with(".layout.json"))
             })
             .expect("every map bundle has its layout JSON");
         let stored = fs::read(dir.join(bundle.output.as_deref().unwrap())).unwrap();
@@ -328,7 +342,7 @@ fn retail_sequences_round_trip_through_midi() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let packages: Vec<&Row> = report.rows.iter().filter(|row| row.kind == Kind::AudioSequence && row.role == "raw").collect();
+    let packages: Vec<&Row> = report.rows.iter().filter(|row| row.asset_type == AssetType::AudioSequence && row.role == "raw").collect();
     assert!(!packages.is_empty(), "no sequence package was written");
     let (mut sequences, mut failures) = (0, Vec::new());
     for package_row in &packages {

@@ -21,5 +21,5 @@ pub static TABLE: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "area-message",
+    asset_type: "area-message",
 };

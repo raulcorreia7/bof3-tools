@@ -14,7 +14,7 @@ use psx_formats::gfx::texture::{Clut, Color, Depth, Tpage};
 
 use super::{Code, SITES, Site, terrain_descriptor};
 use crate::replay::scenes::Scene;
-use crate::replay::{Kind, Vram, Writer};
+use crate::replay::{Vram, WriteType, Writer};
 
 /// What named a join.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -57,7 +57,7 @@ pub struct Join {
 /// The upload and palette that the page at `page_x`, `page_y` and the CLUT row `clut` resolve to.
 pub fn resolve(vram: &Vram, page_x: u16, page_y: u16, clut: Clut, depth: Depth) -> Option<(Writer, Writer)> {
     let (x, y) = (usize::from(page_x), usize::from(page_y));
-    let texture = vram.writer(x, y).filter(|_| vram.kind(x, y) == Some(Kind::Upload))?;
+    let texture = vram.writer(x, y).filter(|_| vram.write_type(x, y) == Some(WriteType::Upload))?;
     let palette = vram.clut_writer(clut, depth)?;
     Some((texture.clone(), palette.clone()))
 }

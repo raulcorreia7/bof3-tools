@@ -95,7 +95,7 @@ impl std::fmt::Display for Writer {
 
 /// How a span reached VRAM.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Kind {
+pub enum WriteType {
     /// A type-3 upload.
     Upload,
     /// Words of the palette arena, uploaded through the working copy.
@@ -148,7 +148,7 @@ pub struct Region {
     /// The entry that wrote it.
     pub writer: Writer,
     /// Whether it is an upload or palette words.
-    pub kind: Kind,
+    pub write_type: WriteType,
 }
 
 /// One archive as the loader sees it: the table and each entry's payload.
@@ -164,7 +164,7 @@ pub struct Archive<'a> {
 pub struct Vram {
     words: Vec<u16>,
     owners: Vec<u32>,
-    kinds: Vec<Kind>,
+    types: Vec<WriteType>,
     writers: Vec<Writer>,
     arena: Vec<u16>,
     arena_owners: Vec<u32>,
@@ -187,7 +187,7 @@ impl Vram {
         Self {
             words: vec![0; VRAM_WIDTH * VRAM_HEIGHT],
             owners: vec![NOBODY; VRAM_WIDTH * VRAM_HEIGHT],
-            kinds: Vec::new(),
+            types: Vec::new(),
             writers: Vec::new(),
             arena: vec![0; ARENA_WORDS],
             arena_owners: vec![NOBODY; ARENA_WORDS],
@@ -244,7 +244,7 @@ impl Vram {
             match entry.file_type {
                 TYPE_VRAM => self.upload(writer, entry.ram_ptr, payload),
                 TYPE_RAM => self.write_ram(writer, entry.ram_ptr, payload),
-                kind if TYPES_LZ77.contains(&kind) => {
+                write_type if TYPES_LZ77.contains(&write_type) => {
                     if overlaps_arena(entry.ram_ptr, payload.len())
                         && let Ok(decoded) = crate::lz77::decode(payload)
                     {
@@ -301,7 +301,7 @@ impl Vram {
     /// the same place of the working copy (`dst` and `dst + 0x4000`), and raises `g_GfxPalettePending`
     /// so the next [`Vram::upload_palette`] sends them. Words outside the arena are dropped.
     pub fn load_palette(&mut self, ram: u32, words: &[u16], writer: Writer) {
-        let owner = self.owner(writer, Kind::Palette);
+        let owner = self.owner(writer, WriteType::Palette);
         for (index, &word) in words.iter().enumerate() {
             let address = u64::from(ram) + 2 * index as u64;
             let Some(at) = address.checked_sub(u64::from(ARENA_BASE)).map(|offset| (offset / 2) as usize) else {
@@ -320,7 +320,7 @@ impl Vram {
 
     /// `LoadImage`: writes the row-major `words` of `rect`, clipped to VRAM.
     pub fn load_image(&mut self, rect: Rect, words: &[u16], writer: Writer) {
-        let owner = self.owner(writer, Kind::Image);
+        let owner = self.owner(writer, WriteType::Image);
         let owners = vec![owner; words.len()];
         self.write_rect(rect.x, rect.y, rect.width, rect.height, words, &owners);
     }
@@ -347,12 +347,12 @@ impl Vram {
     }
 
     /// How the word at `x`, `y` reached VRAM, if anything wrote it.
-    pub fn kind(&self, x: usize, y: usize) -> Option<Kind> {
+    pub fn write_type(&self, x: usize, y: usize) -> Option<WriteType> {
         if x >= VRAM_WIDTH || y >= VRAM_HEIGHT {
             return None;
         }
         let owner = self.owners[y * VRAM_WIDTH + x];
-        owner.checked_sub(1).and_then(|index| self.kinds.get(index as usize).copied())
+        owner.checked_sub(1).and_then(|index| self.types.get(index as usize).copied())
     }
 
     /// The one entry that wrote every word of the rectangle, or `None` when a word is unwritten,
@@ -436,7 +436,7 @@ impl Vram {
                     width: (right - left) as u16,
                     height: (bottom - top) as u16,
                     writer: self.writer_of(owner)?.clone(),
-                    kind: self.kinds[owner as usize - 1],
+                    write_type: self.types[owner as usize - 1],
                 })
             })
             .collect()
@@ -456,12 +456,12 @@ impl Vram {
         owner.checked_sub(1).and_then(|index| self.writers.get(index as usize))
     }
 
-    fn owner(&mut self, writer: Writer, kind: Kind) -> u32 {
+    fn owner(&mut self, writer: Writer, write_type: WriteType) -> u32 {
         if let Some(index) = self.writers.iter().position(|seen| *seen == writer) {
             return index as u32 + 1;
         }
         self.writers.push(writer);
-        self.kinds.push(kind);
+        self.types.push(write_type);
         self.writers.len() as u32
     }
 
@@ -469,7 +469,7 @@ impl Vram {
         let Ok(rectangles) = vram::decode(payload, upload::descriptor(load_arg)) else {
             return;
         };
-        let owner = self.owner(writer, Kind::Upload);
+        let owner = self.owner(writer, WriteType::Upload);
         let side = vram::RECTANGLE_SIDE;
         let owners = vec![owner; side * side];
         for rectangle in rectangles {
@@ -502,7 +502,7 @@ impl Vram {
         if !overlaps_arena(ram, bytes.len()) {
             return;
         }
-        let owner = self.owner(writer, Kind::Palette);
+        let owner = self.owner(writer, WriteType::Palette);
         let (pairs, _) = bytes.as_chunks::<2>();
         for (index, pair) in pairs.iter().enumerate() {
             let address = ram as u64 + 2 * index as u64;

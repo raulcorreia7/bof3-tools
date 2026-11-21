@@ -31,7 +31,7 @@ use sha2::{Digest, Sha256};
 
 pub use route::Route;
 
-use record::{PaletteKind, Recorder};
+use record::{PaletteType, Recorder};
 use sources::Sources;
 
 /// The bof3-player revision of the machine that made an observation (`Cargo.lock`).
@@ -238,12 +238,12 @@ pub fn run(input: ObserveInput, mut progress: impl FnMut(Progress) -> bool) -> R
                 slot,
                 bits: used.depth.map_or(15, Depth::bits),
                 clut: used.clut.map(|clut| [clut.x, clut.y]),
-                palette: used.palette.map(|(entry, kind)| Palette {
+                palette: used.palette.map(|(entry, palette_type)| Palette {
                     archive: files[entry.file].path.clone(),
                     slot: entry.slot,
-                    via: match kind {
-                        PaletteKind::Upload => "upload",
-                        PaletteKind::Arena => "arena",
+                    via: match palette_type {
+                        PaletteType::Upload => "upload",
+                        PaletteType::Arena => "arena",
                     }
                     .into(),
                 }),

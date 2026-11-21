@@ -858,7 +858,7 @@ fn cell_fields(editor: &Editor, area: &Area, cell: usize, face: Face, cx: &mut C
 
 fn actor_fields(editor: &Editor, area: &Area, index: usize, cx: &mut Context<Editor>) -> Div {
     let actor = &area.actor_list()[index];
-    let mut fields = div().flex().flex_col().gap(px(GAP_SMALL)).child(strong(format!("Actor {index}: kind {:X} at program +{:#06X}", actor.record.kind, actor.record.at)));
+    let mut fields = div().flex().flex_col().gap(px(GAP_SMALL)).child(strong(format!("Actor {index}: type {:X} at program +{:#06X}", actor.record.record_type, actor.record.at)));
     for line in model::describe(area, Hit::Actor(index)) {
         fields = fields.child(muted(line));
     }
@@ -908,8 +908,8 @@ fn zone_list(area: &Area) -> Div {
         Ok(zones) => {
             for (index, zone) in zones.iter().enumerate() {
                 list = list.child(mono(format!(
-                    "{index}: ({}, {})-({}, {}) rate {} kind {} music {} {}",
-                    zone.first[0], zone.first[1], zone.last[0], zone.last[1], zone.rate, zone.kind, zone.seed, zone.pick
+                    "{index}: ({}, {})-({}, {}) rate {} type {} music {} {}",
+                    zone.first[0], zone.first[1], zone.last[0], zone.last[1], zone.rate, zone.zone_type, zone.seed, zone.pick
                 )));
             }
             list.child(muted("The zones live in SLUS_004.22, which the project does not rebuild, so they are read only."))

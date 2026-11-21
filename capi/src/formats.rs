@@ -64,7 +64,7 @@ impl rebof3_format {
     }
 }
 
-/// What one format is: its names, its state and the asset kind it is written under.
+/// What one format is: its names, its state and the asset type it is written under.
 ///
 /// Borrowed: the strings are NUL-terminated and live for the process.
 #[repr(C)]
@@ -75,7 +75,7 @@ pub struct rebof3_format_info {
     pub state: *const c_char,
     pub spec_state: *const c_char,
     pub codec_state: *const c_char,
-    pub kind: *const c_char,
+    pub asset_type: *const c_char,
 }
 
 /// The PNG and JSON of a character sprite sheet. Free it with `rebof3_sprite_sheet_free`.
@@ -102,7 +102,7 @@ struct InfoStrings {
     state: CString,
     spec_state: CString,
     codec_state: CString,
-    kind: CString,
+    asset_type: CString,
 }
 
 static INFO_STRINGS: LazyLock<[InfoStrings; FORMAT_COUNT]> = LazyLock::new(|| {
@@ -114,7 +114,7 @@ static INFO_STRINGS: LazyLock<[InfoStrings; FORMAT_COUNT]> = LazyLock::new(|| {
             state: CString::new(description.state.label().as_bytes()).expect("a format state has no NUL"),
             spec_state: CString::new(description.spec_state.as_bytes()).expect("a specification state has no NUL"),
             codec_state: CString::new(description.codec_state.as_bytes()).expect("a codec state has no NUL"),
-            kind: CString::new(description.kind.as_bytes()).expect("a kind name has no NUL"),
+            asset_type: CString::new(description.asset_type.as_bytes()).expect("a type name has no NUL"),
         }
     })
 });
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn rebof3_format_describe(format: rebof3_format, out_info:
             state: info.state.as_ptr(),
             spec_state: info.spec_state.as_ptr(),
             codec_state: info.codec_state.as_ptr(),
-            kind: info.kind.as_ptr(),
+            asset_type: info.asset_type.as_ptr(),
         };
         Ok(())
     })

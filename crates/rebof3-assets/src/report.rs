@@ -1,13 +1,13 @@
-//! `assets.jsonl` and the by-kind summary.
+//! `assets.jsonl` and the by-type summary.
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Write as _};
 
 use crate::Error;
-use crate::kind::{Handling, Kind};
+use crate::types::{AssetType, Handling};
 
 /// Keys of each `assets.jsonl` object, in column order.
-pub const COLUMNS: [&str; 15] = ["source", "slot", "offset", "size", "type", "load_arg", "format", "kind", "state", "role", "output", "bytes", "sha256", "evidence", "note"];
+pub const COLUMNS: [&str; 15] = ["source", "slot", "offset", "size", "type", "load_arg", "format", "type", "state", "role", "output", "bytes", "sha256", "evidence", "note"];
 /// Marks a column that does not apply to the row.
 pub const NONE: &str = "-";
 /// The `format` of a file rendered from a `bof3player` catalog item. Such a file is an output of the
@@ -41,7 +41,7 @@ pub struct Row {
     pub load_arg: Option<u32>,
     /// The census format name (`rebof3_formats::Format::name`).
     pub format: &'static str,
-    pub kind: Kind,
+    pub asset_type: AssetType,
     /// The census state: codec, specified, unknown, code, reserve, or file.
     pub state: &'static str,
     /// What the output is: raw, png, json, decoded.
@@ -59,7 +59,7 @@ pub struct Row {
 
 impl Row {
     /// A row of a whole file: no slot, no entry fields, nothing written yet.
-    pub(crate) fn new(source: String, format: &'static str, kind: Kind, state: &'static str, role: &'static str) -> Self {
+    pub(crate) fn new(source: String, format: &'static str, asset_type: AssetType, state: &'static str, role: &'static str) -> Self {
         Self {
             source,
             slot: None,
@@ -68,7 +68,7 @@ impl Row {
             file_type: None,
             load_arg: None,
             format,
-            kind,
+            asset_type,
             state,
             role,
             output: None,
@@ -94,7 +94,7 @@ impl Row {
             optional(self.file_type.map(|file_type| file_type.to_string())),
             optional(self.load_arg.map(|value| format!("{value:#010x}"))),
             self.format.to_string(),
-            self.kind.name().to_string(),
+            self.asset_type.name().to_string(),
             self.state.to_string(),
             self.role.to_string(),
             optional(self.output.clone()),
@@ -139,7 +139,7 @@ pub struct Report {
     pub rows: Vec<Row>,
     /// Payloads whose derived output could not be written.
     pub failures: Vec<Failure>,
-    /// Lines on kinds another tool owns or the run could not produce.
+    /// Lines on types another tool owns or the run could not produce.
     pub notes: Vec<String>,
 }
 
@@ -167,12 +167,12 @@ impl Report {
         std::fs::write(directory.join(crate::extract::SUMMARY_FILE), self.summary())
     }
 
-    /// Payloads per kind. A payload with several outputs counts once.
-    fn payloads(&self) -> BTreeMap<Kind, Tally> {
-        let mut tallies: BTreeMap<Kind, Tally> = BTreeMap::new();
+    /// Payloads per type. A payload with several outputs counts once.
+    fn payloads(&self) -> BTreeMap<AssetType, Tally> {
+        let mut tallies: BTreeMap<AssetType, Tally> = BTreeMap::new();
         let mut seen = std::collections::HashSet::new();
         for row in &self.rows {
-            let tally = tallies.entry(row.kind).or_default();
+            let tally = tallies.entry(row.asset_type).or_default();
             tally.files += usize::from(row.output.is_some());
             tally.written += row.bytes;
             tally.state = row.state;
@@ -184,17 +184,17 @@ impl Report {
         tallies
     }
 
-    /// The summary by kind, the coverage and classified lines, and every unknown entry.
+    /// The summary by type, the coverage and classified lines, and every unknown entry.
     pub fn summary(&self) -> String {
         let tallies = self.payloads();
         let mut out = String::new();
-        let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} handling", "kind", "entries", "bytes", "files", "written", "state");
+        let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} handling", "type", "entries", "bytes", "files", "written", "state");
         let mut total = Tally::default();
-        for kind in Kind::ALL {
-            let Some(tally) = tallies.get(kind) else {
+        for asset_type in AssetType::ALL {
+            let Some(tally) = tallies.get(asset_type) else {
                 continue;
             };
-            let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} {}", kind.name(), tally.entries, tally.bytes, tally.files, tally.written, tally.state, kind.handling().label(),);
+            let _ = writeln!(out, "{:<17} {:>7} {:>13} {:>7} {:>13}  {:<9} {}", asset_type.name(), tally.entries, tally.bytes, tally.files, tally.written, tally.state, asset_type.handling().label(),);
             total.entries += tally.entries;
             total.bytes += tally.bytes;
             total.files += tally.files;
@@ -228,10 +228,10 @@ impl Report {
     }
 
     /// One line: how much of the disc each handling covers.
-    fn coverage(&self, tallies: &BTreeMap<Kind, Tally>) -> String {
+    fn coverage(&self, tallies: &BTreeMap<AssetType, Tally>) -> String {
         let mut by_handling: BTreeMap<&str, (usize, u64)> = BTreeMap::new();
-        for (kind, tally) in tallies {
-            let slot = by_handling.entry(kind.handling().label()).or_default();
+        for (asset_type, tally) in tallies {
+            let slot = by_handling.entry(asset_type.handling().label()).or_default();
             slot.0 += tally.entries;
             slot.1 += tally.bytes;
         }
@@ -244,7 +244,7 @@ impl Report {
 
     /// Every entry no rule classifies, largest first.
     fn unknown_entries(&self) -> Unknown<'_> {
-        let mut rows: Vec<&Row> = self.rows.iter().filter(|row| matches!(row.kind, Kind::Unknown) && row.role == "raw").collect();
+        let mut rows: Vec<&Row> = self.rows.iter().filter(|row| matches!(row.asset_type, AssetType::Unknown) && row.role == "raw").collect();
         let total = rows.len();
         let bytes = rows.iter().map(|row| row.size).sum();
         rows.sort_by(|left, right| right.size.cmp(&left.size).then_with(|| (&left.source, left.slot).cmp(&(&right.source, right.slot))));

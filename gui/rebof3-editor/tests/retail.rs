@@ -12,7 +12,7 @@ use rebof3_editor::schema::{self, Field};
 use rebof3_emi::text::codec::{self, Encoding};
 use rebof3_formats::Format;
 use rebof3_formats::map::MapBundle;
-use rebof3_formats::text::discover::{self, Kind};
+use rebof3_formats::text::discover::{self, FoundType};
 use rebof3_formats::vram::texture_words;
 
 fn disc() -> Option<PathBuf> {
@@ -90,7 +90,7 @@ fn every_entry_round_trips_through_its_editor() {
             let found = discover::table_records(payload).unwrap_or_else(|| discover::strings(payload, Some(load_arg)));
             for string in found {
                 strings.0 += 1;
-                let encoding = if matches!(string.kind, Kind::Field { .. }) { Encoding::Name } else { Encoding::Message };
+                let encoding = if matches!(string.string_type, FoundType::Field { .. }) { Encoding::Name } else { Encoding::Message };
                 let raw = &payload[string.start..string.end];
                 let text = codec::decode(encoding, raw);
                 if codec::encode(encoding, &text).ok().as_deref() != Some(raw) {

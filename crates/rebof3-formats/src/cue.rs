@@ -22,7 +22,7 @@ pub static TABLE: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "audio-cues",
+    asset_type: "audio-cues",
 };
 
 /// Decodes the table and encodes it again; `Err` names the first difference.

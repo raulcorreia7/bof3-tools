@@ -1,7 +1,7 @@
-//! The asset kinds `rebof3-assets` sorts the disc into.
+//! The asset types `rebof3-assets` sorts the disc into.
 //!
-//! A kind is a directory of the output tree and a value of the `kind` column of
-//! `assets.jsonl`. An EMI entry's kind follows from its
+//! A type is a directory of the output tree and a value of the `asset_type` column of
+//! `assets.jsonl`. An EMI entry's type follows from its
 //! [`Format`], so the census in
 //! `wiki: formats/conversion#conversion-map` and this table name the
 //! same things.
@@ -10,7 +10,7 @@ use rebof3_formats::Format;
 
 use crate::error::{Error, Result};
 
-/// What the tool writes for a kind.
+/// What the tool writes for a type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Handling {
     /// The stored bytes and a derived file (PNG, JSON or decoded bytes).
@@ -31,37 +31,37 @@ impl Handling {
     }
 }
 
-macro_rules! kinds {
+macro_rules! types {
     ($($variant:ident => ($name:literal, $handling:ident, $about:literal)),+ $(,)?) => {
         /// One class of game asset.
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-        pub enum Kind {
+        pub enum AssetType {
             $($variant),+
         }
 
-        impl Kind {
-            /// Every kind, in report order.
-            pub const ALL: &'static [Kind] = &[$(Kind::$variant),+];
+        impl AssetType {
+            /// Every type, in report order.
+            pub const ALL: &'static [AssetType] = &[$(AssetType::$variant),+];
 
-            /// The kind's name on the command line, in `assets.jsonl` and as a directory.
+            /// The type's name on the command line, in `assets.jsonl` and as a directory.
             pub fn name(self) -> &'static str {
-                match self { $(Kind::$variant => $name),+ }
+                match self { $(AssetType::$variant => $name),+ }
             }
 
-            /// What the tool writes for the kind.
+            /// What the tool writes for the type.
             pub fn handling(self) -> Handling {
-                match self { $(Kind::$variant => Handling::$handling),+ }
+                match self { $(AssetType::$variant => Handling::$handling),+ }
             }
 
-            /// One line on what the kind holds.
+            /// One line on what the type holds.
             pub fn about(self) -> &'static str {
-                match self { $(Kind::$variant => $about),+ }
+                match self { $(AssetType::$variant => $about),+ }
             }
         }
     };
 }
 
-kinds! {
+types! {
     Executable => ("executable", Raw, "program images: SLUS_004.22 and LOGO.EXE"),
     System => ("system", Raw, "SYSTEM.CNF and the license sectors"),
     Video => ("video", Raw, "MDEC video with XA audio (2336-byte sectors)"),
@@ -90,14 +90,14 @@ kinds! {
     Text => ("text", Decoded, "game strings and message tables as JSON, from the extracted disc"),
 }
 
-impl Kind {
-    /// The kind of an EMI entry's format, from the format's registry row.
+impl AssetType {
+    /// The type of an EMI entry's format, from the format's registry row.
     pub fn of_format(format: Format) -> Self {
-        let name = format.describe().kind;
-        Self::ALL.iter().copied().find(|kind| kind.name() == name).unwrap_or_else(|| panic!("{name} is not a kind"))
+        let name = format.describe().asset_type;
+        Self::ALL.iter().copied().find(|asset_type| asset_type.name() == name).unwrap_or_else(|| panic!("{name} is not a type"))
     }
 
-    /// The current name of a kind named by an earlier release; any other name comes back unchanged.
+    /// The current name of a type named by an earlier release; any other name comes back unchanged.
     pub fn canonical(name: &str) -> &str {
         match name {
             "character-bank" => "character-sprites",
@@ -109,7 +109,7 @@ impl Kind {
     /// Parses one `--only` name.
     pub fn parse(name: &str) -> Result<Self> {
         let name = Self::canonical(name);
-        Self::ALL.iter().copied().find(|kind| kind.name() == name).ok_or_else(|| Error::UnknownKind(name.to_string()))
+        Self::ALL.iter().copied().find(|asset_type| asset_type.name() == name).ok_or_else(|| Error::UnknownType(name.to_string()))
     }
 }
 
@@ -185,17 +185,17 @@ impl Mode {
     }
 }
 
-/// The kinds a run produces, and the form they are written in: all of them, or the `--only` list.
+/// The types a run produces, and the form they are written in: all of them, or the `--only` list.
 #[derive(Clone, Debug)]
 pub struct Selection {
-    kinds: Vec<Kind>,
+    types: Vec<AssetType>,
     mode: Mode,
     audio: AudioFormat,
 }
 
 impl Selection {
     pub fn all() -> Self {
-        Self { kinds: Kind::ALL.to_vec(), mode: Mode::Both, audio: AudioFormat::Wav }
+        Self { types: AssetType::ALL.to_vec(), mode: Mode::Both, audio: AudioFormat::Wav }
     }
 
     /// The same selection, written in `mode`.
@@ -219,22 +219,22 @@ impl Selection {
         self.audio
     }
 
-    /// Parses a comma-separated kind list.
+    /// Parses a comma-separated type list.
     pub fn parse(list: &str) -> Result<Self> {
-        let kinds = list.split(',').map(str::trim).filter(|name| !name.is_empty()).map(Kind::parse).collect::<Result<Vec<_>>>()?;
-        if kinds.is_empty() {
-            return Err(Error::NoKinds);
+        let types = list.split(',').map(str::trim).filter(|name| !name.is_empty()).map(AssetType::parse).collect::<Result<Vec<_>>>()?;
+        if types.is_empty() {
+            return Err(Error::NoTypes);
         }
-        Ok(Self { kinds, mode: Mode::Both, audio: AudioFormat::Wav })
+        Ok(Self { types, mode: Mode::Both, audio: AudioFormat::Wav })
     }
 
-    pub fn contains(&self, kind: Kind) -> bool {
-        self.kinds.contains(&kind)
+    pub fn contains(&self, asset_type: AssetType) -> bool {
+        self.types.contains(&asset_type)
     }
 
-    /// Whether the selection leaves out every kind an EMI entry can have.
-    pub fn is_only(&self, kind: Kind) -> bool {
-        self.kinds == [kind]
+    /// Whether the selection leaves out every type an EMI entry can have.
+    pub fn is_only(&self, asset_type: AssetType) -> bool {
+        self.types == [asset_type]
     }
 }
 
@@ -243,9 +243,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_format_names_a_kind() {
+    fn every_format_names_a_type() {
         for format in Format::ALL {
-            assert!(Kind::ALL.iter().any(|kind| kind.name() == format.describe().kind), "{}", format.name());
+            assert!(AssetType::ALL.iter().any(|asset_type| asset_type.name() == format.describe().asset_type), "{}", format.name());
         }
     }
 }

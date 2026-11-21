@@ -93,7 +93,7 @@ It reads an extracted disc and saves edits to a project folder. The views, keys 
 | Area maps                         | OBJ, glTF                                                |
 | Text, game tables, encounters     | JSON and plain text                                      |
 
-`bof3 assets kinds` lists every asset kind and how it is handled. The formats are described in the
+`bof3 assets types` lists every asset type and how it is handled. The formats are described in the
 [wiki](https://raulcorreia7.github.io/bof3-wiki/).
 
 ## Check

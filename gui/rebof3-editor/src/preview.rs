@@ -3,7 +3,7 @@
 //! sequence into an archive the library reads, so every preview has the driver's pitch, envelope, loop,
 //! interpolation and mix, and the library's stereo 44.1 kHz output.
 
-use bof3player::catalog::{Item, Kind as ItemKind};
+use bof3player::catalog::{Item, MediaType};
 use bof3player::{Library, MemorySource, NoNaming};
 use psx_formats::sep::{Event, Package, Sequence};
 use psx_formats::vab;
@@ -58,7 +58,7 @@ pub struct Note {
 /// of the sample. `header` and `body` are the bank's `.vh` and `.vb`, so an edited bank plays as edited.
 pub fn sample_pcm(header: &[u8], body: &[u8], sample: u32) -> Result<Pcm, String> {
     let archive = bank_archive(header, body, None)?;
-    render_preview(&archive, |item| item.kind == ItemKind::Sample && item.sub_index == sample).ok_or_else(|| format!("the bank has no sample {sample}"))?
+    render_preview(&archive, |item| item.media_type == MediaType::Sample && item.sub_index == sample).ok_or_else(|| format!("the bank has no sample {sample}"))?
 }
 
 /// Renders one note as the game's sound driver plays it: keyed on at full velocity on the driver's first
@@ -73,7 +73,7 @@ pub fn note_pcm(header: &[u8], body: &[u8], note: &Note) -> Result<Pcm, String> 
     let hold = (note.hold.max(0.0) * PREVIEW_TICKS_PER_SECOND).round().max(1.0) as u32;
     let package = Package { sequences: vec![one_note(program, note.note, hold)] }.encode();
     let archive = bank_archive(&header, body, Some(&package))?;
-    render_preview(&archive, |item| item.kind == ItemKind::Music).ok_or_else(|| "the preview sequence is not in the catalog".to_string())?
+    render_preview(&archive, |item| item.media_type == MediaType::Music).ok_or_else(|| "the preview sequence is not in the catalog".to_string())?
 }
 
 /// The header with every other tone of the program of tone `block`/`slot` emptied, and that program.

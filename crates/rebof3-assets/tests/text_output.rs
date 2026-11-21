@@ -1,4 +1,4 @@
-//! The text kind's files: the stored payload, one JSON row per string and a plain-text view,
+//! The text type's files: the stored payload, one JSON row per string and a plain-text view,
 //! beside a run-wide index. The synthetic archive exercises the table, a string table and the
 //! payloads the scan drops; the retail disc is covered by the hands-on run in the task report.
 
@@ -95,7 +95,7 @@ fn a_text_run_writes_the_payload_its_rows_and_the_index() {
     assert_eq!(row["entry"], 0);
     assert_eq!(row["ram"], serde_json::json!(0x8001_0000u32 + row["offset"].as_u64().unwrap() as u32));
     assert_eq!(row["found"], "table header");
-    assert_eq!(row["kind"], "message");
+    assert_eq!(row["string_type"], "message");
     let start = row["offset"].as_u64().unwrap() as usize;
     let length = row["length"].as_u64().unwrap() as usize;
     assert_eq!(row["bytes"], serde_json::Value::String(hex(&table_bytes[start..start + length])));
@@ -104,7 +104,7 @@ fn a_text_run_writes_the_payload_its_rows_and_the_index() {
     let labels_json = fs::read(out.join("text/BIN/ETC/TEST/1.json")).unwrap();
     assert_eq!(strings::import(&labels_json, &labels_bytes).unwrap(), labels_bytes);
     let document: serde_json::Value = serde_json::from_slice(&labels_json).unwrap();
-    assert_eq!(document["strings"][0]["kind"], "string-table");
+    assert_eq!(document["strings"][0]["string_type"], "string-table");
     assert_eq!(document["strings"][0]["table"], "scan@0x8");
     assert_eq!(document["strings"][0]["id"], "scan@0x8[0]");
     assert_eq!(document["strings"][0]["found"], "scan");
@@ -115,7 +115,7 @@ fn a_text_run_writes_the_payload_its_rows_and_the_index() {
     let rows: Vec<serde_json::Value> = index.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
     assert!(rows.contains(&serde_json::json!({
         "source": "BIN/ETC/TEST.EMI#1+0x0",
-        "kind": "string-table",
+        "string_type": "string-table",
         "id": "scan@0x8[0]",
         "ram": "0x8001a000",
         "text": "Attack{END}"

@@ -32,10 +32,10 @@ impl From<rebof3_assets::Error> for Failure {
             }
             rebof3_assets::Error::Formats(inner) => inner.into(),
             rebof3_assets::Error::Job(message) => invalid(message),
-            rebof3_assets::Error::UnknownKind(_)
+            rebof3_assets::Error::UnknownType(_)
             | rebof3_assets::Error::UnknownAudioFormat(_)
             | rebof3_assets::Error::UnknownMode(_)
-            | rebof3_assets::Error::NoKinds
+            | rebof3_assets::Error::NoTypes
             | rebof3_assets::Error::NoTextDisc(_) => usage(error.to_string()),
             other => Self(Fail::new(psx_status::Format, other.to_string())),
         }

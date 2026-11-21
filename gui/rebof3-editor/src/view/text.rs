@@ -6,7 +6,7 @@
 
 use gpui::{AnyElement, Context, div, prelude::*, px};
 use rebof3_emi::text::codec::{self, Encoding};
-use rebof3_formats::text::discover::{self, Found, Kind};
+use rebof3_formats::text::discover::{self, Found, FoundType};
 
 use super::{Entry, Field, compose, input, message};
 use crate::app::Editor;
@@ -38,10 +38,10 @@ pub fn has_text(payload: &[u8], load_arg: u32) -> bool {
     !found(payload, load_arg).is_empty()
 }
 
-fn encoding(kind: Kind) -> Encoding {
-    match kind {
-        Kind::Field { .. } => Encoding::Name,
-        Kind::Message | Kind::Record => Encoding::Message,
+fn encoding(string_type: FoundType) -> Encoding {
+    match string_type {
+        FoundType::Field { .. } => Encoding::Name,
+        FoundType::Message | FoundType::Record => Encoding::Message,
     }
 }
 
@@ -72,7 +72,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let mut list = div().id("strings").flex().flex_col().flex_1().gap(px(GAP_SMALL)).overflow_y_scroll();
     for string in &strings {
         let span = string.start..string.end;
-        let text = codec::decode(encoding(string.kind), &payload[span.clone()]);
+        let text = codec::decode(encoding(string.string_type), &payload[span.clone()]);
         if !needle.is_empty() && !text.to_lowercase().contains(&needle) {
             continue;
         }
@@ -110,7 +110,7 @@ pub fn string_changed(editor: &mut Editor, start: usize, text: &str) -> Option<S
     let string = found(&payload, entry.load_arg()).into_iter().find(|string| string.start == start)?;
     let span = string.start..string.end;
 
-    match codec::encode(encoding(string.kind), text) {
+    match codec::encode(encoding(string.string_type), text) {
         Ok(bytes) if bytes.len() <= span.len() => {
             payload[span].fill(TERMINATOR);
             payload[start..start + bytes.len()].copy_from_slice(&bytes);
@@ -160,7 +160,7 @@ mod tests {
                 let entry = Entry { project: &project, archive: &archive, index };
                 let payload = entry.payload();
                 for string in found(payload, entry.load_arg()) {
-                    let text = codec::decode(encoding(string.kind), &payload[string.start..string.end]);
+                    let text = codec::decode(encoding(string.string_type), &payload[string.start..string.end]);
                     if text.contains("{BACKSPACE}") {
                         continue;
                     }

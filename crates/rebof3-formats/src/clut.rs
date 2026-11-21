@@ -26,7 +26,7 @@ pub static BLOCK: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "palette",
+    asset_type: "palette",
 };
 
 /// Decodes the block and encodes it again; `Err` names the first difference.

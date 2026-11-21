@@ -44,9 +44,9 @@ pub struct Message {
     /// How the message was found: `table header`.
     #[serde(default)]
     pub found: String,
-    /// The string's kind: `message`.
+    /// The string's type: `message`.
     #[serde(default)]
-    pub kind: String,
+    pub string_type: String,
 }
 
 /// The JSON form: the payload size, one row per message, and the slot map. A slot is `null` when it
@@ -191,7 +191,7 @@ pub fn export_counted(payload: &[u8], source: Option<&PayloadSource>) -> Result<
             bytes: hex(raw),
             text: codec::decode(Encoding::Message, raw),
             found: "table header".into(),
-            kind: "message".into(),
+            string_type: "message".into(),
         });
     }
     let document = Document { size: Some(payload.len()), messages: rows.iter().cloned().map(|row| WireMessage::Row(Box::new(row))).collect(), slots: table.slots };

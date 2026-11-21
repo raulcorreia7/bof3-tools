@@ -30,8 +30,8 @@ const INDEX_MD: &str = "index.md";
 const DEFAULT_OUT: &str = "build/extract";
 /// The steps, in run order.
 const STEPS: [&str; 5] = ["disc", "emi", "assets", "assets-export", "audio"];
-/// Steps whose first folder level is the asset kind.
-const KIND_FOLDER_STEPS: [&str; 2] = ["assets", "assets-export"];
+/// Steps whose first folder level is the asset type.
+const TYPE_FOLDER_STEPS: [&str; 2] = ["assets", "assets-export"];
 /// Items the `audio` step renders (sample ids).
 const AUDIO_QUERIES: [&str; 2] = ["sample:BATL_END", "sample:A085SE2"];
 /// The browser's manifest keeps a compare column; no step has a peer to compare against.
@@ -59,7 +59,7 @@ Steps (default: all, in this order):
   -q, --quiet        print only errors
   -h, --help         this text
 
-DIR/index.json and DIR/index.md list every file with its step, kind, size and sha256.
+DIR/index.json and DIR/index.md list every file with its step, asset_type, size and sha256.
 Naming STEPs reruns only those; the other steps keep their earlier files and index rows.
 Exit code: 0 success, 1 some step had failures, 2 an error.
 
@@ -166,7 +166,7 @@ struct StepRecord {
 struct FileRecord {
     compare: String,
     consumer: String,
-    kind: String,
+    asset_type: String,
     path: String,
     peer: String,
     sha256: String,
@@ -303,14 +303,14 @@ fn export_jobs(context: &Context, rows: &[Value]) -> Vec<ExportJob> {
     let mut jobs = Vec::new();
     let mut banks: BTreeMap<(String, String), BTreeMap<String, PathBuf>> = BTreeMap::new();
     for row in rows {
-        let (Some(output), Some(kind)) = (row["output"].as_str(), row["kind"].as_str()) else { continue };
+        let (Some(output), Some(asset_type)) = (row["output"].as_str(), row["type"].as_str()) else { continue };
         if output == "-" {
             continue; // a payload the extractor reserves and does not write
         }
         let path = source.join(output);
-        let stem = Path::new(output).strip_prefix(kind).unwrap_or(Path::new(output)).with_extension("");
+        let stem = Path::new(output).strip_prefix(asset_type).unwrap_or(Path::new(output)).with_extension("");
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
-        match (kind, extension.as_str()) {
+        match (asset_type, extension.as_str()) {
             ("area-map", "bin") => jobs.push(ExportJob { label: format!("terrain {output}"), target: out.join("terrain").join(&stem).with_extension("glb"), source: path, what: Export::Terrain }),
             ("area-message", "bin") => jobs.push(ExportJob { label: format!("message {output}"), target: out.join("message").join(&stem).with_extension("json"), source: path, what: Export::Message }),
             ("audio-bank", "vh" | "vb") => {
@@ -432,14 +432,14 @@ fn sha256(path: &Path) -> String {
     })
 }
 
-fn kind_of(step: &str, relative: &Path) -> String {
+fn asset_type_of(step: &str, relative: &Path) -> String {
     let name = relative.file_name().and_then(|n| n.to_str()).unwrap_or("");
     if step == "audio" {
-        return name.split('_').next().unwrap_or(name).to_string(); // `<kind>_<item>.wav`
+        return name.split('_').next().unwrap_or(name).to_string(); // `<asset_type>_<item>.wav`
     }
     let mut parts = relative.components();
     let first = parts.next().and_then(|c| c.as_os_str().to_str());
-    if let (true, Some(first), Some(_)) = (KIND_FOLDER_STEPS.contains(&step), first, parts.next()) {
+    if let (true, Some(first), Some(_)) = (TYPE_FOLDER_STEPS.contains(&step), first, parts.next()) {
         return first.to_string();
     }
     relative.extension().map_or_else(|| "no extension".into(), |ext| ext.to_string_lossy().to_lowercase())
@@ -456,7 +456,7 @@ fn files_under(folder: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
-/// Every file under `DIR/STEP` with its kind, size and sha256, sorted by path.
+/// Every file under `DIR/STEP` with its type, size and sha256, sorted by path.
 fn scan(context: &Context, step: &str) -> Vec<FileRecord> {
     let root = context.folder(step);
     let mut paths = Vec::new();
@@ -471,7 +471,7 @@ fn scan(context: &Context, step: &str) -> Vec<FileRecord> {
             let posix = relative.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/");
             FileRecord {
                 consumer: step.to_string(),
-                kind: kind_of(step, relative).to_string(),
+                asset_type: asset_type_of(step, relative).to_string(),
                 path: posix,
                 size: fs::metadata(path).map_or(0, |m| m.len()),
                 sha256: digest,
@@ -512,17 +512,17 @@ fn write_index(context: &Context, records: &[StepRecord], files: &[FileRecord]) 
     md.push_str(&table(&header, &rows));
     for record in records {
         let name = record.name.as_str();
-        let mut kinds: BTreeMap<&str, (u64, u64)> = BTreeMap::new();
+        let mut types: BTreeMap<&str, (u64, u64)> = BTreeMap::new();
         for file in files.iter().filter(|f| f.consumer == name) {
-            let entry = kinds.entry(file.kind.as_str()).or_default();
+            let entry = types.entry(file.asset_type.as_str()).or_default();
             entry.0 += 1;
             entry.1 += file.size;
         }
-        if kinds.is_empty() {
+        if types.is_empty() {
             continue;
         }
-        let rows: Vec<Vec<String>> = kinds.iter().map(|(k, (n, b))| vec![(*k).into(), n.to_string(), b.to_string()]).collect();
-        let _ = write!(md, "\n\n## {name}\n\n{}", table(&["kind", "files", "bytes"], &rows));
+        let rows: Vec<Vec<String>> = types.iter().map(|(k, (n, b))| vec![(*k).into(), n.to_string(), b.to_string()]).collect();
+        let _ = write!(md, "\n\n## {name}\n\n{}", table(&["type", "files", "bytes"], &rows));
     }
     md.push('\n');
     write(INDEX_MD, md)

@@ -23,7 +23,7 @@ pub static PACKAGE: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
     open: None,
-    kind: "audio-sequence",
+    asset_type: "audio-sequence",
 };
 
 /// Parses the package and encodes it again; `Err` names the first difference.

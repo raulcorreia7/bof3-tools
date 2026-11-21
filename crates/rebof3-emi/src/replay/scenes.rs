@@ -22,12 +22,12 @@ pub const ENDKANJI: &str = "BIN/ETC/ENDKANJI.EMI";
 pub const BATTLE: &str = "BIN/BATTLE/BATTLE.EMI";
 
 /// The areas whose `AreaLoad` flag byte (`+0x32`) has bit 0 set, the world map
-/// (`wiki: data/programs#map-kinds`). The flags live in the executable, not in an archive.
+/// (`wiki: data/programs#map-types`). The flags live in the executable, not in an archive.
 pub const WORLD_MAP_AREAS: [u16; 11] = [16, 33, 45, 65, 87, 88, 104, 115, 121, 151, 152];
 
-/// What kind of screen a scene is.
+/// What type of screen a scene is.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Kind {
+pub enum SceneType {
     /// `FIRST` alone, before the title.
     Frontend,
     /// The title screen.
@@ -48,19 +48,19 @@ pub enum Kind {
     Ending,
 }
 
-impl Kind {
-    /// The kind's name in a list.
+impl SceneType {
+    /// The type's name in a list.
     pub fn label(self) -> &'static str {
         match self {
-            Kind::Frontend => "Frontend",
-            Kind::Title => "Title",
-            Kind::Field => "Field",
-            Kind::WorldMap => "World map",
-            Kind::Menu => "Menu",
-            Kind::Village => "Fairy Village",
-            Kind::Battle => "Battle",
-            Kind::Effect => "Battle effect",
-            Kind::Ending => "Ending",
+            SceneType::Frontend => "Frontend",
+            SceneType::Title => "Title",
+            SceneType::Field => "Field",
+            SceneType::WorldMap => "World map",
+            SceneType::Menu => "Menu",
+            SceneType::Village => "Fairy Village",
+            SceneType::Battle => "Battle",
+            SceneType::Effect => "Battle effect",
+            SceneType::Ending => "Ending",
         }
     }
 }
@@ -68,10 +68,10 @@ impl Kind {
 /// A screen of the game and the loader steps that build its VRAM.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Scene {
-    /// The scene's name: its kind and the archives it adds.
+    /// The scene's name: its type and the archives it adds.
     pub name: String,
-    /// What kind of screen it is.
-    pub kind: Kind,
+    /// What type of screen it is.
+    pub scene_type: SceneType,
     /// The steps, in order.
     pub steps: Vec<Step>,
 }
@@ -85,8 +85,8 @@ impl Scene {
         })
     }
 
-    fn then(mut self, kind: Kind, name: String, steps: impl IntoIterator<Item = Step>) -> Self {
-        self.kind = kind;
+    fn then(mut self, scene_type: SceneType, name: String, steps: impl IntoIterator<Item = Step>) -> Self {
+        self.scene_type = scene_type;
         self.name = name;
         self.steps.extend(steps);
         self
@@ -96,18 +96,18 @@ impl Scene {
 /// `SYS_StartFrontend`: `GFX_ClearRect(0, 0, 1024, 512)`, stream `FIRST`, `GFX_ResetPalette`;
 /// `SYS_Main` then runs `GFX_UploadPalette`.
 pub fn frontend() -> Scene {
-    Scene { name: "Frontend".into(), kind: Kind::Frontend, steps: vec![Step::Clear, Step::Load(FIRST.into()), Step::ResetPalette, Step::UploadPalette] }
+    Scene { name: "Frontend".into(), scene_type: SceneType::Frontend, steps: vec![Step::Clear, Step::Load(FIRST.into()), Step::ResetPalette, Step::UploadPalette] }
 }
 
 /// `Game_BeginTitle (emi/etc/game/01)`: stream `DEMO`, then `GFX_ResetPalette`.
 pub fn title() -> Scene {
-    frontend().then(Kind::Title, "Title".into(), [Step::Load(DEMO.into()), Step::ResetPalette, Step::UploadPalette])
+    frontend().then(SceneType::Title, "Title".into(), [Step::Load(DEMO.into()), Step::ResetPalette, Step::UploadPalette])
 }
 
 /// `func_8019FAA0`, the area loader: stream the area archive, then `GFX_ResetPalette`.
 pub fn field(area: &str) -> Scene {
-    let kind = if area_id(area).is_some_and(|id| WORLD_MAP_AREAS.contains(&id)) { Kind::WorldMap } else { Kind::Field };
-    frontend().then(kind, format!("{}: {}", kind.label(), stem(area)), [Step::Load(area.into()), Step::ResetPalette, Step::UploadPalette])
+    let scene_type = if area_id(area).is_some_and(|id| WORLD_MAP_AREAS.contains(&id)) { SceneType::WorldMap } else { SceneType::Field };
+    frontend().then(scene_type, format!("{}: {}", scene_type.label(), stem(area)), [Step::Load(area.into()), Step::ResetPalette, Step::UploadPalette])
 }
 
 /// A menu overlay over `base`. The open handler streams the archive, then copies the palette:
@@ -126,27 +126,27 @@ pub fn menu(base: Scene, archive: &str) -> Option<Scene> {
         "SISYOU" => &[Step::CopyPalette(2)],
         _ => return None,
     };
-    let name = format!("{}: {}", Kind::Menu.label(), stem(archive));
+    let name = format!("{}: {}", SceneType::Menu.label(), stem(archive));
     let mut steps = vec![Step::Load(archive.into())];
     steps.extend(copies.iter().cloned());
     steps.push(Step::UploadPalette);
-    Some(base.then(Kind::Menu, name, steps))
+    Some(base.then(SceneType::Menu, name, steps))
 }
 
 /// A Fairy Village event over `base`: `Fairy_LoadCommu01` to `Fairy_LoadCommu05` stream
 /// `COMMU01` to `COMMU05`, and `Fairy_FinishEventLoad (commu00/00)` runs `GFX_ResetPalette` once the
 /// stream is ready.
 pub fn village(base: Scene, archive: &str) -> Scene {
-    let name = format!("{}: {}", Kind::Village.label(), stem(archive));
-    base.then(Kind::Village, name, [Step::Load(archive.into()), Step::ResetPalette, Step::UploadPalette])
+    let name = format!("{}: {}", SceneType::Village.label(), stem(archive));
+    base.then(SceneType::Village, name, [Step::Load(archive.into()), Step::ResetPalette, Step::UploadPalette])
 }
 
 /// A battle over `base`. `Battle_LoadBattleArchive` streams `BATTLE`, `BATTLE2` or a `BOSS`
 /// archive; the battle reset `func_801D1228 (battle/03)` copies the 16 words at arena row 15,
 /// column 240, then rows 26 and 27 (`GFX_CopyPalette(0x1A)`, `GFX_CopyPalette(0x1B)`).
 pub fn battle(base: Scene, archive: &str) -> Scene {
-    let name = format!("{}: {}", Kind::Battle.label(), stem(archive));
-    base.then(Kind::Battle, name, [Step::Load(archive.into()), Step::CopyWords { row: 15, column: 240, count: 16 }, Step::CopyPalette(26), Step::CopyPalette(27), Step::UploadPalette])
+    let name = format!("{}: {}", SceneType::Battle.label(), stem(archive));
+    base.then(SceneType::Battle, name, [Step::Load(archive.into()), Step::CopyWords { row: 15, column: 240, count: 16 }, Step::CopyPalette(26), Step::CopyPalette(27), Step::UploadPalette])
 }
 
 /// An archive a battle streams part-way, over the battle `base`, with the copy its ready step
@@ -164,26 +164,26 @@ pub fn battle(base: Scene, archive: &str) -> Scene {
 /// Returns `None` for an archive a battle does not stream.
 pub fn in_battle(base: Scene, archive: &str) -> Option<Scene> {
     let name = stem(archive);
-    let (kind, copies): (Kind, &[u8]) = match name {
-        "BATL_DRA" => (Kind::Battle, &[26, 27]),
-        "BATL_RE2" => (Kind::Battle, &[27]),
-        "BATL_RET" | "BATL_OVR" => (Kind::Battle, &[26]),
-        "BATL_SE" | "COMN_SE" => (Kind::Battle, &[]),
-        _ if archive.contains("/BMAGIC/") => (Kind::Effect, &[26]),
+    let (scene_type, copies): (SceneType, &[u8]) = match name {
+        "BATL_DRA" => (SceneType::Battle, &[26, 27]),
+        "BATL_RE2" => (SceneType::Battle, &[27]),
+        "BATL_RET" | "BATL_OVR" => (SceneType::Battle, &[26]),
+        "BATL_SE" | "COMN_SE" => (SceneType::Battle, &[]),
+        _ if archive.contains("/BMAGIC/") => (SceneType::Effect, &[26]),
         _ => return None,
     };
     let mut steps = vec![Step::Load(archive.into())];
     steps.extend(copies.iter().map(|&row| Step::CopyPalette(row)));
     steps.push(Step::UploadPalette);
     let name = format!("{} + {name}", base.name);
-    Some(base.then(kind, name, steps))
+    Some(base.then(scene_type, name, steps))
 }
 
 /// The ending: `Scene_LoadOverlay` streams `SCENA17` and `Scene_EnterSaveArea (scenario/scena17/00)` runs
 /// `GFX_ResetPalette`; `func_801F77B4` then streams `ENDKANJI` with no palette step.
 pub fn ending(kanji: bool) -> Scene {
-    let scene = frontend().then(Kind::Ending, "Ending".into(), [Step::Load(SCENA17.into()), Step::ResetPalette, Step::UploadPalette]);
-    if kanji { scene.then(Kind::Ending, "Ending: ENDKANJI".into(), [Step::Load(ENDKANJI.into())]) } else { scene }
+    let scene = frontend().then(SceneType::Ending, "Ending".into(), [Step::Load(SCENA17.into()), Step::ResetPalette, Step::UploadPalette]);
+    if kanji { scene.then(SceneType::Ending, "Ending: ENDKANJI".into(), [Step::Load(ENDKANJI.into())]) } else { scene }
 }
 
 /// Every default scene the disc's archives allow, field areas first.
@@ -273,10 +273,10 @@ mod tests {
     #[test]
     fn a_field_scene_loads_first_then_the_area() {
         let scene = field("BIN/WORLD00/AREA024.EMI");
-        assert_eq!(scene.kind, Kind::Field);
+        assert_eq!(scene.scene_type, SceneType::Field);
         assert_eq!(scene.archives().collect::<Vec<_>>(), [FIRST, "BIN/WORLD00/AREA024.EMI"]);
         assert_eq!(scene.steps.last(), Some(&Step::UploadPalette));
-        assert_eq!(field("BIN/WORLD00/AREA016.EMI").kind, Kind::WorldMap);
+        assert_eq!(field("BIN/WORLD00/AREA016.EMI").scene_type, SceneType::WorldMap);
     }
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
         let battle = battle(frontend(), BATTLE);
         assert!(battle.steps.contains(&Step::CopyWords { row: 15, column: 240, count: 16 }));
         let effect = in_battle(battle, "BIN/BMAGIC/MAGIC218.EMI").expect("an effect");
-        assert_eq!(effect.kind, Kind::Effect);
+        assert_eq!(effect.scene_type, SceneType::Effect);
         assert!(effect.steps.ends_with(&[Step::CopyPalette(26), Step::UploadPalette]));
     }
 }

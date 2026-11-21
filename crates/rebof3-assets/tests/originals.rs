@@ -1,5 +1,5 @@
 //! The original bytes of every asset: the catalog's hashes match the disc
-//! slices, and every kind with a codec comes back to its own bytes.
+//! slices, and every type with a codec comes back to its own bytes.
 //!
 //! The test skips when the disc image is not there. Point `BOF3_DISC_IMAGE` at
 //! its cue sheet (`BOF3_REQUIRE_RETAIL=1` makes a skip a failure).
@@ -17,8 +17,8 @@ use std::thread;
 use psx_cd::Image;
 use psx_cd::checksum::sha256_hex;
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::kind::Selection;
 use rebof3_assets::report::Report;
+use rebof3_assets::types::Selection;
 use rebof3_formats::vram::TextureImport;
 
 /// The extracted tree and its catalog, extracted once for the whole file.
@@ -131,15 +131,15 @@ fn the_catalog_hashes_match_the_disc_slices() {
 }
 
 #[test]
-fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
+fn every_type_with_a_codec_comes_back_to_its_own_bytes() {
     let _finished = Finished;
     let Some(extracted) = extracted() else {
         return;
     };
     let tree = &extracted.tree;
     let mut round_trip: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
-    let mut record = |kind: &'static str, same: bool| {
-        let counts = round_trip.entry(kind).or_default();
+    let mut record = |asset_type: &'static str, same: bool| {
+        let counts = round_trip.entry(asset_type).or_default();
         counts.0 += 1;
         if same {
             counts.1 += 1;
@@ -192,7 +192,7 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
     // An encounter block: its JSON reads back to the stored bytes.
     for path in with_suffix(tree, ".emi0") {
         let name = path.to_string_lossy().into_owned();
-        let kind = if name.contains("area-encounters/") {
+        let asset_type = if name.contains("area-encounters/") {
             "area-encounters"
         } else if name.contains("area-message/") {
             "area-message"
@@ -203,12 +203,12 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
         let slot = path.file_stem().unwrap().to_string_lossy().into_owned();
         let Some(json) = beside(&path, &format!("{slot}.json")) else { continue };
         let document = fs::read(json).unwrap();
-        let same = if kind == "area-encounters" {
+        let same = if asset_type == "area-encounters" {
             rebof3_formats::encounter::open::import(&document, &payload).map(|back| back == payload).unwrap_or(false)
         } else {
             rebof3_formats::message::table::import(&document).map(|back| back == payload).unwrap_or(false)
         };
-        record(kind, same);
+        record(asset_type, same);
     }
 
     // A cue table and a scene table: the codec rebuilds them.
@@ -275,13 +275,13 @@ fn every_kind_with_a_codec_comes_back_to_its_own_bytes() {
     }
     eprintln!("audio-bank: {bank_bytes} rebuilt headers equal the stored header (expected 0: the import rebuilds it)");
 
-    for (kind, (count, same)) in &round_trip {
-        eprintln!("{kind}: {same} of {count} come back to their own bytes");
+    for (asset_type, (count, same)) in &round_trip {
+        eprintln!("{asset_type}: {same} of {count} come back to their own bytes");
     }
     assert!(!round_trip.is_empty(), "the disc holds assets to round trip");
-    // Every kind comes back byte for byte; a sound bank comes back as the same SoundFont content.
-    for (kind, (count, same)) in &round_trip {
-        assert_eq!(same, count, "{kind} comes back to its own bytes");
+    // Every type comes back byte for byte; a sound bank comes back as the same SoundFont content.
+    for (asset_type, (count, same)) in &round_trip {
+        assert_eq!(same, count, "{asset_type} comes back to its own bytes");
     }
 }
 

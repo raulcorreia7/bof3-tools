@@ -30,7 +30,7 @@ pub static CODE: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "code",
+    asset_type: "code",
 };
 
 /// The reserved slots as a format-registry row; `classify` selects them by their all-zero payload.
@@ -46,7 +46,7 @@ pub static RESERVE: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "reserve",
+    asset_type: "reserve",
 };
 
 /// The entries no rule matched, as a format-registry row.
@@ -62,5 +62,5 @@ pub static UNCLASSIFIED: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "unknown",
+    asset_type: "unknown",
 };

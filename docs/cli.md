@@ -83,7 +83,7 @@ folder's `emi.json`.
 `pack FOLDER -J [FILE]` loads and validates every named entry once, before it reads a payload or
 creates the output. The manifest supplies each entry's type, RAM pointer and the archive version.
 Without `-J`, `pack` guesses the type from the extension and loses the load addresses.
-`extract -J` also writes each entry's `format` and `kind` from the format registry; `pack` ignores them.
+`extract -J` also writes each entry's `format` and `asset_type` from the format registry; `pack` ignores them.
 
 - A name that is absolute, has a parent-directory component, is missing, is not a regular file, or
   resolves outside the canonical input folder (a symlink escape) fails the run with exit 2 and a
@@ -103,7 +103,7 @@ Without `-J`, `pack` guesses the type from the extension and loses the load addr
 ## assets
 
 `assets` extracts assets from the disc and converts one asset between its stored bytes and an open
-format. The kinds and the output layout are in [assets](assets.md).
+format. The types and the output layout are in [assets](assets.md).
 
 ```sh
 bin/bof3 assets extract --only texture,palette -i "Breath of Fire III (USA).cue" -o build/art
@@ -117,17 +117,17 @@ bin/bof3 assets coverage -i "Breath of Fire III (USA).cue"
 | Switch               | Meaning                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------ |
 | `-i/--input IMAGE`   | CUE sheet or image; `--image` is an alias                                            |
-| `--only KINDS`       | Comma-separated kinds (default every kind)                                           |
+| `--only TYPES`       | Comma-separated types (default every type)                                           |
 | `--mode raw\|modern` | `raw` writes the stored bytes, `modern` the conversions; the default writes both     |
 | `--audio-format FMT` | `wav`, `flac` or `ogg` for rendered audio (default `wav`)                            |
 | `--list`             | Classify everything and write nothing                                                |
 | `--jobs N`           | Worker threads (default every core)                                                  |
-| `--text-disc DIR`    | Extracted disc the `text` kind reads (default `build/disc` in the working directory) |
+| `--text-disc DIR`    | Extracted disc the `text` type reads (default `build/disc` in the working directory) |
 
-`assets kinds` lists every kind and what it writes. `assets coverage [-i IMAGE]` reports which kinds
+`assets types` lists every type and what it writes. `assets coverage [-i IMAGE]` reports which types
 rebuild their own bytes ([round-trip coverage](assets.md#round-trip-coverage)).
 
-The `text` kind reads the extracted disc: it walks every `.EMI` archive below `--text-disc`, and each
+The `text` type reads the extracted disc: it walks every `.EMI` archive below `--text-disc`, and each
 payload that holds text writes `text/<disc path without .EMI>/<slot>.bin`, `<slot>.json` and
 `<slot>.txt`, plus `text/index.jsonl`. `-i IMAGE` supplies the archive LBA for the JSON's disc offset.
 `--list` prints the plan and every payload the scan drops. The file contents are in
@@ -169,7 +169,7 @@ folder per step below `DIR` (default `build/extract`).
 | `assets-export` | terrain glTF, message JSON, SoundFont and MIDI                  |
 | `audio`         | sample WAVs rendered by the audio library                       |
 
-`DIR/index.json` and `DIR/index.md` list every file with its step, kind, size and SHA-256. Named steps
+`DIR/index.json` and `DIR/index.md` list every file with its step, type, size and SHA-256. Named steps
 rerun only those steps; the others keep their files and index rows. `assets` needs the folder the
 `disc` step writes. Exit status 0 is success, 1 means a step had failures, and 2 an error.
 

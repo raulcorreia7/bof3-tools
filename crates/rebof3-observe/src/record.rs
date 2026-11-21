@@ -22,7 +22,7 @@ const CHANNEL_DROP: u32 = 3;
 
 /// How a CLUT row's entry was found.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PaletteKind {
+pub enum PaletteType {
     /// A type-3 entry uploaded the row's words to VRAM.
     Upload,
     /// A type-0 entry loaded the words into the palette arena, which `GFX_UploadPalette` sends.
@@ -41,7 +41,7 @@ pub struct Use {
     /// The CLUT row's words when the palette was named, or at the first draw when it never was.
     pub words: Vec<u16>,
     /// The entry that wrote the CLUT row, and how.
-    pub palette: Option<(EntryRef, PaletteKind)>,
+    pub palette: Option<(EntryRef, PaletteType)>,
     /// The frame of the first draw.
     pub frame: u64,
     /// The `GP0` command byte of the first draw.
@@ -248,12 +248,12 @@ impl Recorder {
 
     /// The entry that wrote the CLUT row's `words`: a type-3 entry when its upload wrote all of
     /// them, else an arena bank of a file read that holds those words at that place.
-    fn palette(&self, clut: Clut, depth: Depth, words: &[u16]) -> Option<(EntryRef, PaletteKind)> {
+    fn palette(&self, clut: Clut, depth: Depth, words: &[u16]) -> Option<(EntryRef, PaletteType)> {
         let right = clut.x + depth.colors() as u16;
         if let Some(entry) = self.sole_entry([clut.x, clut.y, right, clut.y + 1]) {
-            return Some((entry, PaletteKind::Upload));
+            return Some((entry, PaletteType::Upload));
         }
-        self.sources.arena_bank(clut, depth, words).map(|entry| (entry, PaletteKind::Arena))
+        self.sources.arena_bank(clut, depth, words).map(|entry| (entry, PaletteType::Arena))
     }
 
     /// The uses of each entry, keyed by the file's disc path and the slot.

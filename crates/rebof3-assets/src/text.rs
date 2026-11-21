@@ -1,4 +1,4 @@
-//! The `text` kind: game strings.
+//! The `text` type: game strings.
 //!
 //! The codec is `rebof3_emi::text::codec`; the message tables are `rebof3_formats::message::table` and the
 //! strings of other payloads `rebof3_formats::text`. [`extract_with`] walks the extracted disc (`build/disc`, or `--text-disc DIR`) and writes, for every payload that
@@ -20,8 +20,8 @@ use rebof3_formats::text::discover;
 use rebof3_formats::{Format, classify};
 
 use crate::error::{Error, Result};
-use crate::kind::Kind;
 use crate::report::{Failure, Report, Row};
+use crate::types::AssetType;
 use source::PayloadSource;
 
 /// Directory of the text tree below the output directory.
@@ -79,7 +79,7 @@ struct Line {
 #[derive(serde::Serialize)]
 struct IndexRow {
     source: String,
-    kind: String,
+    string_type: String,
     id: String,
     ram: Option<String>,
     text: String,
@@ -227,7 +227,7 @@ fn text_file(source: &PayloadSource, slot: usize, entry: &Entry, payload: &[u8],
             return Ok(None);
         }
         let lines: Vec<Line> = rows.iter().map(|row| Line { offset: row.origin.offset, id: row.id.clone(), text: row.text.clone() }).collect();
-        let index = rows.iter().map(|row| index_row(source, &row.origin, &row.kind, &row.id, &row.text)).collect();
+        let index = rows.iter().map(|row| index_row(source, &row.origin, &row.string_type, &row.id, &row.text)).collect();
         return Ok(Some(TextFile { payload: payload.to_vec(), plain: plain_text(&lines), json, index, strings }));
     }
 
@@ -243,7 +243,7 @@ fn text_file(source: &PayloadSource, slot: usize, entry: &Entry, payload: &[u8],
     items.extend(scan);
     items.sort_by_key(|item| item.origin.offset);
     let lines: Vec<Line> = items.iter().map(|item| Line { offset: item.origin.offset, id: item.id.clone(), text: item.text.clone() }).collect();
-    let index = items.iter().map(|item| index_row(source, &item.origin, &item.kind, &item.id, &item.text)).collect();
+    let index = items.iter().map(|item| index_row(source, &item.origin, &item.string_type, &item.id, &item.text)).collect();
     Ok(Some(TextFile { payload: payload.to_vec(), json: strings::document(payload.len(), &items), plain: plain_text(&lines), index, strings: items.len() }))
 }
 
@@ -256,8 +256,8 @@ fn scan_holds_text(format: Format, scan: &[strings::Item]) -> bool {
     match format {
         Format::SharedResourceTable => !scan.is_empty(),
         Format::CodeImage => {
-            let fields = scan.iter().filter(|item| item.kind == "string-table" && label_like(&item.text)).count();
-            fields >= 4 || scan.iter().any(|item| item.kind == "loose" && words_like(&item.text))
+            let fields = scan.iter().filter(|item| item.string_type == "string-table" && label_like(&item.text)).count();
+            fields >= 4 || scan.iter().any(|item| item.string_type == "loose" && words_like(&item.text))
         }
         _ => false,
     }
@@ -309,10 +309,10 @@ fn plain_text(lines: &[Line]) -> String {
 }
 
 /// One row of the run's index.
-fn index_row(source: &PayloadSource, origin: &source::Origin, kind: &str, id: &str, text: &str) -> IndexRow {
+fn index_row(source: &PayloadSource, origin: &source::Origin, string_type: &str, id: &str, text: &str) -> IndexRow {
     IndexRow {
         source: format!("{}#{}+{:#x}", source.source, source.entry, origin.offset),
-        kind: kind.to_string(),
+        string_type: string_type.to_string(),
         id: id.to_string(),
         ram: origin.ram.map(|ram| format!("{ram:#010x}")),
         text: text.to_string(),
@@ -335,7 +335,7 @@ fn write_index(options: &Options, index: &mut [IndexRow], report: &mut Report) -
         output: Some(output.clone()),
         bytes: jsonl.len() as u64,
         sha256: sha256_hex(jsonl.as_bytes()),
-        ..Row::new(output, INDEX_FORMAT, Kind::Text, "codec", "index")
+        ..Row::new(output, INDEX_FORMAT, AssetType::Text, "codec", "index")
     });
     Ok(())
 }
@@ -361,6 +361,6 @@ fn row(source: &PayloadSource, entry: &Entry, payload: &[u8], output: String, wr
         bytes: written.len() as u64,
         sha256: if write { sha256_hex(written) } else { String::new() },
         // The text codec produced the JSON, whatever the payload's own format state is.
-        ..Row::new(source.source.clone(), format.name(), Kind::Text, "codec", role).at_slot(source.entry, entry)
+        ..Row::new(source.source.clone(), format.name(), AssetType::Text, "codec", role).at_slot(source.entry, entry)
     }
 }

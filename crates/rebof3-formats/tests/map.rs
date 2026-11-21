@@ -4,7 +4,7 @@ mod support;
 
 use rebof3_formats::map::{Cell, ListRecord, MapBundle, MapCell, MapObject, TileQuad, TileRect};
 
-/// A bundle of two by two cells with one tile of each kind.
+/// A bundle of two by two cells with one tile of each type.
 fn bundle() -> MapBundle {
     let mut rects: [Vec<TileRect>; 4] = Default::default();
     rects[0].push(TileRect { u: 1, v: 2, du: 3, dv: 4 });

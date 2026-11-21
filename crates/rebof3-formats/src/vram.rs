@@ -24,7 +24,7 @@ pub static UPLOAD: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: Some(open),
-    kind: "texture",
+    asset_type: "texture",
 };
 
 /// Decodes the upload and encodes it again; `Err` names the first difference.

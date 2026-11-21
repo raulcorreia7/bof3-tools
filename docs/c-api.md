@@ -30,7 +30,7 @@ UPDATE_HEADER=1 cargo test -p rebof3-capi --test header
 ## Formats
 
 `rebof3_format_classify` names an entry's format from its table record and payload.
-`rebof3_format_describe` returns the format's static name, extension, state and asset kind; those
+`rebof3_format_describe` returns the format's static name, extension, state and asset type; those
 strings are NUL-terminated and are not freed. The exporters are `rebof3_texture_export_png`,
 `rebof3_texture_export_tim`, `rebof3_texture_export_row_png`, `rebof3_palette_export_json`,
 `rebof3_palette_export_swatch`, `rebof3_vag_export_wav`, `rebof3_vab_export_wav`,
@@ -44,12 +44,12 @@ a new container in memory.
 
 ## Assets
 
-`rebof3_assets_codec_count` and `rebof3_assets_codec_info` describe the conversion table: a kind's
-files, whether it takes a name, an index or a load argument, and its default extension; the kind and
+`rebof3_assets_codec_count` and `rebof3_assets_codec_info` describe the conversion table: a type's
+files, whether it takes a name, an index or a load argument, and its default extension; the type and
 extension strings are static and NUL-terminated. `rebof3_assets_convert` runs one export or import
-from memory. `rebof3_assets_extract` runs the selected kinds over a disc image and returns the
+from memory. `rebof3_assets_extract` runs the selected types over a disc image and returns the
 `assets.jsonl` text and summary; with `write` set it writes them into the output directory too. A
-NULL `kinds` selects every kind, with the `text` kind included only when `text_disc` is set.
+NULL `types` selects every type, with the `text` type included only when `text_disc` is set.
 
 ## Use
 
