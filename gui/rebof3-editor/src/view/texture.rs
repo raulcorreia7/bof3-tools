@@ -27,10 +27,12 @@ use rebof3_emi::texture::{ResidentClutBlock, clut_at, suggest};
 use rebof3_formats::Format;
 use rebof3_formats::clut::color_rgba;
 use rebof3_formats::joins::joined_rows;
+use rebof3_formats::vram::RowUse;
 use rebof3_formats::vram::{self as texture_vram, TextureWords, texture_words};
 use rebof3_observe::{Observation, ObserveInput, Palette, Progress, Route, cache};
 
 use super::palette::{SWATCH, SWATCH_GAP, words as words_of};
+use super::scene::Replayed;
 use super::{Entry, Menu, editing_menu};
 use crate::app::{Editor, Menu as WindowMenu};
 use crate::project::ArchivePath;
@@ -204,56 +206,25 @@ pub fn prepare(editor: &mut Editor) {
         _ => None,
     };
     let Some(entry) = editor.current() else { return };
-    let mut joined = Vec::new();
-    let mut suggested = Vec::new();
-    let mut depth_hint = None;
-    let rules = match &replayed {
+    let (joined, suggested, depth_hint, rules) = match &replayed {
         Some(replayed) => {
-            let me = Writer::entry(archive.as_str(), index);
-            for join in replayed.joins.iter().filter(|join| join.texture == me) {
-                joined.push(Row {
-                    clut: join.clut,
-                    depth: join.depth,
-                    words: replayed.vram.clut_words(join.clut, join.depth),
-                    palette: join.palette.to_string(),
-                    evidence: format!("{}; scene {}", join.rule.evidence(), replayed.scene.name),
-                });
+            let joined = scene_rows(replayed, Writer::entry(archive.as_str(), index));
+            let hint = if joined.is_empty() {
+                texture_words(entry.load_arg(), entry.payload()).ok().map(|words| suggest::suggest(&replayed.vram, &words.words, words.width, words.height, &archive))
+            } else {
+                None
+            };
+            let rules = format!("no rule of scene {} names it", replayed.scene.name);
+            match hint {
+                Some(hint) => (joined, suggestion_rows(replayed, &hint), hint.depths.first().map(depth_choice), rules),
+                None => (joined, Vec::new(), None, rules),
             }
-            if joined.is_empty()
-                && let Ok(words) = texture_words(entry.load_arg(), entry.payload())
-            {
-                let hint = suggest::suggest(&replayed.vram, &words.words, words.width, words.height, &archive);
-                depth_hint = hint.depths.first().map(|score| {
-                    let bits = match score.depth {
-                        Some(Depth::Four) => Bits::Four,
-                        Some(Depth::Eight) => Bits::Eight,
-                        None => Bits::Sixteen,
-                    };
-                    (bits, score.score)
-                });
-                suggested = hint
-                    .cluts
-                    .iter()
-                    .take(SUGGESTIONS)
-                    .map(|candidate| Row {
-                        clut: candidate.clut,
-                        depth: candidate.depth,
-                        words: replayed.vram.clut_words(candidate.clut, candidate.depth),
-                        palette: candidate.palette.to_string(),
-                        evidence: format!("suggestion, score {:.2}, scene {}; no rule names this row", candidate.score, replayed.scene.name),
-                    })
-                    .collect();
-            }
-            format!("no rule of scene {} names it", replayed.scene.name)
         }
         None => {
             // No default scene loads the archive: the archive-only rule.
             let payloads: Vec<&[u8]> = (0..entry.archive.entries().len()).map(|at| entry.sibling(at)).collect();
             let rows = joined_rows(&archive, entry.archive.entries(), &payloads);
-            for row in rows.get(&index).cloned().unwrap_or_default() {
-                joined.push(Row { clut: row.clut, depth: row.depth, words: row.words, palette: format!("{} #{}", row.palette_archive, row.palette), evidence: row.evidence });
-            }
-            "no scene loads its archive and no archive rule names it".to_string()
+            (archive_rows(rows.get(&index).cloned().unwrap_or_default()), Vec::new(), None, "no scene loads its archive and no archive rule names it".to_string())
         }
     };
     let state = &mut editor.views.texture;
@@ -282,6 +253,52 @@ pub fn prepare(editor: &mut Editor) {
     state.suggested = suggested;
     state.depth_hint = depth_hint;
     state.key = Some(key);
+}
+
+/// The rows the replayed scene's joins give the texture `me`.
+fn scene_rows(replayed: &Replayed, me: Writer) -> Vec<Row> {
+    replayed
+        .joins
+        .iter()
+        .filter(|join| join.texture == me)
+        .map(|join| Row {
+            clut: join.clut,
+            depth: join.depth,
+            words: replayed.vram.clut_words(join.clut, join.depth),
+            palette: join.palette.to_string(),
+            evidence: format!("{}; scene {}", join.rule.evidence(), replayed.scene.name),
+        })
+        .collect()
+}
+
+/// The best palette rows the scene's VRAM offers a texture no rule names, as listed suggestions.
+fn suggestion_rows(replayed: &Replayed, hint: &suggest::Suggestion) -> Vec<Row> {
+    hint.cluts
+        .iter()
+        .take(SUGGESTIONS)
+        .map(|candidate| Row {
+            clut: candidate.clut,
+            depth: candidate.depth,
+            words: replayed.vram.clut_words(candidate.clut, candidate.depth),
+            palette: candidate.palette.to_string(),
+            evidence: format!("suggestion, score {:.2}, scene {}; no rule names this row", candidate.score, replayed.scene.name),
+        })
+        .collect()
+}
+
+/// A suggested depth as the view's choice and its score.
+fn depth_choice(score: &suggest::DepthScore) -> (Bits, f64) {
+    let bits = match score.depth {
+        Some(Depth::Four) => Bits::Four,
+        Some(Depth::Eight) => Bits::Eight,
+        None => Bits::Sixteen,
+    };
+    (bits, score.score)
+}
+
+/// The rows the archive-only rule gives a texture.
+fn archive_rows(rows: Vec<RowUse>) -> Vec<Row> {
+    rows.into_iter().map(|row| Row { clut: row.clut, depth: row.depth, words: row.words, palette: format!("{} #{}", row.palette_archive, row.palette), evidence: row.evidence }).collect()
 }
 
 /// Reads the current words of a named palette's CLUT row.
