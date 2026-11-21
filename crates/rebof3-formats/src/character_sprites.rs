@@ -23,7 +23,7 @@ pub static LZ77: Description = Description {
     round_trip: RoundTrip::None,
     derive: Some(derive),
     open: None,
-    kind: "character-sprites",
+    asset_type: "character-sprites",
 };
 
 /// The raw sprites as a format-registry row.
@@ -39,7 +39,7 @@ pub static RAW: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "character-sprites",
+    asset_type: "character-sprites",
 };
 
 /// The LZ77-decoded blob, as the game's own decoder produces it.

@@ -96,7 +96,7 @@ impl<'a> Executable<'a> {
             .0
             .iter()
             .enumerate()
-            .map(|(index, row)| Zone { address: start + (index * ZONE_BYTES) as u32, first: [row[0], row[1]], last: [row[2], row[3]], rate: row[4], kind: row[5], seed: row[6], pick: row[7] })
+            .map(|(index, row)| Zone { address: start + (index * ZONE_BYTES) as u32, first: [row[0], row[1]], last: [row[2], row[3]], rate: row[4], zone_type: row[5], seed: row[6], pick: row[7] })
             .collect())
     }
 }
@@ -125,8 +125,8 @@ pub struct Zone {
     pub last: [u8; 2],
     /// The step-threshold row `Area_RollEncounterThreshold` (`emi/etc/game/00@0x801B3CCC`) reads.
     pub rate: u8,
-    /// The zone kind, stored to `D_80143F03` (the setup stream's test 8 reads it).
-    pub kind: u8,
+    /// The zone type, stored to `D_80143F03` (the setup stream's test 8 reads it).
+    pub zone_type: u8,
     /// The music selection seed and picker flag (`func_801A0380`).
     pub seed: u8,
     pub pick: u8,

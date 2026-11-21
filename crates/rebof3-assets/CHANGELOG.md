@@ -15,7 +15,7 @@ or module name inside the crate moves.
 - Texture extraction now writes the palette-applied view for every texture with a proven draw
   rule: `decode::joined_rows_in` takes the resident palette banks, joins the world-map terrain
   rows, and the extractor reads each selected archive's palette band to build that set.
-- The `text` kind writes the stored payload (`<slot>.bin`), one JSON row per string with its source
+- The `text` type writes the stored payload (`<slot>.bin`), one JSON row per string with its source
   chain, and a plain-text view, plus `text/index.tsv` for the run. The scan keeps message tables,
   the known tables, resource tables and code menus, and drops payloads that only decode as stray
   tags; `--list` prints each dropped payload.

@@ -24,7 +24,7 @@ use crate::{Blend, Camera, Frame, Primitive, Scene, Texture, VRAM_HEIGHT, VRAM_W
 const PLATFORM_SURFACELESS_MESA: egl::Enum = 0x31DD;
 /// The depth the projection maps to the far plane.
 const FAR: f32 = 1.0e6;
-/// Floats per vertex: view position 3, texture coordinate 2, colour 4, texture kind, page 2, depth,
+/// Floats per vertex: view position 3, texture coordinate 2, colour 4, texture type, page 2, depth,
 /// CLUT 2, semi-transparency.
 const VERTEX_FLOATS: usize = 16;
 
@@ -198,8 +198,8 @@ impl Gles {
         // SAFETY: the caller made the context current.
         unsafe {
             let program = gl.create_program()?;
-            for (kind, source) in [(glow::VERTEX_SHADER, VERTEX_SHADER), (glow::FRAGMENT_SHADER, FRAGMENT_SHADER)] {
-                let shader = gl.create_shader(kind)?;
+            for (shader_type, source) in [(glow::VERTEX_SHADER, VERTEX_SHADER), (glow::FRAGMENT_SHADER, FRAGMENT_SHADER)] {
+                let shader = gl.create_shader(shader_type)?;
                 gl.shader_source(shader, source);
                 gl.compile_shader(shader);
                 if !gl.get_shader_compile_status(shader) {
@@ -507,7 +507,7 @@ fn runs<'a, K: PartialEq>(items: &[&'a Primitive], key: impl Fn(&&'a Primitive) 
 /// Appends one corner's vertex.
 fn vertex(floats: &mut Vec<f32>, primitive: &Primitive, camera: &Camera, corner: usize) {
     floats.extend(camera.view(primitive.corners[corner]));
-    let (uv, kind, page, clut, depth) = match primitive.texture {
+    let (uv, texture_type, page, clut, depth) = match primitive.texture {
         Texture::None => ([0.0; 2], 0.0, [0.0; 2], [0.0; 2], 0.0),
         Texture::Vram { page, clut, depth, uvs } => {
             let bits = match depth {
@@ -522,7 +522,7 @@ fn vertex(floats: &mut Vec<f32>, primitive: &Primitive, camera: &Camera, corner:
     };
     floats.extend(uv);
     floats.extend(primitive.colour.map(|channel| f32::from(channel) / 255.0));
-    floats.extend([kind, page[0], page[1], depth]);
+    floats.extend([texture_type, page[0], page[1], depth]);
     floats.extend(clut);
     floats.push(if matches!(primitive.blend, Blend::Psx(_)) { 1.0 } else { 0.0 });
 }

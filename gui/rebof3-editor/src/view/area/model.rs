@@ -420,7 +420,7 @@ fn marker(area: &Area, actor: &Actor, camera: &Camera, index: usize, picked: boo
     let right = math::scale(camera.rotation[0], MARKER_WIDTH / 2.0);
     let up = math::scale(camera.rotation[1], -MARKER_HEIGHT);
     let corners = [math::add(math::sub(base, right), up), math::add(math::add(base, right), up), math::sub(base, right), math::add(base, right)];
-    let [red, green, blue] = hue(f32::from(actor.record.kind) / 15.0);
+    let [red, green, blue] = hue(f32::from(actor.record.record_type) / 15.0);
     let colour = if picked { [PICKED_COLOUR[0], PICKED_COLOUR[1], PICKED_COLOUR[2], 0xFF] } else { [red, green, blue, MARKER_ALPHA] };
     let mut primitives = vec![Primitive { corners, texture: Texture::None, colour, blend: Blend::Alpha, depth_test: true, id: Some(PICK_ACTOR | index as u32) }];
     if let (Some(facing), Some(steps)) = (actor.placement.facing, area.facings.as_ref())
@@ -486,8 +486,8 @@ fn describe_quad(area: &Area, quad: &Quad) -> Vec<String> {
     }
     if let Some((index, zone)) = area.zones_at(cell).first() {
         lines.push(format!(
-            "Zone row {index} at {:#010X}: cells ({}, {}) to ({}, {}), rate {}, kind {}, music {} {} (func_801B3C3C).",
-            zone.address, zone.first[0], zone.first[1], zone.last[0], zone.last[1], zone.rate, zone.kind, zone.seed, zone.pick
+            "Zone row {index} at {:#010X}: cells ({}, {}) to ({}, {}), rate {}, type {}, music {} {} (func_801B3C3C).",
+            zone.address, zone.first[0], zone.first[1], zone.last[0], zone.last[1], zone.rate, zone.zone_type, zone.seed, zone.pick
         ));
     }
     lines
@@ -504,7 +504,7 @@ fn describe_actor(area: &Area, actor: &Actor) -> Vec<String> {
     let program = area.program.as_ref().map_or(&[][..], |(_, bytes)| bytes.as_slice());
     let bytes: Vec<String> = actor.record.bytes(program).iter().map(|byte| format!("{byte:02X}")).collect();
     let mut lines = vec![
-        format!("Kind {:X} record at program +{:#06X}, run by {}: {}.", actor.record.kind, actor.record.at, actor.record.layout().handler, bytes.join(" ")),
+        format!("Type {:X} record at program +{:#06X}, run by {}: {}.", actor.record.record_type, actor.record.at, actor.record.layout().handler, bytes.join(" ")),
         format!(
             "Cell ({}, {}), facing {}, scene id {}.",
             half(actor.placement.x2),
@@ -696,7 +696,7 @@ pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
                 name: actor_node(index),
                 translation: Some([(f32::from(x2) + 1.0) / 2.0, ground(bundle, x2, y2) as f32, (f32::from(y2) + 1.0) / 2.0]),
                 extras: json!({
-                    "kind": actor.record.kind,
+                    "type": actor.record.record_type,
                     "record": actor.record.at,
                     "bytes": actor.record.bytes(program),
                     "handler": actor.record.layout().handler,
@@ -718,7 +718,7 @@ pub fn export(area: &Area, name: &str) -> Option<Vec<u8>> {
                 name: format!("zone {index}"),
                 translation: Some([(f32::from(zone.first[0]) + f32::from(zone.last[0]) + 1.0) / 2.0, 0.0, (f32::from(zone.first[1]) + f32::from(zone.last[1]) + 1.0) / 2.0]),
                 extras: json!({
-                    "first": zone.first, "last": zone.last, "rate": zone.rate, "kind": zone.kind,
+                    "first": zone.first, "last": zone.last, "rate": zone.rate, "type": zone.zone_type,
                     "seed": zone.seed, "pick": zone.pick, "address": zone.address,
                 }),
                 children: Vec::new(),

@@ -87,7 +87,7 @@ pub fn prepare(editor: &mut Editor) {
     let shown_page = laid.pages.get(page.min(laid.pages.len() - 1));
     let (window, window_size) = shown_page
         .map(|page| {
-            let size = laid.placement.kind.size();
+            let size = laid.placement.event_type.size();
             png(&render::window(&font, page, render::Window { size, framed: laid.placement.framed, glyphs: usize::MAX, backdrop: BACKDROP }))
         })
         .unzip();

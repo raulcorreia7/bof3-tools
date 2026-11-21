@@ -1,7 +1,7 @@
-//! The table of asset codecs: for each kind, how its stored bytes become an open form (export) and
+//! The table of asset codecs: for each type, how its stored bytes become an open form (export) and
 //! come back (import).
 //!
-//! A [`Codec`] row names the kind and holds an [`Op`] per direction. An op says which files it
+//! A [`Codec`] row names the type and holds an [`Op`] per direction. An op says which files it
 //! reads, which options it takes, the messages for what is missing, the default output extension and
 //! the function that does the work, so a command line can be built from the table: parse, check the
 //! op's needs, read the files, call [`Op::run`], write the bytes.
@@ -88,24 +88,24 @@ impl Op {
     }
 
     /// Runs the conversion after checking that `job` carries what the op takes, and nothing else.
-    pub fn run_checked(&self, kind: &str, job: &Job<'_>) -> Result<Vec<u8>> {
+    pub fn run_checked(&self, asset_type: &str, job: &Job<'_>) -> Result<Vec<u8>> {
         let fail = |message: String| Err(crate::error::Error::Job(message));
         if self.named != job.name.is_some() {
-            return fail(if self.named { self.needs_input.into() } else { format!("the {kind} conversion takes no name") });
+            return fail(if self.named { self.needs_input.into() } else { format!("the {asset_type} conversion takes no name") });
         }
         match (self.companion_flag, self.files >= 2, job.companion.is_some()) {
             (Some(flag), _, false) => return fail(flag.missing.into()),
             (None, true, false) => return fail(self.needs_input.into()),
-            (None, false, true) => return fail(format!("the {kind} conversion takes no companion")),
+            (None, false, true) => return fail(format!("the {asset_type} conversion takes no companion")),
             _ => {}
         }
         match (self.index, job.index) {
-            (Index::No, Some(_)) => return fail(format!("the {kind} conversion takes no index")),
+            (Index::No, Some(_)) => return fail(format!("the {asset_type} conversion takes no index")),
             (Index::Required(missing), None) => return fail(missing.into()),
             _ => {}
         }
         if !self.load_arg && job.load_arg.is_some() {
-            return fail(format!("the {kind} conversion takes no load argument"));
+            return fail(format!("the {asset_type} conversion takes no load argument"));
         }
         (self.run)(job)
     }
@@ -116,10 +116,10 @@ impl Op {
     }
 }
 
-/// One asset kind with an open form.
+/// One asset type with an open form.
 pub struct Codec {
-    /// The kind's name on the command line.
-    pub kind: &'static str,
+    /// The type's name on the command line.
+    pub asset_type: &'static str,
     /// Stored bytes to the open form.
     pub export: Option<Op>,
     /// The open form back to stored bytes.
@@ -136,9 +136,9 @@ impl Codec {
     }
 }
 
-/// The codec of `kind`, if the kind has one.
-pub fn find(kind: &str) -> Option<&'static Codec> {
-    CODECS.iter().find(|codec| codec.kind == kind)
+/// The codec of `asset_type`, if the type has one.
+pub fn find(asset_type: &str) -> Option<&'static Codec> {
+    CODECS.iter().find(|codec| codec.asset_type == asset_type)
 }
 
 fn companion<'a>(job: &Job<'a>) -> &'a [u8] {
@@ -148,12 +148,12 @@ fn companion<'a>(job: &Job<'a>) -> &'a [u8] {
 /// Every codec, in the order the help lists them.
 pub static CODECS: &[Codec] = &[
     Codec {
-        kind: "palette",
+        asset_type: "palette",
         export: Some(Op::new("export palette needs a CLUT block file", "json", |job| Ok(rebof3_formats::clut::export(job.input)?))),
         import: Some(Op::new("import palette needs a palette JSON file", "bin", |job| Ok(rebof3_formats::clut::import(job.input)?))),
     },
     Codec {
-        kind: "vag",
+        asset_type: "vag",
         export: Some(Op {
             files: 2,
             index: Index::Required("export vag needs --index, the VAG's number in the bank"),
@@ -162,7 +162,7 @@ pub static CODECS: &[Codec] = &[
         import: Some(Op::new("import vag needs a WAVE file", "vag", |job| Ok(rebof3_formats::vab::vag::import(job.input)?))),
     },
     Codec {
-        kind: "sequence",
+        asset_type: "sequence",
         export: Some(Op {
             index: Index::Optional,
             ..Op::new("export sequence needs a sequence package (.seq) file", "mid", |job| Ok(rebof3_formats::sep::midi::export(job.input, job.index.unwrap_or(0) as usize)?))
@@ -170,7 +170,7 @@ pub static CODECS: &[Codec] = &[
         import: None,
     },
     Codec {
-        kind: "vab",
+        asset_type: "vab",
         export: Some(Op {
             files: 2,
             ..Op::new("export vab needs a header (.vh) and a body (.vb) file", "vab", |job| {
@@ -181,22 +181,22 @@ pub static CODECS: &[Codec] = &[
         import: None,
     },
     Codec {
-        kind: "sep",
+        asset_type: "sep",
         export: Some(Op::new("export sep needs a sequence package (.seq) file", "sep", |job| Ok(Package::validate(job.input)?.encode()))),
         import: Some(Op::new("import sep needs a SEP file", "bin", |job| Ok(Package::validate(job.input)?.encode()))),
     },
     Codec {
-        kind: "seq",
+        asset_type: "seq",
         export: Some(Op { index: Index::Optional, ..Op::new("export seq needs a sequence package (.seq) file", "{index}.seq", |job| Ok(seq::export(job.input, job.index.unwrap_or(0) as usize)?)) }),
         import: None,
     },
     Codec {
-        kind: "message",
+        asset_type: "message",
         export: Some(Op::new("export message needs a message table payload", "json", |job| Ok(table::export(job.input)?))),
         import: Some(Op::new("import message needs a JSON file from export message", "bin", |job| Ok(table::import(job.input)?))),
     },
     Codec {
-        kind: "message-po",
+        asset_type: "message-po",
         export: Some(Op::new("export message-po needs a message table payload", "po", |job| Ok(rebof3_formats::message::po::export(job.input)?))),
         import: Some(
             Op::new("import message-po needs a PO file from export message-po", "bin", |job| Ok(rebof3_formats::message::po::import(job.input, companion(job))?))
@@ -204,7 +204,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "script",
+        asset_type: "script",
         export: Some(Op::new("export script needs a script table payload", "txt", |job| Ok(rebof3_formats::script::text::export(job.input)?))),
         import: Some(
             Op::new("import script needs a text file from export script", "bin", |job| Ok(rebof3_formats::script::text::import(job.input, companion(job))?))
@@ -212,7 +212,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "strings",
+        asset_type: "strings",
         export: Some(Op { load_arg: true, ..Op::new("export strings needs a payload file", "json", |job| Ok(strings::export(job.input, job.load_arg)?)) }),
         import: Some(
             Op::new("import strings needs a JSON file from export strings", "bin", |job| Ok(strings::import(job.input, companion(job))?))
@@ -220,7 +220,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "characters",
+        asset_type: "characters",
         export: Some(Op::new("export characters needs the payload of ETC/START.EMI entry 8", "json", |job| tables::characters(job.input))),
         import: Some(
             Op::new("import characters needs a JSON file from export characters", "bin", |job| import::characters(job.input, companion(job)))
@@ -228,7 +228,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "character-sprites",
+        asset_type: "character-sprites",
         export: Some(Op::new("export character-sprites needs the decoded character sprites", "json", |job| sprites::character_sprites(job.input))),
         import: Some(
             Op::new("import character-sprites needs a JSON file from export character-sprites", "bin", |job| import::character_sprites(job.input, companion(job)))
@@ -236,7 +236,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "terrain",
+        asset_type: "terrain",
         export: None,
         import: Some(
             Op::new("import terrain needs a mesh file", "bin", |job| Ok(rebof3_formats::map::terrain::import(job.input, companion(job))?))
@@ -244,7 +244,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "table",
+        asset_type: "table",
         export: None,
         import: Some(Op {
             named: true,
@@ -255,7 +255,7 @@ pub static CODECS: &[Codec] = &[
         }),
     },
     Codec {
-        kind: "encounters",
+        asset_type: "encounters",
         export: None,
         import: Some(
             Op::new("import encounters needs the block's JSON file", "bin", |job| Ok(rebof3_formats::encounter::open::import(job.input, companion(job))?))
@@ -263,7 +263,7 @@ pub static CODECS: &[Codec] = &[
         ),
     },
     Codec {
-        kind: "layout",
+        asset_type: "layout",
         export: None,
         import: Some(
             Op::new("import layout needs the layout's JSON file", "bin", |job| Ok(rebof3_formats::map::layout::import(job.input, companion(job))?))

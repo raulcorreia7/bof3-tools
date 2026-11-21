@@ -1,10 +1,10 @@
 //! The LZSS codec of the transfer queue's packed images.
 //!
-//! `GFX_UpdateTransferQueue` (`exe/slus_004_22@0x8014E6D0`) hands an image record of kind 2 to
+//! `GFX_UpdateTransferQueue` (`exe/slus_004_22@0x8014E6D0`) hands an image record of type 2 to
 //! `GFX_DecodeLzss` (`exe/slus_004_22@0x8014E8FC`), which unpacks the stream into the shared image
 //! buffer before its `LoadImage`. The stream is a classic LZSS:
 //!
-//! - A flag byte gives the kind of the next eight tokens, low bit first: 1 is a literal byte, 0 a
+//! - A flag byte gives the type of the next eight tokens, low bit first: 1 is a literal byte, 0 a
 //!   two-byte back-reference.
 //! - A back-reference is `pos_low, (pos_high << 4) | length_code`: it copies `length_code + 3` bytes
 //!   from ring position `pos`, one byte at a time, so a copy may read bytes it has just written.

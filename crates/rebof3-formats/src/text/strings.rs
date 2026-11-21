@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use rebof3_emi::Entry;
 use rebof3_emi::text::codec::{self, Encoding};
 
-use crate::text::discover::{self, Found, Kind};
+use crate::text::discover::{self, Found, FoundType};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -56,7 +56,7 @@ pub struct Item {
     pub text: String,
     /// `message`, `string-table` or `loose`.
     #[serde(default)]
-    pub kind: String,
+    pub string_type: String,
     /// A stable id: `message[<slot>]`, `<table>[<index>]` or `loose`.
     #[serde(default)]
     pub id: String,
@@ -83,7 +83,7 @@ impl Item {
             stride: Some(stride),
             bytes: hex(raw),
             text,
-            kind: "string-table".into(),
+            string_type: "string-table".into(),
             id: format!("{table}[{index}]"),
             table: Some(table.into()),
             index: Some(index),
@@ -110,17 +110,17 @@ pub fn rows(payload: &[u8], load_address: Option<u32>, source: Option<&PayloadSo
         if exclude.iter().any(|&(from, to)| found.start < to && from < found.end) {
             continue;
         }
-        let row = match found.kind {
-            Kind::Field { stride } => {
+        let row = match found.string_type {
+            FoundType::Field { stride } => {
                 let next = fields.entry(stride).or_insert(0usize);
                 let index = *next;
                 *next += 1;
                 let table = format!("scan@0x{stride:x}");
                 let id = format!("{table}[{index}]");
-                FoundRow { kind: "string-table", table: Some(table), index: Some(index), id }
+                FoundRow { string_type: "string-table", table: Some(table), index: Some(index), id }
             }
-            Kind::Record => FoundRow { kind: "loose", table: None, index: None, id: "loose".into() },
-            Kind::Message => FoundRow { kind: "message", table: None, index: None, id: "message".into() },
+            FoundType::Record => FoundRow { string_type: "loose", table: None, index: None, id: "loose".into() },
+            FoundType::Message => FoundRow { string_type: "message", table: None, index: None, id: "message".into() },
         };
         items.push(item(payload, found, source, row)?);
     }
@@ -144,7 +144,7 @@ pub fn document(size: usize, items: &[Item]) -> Vec<u8> {
 /// The strings that do not overlap: a name keeps its bytes, and a record that overlaps a name, or another record,
 /// is left out. Its bytes stay in the payload, which the import keeps as they are.
 pub fn disjoint(found: Vec<Found>) -> Vec<Found> {
-    let (names, records): (Vec<Found>, Vec<Found>) = found.into_iter().partition(|string| !matches!(string.kind, Kind::Record));
+    let (names, records): (Vec<Found>, Vec<Found>) = found.into_iter().partition(|string| !matches!(string.string_type, FoundType::Record));
     let mut kept: BTreeMap<usize, Found> = BTreeMap::new();
     for string in names.into_iter().chain(records) {
         let before = kept.range(..=string.start).next_back().is_some_and(|(_, other)| other.end > string.start);
@@ -158,7 +158,7 @@ pub fn disjoint(found: Vec<Found>) -> Vec<Found> {
 
 /// The row fields a scan assigns to one found string.
 struct FoundRow {
-    kind: &'static str,
+    string_type: &'static str,
     table: Option<String>,
     index: Option<usize>,
     id: String,
@@ -170,9 +170,9 @@ fn item(payload: &[u8], found: Found, source: Option<&PayloadSource>, row: Found
     if codec::encode(Encoding::Message, &text)? != raw {
         return Err(Error::Import(format!("the string at {:#x} does not encode to its bytes", found.start)));
     }
-    let stride = match found.kind {
-        Kind::Field { stride } => Some(stride),
-        Kind::Message | Kind::Record => None,
+    let stride = match found.string_type {
+        FoundType::Field { stride } => Some(stride),
+        FoundType::Message | FoundType::Record => None,
     };
     Ok(Item {
         origin: source.map_or_else(|| Origin::plain(found.start), |source| source.origin(found.start)),
@@ -180,7 +180,7 @@ fn item(payload: &[u8], found: Found, source: Option<&PayloadSource>, row: Found
         stride,
         bytes: hex(raw),
         text,
-        kind: row.kind.to_string(),
+        string_type: row.string_type.to_string(),
         id: row.id,
         table: row.table,
         index: row.index,

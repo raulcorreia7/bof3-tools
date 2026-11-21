@@ -3,7 +3,7 @@
 //! The `bof3player` catalog lists every playable item of the disc's sound archives. Music, samples
 //! and XA streams render through a [`bof3player::Player`] to 16-bit PCM, which the selected
 //! [`AudioFormat`] writes. A music item's sequence package is the `.seq` of the same archive, which
-//! the `audio-sequence` kind keeps as stored bytes; its bank is the `.vh`/`.vb` pair.
+//! the `audio-sequence` type keeps as stored bytes; its bank is the `.vh`/`.vb` pair.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
@@ -12,22 +12,22 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::sync_channel;
 use std::thread;
 
-use bof3player::catalog::{Item, Kind as ItemKind};
-use bof3player::discover::{self, SourceKind};
+use bof3player::catalog::{Item, MediaType};
+use bof3player::discover::{self, SourceType};
 use bof3player::export::Tags;
 use bof3player::{Library, MemorySource, NoNaming, export};
 
 use crate::error::{Error, Result};
-use crate::kind::{AudioFormat, Kind, Mode};
 use crate::report::Failure;
+use crate::types::{AssetType, AudioFormat, Mode};
 
 /// Rendered clips queued per worker before the workers wait for the writer.
 const QUEUE_PER_WORKER: usize = 2;
 
 /// One sound item rendered to a file.
 pub struct Clip {
-    /// The asset kind the file belongs to.
-    pub kind: Kind,
+    /// The asset type the file belongs to.
+    pub asset_type: AssetType,
     /// The file's path below the output directory.
     pub output: String,
     /// The file's extension: `wav`, `flac` or `ogg`.
@@ -55,35 +55,35 @@ pub struct Original {
 
 /// Opens the disc image as a `bof3player` library. An image too small to be a game disc fails here.
 pub fn open(image: &Path) -> Result<Library<'static>> {
-    discover::open_with(SourceKind::Disc, image, bof3player::names::game_names()).map_err(audio)
+    discover::open_with(SourceType::Disc, image, bof3player::names::game_names()).map_err(audio)
 }
 
-/// Renders every playable music, sample and XA item of `library` whose kind `wanted` selects.
+/// Renders every playable music, sample and XA item of `library` whose type `wanted` selects.
 ///
 /// `mode` limits the work: raw mode reads only the samples' original bytes, and modern mode skips them. The items
 /// render on all cores. Each file goes to `emit` in catalog order as soon as it and the
 /// items before it are rendered, so the run holds a few clips at a time. The result is one line
 /// per item that could not be rendered, in catalog order.
-pub fn render(library: &Library<'_>, wanted: impl Fn(Kind) -> bool, mode: Mode, container: AudioFormat, emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<Failure>> {
+pub fn render(library: &Library<'_>, wanted: impl Fn(AssetType) -> bool, mode: Mode, container: AudioFormat, emit: impl FnMut(Clip) -> Result<()>) -> Result<Vec<Failure>> {
     let jobs = thread::available_parallelism().map_or(1, NonZeroUsize::get);
     render_with_jobs(library, wanted, mode, container, jobs, emit)
 }
 
 pub(crate) fn render_with_jobs(
     library: &Library<'_>,
-    wanted: impl Fn(Kind) -> bool,
+    wanted: impl Fn(AssetType) -> bool,
     mode: Mode,
     container: AudioFormat,
     jobs: usize,
     mut emit: impl FnMut(Clip) -> Result<()>,
 ) -> Result<Vec<Failure>> {
-    let work: Vec<(&Item, Kind)> = library
+    let work: Vec<(&Item, AssetType)> = library
         .catalog()
         .items()
         .iter()
         .filter(|item| item.playable)
-        .filter_map(|item| kind_of(item.kind).filter(|kind| wanted(*kind)).map(|kind| (item, kind)))
-        .filter(|(item, _)| mode != Mode::Raw || item.kind == ItemKind::Sample)
+        .filter_map(|item| asset_type_of(item.media_type).filter(|asset_type| wanted(*asset_type)).map(|asset_type| (item, asset_type)))
+        .filter(|(item, _)| mode != Mode::Raw || item.media_type == MediaType::Sample)
         .collect();
     let workers = jobs.min(work.len()).max(1);
     let next = AtomicUsize::new(0);
@@ -96,10 +96,10 @@ pub(crate) fn render_with_jobs(
             scope.spawn(move || {
                 loop {
                     let index = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(&(item, kind)) = work.get(index) else {
+                    let Some(&(item, asset_type)) = work.get(index) else {
                         return;
                     };
-                    let result = clip(library, item, kind, mode, container).map_err(|error| Failure::SoundItem { id: item.id.to_string(), error });
+                    let result = clip(library, item, asset_type, mode, container).map_err(|error| Failure::SoundItem { id: item.id.to_string(), error });
                     if sender.send((index, result)).is_err() {
                         return;
                     }
@@ -124,21 +124,21 @@ pub(crate) fn render_with_jobs(
     Ok(failures)
 }
 
-/// The asset kind an item's file belongs to, or `None` for items another kind already covers.
-fn kind_of(kind: ItemKind) -> Option<Kind> {
-    match kind {
-        ItemKind::Music => Some(Kind::AudioSequence),
-        ItemKind::Sample => Some(Kind::AudioBank),
-        ItemKind::Xa => Some(Kind::XaAudio),
+/// The asset type an item's file belongs to, or `None` for items another type already covers.
+fn asset_type_of(asset_type: MediaType) -> Option<AssetType> {
+    match asset_type {
+        MediaType::Music => Some(AssetType::AudioSequence),
+        MediaType::Sample => Some(AssetType::AudioBank),
+        MediaType::Xa => Some(AssetType::XaAudio),
         _ => None,
     }
 }
 
-fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: AudioFormat) -> Result<Clip> {
+fn clip(library: &Library<'_>, item: &Item, asset_type: AssetType, mode: Mode, container: AudioFormat) -> Result<Clip> {
     let extension = container.extension();
     let bytes = if mode.writes(extension, true) {
         let mut player = library.player(item).map_err(audio)?;
-        let music = item.kind == ItemKind::Music;
+        let music = item.media_type == MediaType::Music;
         let window = player.loop_window().filter(|_| music);
         let mut pcm = player.render_all().map_err(audio)?;
         let rate = player.sample_rate();
@@ -168,26 +168,26 @@ fn clip(library: &Library<'_>, item: &Item, kind: Kind, mode: Mode, container: A
     // The item directory drops the source extension, so it never shares a name with a stored file.
     let stem = Path::new(&item.path).with_extension("");
     let name = item.id.replace([':', '#'], "-");
-    let evidence = match item.kind {
-        ItemKind::Music => format!("bof3player catalog item {}; bank {} of {} (its .vh/.vb pair in audio-bank)", item.id, item.bank, item.path),
-        ItemKind::Sample => {
+    let evidence = match item.media_type {
+        MediaType::Music => format!("bof3player catalog item {}; bank {} of {} (its .vh/.vb pair in audio-bank)", item.id, item.bank, item.path),
+        MediaType::Sample => {
             format!("bof3player catalog item {}; bank {}, sample {}", item.id, item.bank, item.sub_index)
         }
         _ => format!("bof3player catalog item {}; {} sectors from sector {}", item.id, item.sectors, item.sub_index),
     };
     // A sample's original bytes are its waveform data, as the VAB body stores them.
-    let original = match item.kind {
-        ItemKind::Sample if mode.writes("vag", true) => library.export_vag(item).ok().map(|bytes| Original { output: format!("{}/{}/{name}.vag", kind.name(), stem.display()), bytes }),
+    let original = match item.media_type {
+        MediaType::Sample if mode.writes("vag", true) => library.export_vag(item).ok().map(|bytes| Original { output: format!("{}/{}/{name}.vag", asset_type.name(), stem.display()), bytes }),
         _ => None,
     };
     Ok(Clip {
-        kind,
-        output: format!("{}/{}/{name}.{extension}", kind.name(), stem.display()),
+        asset_type,
+        output: format!("{}/{}/{name}.{extension}", asset_type.name(), stem.display()),
         extension,
         evidence,
         source: item.path.clone(),
         bytes,
-        midi: (item.kind == ItemKind::Music && mode.writes("midi", true)).then(|| library.export_midi(item).map_err(audio)).transpose()?,
+        midi: (item.media_type == MediaType::Music && mode.writes("midi", true)).then(|| library.export_midi(item).map_err(audio)).transpose()?,
         original,
     })
 }
@@ -227,7 +227,7 @@ pub fn sequence_pcm(path: &str, archive: &[u8], sequence: u32, seconds: f64) -> 
         .catalog()
         .items()
         .iter()
-        .find(|item| item.kind == ItemKind::Music && item.path == path && item.index == sequence)
+        .find(|item| item.media_type == MediaType::Music && item.path == path && item.index == sequence)
         .ok_or_else(|| Error::NoSequence { path: path.to_string(), sequence })?;
     let mut player = library.player(item).map_err(audio)?;
 

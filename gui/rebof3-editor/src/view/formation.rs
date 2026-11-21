@@ -254,7 +254,7 @@ fn formation_view(enemies: &[Shown], sizes: &SpriteSizes, mirror: bool, scene: &
         let record = placed
             .scene
             .as_ref()
-            .map(|record| format!("page {} row {} CLUT selector {:#04X} kind {} section {}", record.texture_page, record.texture_v, record.clut_select, record.texture_mode, record.script_section));
+            .map(|record| format!("page {} row {} CLUT selector {:#04X} type {} section {}", record.texture_page, record.texture_v, record.clut_select, record.texture_mode, record.script_section));
         lines.push(format!("{name}: frame {} of {}, {}", player.frame(), animation.frames.len(), record.unwrap_or_default()));
     }
 

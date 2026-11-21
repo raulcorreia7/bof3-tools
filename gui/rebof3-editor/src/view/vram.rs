@@ -13,8 +13,8 @@ use gpui::{AnyElement, Bounds, Context, Div, MouseButton, MouseDownEvent, MouseM
 use psx_formats::gfx::png;
 use psx_formats::gfx::texture::Clut;
 use psx_formats::gfx::vram::{VRAM_HEIGHT, VRAM_WIDTH};
-use rebof3_emi::replay::scenes::{self, Kind as SceneKind, Scene};
-use rebof3_emi::replay::{Kind, Rect, Region, Vram};
+use rebof3_emi::replay::scenes::{self, Scene, SceneType};
+use rebof3_emi::replay::{Rect, Region, Vram, WriteType};
 use rebof3_formats::clut::color_rgba;
 
 use super::Entry;
@@ -117,12 +117,12 @@ pub fn vram_png(vram: &Vram) -> Vec<u8> {
 }
 
 fn describe(region: &Region) -> String {
-    let kind = match region.kind {
-        Kind::Upload => "upload",
-        Kind::Palette => "palette",
-        Kind::Image => "image",
+    let write_type = match region.write_type {
+        WriteType::Upload => "upload",
+        WriteType::Palette => "palette",
+        WriteType::Image => "image",
     };
-    format!("{} {kind}, x {} y {}, {}×{} words", region.writer, region.x, region.y, region.width, region.height)
+    format!("{} {write_type}, x {} y {}, {}×{} words", region.writer, region.x, region.y, region.width, region.height)
 }
 
 pub fn show(editor: &Editor, _entry: &Entry<'_>, cx: &mut Context<Editor>) -> AnyElement {
@@ -138,8 +138,8 @@ pub fn show(editor: &Editor, _entry: &Entry<'_>, cx: &mut Context<Editor>) -> An
         .regions
         .iter()
         .map(|region| {
-            let line = match region.kind {
-                Kind::Palette => PALETTE_LINE,
+            let line = match region.write_type {
+                WriteType::Palette => PALETTE_LINE,
                 _ => UPLOAD_LINE,
             };
             (region.clone(), line)
@@ -244,18 +244,18 @@ fn click(editor: &mut Editor, position: Point<Pixels>) {
     }
 }
 
-/// The scene kind tabs, the step through the kind's scenes, zoom and export.
+/// The scene type tabs, the step through the type's scenes, zoom and export.
 pub(super) fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Context<Editor>) -> Div {
     let state = &editor.views.vram;
     let current = &replayed.scene;
-    let mut kinds: Vec<SceneKind> = state.catalog.iter().map(|scene| scene.kind).collect();
-    kinds.sort();
-    kinds.dedup();
+    let mut types: Vec<SceneType> = state.catalog.iter().map(|scene| scene.scene_type).collect();
+    types.sort();
+    types.dedup();
 
     let mut row = div().flex().flex_wrap().items_center().gap(px(GAP_SMALL)).child("Scene");
-    for kind in kinds {
-        row = row.child(tab(("scene-kind", kind as usize), kind.label(), current.kind == kind).on_click(cx.listener(move |editor, _, _, cx| {
-            let first = editor.views.vram.catalog.iter().find(|scene| scene.kind == kind).cloned();
+    for scene_type in types {
+        row = row.child(tab(("scene-type", scene_type as usize), scene_type.label(), current.scene_type == scene_type).on_click(cx.listener(move |editor, _, _, cx| {
+            let first = editor.views.vram.catalog.iter().find(|scene| scene.scene_type == scene_type).cloned();
             editor.views.vram.chosen = first;
             editor.views.vram.picked = None;
             cx.notify();
@@ -265,7 +265,7 @@ pub(super) fn scene_controls(editor: &Editor, replayed: &Replayed, cx: &mut Cont
         move |editor: &mut Editor, _: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut Context<Editor>| {
             let state = &mut editor.views.vram;
             let Some(current) = state.replayed.as_ref().map(|replayed| replayed.scene.clone()) else { return };
-            let same: Vec<&Scene> = state.catalog.iter().filter(|scene| scene.kind == current.kind).collect();
+            let same: Vec<&Scene> = state.catalog.iter().filter(|scene| scene.scene_type == current.scene_type).collect();
             let at = same.iter().position(|scene| **scene == current).unwrap_or(0) as isize;
             let next = (at + offset).rem_euclid(same.len().max(1) as isize) as usize;
             state.chosen = same.get(next).map(|scene| (*scene).clone());

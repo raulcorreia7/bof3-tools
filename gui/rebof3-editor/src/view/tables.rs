@@ -6,7 +6,7 @@ use gpui::{AnyElement, Context, Div, anchored, deferred, div, prelude::*, px};
 use super::{Entry, Field, Menu, editing_menu, input};
 use crate::app::{Editor, Menu as WindowMenu};
 use crate::fonts;
-use crate::schema::{self, Column, Field as Kind, Names, Table};
+use crate::schema::{self, Column, Field as AssetType, Names, Table};
 use crate::theme::{EDITED, MUTED, RAISED, color};
 use crate::widgets::{GAP, GAP_SMALL, ROW_HEIGHT, button, checkbox, menu_item, menu_panel, muted, separator, strong, tab};
 
@@ -97,14 +97,14 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
 
 fn width(column: &Column) -> f32 {
     match column.field {
-        Kind::Name(_) | Kind::Choice(_) => NAME_WIDTH,
-        Kind::ItemAt(_) | Kind::ItemOf(_) | Kind::Ability | Kind::Enemy => REFERENCE_WIDTH,
+        AssetType::Name(_) | AssetType::Choice(_) => NAME_WIDTH,
+        AssetType::ItemAt(_) | AssetType::ItemOf(_) | AssetType::Ability | AssetType::Enemy => REFERENCE_WIDTH,
         _ => NUMBER_WIDTH,
     }
 }
 
 fn row_name(payload: &[u8], sheet: &Table, row: usize) -> Option<String> {
-    let column = sheet.columns.iter().find(|column| matches!(column.field, Kind::Name(_)))?;
+    let column = sheet.columns.iter().find(|column| matches!(column.field, AssetType::Name(_)))?;
     Some(schema::name_text(&payload[sheet.range(row)], column))
 }
 
@@ -119,11 +119,11 @@ fn cell(editor: &Editor, names: &Names, record: &[u8], row: usize, at: usize, co
     });
 
     let content = match column.field {
-        Kind::Name(_) => {
+        AssetType::Name(_) => {
             let text = schema::name_text(record, column);
             input(editor, ("cell", at), which, &text, "", Some(NAME_WIDTH), cx).into_any_element()
         }
-        Kind::Bits(names) => {
+        AssetType::Bits(names) => {
             let mut cell = div().flex().flex_col().child(button(("cell", at), format!("{value:08b}"), true).font_family(fonts::mono()).on_click(open_menu));
             if opened {
                 let mut panel = menu_panel("bits").on_mouse_down_out(close_menu(cx));
@@ -138,7 +138,7 @@ fn cell(editor: &Editor, names: &Names, record: &[u8], row: usize, at: usize, co
             }
             cell.into_any_element()
         }
-        Kind::Choice(choices) => {
+        AssetType::Choice(choices) => {
             let selected = choices.iter().find(|(code, _)| u32::from(*code) == value).map_or_else(|| value.to_string(), |(_, name)| (*name).to_string());
             let mut cell = div().flex().flex_col().child(button(("cell", at), format!("{selected} ▾"), true).w(px(NAME_WIDTH)).on_click(open_menu));
             if opened {
@@ -155,8 +155,8 @@ fn cell(editor: &Editor, names: &Names, record: &[u8], row: usize, at: usize, co
             }
             cell.into_any_element()
         }
-        Kind::U8 | Kind::U16 | Kind::U32 | Kind::Part { .. } => number(editor, which, at, value, cx).into_any_element(),
-        Kind::ItemAt(_) | Kind::ItemOf(_) | Kind::Ability | Kind::Enemy => div()
+        AssetType::U8 | AssetType::U16 | AssetType::U32 | AssetType::Part { .. } => number(editor, which, at, value, cx).into_any_element(),
+        AssetType::ItemAt(_) | AssetType::ItemOf(_) | AssetType::Ability | AssetType::Enemy => div()
             .flex()
             .items_center()
             .gap(px(GAP_SMALL))
@@ -200,7 +200,7 @@ pub fn cell_changed(editor: &mut Editor, row: usize, at: usize, text: &str) -> O
     let record = payload.get_mut(sheet.range(row))?;
 
     match column.field {
-        Kind::Name(_) => match schema::name_bytes(text, column) {
+        AssetType::Name(_) => match schema::name_bytes(text, column) {
             Ok(bytes) => record[column.offset..column.offset + bytes.len()].copy_from_slice(&bytes),
             Err(error) => return Some(format!("{}: {error}", column.name)),
         },

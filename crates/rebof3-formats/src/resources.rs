@@ -19,5 +19,5 @@ pub static SHARED: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "resource-table",
+    asset_type: "resource-table",
 };

@@ -76,7 +76,7 @@ mod tests {
         Entry { file_type, ram_ptr, bytes: BYTES }
     }
 
-    /// A disc of one archive of each kind of rule, and one no rule names.
+    /// A disc of one archive of each type of rule, and one no rule names.
     fn disc(name: &str) -> Disc {
         let area = [entry(0, MAP_BUNDLE), entry(0, ENCOUNTERS), entry(0, MESSAGES), entry(0, WINDOW)];
         let sound = [entry(6, 0), entry(8, 0), entry(7, 0)];

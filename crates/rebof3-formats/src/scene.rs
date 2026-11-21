@@ -38,7 +38,7 @@ pub static ACTOR_DEFS: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "area-actor-defs",
+    asset_type: "area-actor-defs",
 };
 
 /// Decodes the table and encodes it again; `Err` names the first difference.

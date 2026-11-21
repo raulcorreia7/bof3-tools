@@ -1,8 +1,8 @@
 //! Walks the disc image, classifies every file and every EMI slot, and writes
 //! the asset tree.
 //!
-//! Output layout: `<out>/<kind>/<disc path without .EMI>/<slot>.<ext>` for an EMI
-//! entry and `<out>/<kind>/<disc path>` for a whole disc file. Each EMI entry's
+//! Output layout: `<out>/<asset_type>/<disc path without .EMI>/<slot>.<ext>` for an EMI
+//! entry and `<out>/<asset_type>/<disc path>` for a whole disc file. Each EMI entry's
 //! stored bytes are written unchanged (`.img`, `.vh`, `.vb`, `.seq`, `.lz77`
 //! or `.bin`, the names `bof3 emi extract -e` uses) next to any derived file.
 
@@ -22,9 +22,9 @@ use rebof3_formats::{self as classify, Format, classify};
 
 use crate::decode::derive;
 use crate::error::{Error, Result};
-use crate::kind::{AudioFormat, Kind, Selection};
 use crate::report::{DERIVED_TABLE, Failure, RENDERED_ITEM, Report, Row};
 use crate::sound;
+use crate::types::{AssetType, AudioFormat, Selection};
 use rebof3_formats::joins::joined_rows_in;
 use rebof3_formats::registry::Site;
 
@@ -91,14 +91,14 @@ struct Planned<'a> {
     output: Output<'a>,
 }
 
-/// Reads the disc and writes every selected kind the image holds; the `text` kind reads the
+/// Reads the disc and writes every selected type the image holds; the `text` type reads the
 /// extracted disc through [`crate::text::extract`].
 pub fn run(options: &Options) -> Result<Report> {
     let mut image = Image::open(&options.image)?;
     let entries = image.entries()?;
     let resident = resident_blocks(&mut image, &entries, &options.selection);
     let sheet = image.cue_sheet()?;
-    let license = if options.selection.contains(Kind::System) { image.license()? } else { None };
+    let license = if options.selection.contains(AssetType::System) { image.license()? } else { None };
     let (sender, receiver) = sync_channel::<Job>(options.jobs.max(1) * QUEUE_PER_WORKER);
     let receiver = Mutex::new(receiver);
     let report = Mutex::new(Report::default());
@@ -122,11 +122,11 @@ pub fn run(options: &Options) -> Result<Report> {
     })?;
 
     let mut report = report.into_inner().expect("workers do not panic");
-    if let Some(sheet) = sheet.filter(|_| options.selection.contains(Kind::Cdda)) {
+    if let Some(sheet) = sheet.filter(|_| options.selection.contains(AssetType::Cdda)) {
         cdda_rows(&sheet, options, &mut report)?;
     }
-    let sound_kinds = [Kind::AudioBank, Kind::AudioSequence, Kind::XaAudio];
-    if options.write && sound_kinds.iter().any(|kind| options.selection.contains(*kind)) {
+    let sound_types = [AssetType::AudioBank, AssetType::AudioSequence, AssetType::XaAudio];
+    if options.write && sound_types.iter().any(|asset_type| options.selection.contains(*asset_type)) {
         sound_rows(&options.image, options, &mut report)?;
     }
     report.sort();
@@ -166,7 +166,7 @@ fn disc_path(entry: &Entry) -> String {
 /// reads each archive's table and palette-band payloads only, so it does not load the texture
 /// payloads a second time.
 fn resident_blocks(image: &mut Image, entries: &[Entry], selection: &Selection) -> Vec<ResidentClutBlock> {
-    if !(selection.contains(Kind::Texture) || selection.contains(Kind::Palette)) {
+    if !(selection.contains(AssetType::Texture) || selection.contains(AssetType::Palette)) {
         return Vec::new();
     }
     let mut blocks = Vec::new();
@@ -238,31 +238,31 @@ fn is_emi(source: &str) -> bool {
     Path::new(source).extension().is_some_and(|extension| extension.eq_ignore_ascii_case(EMI_EXTENSION))
 }
 
-/// Whether any selected kind can come from this file, judged by name alone.
+/// Whether any selected type can come from this file, judged by name alone.
 fn wanted(entry: &Entry, selection: &Selection) -> bool {
     let source = disc_path(entry);
     if is_emi(&source) {
-        return Kind::ALL.iter().any(|kind| !is_file_kind(*kind) && selection.contains(*kind));
+        return AssetType::ALL.iter().any(|asset_type| !is_file_type(*asset_type) && selection.contains(*asset_type));
     }
-    file_kinds(&source).iter().any(|kind| selection.contains(*kind))
+    file_types(&source).iter().any(|asset_type| selection.contains(*asset_type))
 }
 
-/// Kinds the image does not produce: `text` is written from the extracted disc.
-fn is_file_kind(kind: Kind) -> bool {
-    matches!(kind, Kind::Executable | Kind::System | Kind::Video | Kind::XaAudio | Kind::Cdda | Kind::Text)
+/// Types the image does not produce: `text` is written from the extracted disc.
+fn is_file_type(asset_type: AssetType) -> bool {
+    matches!(asset_type, AssetType::Executable | AssetType::System | AssetType::Video | AssetType::XaAudio | AssetType::Cdda | AssetType::Text)
 }
 
-/// The kinds a non-EMI disc file can have, from its name.
-fn file_kinds(source: &str) -> &'static [Kind] {
+/// The types a non-EMI disc file can have, from its name.
+fn file_types(source: &str) -> &'static [AssetType] {
     let name = source.rsplit('/').next().unwrap_or(source);
     let extension = Path::new(name).extension().map(std::ffi::OsStr::to_ascii_uppercase);
     match extension.as_deref().and_then(|value| value.to_str()) {
-        Some("EXE") => &[Kind::Executable],
-        Some("CNF") => &[Kind::System],
-        Some("STR") => &[Kind::Video, Kind::XaAudio],
-        _ if name.starts_with("SLUS_") => &[Kind::Executable],
-        _ if name == LICENSE_FILE => &[Kind::System],
-        _ => &[Kind::Unknown],
+        Some("EXE") => &[AssetType::Executable],
+        Some("CNF") => &[AssetType::System],
+        Some("STR") => &[AssetType::Video, AssetType::XaAudio],
+        _ if name.starts_with("SLUS_") => &[AssetType::Executable],
+        _ if name == LICENSE_FILE => &[AssetType::System],
+        _ => &[AssetType::Unknown],
     }
 }
 
@@ -277,27 +277,27 @@ fn process(job: &Job, options: &Options, report: &mut Report, resident: &[Reside
             Ok(archive) => return emi_rows(job, &archive, options, report, resident),
             Err(error) => {
                 let note = format!("not an EMI container: {error}");
-                return file_rows(job, Kind::Unknown, &note, options, report);
+                return file_rows(job, AssetType::Unknown, &note, options, report);
             }
         }
     }
-    let kinds = file_kinds(&job.source);
-    let kind = match kinds {
-        [Kind::Video, Kind::XaAudio] if is_movie(&job.bytes) => Kind::Video,
-        [Kind::Video, Kind::XaAudio] => Kind::XaAudio,
-        [kind] => *kind,
-        _ => Kind::Unknown,
+    let types = file_types(&job.source);
+    let asset_type = match types {
+        [AssetType::Video, AssetType::XaAudio] if is_movie(&job.bytes) => AssetType::Video,
+        [AssetType::Video, AssetType::XaAudio] => AssetType::XaAudio,
+        [asset_type] => *asset_type,
+        _ => AssetType::Unknown,
     };
-    if !options.selection.contains(kind) {
+    if !options.selection.contains(asset_type) {
         return Ok(());
     }
-    file_rows(job, kind, "", options, report)
+    file_rows(job, asset_type, "", options, report)
 }
 
 /// A whole disc file, copied unchanged.
-fn file_rows(job: &Job, kind: Kind, note: &str, options: &Options, report: &mut Report) -> Result<()> {
-    let base = Row { size: job.bytes.len() as u64, note: note.to_string(), ..Row::new(job.source.clone(), FILE_FORMAT, kind, FILE_STATE, "raw") };
-    let output = Output { role: "raw", path: format!("{}/{}", kind.name(), job.source), data: Cow::Borrowed(&job.bytes), evidence: String::new() };
+fn file_rows(job: &Job, asset_type: AssetType, note: &str, options: &Options, report: &mut Report) -> Result<()> {
+    let base = Row { size: job.bytes.len() as u64, note: note.to_string(), ..Row::new(job.source.clone(), FILE_FORMAT, asset_type, FILE_STATE, "raw") };
+    let output = Output { role: "raw", path: format!("{}/{}", asset_type.name(), job.source), data: Cow::Borrowed(&job.bytes), evidence: String::new() };
     commit(plan_output(&base, output, options), options, report)
 }
 
@@ -312,14 +312,14 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
     for (slot, entry) in archive.entries().iter().enumerate() {
         let payload = payloads[slot];
         let format = classify(entry, payload);
-        let kind = Kind::of_format(format);
-        if slot == 0 && job.source == GAME_TABLES_SOURCE && options.selection.contains(Kind::DataTable) {
+        let asset_type = AssetType::of_format(format);
+        if slot == 0 && job.source == GAME_TABLES_SOURCE && options.selection.contains(AssetType::DataTable) {
             commit(plan_game_tables(job, entry, payload, options, report), options, report)?;
         }
-        if !options.selection.contains(kind) {
+        if !options.selection.contains(asset_type) {
             continue;
         }
-        let base = Row::new(job.source.clone(), format.name(), kind, format.state().label(), "raw").at_slot(slot, entry);
+        let base = Row::new(job.source.clone(), format.name(), asset_type, format.state().label(), "raw").at_slot(slot, entry);
         if format == Format::Reserve {
             let mut row = base;
             row.role = "none";
@@ -327,7 +327,7 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
             continue;
         }
         let site = Site { stem, slot, entries: archive.entries(), payloads: &payloads, rows: rows.get(&slot).map_or(&[], Vec::as_slice) };
-        let (outputs, note) = slot_outputs(&site, format, entry, kind, options.write);
+        let (outputs, note) = slot_outputs(&site, format, entry, asset_type, options.write);
         let planned: Vec<_> = outputs
             .into_iter()
             .enumerate()
@@ -345,9 +345,9 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
 }
 
 /// The raw payload of one slot and, when writing, its derived and opened files, with the note on any that were skipped.
-fn slot_outputs<'a>(site: &Site<'a>, format: Format, entry: &rebof3_emi::Entry, kind: Kind, write: bool) -> (Vec<Output<'a>>, String) {
+fn slot_outputs<'a>(site: &Site<'a>, format: Format, entry: &rebof3_emi::Entry, asset_type: AssetType, write: bool) -> (Vec<Output<'a>>, String) {
     let payload = site.payloads[site.slot];
-    let name = |tag: &str, extension: &str| format!("{}/{}/{}{tag}.{extension}", kind.name(), site.stem, site.slot);
+    let name = |tag: &str, extension: &str| format!("{}/{}/{}{tag}.{extension}", asset_type.name(), site.stem, site.slot);
     let mut outputs = vec![Output { role: "raw", path: name("", classify::extension(format)), data: Cow::Borrowed(payload), evidence: String::new() }];
     let mut note = String::new();
     if write {
@@ -380,12 +380,12 @@ fn plan_game_tables<'a>(job: &Job, entry: &rebof3_emi::Entry, payload: &'a [u8],
     let stem = job.source.strip_suffix(&format!(".{EMI_EXTENSION}")).unwrap_or(&job.source);
     let mut planned = Vec::new();
     for ((name, data), (table, bytes)) in files.into_iter().zip(stored) {
-        let base = Row::new(job.source.clone(), DERIVED_TABLE, Kind::DataTable, "codec", "json").at_slot(0, entry);
+        let base = Row::new(job.source.clone(), DERIVED_TABLE, AssetType::DataTable, "codec", "json").at_slot(0, entry);
         // The stored bytes are the table's span of the disc file: `offset` and `size` locate them in the archive.
         let original = Row { offset: table.archive_offset as u64, size: bytes.len() as u64, ..base.clone() };
-        let output = Output { role: "raw", path: format!("{}/{stem}/{name}.bin", Kind::DataTable.name()), data: Cow::Borrowed(bytes), evidence: String::new() };
+        let output = Output { role: "raw", path: format!("{}/{stem}/{name}.bin", AssetType::DataTable.name()), data: Cow::Borrowed(bytes), evidence: String::new() };
         planned.extend(plan_output(&original, output, options));
-        let output = Output { role: "json", path: format!("{}/{stem}/{name}.json", Kind::DataTable.name()), data: Cow::Owned(data), evidence: TABLE_EVIDENCE.to_string() };
+        let output = Output { role: "json", path: format!("{}/{stem}/{name}.json", AssetType::DataTable.name()), data: Cow::Owned(data), evidence: TABLE_EVIDENCE.to_string() };
         planned.extend(plan_output(&base, output, options));
     }
     planned
@@ -394,20 +394,20 @@ fn plan_game_tables<'a>(job: &Job, entry: &rebof3_emi::Entry, payload: &'a [u8],
 /// Whether the asset a row belongs to has a conversion. Modern mode writes the original bytes of an asset that has
 /// none: they are its only export.
 fn converts(base: &Row) -> bool {
-    match base.kind {
-        Kind::Cdda
-        | Kind::Texture
-        | Kind::Palette
-        | Kind::AudioBank
-        | Kind::AudioSequence
-        | Kind::AudioCues
-        | Kind::AreaActorDefs
-        | Kind::AreaEncounters
-        | Kind::AreaMap
-        | Kind::DataTable
-        | Kind::XaAudio => true,
+    match base.asset_type {
+        AssetType::Cdda
+        | AssetType::Texture
+        | AssetType::Palette
+        | AssetType::AudioBank
+        | AssetType::AudioSequence
+        | AssetType::AudioCues
+        | AssetType::AreaActorDefs
+        | AssetType::AreaEncounters
+        | AssetType::AreaMap
+        | AssetType::DataTable
+        | AssetType::XaAudio => true,
         // Only the LZ77-packed form decodes; the other character sprites are stored as they are used.
-        Kind::CharacterSprites => base.format == Format::CharacterSpritesLz77.name(),
+        AssetType::CharacterSprites => base.format == Format::CharacterSpritesLz77.name(),
         _ => false,
     }
 }
@@ -454,12 +454,12 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
     };
     let failures = sound::render_with_jobs(
         &library,
-        |kind| options.selection.contains(kind),
+        |asset_type| options.selection.contains(asset_type),
         options.selection.mode(),
         options.selection.audio(),
         options.jobs,
         |clip| {
-            let base = Row::new(clip.source, RENDERED_ITEM, clip.kind, "codec", "raw");
+            let base = Row::new(clip.source, RENDERED_ITEM, clip.asset_type, "codec", "raw");
             let mut planned = Vec::new();
             planned.extend(plan_output(&base, Output { role: clip.extension, path: clip.output.clone(), data: Cow::Owned(clip.bytes), evidence: clip.evidence.clone() }, options));
             if let Some(midi) = clip.midi {
@@ -519,7 +519,7 @@ fn convert_wav_track(source: &Path, directory: &Path, number: u8, audio: AudioFo
 /// The audio tracks of the CUE sheet: the sectors as the disc stores them (`.pcm`) and the
 /// selected audio container.
 fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Result<()> {
-    let directory = options.out.join(Kind::Cdda.name());
+    let directory = options.out.join(AssetType::Cdda.name());
     let mode = options.selection.mode();
     let audio = options.selection.audio();
     let audio_extension = audio.extension();
@@ -540,7 +540,7 @@ fn cdda_rows(sheet: &cue::Sheet, options: &Options, report: &mut Report) -> Resu
             } else {
                 (0, String::new())
             };
-            report.rows.push(Row { size, output: Some(format!("{}/{name}", Kind::Cdda.name())), bytes, sha256, ..Row::new(stem.clone(), FILE_FORMAT, Kind::Cdda, FILE_STATE, role) });
+            report.rows.push(Row { size, output: Some(format!("{}/{name}", AssetType::Cdda.name())), bytes, sha256, ..Row::new(stem.clone(), FILE_FORMAT, AssetType::Cdda, FILE_STATE, role) });
         }
     }
     if let Some(source) = temporary {

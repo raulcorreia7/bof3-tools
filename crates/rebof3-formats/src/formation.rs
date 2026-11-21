@@ -13,7 +13,7 @@
 //! - `func_800ABC30` (`emi/battle/battle/15@0x800ABC30`) hands each kept enemy to `Battle_InitEnemy`
 //!   (`emi/battle/battle/15@0x800ABCE0`), which looks the enemy record's `+0x16` word up with
 //!   `Area_FindSceneRecord` (`exe/slus_004_22@0x8014DD3C`): the scene record gives the sprite's page, row,
-//!   CLUT selector, palette kind and script section ([`crate::scene`]), with work `+0x24` cleared.
+//!   CLUT selector, palette type and script section ([`crate::scene`]), with work `+0x24` cleared.
 //!
 //! The two tables are read from `ETC/GAME.EMI` entry 0, the code image that holds them.
 
@@ -110,7 +110,7 @@ pub fn place(block: &[u8], scenes: Option<&SceneTable>, encounter: usize, offset
 }
 
 /// The VRAM placement `Area_FindSceneRecord` gives an enemy of scene record `scene`: page, row, the
-/// selector's low byte (work `+0x27` is a byte) and the palette kind, with `Battle_InitEnemy`'s flags.
+/// selector's low byte (work `+0x27` is a byte) and the palette type, with `Battle_InitEnemy`'s flags.
 pub fn placement(scene: &SceneRecord) -> Placement {
     Placement::scene(scene.texture_page, scene.texture_v, scene.clut_select as u8, scene.texture_mode, ENEMY_FLAGS)
 }

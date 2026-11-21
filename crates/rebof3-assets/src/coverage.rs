@@ -1,8 +1,8 @@
 //! Round-trip coverage: how much of the disc's EMI content exports and imports to its own bytes.
 //!
-//! For each kind, the line counts the entries of that kind on the disc and the bytes they hold, and the part of them
-//! that round trips through the kind's own format. A kind with no round trip here reports zero, and [`has_round_trip`]
-//! says which kinds those are. The text line counts the entries that hold game strings, outside message tables and
+//! For each type, the line counts the entries of that type on the disc and the bytes they hold, and the part of them
+//! that round trips through the type's own format. A type with no round trip here reports zero, and [`has_round_trip`]
+//! says which types those are. The text line counts the entries that hold game strings, outside message tables and
 //! inside them. The `ETC/GAME.EMI` tables are counted one table at a time.
 
 use std::collections::BTreeMap;
@@ -14,7 +14,7 @@ use rebof3_formats::game_tables::TABLES;
 use rebof3_formats::{Format, classify};
 
 use crate::error::Result;
-use crate::kind::Kind;
+use crate::types::AssetType;
 use rebof3_formats::message::table;
 use rebof3_formats::text::{discover, strings};
 
@@ -51,18 +51,18 @@ impl Line {
     }
 }
 
-/// The lines of a disc: one per kind that has entries, the text line, and the palette line of the character sprites.
+/// The lines of a disc: one per type that has entries, the text line, and the palette line of the character sprites.
 #[derive(Debug, Default)]
 pub struct Report {
-    pub kinds: BTreeMap<Kind, Line>,
+    pub types: BTreeMap<AssetType, Line>,
     pub text: Line,
     /// The palette tables of the character sprites, against their decoded bytes. The node data is not decoded.
     pub palettes: Line,
 }
 
-/// Whether the kind has a round trip in this module. The other kinds report their entries with zero round-tripped.
-pub fn has_round_trip(kind: Kind) -> bool {
-    matches!(kind, Kind::AreaMessage | Kind::AreaEncounters | Kind::DataTable | Kind::Text)
+/// Whether the type has a round trip in this module. The other types report their entries with zero round-tripped.
+pub fn has_round_trip(asset_type: AssetType) -> bool {
+    matches!(asset_type, AssetType::AreaMessage | AssetType::AreaEncounters | AssetType::DataTable | AssetType::Text)
 }
 
 /// Measures the round trips of every EMI entry on the disc at `image`.
@@ -81,7 +81,7 @@ pub fn run(image: &Path) -> Result<Report> {
             let payload = archive.payload(&container, index)?;
             let format = classify(entry, payload);
             let both = format_round_trips(format, payload);
-            report.kinds.entry(Kind::of_format(format)).or_default().count(payload.len() as u64, both);
+            report.types.entry(AssetType::of_format(format)).or_default().count(payload.len() as u64, both);
             if strings::holds_text(entry)
                 && let Some(text) = text_round_trips(entry, payload)
             {
@@ -150,7 +150,7 @@ fn text_round_trips(entry: &rebof3_emi::Entry, payload: &[u8]) -> Option<bool> {
 fn characters(report: &mut Report, payload: &[u8]) {
     let both = rebof3_formats::characters::export(payload).and_then(|json| rebof3_formats::characters::import(&json, payload)).is_ok_and(|rebuilt| rebuilt == payload);
     for _ in 0..rebof3_formats::characters::CHARACTERS {
-        report.kinds.entry(Kind::DataTable).or_default().count(rebof3_formats::characters::RECORD_BYTES as u64, both);
+        report.types.entry(AssetType::DataTable).or_default().count(rebof3_formats::characters::RECORD_BYTES as u64, both);
     }
 }
 
@@ -162,7 +162,7 @@ fn game_tables(report: &mut Report, payload: &[u8]) -> Result<()> {
         let stored = &payload[start..start + table.count * table.record];
         let json = files.iter().find(|(name, _)| *name == table.name).map(|(_, json)| json.as_slice());
         let both = json.is_some_and(|json| rebof3_formats::game_tables::open::import_in_payload(table.name, json, payload).is_ok_and(|rebuilt| rebuilt == stored));
-        report.kinds.entry(Kind::DataTable).or_default().count(stored.len() as u64, both);
+        report.types.entry(AssetType::DataTable).or_default().count(stored.len() as u64, both);
     }
     Ok(())
 }

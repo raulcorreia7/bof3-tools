@@ -69,7 +69,7 @@ pub static AREA: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "area-script",
+    asset_type: "area-script",
 };
 
 /// The battle script table as a format-registry row.
@@ -85,7 +85,7 @@ pub static BATTLE: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "battle-script",
+    asset_type: "battle-script",
 };
 
 /// The magic-effect script table as a format-registry row.
@@ -101,7 +101,7 @@ pub static MAGIC: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: Some(derive),
     open: None,
-    kind: "bmagic-script",
+    asset_type: "bmagic-script",
 };
 
 /// Decodes the table to its ops and encodes it again; `Err` names the first difference.

@@ -81,14 +81,14 @@ const CHOICE_ROW_GAP: i32 = 2;
 
 /// Which window frame the message shows in.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum WindowKind {
+pub enum WindowType {
     /// 200 by 54 pixels (`unk_0A = 0xC8`, `unk_0B = 0x36` in `func_80159050`).
     Wide,
     /// 120 by 54 pixels (`unk_0A = 0x78`), picked by bit 6 of the leading `{BOX}` operand.
     Narrow,
 }
 
-impl WindowKind {
+impl WindowType {
     /// The frame's width and height in pixels.
     pub fn size(self) -> (i32, i32) {
         match self {
@@ -106,7 +106,7 @@ pub struct Placement {
     pub operand: Option<u8>,
     /// The row of the panel-origin table the window settles at (`g_MenuPanelOrigins`, `0x8017F90C`).
     pub index: u8,
-    pub kind: WindowKind,
+    pub event_type: WindowType,
     /// Whether the frame is drawn: bit 7 of the operand hides it (`func_80159510` tests panel flag 1).
     pub framed: bool,
 }
@@ -114,7 +114,7 @@ pub struct Placement {
 impl Placement {
     fn of(operand: Option<u8>) -> Self {
         let value = operand.unwrap_or(0);
-        Self { operand, index: value & !(BOX_NO_FRAME | BOX_NARROW), kind: if value & BOX_NARROW != 0 { WindowKind::Narrow } else { WindowKind::Wide }, framed: value & BOX_NO_FRAME == 0 }
+        Self { operand, index: value & !(BOX_NO_FRAME | BOX_NARROW), event_type: if value & BOX_NARROW != 0 { WindowType::Narrow } else { WindowType::Wide }, framed: value & BOX_NO_FRAME == 0 }
     }
 }
 
@@ -178,7 +178,7 @@ pub struct Runtime {
 
 /// What the step machine does at a code that draws nothing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EventKind {
+pub enum EventType {
     /// `{SE:n}`: queues cue `n | 0x200` (`SND_PlayCue (exe/slus_004_22@0x8015DF18)`).
     Sound(u8),
     /// `{GAP}`: waits eight more frames before the next glyph.
@@ -201,7 +201,7 @@ pub enum EventKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Event {
     pub glyphs: usize,
-    pub kind: EventKind,
+    pub event_type: EventType,
 }
 
 /// What the layout could not settle, with the reason.
@@ -391,9 +391,9 @@ impl<'a> Machine<'a> {
         self.streams.get(at.stream).and_then(|stream| stream.get(at.at)).copied()
     }
 
-    fn event(&mut self, kind: EventKind) {
+    fn event(&mut self, event_type: EventType) {
         let glyphs = self.page().glyphs.len();
-        self.page().events.push(Event { glyphs, kind });
+        self.page().events.push(Event { glyphs, event_type });
     }
 
     fn unproven(&mut self, at: Cursor, why: impl Into<String>) {
@@ -427,12 +427,12 @@ impl<'a> Machine<'a> {
                         self.choice(at, operand);
                         return;
                     }
-                    let kind = match op {
-                        code::SE => EventKind::Sound(operand),
-                        code::STYLE => EventKind::Style(operand),
-                        _ => EventKind::Box(operand),
+                    let event_type = match op {
+                        code::SE => EventType::Sound(operand),
+                        code::STYLE => EventType::Style(operand),
+                        _ => EventType::Box(operand),
                     };
-                    self.event(kind);
+                    self.event(event_type);
                     at.at += 1;
                 }
                 code::NEWLINE => {
@@ -453,22 +453,22 @@ impl<'a> Machine<'a> {
                 }
                 code::NOCOLOR => self.color = 0,
                 code::PAGE => {}
-                code::NOP => self.event(EventKind::Nop),
-                code::GAP => self.event(EventKind::Gap),
-                code::STYLE_ALT | code::WAIT => self.event(EventKind::ToggleInstant),
+                code::NOP => self.event(EventType::Nop),
+                code::GAP => self.event(EventType::Gap),
+                code::STYLE_ALT | code::WAIT => self.event(EventType::ToggleInstant),
                 code::BOXEND => {
                     // The step machine stops at `{BOXEND}` and reads its operand; the draw pass never reaches it.
                     let operand = self.byte(Cursor { at: at.at + 1, ..at }).unwrap_or(0);
-                    self.event(EventKind::BoxEnd(operand));
+                    self.event(EventType::BoxEnd(operand));
                     at.at += 1;
                 }
                 code::OFFSET => {
                     self.animated = true;
-                    self.event(EventKind::Offset(true));
+                    self.event(EventType::Offset(true));
                 }
                 code::CURSOR => {
                     self.animated = false;
-                    self.event(EventKind::Offset(false));
+                    self.event(EventType::Offset(false));
                 }
                 _ => at = self.glyph(at, op),
             }

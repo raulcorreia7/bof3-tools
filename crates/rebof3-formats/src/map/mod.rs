@@ -70,7 +70,7 @@ pub static BUNDLE: Description = Description {
     round_trip: RoundTrip::Payload(round_trip),
     derive: None,
     open: Some(open),
-    kind: "area-map",
+    asset_type: "area-map",
 };
 
 /// The layout the terrain is read from, cited in the catalog's evidence column.

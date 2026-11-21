@@ -98,7 +98,7 @@ pub static HEADER: Description = Description {
     round_trip: RoundTrip::Bank,
     derive: None,
     open: Some(open),
-    kind: "audio-bank",
+    asset_type: "audio-bank",
 };
 
 /// The body as a format-registry row.
@@ -114,7 +114,7 @@ pub static BODY: Description = Description {
     round_trip: RoundTrip::Bank,
     derive: None,
     open: None,
-    kind: "audio-bank",
+    asset_type: "audio-bank",
 };
 
 /// Parses a header with its body and encodes the header again; `Err` names what differs.

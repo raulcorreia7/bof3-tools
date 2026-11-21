@@ -243,7 +243,7 @@ pub struct Unit {
     pub entries: Vec<Placed>,
 }
 
-/// A section of a group: a family of archives, or a kind of entry.
+/// A section of a group: a family of archives, or a type of entry.
 #[derive(Clone, Debug)]
 pub struct Section {
     pub title: &'static str,

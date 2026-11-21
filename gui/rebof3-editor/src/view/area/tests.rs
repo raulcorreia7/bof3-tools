@@ -139,7 +139,7 @@ fn every_retail_area_reads_renders_and_round_trips() {
         coverage.gltf_round_trips += 1;
     }
     eprintln!("{coverage:?}");
-    // Every setup stream walks; one places no actor, and the 7 kind C records have no position, so
+    // Every setup stream walks; one places no actor, and the 7 type C records have no position, so
     // 5,280 of the 5,287 records are actors.
     let expected = Coverage {
         areas: AREAS,

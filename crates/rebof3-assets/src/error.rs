@@ -20,14 +20,14 @@ pub enum Error {
         path: String,
         sequence: u32,
     },
-    /// An `--only` name that is no kind.
-    UnknownKind(String),
+    /// An `--only` name that is no type.
+    UnknownType(String),
     /// An `--audio-format` value that is no format.
     UnknownAudioFormat(String),
     /// A `--mode` value that is neither mode.
     UnknownMode(String),
-    /// An `--only` list with no kind.
-    NoKinds,
+    /// An `--only` list with no type.
+    NoTypes,
     /// A conversion job that does not fit its op.
     Job(String),
     /// A worker thread stopped before its work was sent.
@@ -45,10 +45,10 @@ impl fmt::Display for Error {
             Self::TextIndex(error) => write!(f, "{error}"),
             Self::Audio(error) => write!(f, "{error}"),
             Self::NoSequence { path, sequence } => write!(f, "{path} has no playable sequence {sequence}"),
-            Self::UnknownKind(name) => write!(f, "unknown kind {name:?}; the kinds are {}", crate::kind::Kind::ALL.iter().map(|kind| kind.name()).collect::<Vec<_>>().join(", ")),
+            Self::UnknownType(name) => write!(f, "unknown type {name:?}; the types are {}", crate::types::AssetType::ALL.iter().map(|asset_type| asset_type.name()).collect::<Vec<_>>().join(", ")),
             Self::UnknownAudioFormat(name) => write!(f, "unknown audio format {name:?}; the formats are wav, flac and ogg"),
             Self::UnknownMode(name) => write!(f, "unknown mode {name:?}; the modes are raw and modern"),
-            Self::NoKinds => f.write_str("--only needs at least one kind"),
+            Self::NoTypes => f.write_str("--only needs at least one type"),
             Self::Job(message) => f.write_str(message),
             Self::WorkerStopped => f.write_str("a worker thread stopped early"),
         }

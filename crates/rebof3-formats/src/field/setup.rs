@@ -6,7 +6,7 @@
 //!
 //! | Byte | Operands | Meaning | Reader |
 //! | ---- | -------- | ------- | ------ |
-//! | `< 0xF0` | the record's bytes | an actor record; the high nibble is its kind | `func_801A4BF8` |
+//! | `< 0xF0` | the record's bytes | an actor record; the high nibble is its type | `func_801A4BF8` |
 //! | `F0 tt pp` | then-body [`FD` else-body] `FE` | run the then-body when test `tt & 0x1F` of `pp` holds | `func_801A3FC0` |
 //! | `F1 tt pp` | the same | the test inverted | `func_801A4158` |
 //! | `F4 tt` | { `F6 vv` \| `F7` } body `F8` ... `F5` | a switch on test `tt`: case `vv`, default, break, end | `func_801A4518` |
@@ -15,7 +15,7 @@
 //!
 //! A case body falls through later labels until `F8`, as C's does (`func_801A4640`). Any other byte
 //! where a record or block is expected hangs the game, so [`walk`] refuses it. The record lengths are
-//! `s_ScriptOpcodeLengths` (`emi/etc/game/00@0x801C8444`), indexed by kind.
+//! `s_ScriptOpcodeLengths` (`emi/etc/game/00@0x801C8444`), indexed by type.
 //!
 //! A record's bytes are edited in place: no edit changes a length, so every other byte of the program
 //! stays as it was.
@@ -40,10 +40,10 @@ const FIRST_BLOCK: u8 = 0xF0;
 /// The bits of an `F0`/`F1` test id (`func_801A3FC0`: `tt & 0x1F`).
 const TEST_MASK: u8 = 0x1F;
 
-/// Where one kind of record keeps its fields, from its handler.
+/// Where one type of record keeps its fields, from its handler.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Layout {
-    /// `s_ScriptOpcodeLengths[kind]`.
+    /// `s_ScriptOpcodeLengths[record_type]`.
     pub length: usize,
     /// The handler `func_801A4BF8` calls.
     pub handler: &'static str,
@@ -61,8 +61,8 @@ const fn layout(length: usize, handler: &'static str, scene: bool, position: Opt
     Layout { length, handler, scene, position, facing }
 }
 
-/// The record layouts, by kind (the high nibble of byte 0). Every handler is in `emi/etc/game/00`.
-pub const KINDS: [Layout; 16] = [
+/// The record layouts, by type (the high nibble of byte 0). Every handler is in `emi/etc/game/00`.
+pub const RECORD_TYPES: [Layout; 16] = [
     layout(0x11, "func_801A4D54", true, Some([6, 7, 8, 9]), true),
     layout(0x10, "func_801A50C0", true, Some([6, 7, 8, 9]), true),
     layout(0x13, "func_801A57F0", true, Some([6, 7, 8, 9]), true),
@@ -110,13 +110,13 @@ impl Guard {
 pub struct Record {
     /// The record's offset in the program.
     pub at: usize,
-    pub kind: u8,
+    pub record_type: u8,
     pub guards: Vec<Guard>,
 }
 
 impl Record {
     pub fn layout(&self) -> &'static Layout {
-        &KINDS[usize::from(self.kind & 0xF)]
+        &RECORD_TYPES[usize::from(self.record_type & 0xF)]
     }
 
     /// The record's bytes in `program`.
@@ -124,7 +124,7 @@ impl Record {
         &program[self.at..self.at + self.layout().length]
     }
 
-    /// Where the record puts its actor, when its kind has a position.
+    /// Where the record puts its actor, when its type has a position.
     pub fn placement(&self, program: &[u8]) -> Option<Placement> {
         let layout = self.layout();
         let [x_half, x_whole, y_half, y_whole] = layout.position?;
@@ -171,7 +171,7 @@ pub fn walk(program: &[u8], start: usize) -> Result<Stream> {
 /// The program with `record` moved to `x2`, `y2` half cells. A half byte that already says "half"
 /// keeps its value, so an unchanged position writes back the same bytes.
 pub fn with_position(program: &[u8], record: &Record, x2: u16, y2: u16) -> Result<Vec<u8>> {
-    let [x_half, x_whole, y_half, y_whole] = record.layout().position.ok_or_else(|| Error::Field(format!("a kind {:X} record has no position", record.kind)))?;
+    let [x_half, x_whole, y_half, y_whole] = record.layout().position.ok_or_else(|| Error::Field(format!("a type {:X} record has no position", record.record_type)))?;
     let (x, y) = (x2 / 2, y2 / 2);
     let (Ok(x), Ok(y)) = (u8::try_from(x), u8::try_from(y)) else {
         return Err(Error::Field(format!("cell ({x}, {y}) does not fit the record's bytes")));
@@ -190,13 +190,13 @@ pub fn with_position(program: &[u8], record: &Record, x2: u16, y2: u16) -> Resul
 /// The program with `record` facing `facing` (`0` to `7`, the rows of `g_FacingSteps`).
 pub fn with_facing(program: &[u8], record: &Record, facing: u8) -> Result<Vec<u8>> {
     if !record.layout().facing {
-        return Err(Error::Field(format!("a kind {:X} record has no facing", record.kind)));
+        return Err(Error::Field(format!("a type {:X} record has no facing", record.record_type)));
     }
     if usize::from(facing) >= super::FACINGS {
         return Err(Error::Field(format!("facing {facing} is past the {} rows of g_FacingSteps", super::FACINGS)));
     }
     let mut program = program.to_vec();
-    program[record.at] = (record.kind << 4) | facing;
+    program[record.at] = (record.record_type << 4) | facing;
     Ok(program)
 }
 
@@ -205,7 +205,7 @@ pub fn with_facing(program: &[u8], record: &Record, facing: u8) -> Result<Vec<u8
 /// holds the id.
 pub fn with_scene(program: &[u8], record: &Record, scene: u16) -> Result<Vec<u8>> {
     if !record.layout().scene {
-        return Err(Error::Field(format!("a kind {:X} record names no scene", record.kind)));
+        return Err(Error::Field(format!("a type {:X} record names no scene", record.record_type)));
     }
     let mut program = program.to_vec();
     program[record.at + 1..record.at + 3].copy_from_slice(&scene.to_be_bytes());
@@ -239,12 +239,12 @@ impl Walker<'_> {
     fn element(&mut self, at: usize, guards: &[Guard]) -> Result<Option<usize>> {
         let byte = self.byte(at)?;
         if byte < FIRST_BLOCK {
-            let kind = byte >> 4;
-            let length = KINDS[usize::from(kind)].length;
+            let record_type = byte >> 4;
+            let length = RECORD_TYPES[usize::from(record_type)].length;
             if length == 0 || at + length > self.program.len() {
-                return Err(Error::Field(format!("the kind {kind:X} record at {at:#X} runs past the program")));
+                return Err(Error::Field(format!("the type {record_type:X} record at {at:#X} runs past the program")));
             }
-            self.records.push(Record { at, kind, guards: guards.to_vec() });
+            self.records.push(Record { at, record_type, guards: guards.to_vec() });
             return Ok(Some(at + length));
         }
         match byte {
@@ -323,8 +323,8 @@ impl Walker<'_> {
 mod tests {
     use super::*;
 
-    /// A kind 0 record at cell (3.5, 4) facing 2, then an `if` with a kind 9 record in its else branch,
-    /// then a switch whose case 1 holds a kind E record.
+    /// A type 0 record at cell (3.5, 4) facing 2, then an `if` with a type 9 record in its else branch,
+    /// then a switch whose case 1 holds a type E record.
     fn program() -> Vec<u8> {
         let mut bytes = vec![0x02, 0x00, 0x07, 0, 0, 0, 1, 3, 0, 4, 0, 0, 0, 0, 0, 0, 0];
         bytes.extend([IF, 0x22, 5, ELSE, 0x93, 0, 7, 0, 0, 5, 0, 6, 0, 0, 0, 0, 0, END_IF]);
@@ -348,8 +348,8 @@ mod tests {
         let renamed = with_scene(&program, record, 0x0102).unwrap();
         assert_eq!(record.placement(&renamed).unwrap().scene, Some(0x0102));
         assert_eq!(with_scene(&program, record, 7).unwrap(), program, "an unchanged id writes the same bytes");
-        let kind_e = &walk(&program, 0).unwrap().records[2];
-        assert!(with_scene(&program, kind_e, 1).is_err());
+        let record_type_e = &walk(&program, 0).unwrap().records[2];
+        assert!(with_scene(&program, record_type_e, 1).is_err());
     }
 
     #[test]

@@ -6,8 +6,8 @@ use std::sync::LazyLock;
 
 use ::rebof3_assets as assets_lib;
 use assets_lib::codec::{self, Direction, Index};
-use assets_lib::kind::{AudioFormat, Kind, Mode, Selection};
 use assets_lib::report::Report;
+use assets_lib::types::{AssetType, AudioFormat, Mode, Selection};
 
 use psx_capi::{handle_ref, input, opt_out, opt_utf8, out_ref, owned_buffer, owned_string, psx_buffer, psx_status, psx_string, utf8};
 
@@ -73,7 +73,7 @@ pub struct rebof3_assets_job {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct rebof3_assets_codec {
-    pub kind: *const c_char,
+    pub asset_type: *const c_char,
     pub files: u32,
     pub named: bool,
     pub load_arg: bool,
@@ -91,8 +91,8 @@ pub struct rebof3_assets_options {
     pub image_path_len: usize,
     pub output_dir: *const c_char,
     pub output_dir_len: usize,
-    pub kinds: *const c_char,
-    pub kinds_len: usize,
+    pub types: *const c_char,
+    pub types_len: usize,
     pub text_disc: *const c_char,
     pub text_disc_len: usize,
     pub mode: rebof3_mode,
@@ -144,7 +144,7 @@ fn cstring(text: &str) -> CString {
 }
 
 struct CodecStrings {
-    kind: CString,
+    asset_type: CString,
     export: Option<CString>,
     import: Option<CString>,
 }
@@ -152,7 +152,11 @@ struct CodecStrings {
 static CODEC_STRINGS: LazyLock<Vec<CodecStrings>> = LazyLock::new(|| {
     codec::CODECS
         .iter()
-        .map(|codec| CodecStrings { kind: cstring(codec.kind), export: codec.export.as_ref().map(|op| cstring(op.extension)), import: codec.import.as_ref().map(|op| cstring(op.extension)) })
+        .map(|codec| CodecStrings {
+            asset_type: cstring(codec.asset_type),
+            export: codec.export.as_ref().map(|op| cstring(op.extension)),
+            import: codec.import.as_ref().map(|op| cstring(op.extension)),
+        })
         .collect()
 });
 
@@ -176,16 +180,16 @@ pub unsafe extern "C" fn rebof3_assets_codec_count(out_count: *mut usize) -> psx
 /// Reads one codec's requirements in one direction.
 ///
 /// # Safety
-/// `kind` must point to `kind_len` readable UTF-8 bytes and `out_codec` must be writable.
+/// `asset_type` must point to `asset_type_len` readable UTF-8 bytes and `out_codec` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_assets_codec_info(kind: *const c_char, kind_len: usize, direction: rebof3_direction, out_codec: *mut rebof3_assets_codec) -> psx_status {
+pub unsafe extern "C" fn rebof3_assets_codec_info(asset_type: *const c_char, asset_type_len: usize, direction: rebof3_direction, out_codec: *mut rebof3_assets_codec) -> psx_status {
     guarded(|| {
-        let kind = unsafe { utf8(kind, kind_len, "kind")? };
+        let asset_type = unsafe { utf8(asset_type, asset_type_len, "type")? };
         let direction = direction_of(direction);
         let out_codec = unsafe { out_ref(out_codec, "out_codec")? };
-        let codec = codec::find(kind).ok_or_else(|| unsupported(format!("no codec named {kind:?}")))?;
-        let op = codec.op(direction).ok_or_else(|| unsupported(format!("{kind:?} has no {} conversion", direction_name(direction))))?;
-        let position = codec::CODECS.iter().position(|candidate| candidate.kind == codec.kind).expect("find returns a codec of CODECS");
+        let codec = codec::find(asset_type).ok_or_else(|| unsupported(format!("no codec named {asset_type:?}")))?;
+        let op = codec.op(direction).ok_or_else(|| unsupported(format!("{asset_type:?} has no {} conversion", direction_name(direction))))?;
+        let position = codec::CODECS.iter().position(|candidate| candidate.asset_type == codec.asset_type).expect("find returns a codec of CODECS");
         let strings = &CODEC_STRINGS[position];
         let extension = match direction {
             Direction::Export => strings.export.as_ref(),
@@ -193,7 +197,7 @@ pub unsafe extern "C" fn rebof3_assets_codec_info(kind: *const c_char, kind_len:
         }
         .expect("the op exists");
         *out_codec = rebof3_assets_codec {
-            kind: strings.kind.as_ptr(),
+            asset_type: strings.asset_type.as_ptr(),
             files: u32::try_from(op.files).unwrap_or(u32::MAX),
             named: op.named,
             load_arg: op.load_arg,
@@ -207,17 +211,17 @@ pub unsafe extern "C" fn rebof3_assets_codec_info(kind: *const c_char, kind_len:
 /// Runs one codec conversion from the supplied bytes.
 ///
 /// # Safety
-/// `kind` must point to `kind_len` readable UTF-8 bytes, `job` must be a readable job whose
+/// `asset_type` must point to `asset_type_len` readable UTF-8 bytes, `job` must be a readable job whose
 /// pointers are readable for their lengths, and `out_bytes` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: usize, direction: rebof3_direction, job: *const rebof3_assets_job, out_bytes: *mut psx_buffer) -> psx_status {
+pub unsafe extern "C" fn rebof3_assets_convert(asset_type: *const c_char, asset_type_len: usize, direction: rebof3_direction, job: *const rebof3_assets_job, out_bytes: *mut psx_buffer) -> psx_status {
     guarded(|| {
-        let kind = unsafe { utf8(kind, kind_len, "kind")? };
+        let asset_type = unsafe { utf8(asset_type, asset_type_len, "type")? };
         let direction = direction_of(direction);
         let job = unsafe { handle_ref(job, "job")? };
         let out_bytes = unsafe { out_ref(out_bytes, "out_bytes")? };
-        let codec = codec::find(kind).ok_or_else(|| unsupported(format!("no codec named {kind:?}")))?;
-        let op = codec.op(direction).ok_or_else(|| unsupported(format!("{kind:?} has no {} conversion", direction_name(direction))))?;
+        let codec = codec::find(asset_type).ok_or_else(|| unsupported(format!("no codec named {asset_type:?}")))?;
+        let op = codec.op(direction).ok_or_else(|| unsupported(format!("{asset_type:?} has no {} conversion", direction_name(direction))))?;
         if job.input.is_null() {
             return Err(invalid(op.needs_input));
         }
@@ -227,7 +231,7 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
         let index = unsafe { optional_u32(job.index) };
         let load_arg = unsafe { optional_u32(job.load_arg) };
         let job = codec::Job { name, input: input_bytes, companion, index, load_arg };
-        let bytes = op.run_checked(kind, &job)?;
+        let bytes = op.run_checked(asset_type, &job)?;
         *out_bytes = owned_buffer(bytes);
         Ok(())
     })
@@ -240,27 +244,27 @@ pub unsafe extern "C" fn rebof3_assets_convert(kind: *const c_char, kind_len: us
 unsafe fn extract_report(options: &rebof3_assets_options) -> Result<(String, String), Failure> {
     let image = unsafe { utf8(options.image_path, options.image_path_len, "image_path")? };
     let out_dir = unsafe { utf8(options.output_dir, options.output_dir_len, "output_dir")? };
-    let kinds = unsafe { opt_utf8(options.kinds, options.kinds_len, "kinds")? };
+    let types = unsafe { opt_utf8(options.types, options.types_len, "types")? };
     let text_disc = unsafe { opt_utf8(options.text_disc, options.text_disc_len, "text_disc")? };
-    let selection = match kinds {
-        Some(kinds) => Selection::parse(kinds)?,
+    let selection = match types {
+        Some(types) => Selection::parse(types)?,
         None => Selection::all(),
     };
     let selection = selection.with_mode(mode_of(options.mode)).with_audio(audio_of(options.audio));
-    let explicit_text = kinds.is_some() && selection.contains(Kind::Text);
+    let explicit_text = types.is_some() && selection.contains(AssetType::Text);
     if explicit_text && text_disc.is_none() {
-        return Err(usage("the text kind needs text_disc"));
+        return Err(usage("the text type needs text_disc"));
     }
-    let wants_text = if kinds.is_some() { explicit_text } else { text_disc.is_some() };
+    let wants_text = if types.is_some() { explicit_text } else { text_disc.is_some() };
     let write = options.write;
     let out = PathBuf::from(out_dir);
     let image = PathBuf::from(image);
     let jobs = if options.jobs == 0 { std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) } else { options.jobs };
-    let only_text = selection.is_only(Kind::Text);
+    let only_text = selection.is_only(AssetType::Text);
     let mut report =
         if only_text { Report::default() } else { assets_lib::extract::run(&assets_lib::extract::Options { image: image.clone(), out: out.clone(), selection: selection.clone(), write, jobs })? };
     if wants_text {
-        let disc = text_disc.ok_or_else(|| usage("the text kind needs text_disc"))?;
+        let disc = text_disc.ok_or_else(|| usage("the text type needs text_disc"))?;
         let text = assets_lib::text::extract_with(&assets_lib::text::Options {
             disc: PathBuf::from(disc),
             out: out.clone(),

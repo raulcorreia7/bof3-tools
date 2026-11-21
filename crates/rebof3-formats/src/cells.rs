@@ -18,5 +18,5 @@ pub static GRID: Description = Description {
     round_trip: RoundTrip::None,
     derive: None,
     open: None,
-    kind: "area-cells",
+    asset_type: "area-cells",
 };

@@ -12,12 +12,12 @@ What the tools know about one format is spread over three crates:
 | Where | What it holds for a format | Size |
 | ----- | -------------------------- | ---: |
 | `rebof3-emi` | the parser and encoder, the entry classifier, the coverage table | 5,699 lines in 22 format modules, plus 1,191 of container and primitives |
-| `rebof3-assets` | the conversion to open files, the imports, the extract-all `match` over kinds | 3,257 lines of conversion, 1,697 of extraction, kinds, codec table and report |
+| `rebof3-assets` | the conversion to open files, the imports, the extract-all `match` over types | 3,257 lines of conversion, 1,697 of extraction, types, codec table and report |
 | `rebof3-editor` | the view, the tab list, the colours, the schema | `Format::` is matched in 17 files |
 
 Three costs follow.
 
-- Adding or changing a format touches the classifier, the coverage `match`, the kind table, the
+- Adding or changing a format touches the classifier, the coverage `match`, the type table, the
   codec table, the extractor and the editor's tab list. `classify.rs` alone had six `match`es over
   the same 21 variants (`name`, `state`, `spec_state`, `codec_state`, `evidence`, `extension`).
 - `rebof3_emi::Error` lists the errors of every format (map, scene, script, encounter, text,
@@ -55,7 +55,7 @@ Dependency rules:
    extension does it take" and "does its codec rebuild the bytes". The coverage table, the
    extractor and the editor ask the registry; none of them matches on a format to get a name or a
    state.
-4. The extractor and the command line map a **kind** to its `export` and `import` through the
+4. The extractor and the command line map a **type** to its `export` and `import` through the
    registry's rows, and the editor maps a format to its **views** through one table in the editor
    (views are GUI code and stay in `rebof3-editor`, which depends on `rebof3-formats`; the reverse
    never holds).
@@ -79,7 +79,7 @@ rebof3-emi                  container, pack, manifest, verify, LZ77, record read
         ^                   VRAM model (texture) and load replay
 rebof3-formats              registry + one module per format + shared glTF and identity helpers
         ^
-rebof3-assets               extract-all, disc walk, kinds, report (calls the registry)
+rebof3-assets               extract-all, disc walk, types, report (calls the registry)
         ^
 bof3, bof3-edit             command line; editor views (a table from format to views)
 ```
@@ -103,7 +103,7 @@ then; today every format uses `psx-formats`, `serde` and `serde_json` only.
 
 `rebof3-emi` keeps its `no_std + alloc` mode for the container table and the cue table that the
 audio library reads. `rebof3-assets` keeps what is not a format: the disc walk, the output tree,
-the report, the kinds and the command-line codec table.
+the report, the types and the command-line codec table.
 
 ## Decision 3: how formats move
 
@@ -124,7 +124,7 @@ then the formats that nothing else in the container uses, then the ones others d
 
 ## Consequences
 
-- A new format is one module, one registry row, one kind and, if it has a view, one editor row.
+- A new format is one module, one registry row, one type and, if it has a view, one editor row.
 - `Format::name`, `state`, `spec_state`, `codec_state`, `evidence` and `extension` read the
   registry row; the six `match`es are gone.
 - Callers import from `rebof3_formats` instead of `rebof3_emi` for everything that is a format.
@@ -139,8 +139,8 @@ then the formats that nothing else in the container uses, then the ones others d
 
 Every format moved into `rebof3-formats`, one commit per move:
 
-- the registry with `classify`, the coverage table and each format's `kind`, `derive` and `open`
-  hooks, which replace the `match`es in `Format`, `Kind::of_format`, `decode::derive` and the
+- the registry with `classify`, the coverage table and each format's `asset_type`, `derive` and `open`
+  hooks, which replace the `match`es in `Format`, `AssetType::of_format`, `decode::derive` and the
   per-format branches of `extract.rs`;
 - `script`, `scene`, `map` (terrain, layout and glTF), `game_tables` and `encounter`;
 - `vab` (with `vag` and `soundfont`) and `sep` (with `midi`);
@@ -165,6 +165,6 @@ Left:
 
 - `rebof3-emi` keeps only the container and primitives (LZ77, LZSS, record readers, text codec, VRAM
   model and replay), and its error has no variant for a format.
-- `rebof3-assets` keeps the disc walk, the output tree, the report, the kinds, the CLI codec table,
+- `rebof3-assets` keeps the disc walk, the output tree, the report, the types, the CLI codec table,
   the sound rendering and the text extraction run, which are not formats.
-- `Kind::of_format` reads the row's `kind` name; the kinds themselves stay in `rebof3-assets`.
+- `AssetType::of_format` reads the row's `asset_type` name; the types themselves stay in `rebof3-assets`.

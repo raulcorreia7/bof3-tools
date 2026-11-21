@@ -17,7 +17,7 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use gpui::{AnyElement, Context, Div, Hsla, ParentElement, Styled, div, prelude::*, px, rgba};
-use rebof3_emi::replay::{Kind as WriteKind, Writer};
+use rebof3_emi::replay::{WriteType, Writer};
 use rebof3_emi::texture::{ARENA_BASE, ARENA_BYTES, ARENA_ROW_WORDS, ARENA_VRAM_ROW, ClutBlock, clut_at, sheet};
 use rebof3_formats::{Format, classify};
 
@@ -70,7 +70,7 @@ impl Rect {
 
 /// What places a rectangle.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Kind {
+pub enum PlacedType {
     /// A type-3 entry: its load argument names the place.
     Texture,
     /// A type-0 CLUT block: its load address names its place in the palette arena.
@@ -83,7 +83,7 @@ pub enum Kind {
 #[derive(Clone, Debug)]
 pub struct Placed {
     pub writer: Writer,
-    pub kind: Kind,
+    pub placed_type: PlacedType,
     /// One rectangle, or up to three for a CLUT block that starts or ends inside an arena row.
     pub rects: Vec<Rect>,
     /// The depth, and whether a draw site names it.
@@ -168,12 +168,12 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
             let payload = project.payload(loaded, slot);
             let on_disc = loaded.entries().get(slot).map(|entry| entry.ram_ptr);
             let joins = replayed.joins.iter();
-            let (kind, rects, depth, sites) = match classify(entry, payload) {
+            let (placed_type, rects, depth, sites) = match classify(entry, payload) {
                 Format::VramUpload => {
                     let Some(sheet) = sheet(slot, entry.ram_ptr, payload.len()) else { continue };
                     let joined = joins.filter(|join| join.texture == writer);
                     let (depths, sites): (BTreeSet<u32>, Vec<String>) = joined.map(|join| (join.depth.bits(), join.rule.evidence())).unzip();
-                    (Kind::Texture, vec![Rect { x: sheet.x, y: sheet.y, width: sheet.width, height: sheet.height }], depth_text(&depths), sites)
+                    (PlacedType::Texture, vec![Rect { x: sheet.x, y: sheet.y, width: sheet.width, height: sheet.height }], depth_text(&depths), sites)
                 }
                 Format::ClutBlock => {
                     let Some(block) = ClutBlock::new(slot, entry.ram_ptr, payload.len()) else { continue };
@@ -183,7 +183,7 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
                     if !depths.is_empty() {
                         depth = format!("{depth}; {}", depth_text(&depths));
                     }
-                    (Kind::Palette, palette_rects(block.arena_word, block.words), depth, sites)
+                    (PlacedType::Palette, palette_rects(block.arena_word, block.words), depth, sites)
                 }
                 _ => continue,
             };
@@ -191,24 +191,24 @@ pub fn placements(project: &Project, replayed: &Replayed) -> Vec<Placed> {
             let mut sites = sites;
             sites.sort();
             sites.dedup();
-            let note = match kind {
-                Kind::Texture => "Moves by its load argument's column and row.".to_string(),
+            let note = match placed_type {
+                PlacedType::Texture => "Moves by its load argument's column and row.".to_string(),
                 _ => "Moves by its load address in the palette arena.".to_string(),
             };
-            placed.push(Placed { writer, kind, rects, depth, load_arg: Some(entry.ram_ptr), on_disc, note, sites });
+            placed.push(Placed { writer, placed_type, rects, depth, load_arg: Some(entry.ram_ptr), on_disc, note, sites });
         }
     }
     for region in &replayed.regions {
         if seen.contains(&region.writer) {
             continue;
         }
-        let (depth, note) = match (&region.writer, region.kind) {
+        let (depth, note) = match (&region.writer, region.write_type) {
             (Writer::Named(name), _) => ("unknown".to_string(), format!("Uploaded by code ({name}); no data places it.")),
-            (_, WriteKind::Palette) => ("palette words".to_string(), "Palette words of a compressed block, copied by the loader to the arena; this view does not move them.".to_string()),
+            (_, WriteType::Palette) => ("palette words".to_string(), "Palette words of a compressed block, copied by the loader to the arena; this view does not move them.".to_string()),
             _ => ("unknown".to_string(), "Not a whole number of upload rectangles, so the loader places it itself.".to_string()),
         };
         let rect = Rect { x: region.x, y: region.y, width: region.width, height: region.height };
-        placed.push(Placed { writer: region.writer.clone(), kind: Kind::Code, rects: vec![rect], depth, load_arg: None, on_disc: None, note, sites: Vec::new() });
+        placed.push(Placed { writer: region.writer.clone(), placed_type: PlacedType::Code, rects: vec![rect], depth, load_arg: None, on_disc: None, note, sites: Vec::new() });
     }
     placed
 }
@@ -227,8 +227,8 @@ fn depth_text(depths: &BTreeSet<u32>) -> String {
 /// alone covers every block.
 pub fn collisions(placed: &[Placed]) -> Vec<Collision> {
     let mut found = Vec::new();
-    for (first, one) in placed.iter().enumerate().filter(|(_, placed)| placed.kind != Kind::Code) {
-        for (second, other) in placed.iter().enumerate().skip(first + 1).filter(|(_, placed)| placed.kind != Kind::Code) {
+    for (first, one) in placed.iter().enumerate().filter(|(_, placed)| placed.placed_type != PlacedType::Code) {
+        for (second, other) in placed.iter().enumerate().skip(first + 1).filter(|(_, placed)| placed.placed_type != PlacedType::Code) {
             for (left, right) in one.rects.iter().flat_map(|left| other.rects.iter().map(move |right| (left, right))) {
                 if let Some(area) = left.intersection(*right) {
                     found.push(Collision { first, second, area });
@@ -246,9 +246,9 @@ pub fn moved(project: &Project, placed: &Placed, step: Step) -> Result<u32, Stri
     };
     let loaded = project.loaded(&ArchivePath(archive.clone())).ok_or("the archive is not loaded")?;
     let payload_bytes = project.payload(loaded, *slot).len();
-    match placed.kind {
-        Kind::Code => Err(placed.note.clone()),
-        Kind::Texture => {
+    match placed.placed_type {
+        PlacedType::Code => Err(placed.note.clone()),
+        PlacedType::Texture => {
             let place = rebof3_emi::upload::descriptor(load_arg);
             let (dx, dy) = match step {
                 Step::Left => (-1, 0),
@@ -266,7 +266,7 @@ pub fn moved(project: &Project, placed: &Placed, step: Step) -> Result<u32, Stri
                 .map(|place| rebof3_emi::upload::load_argument(place, load_arg))
                 .ok_or_else(|| "a step that way leaves the frame buffer".to_string())
         }
-        Kind::Palette => {
+        PlacedType::Palette => {
             let word = (load_arg.wrapping_sub(ARENA_BASE) / 2) as usize;
             let delta = match step {
                 Step::Left => -(PALETTE_STEP as isize),
@@ -320,11 +320,11 @@ fn short(writer: &Writer) -> String {
     }
 }
 
-fn fill(kind: Kind) -> Hsla {
-    Hsla::from(rgba(match kind {
-        Kind::Texture => TEXTURE_FILL,
-        Kind::Palette => PALETTE_FILL,
-        Kind::Code => CODE_FILL,
+fn fill(placed_type: PlacedType) -> Hsla {
+    Hsla::from(rgba(match placed_type {
+        PlacedType::Texture => TEXTURE_FILL,
+        PlacedType::Palette => PALETTE_FILL,
+        PlacedType::Code => CODE_FILL,
     }))
 }
 
@@ -366,7 +366,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
                 .top(px(f32::from(rect.y) * zoom))
                 .w(px(width))
                 .h(px(f32::from(rect.height) * zoom))
-                .bg(fill(one.kind))
+                .bg(fill(one.placed_type))
                 .border_1()
                 .border_color(if selected {
                     Hsla::from(rgba(SELECTED_LINE))
@@ -451,10 +451,10 @@ fn list(editor: &Editor, placed: &[Placed], found: &[Collision], cx: &mut Contex
         let line = format!(
             "{:<22} {:<8} x {:>4} y {:>3}  {:>4}×{:<3} words  {}{}{}",
             short(&one.writer),
-            match one.kind {
-                Kind::Texture => "texture",
-                Kind::Palette => "palette",
-                Kind::Code => "code",
+            match one.placed_type {
+                PlacedType::Texture => "texture",
+                PlacedType::Palette => "palette",
+                PlacedType::Code => "code",
             },
             rect.x,
             rect.y,
@@ -488,7 +488,7 @@ fn detail(editor: &Editor, one: &Placed, placed: &[Placed], found: &[Collision],
     for site in &one.sites {
         column = column.child(mono(format!("Read by: {site}")).text_color(color(MUTED)));
     }
-    if one.kind != Kind::Code && !one.sites.is_empty() {
+    if one.placed_type != PlacedType::Code && !one.sites.is_empty() {
         column = column.child(muted("These sites name the page and row as literals in code. A move changes the data only; patch them to follow it."));
     }
     let at = placed.iter().position(|other| other.writer == one.writer);
@@ -497,7 +497,7 @@ fn detail(editor: &Editor, one: &Placed, placed: &[Placed], found: &[Collision],
         let area = collision.area;
         column = column.child(mono(format!("Collides with {} at x {} y {}, {}×{} words", short(&other.writer), area.x, area.y, area.width, area.height)).text_color(Hsla::from(rgba(COLLISION_FILL))));
     }
-    if one.kind == Kind::Code {
+    if one.placed_type == PlacedType::Code {
         return column;
     }
     let mut moves = div().flex().items_center().gap(px(GAP_SMALL)).child("Move");
@@ -567,12 +567,12 @@ mod tests {
         let placed = placements(&project, &replayed);
 
         let texture = placed.iter().find(|placed| placed.writer == Writer::entry(area, 7)).expect("entry 7");
-        assert_eq!(texture.kind, Kind::Texture);
+        assert_eq!(texture.placed_type, PlacedType::Texture);
         let rect = texture.rects[0];
         assert!((rect.x..rect.x + rect.width).contains(&704) && (rect.y..rect.y + rect.height).contains(&256));
         assert!(texture.depth.contains("bpp"), "{}", texture.depth);
         let block = placed.iter().find(|placed| placed.writer == Writer::entry(area, 8)).expect("entry 8");
-        assert_eq!(block.kind, Kind::Palette);
+        assert_eq!(block.placed_type, PlacedType::Palette);
         assert!(block.rects.iter().any(|rect| rect.y >= 480));
 
         let loaded = project.load(&ArchivePath(area.into())).expect("loads");

@@ -82,7 +82,7 @@ typedef enum {
  * Borrowed: the strings live for the process.
  */
 typedef struct {
-  const char *kind;
+  const char *asset_type;
   uint32_t files;
   bool named;
   bool load_arg;
@@ -116,8 +116,8 @@ typedef struct {
   size_t image_path_len;
   const char *output_dir;
   size_t output_dir_len;
-  const char *kinds;
-  size_t kinds_len;
+  const char *types;
+  size_t types_len;
   const char *text_disc;
   size_t text_disc_len;
   rebof3_mode mode;
@@ -175,7 +175,7 @@ typedef struct {
 } rebof3_emi_replacement;
 
 /**
- * What one format is: its names, its state and the asset kind it is written under.
+ * What one format is: its names, its state and the asset type it is written under.
  *
  * Borrowed: the strings are NUL-terminated and live for the process.
  */
@@ -185,7 +185,7 @@ typedef struct {
   const char *state;
   const char *spec_state;
   const char *codec_state;
-  const char *kind;
+  const char *asset_type;
 } rebof3_format_info;
 
 /**
@@ -214,10 +214,10 @@ psx_status rebof3_assets_codec_count(size_t *out_count);
  * Reads one codec's requirements in one direction.
  *
  * # Safety
- * `kind` must point to `kind_len` readable UTF-8 bytes and `out_codec` must be writable.
+ * `asset_type` must point to `asset_type_len` readable UTF-8 bytes and `out_codec` must be writable.
  */
-psx_status rebof3_assets_codec_info(const char *kind,
-                                    size_t kind_len,
+psx_status rebof3_assets_codec_info(const char *asset_type,
+                                    size_t asset_type_len,
                                     rebof3_direction direction,
                                     rebof3_assets_codec *out_codec);
 
@@ -225,11 +225,11 @@ psx_status rebof3_assets_codec_info(const char *kind,
  * Runs one codec conversion from the supplied bytes.
  *
  * # Safety
- * `kind` must point to `kind_len` readable UTF-8 bytes, `job` must be a readable job whose
+ * `asset_type` must point to `asset_type_len` readable UTF-8 bytes, `job` must be a readable job whose
  * pointers are readable for their lengths, and `out_bytes` must be writable.
  */
-psx_status rebof3_assets_convert(const char *kind,
-                                 size_t kind_len,
+psx_status rebof3_assets_convert(const char *asset_type,
+                                 size_t asset_type_len,
                                  rebof3_direction direction,
                                  const rebof3_assets_job *job,
                                  psx_buffer *out_bytes);

@@ -11,8 +11,8 @@ use std::fs;
 
 use psx_formats::sf2::{self, SoundFont};
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::kind::{Kind, Selection};
 use rebof3_assets::report::Row;
+use rebof3_assets::types::{AssetType, Selection};
 use rebof3_formats::vab::soundfont;
 
 /// The SoundFont with its sample names cleared. A name is `VAG` and the bank's VAG number, which the import
@@ -34,7 +34,7 @@ fn retail_banks_take_a_second_round_trip_to_the_same_bank() {
     let report = extract::run(&options).unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let is_bank = |row: &&Row| row.role == "raw" && row.kind == Kind::AudioBank;
+    let is_bank = |row: &&Row| row.role == "raw" && row.asset_type == AssetType::AudioBank;
     let (mut banks, mut sounds) = (0, 0);
     for header_row in report.rows.iter().filter(is_bank).filter(|row| row.file_type == Some(6)) {
         let body_row =

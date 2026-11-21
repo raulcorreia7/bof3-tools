@@ -17,7 +17,7 @@ pub struct Problem {
 
 /// The findings for `layout`, in page order.
 pub fn problems(layout: &Layout, font: &Font) -> Vec<Problem> {
-    let (width, height) = layout.placement.kind.size();
+    let (width, height) = layout.placement.event_type.size();
     let mut found = Vec::new();
     for (index, page) in layout.pages.iter().enumerate() {
         let mut say = |text: String| found.push(Problem { page: index, text });
