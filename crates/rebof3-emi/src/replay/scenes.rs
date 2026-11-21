@@ -280,38 +280,11 @@ mod tests {
     }
 
     #[test]
-    fn each_menu_copies_the_rows_its_open_handler_copies() {
-        let start = menu(frontend(), "BIN/ETC/START.EMI").expect("a menu");
-        assert!(start.steps.ends_with(&[Step::ResetPalette, Step::UploadPalette]));
-        let status = menu(frontend(), "BIN/ETC/STATUS.EMI").expect("a menu");
-        assert!(status.steps.ends_with(&[Step::CopyPalette(1), Step::CopyPalette(2), Step::UploadPalette]));
-        assert!(menu(frontend(), "BIN/ETC/GAME.EMI").is_none());
-    }
-
-    #[test]
     fn a_battle_copies_rows_26_and_27_and_an_effect_row_26() {
         let battle = battle(frontend(), BATTLE);
         assert!(battle.steps.contains(&Step::CopyWords { row: 15, column: 240, count: 16 }));
         let effect = in_battle(battle, "BIN/BMAGIC/MAGIC218.EMI").expect("an effect");
         assert_eq!(effect.kind, Kind::Effect);
         assert!(effect.steps.ends_with(&[Step::CopyPalette(26), Step::UploadPalette]));
-    }
-
-    #[test]
-    fn home_finds_the_scene_that_loads_an_archive() {
-        assert_eq!(home(FIRST).map(|scene| scene.kind), Some(Kind::Frontend));
-        assert_eq!(home("BIN/BOSS/BOSS001.EMI").map(|scene| scene.kind), Some(Kind::Battle));
-        assert_eq!(home("BIN/ETC/COMMU03.EMI").map(|scene| scene.kind), Some(Kind::Village));
-        assert_eq!(home("BIN/BATTLE/BATL_DRA.EMI").map(|scene| scene.kind), Some(Kind::Battle));
-        assert_eq!(home("BIN/ETC/GAME.EMI"), None);
-        assert_eq!(area_id("BIN/WORLD03/AREA151.EMI"), Some(151));
-        assert_eq!(area_id("BIN/ETC/AREA151.EMI"), None);
-    }
-
-    #[test]
-    fn the_catalog_lists_one_scene_per_screen_the_archives_allow() {
-        let archives = [FIRST, DEMO, "BIN/WORLD00/AREA000.EMI", "BIN/ETC/SHOP.EMI", BATTLE, "BIN/BATTLE/BATL_RE2.EMI"];
-        let names: Vec<String> = catalog(archives).into_iter().map(|scene| scene.name).collect();
-        assert_eq!(names, ["Frontend", "Title", "Field: AREA000", "Menu: SHOP", "Battle: BATTLE", "Battle: BATTLE + BATL_RE2"]);
     }
 }

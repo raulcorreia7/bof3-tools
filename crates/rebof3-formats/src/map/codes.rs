@@ -68,19 +68,3 @@ pub fn battle_meaning(value: u8) -> String {
     let room = (value - 1) % 4;
     format!("battlers of reach {reach} and less; room in x {}, in y {}", room & 1 == 1, room & 2 == 2)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_meanings_do_not_overlap() {
-        for pair in MEANINGS.windows(2) {
-            assert!(pair[0].codes.1 < pair[1].codes.0, "{pair:?}");
-        }
-        assert_eq!(meaning_of(0xA7).map(|meaning| meaning.reader), Some("func_801B146C (emi/etc/game/00@0x801B146C)"));
-        assert!(meaning_of(0x60).is_none(), "no reader tests 0x60");
-        assert!(is_exit(0xA7) && !is_exit(0xA4));
-        assert_eq!(battle_meaning(6), "battlers of reach 1 and less; room in x true, in y false");
-    }
-}

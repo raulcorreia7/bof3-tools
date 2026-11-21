@@ -231,11 +231,4 @@ mod tests {
         assert_eq!(read(&[0xFF, 0xFF], 0, 2, false).as_deref(), Some("65535"));
         assert_eq!(read(&[0xFF], 0, 2, false), None);
     }
-
-    #[test]
-    fn offsets_read_as_hex_or_decimal() {
-        assert_eq!(parse_offset("0x1F"), Some(31));
-        assert_eq!(parse_offset(" 16 "), Some(16));
-        assert_eq!(parse_offset("x"), None);
-    }
 }

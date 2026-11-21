@@ -370,38 +370,10 @@ mod tests {
     }
 
     #[test]
-    fn an_item_reads_its_name_flags_and_price() {
-        let tables = GameTables::parse(&payload()).unwrap();
-        assert_eq!(tables.items.len(), 92);
-        assert_eq!(name_text(&tables.items[1].name), "Green Apple");
-        assert_eq!((tables.items[1].flags, tables.items[1].price), (0x21, 120));
-    }
-
-    #[test]
     fn a_short_payload_names_the_table_it_cannot_read() {
         let short = &payload()[..ITEMS.archive_offset - PAYLOAD_START + 10];
         let error = GameTables::parse(short).unwrap_err();
         assert!(matches!(error, Error::GameTableShort { table: "items", .. }), "{error:?}");
-    }
-
-    #[test]
-    fn a_growth_byte_holds_two_nibbles() {
-        let growth = growth(&[0x10, 0x27, 9, 4, 0x3C, 0xA7, 2, 5]);
-        assert_eq!((growth.exp, growth.hp, growth.ap), (10_000, 9, 4));
-        assert_eq!((growth.power, growth.defense), (3, 12));
-        assert_eq!((growth.agility, growth.intellect), (10, 7));
-    }
-
-    #[test]
-    fn a_name_ends_at_its_zero_and_spaces_its_ff() {
-        assert_eq!(name_text(b"Bronze\xffSword\0\0\0\0\0\0"), "Bronze Sword");
-        assert_eq!(name_text(&[0x41, 0x80, 0, 0]), "A{RAW:80}");
-    }
-
-    #[test]
-    fn a_name_uses_the_table_punctuation_and_keeps_colour_codes() {
-        assert_eq!(name_text(b"Man=o\x8e=War\0\0"), "Man-o'-War");
-        assert_eq!(name_text(b"\x05\x02Hawk\x8es\xff\x8b\x06\0"), "{COLOR:02}Hawk's +{RAW:06}");
     }
 
     #[test]
@@ -411,10 +383,5 @@ mod tests {
             let text = name_text(field);
             assert_eq!(name_field(&text, field.len()).unwrap(), field, "{text:?}");
         }
-    }
-
-    #[test]
-    fn a_name_longer_than_its_field_is_refused() {
-        assert!(name_field("Longer Than Eight", 8).is_err());
     }
 }

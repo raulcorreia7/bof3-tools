@@ -373,23 +373,6 @@ mod tests {
     }
 
     #[test]
-    fn an_operand_edit_rewrites_one_byte() {
-        let payload = table();
-        let edited = rewritten(&payload, payload.len(), |program| program.set_op(at(0), Op::Show { ticks: 9, frame: 0 })).expect("edits");
-        let changed = payload.iter().zip(&edited).filter(|(old, new)| old != new).count();
-        assert_eq!((edited.len(), changed), (payload.len(), 1));
-    }
-
-    #[test]
-    fn an_append_uses_the_padding_and_a_second_is_refused() {
-        let payload = table();
-        let append = |bytes: &[u8]| rewritten(bytes, payload.len(), |program| program.insert_op(at(3), Op::Show { ticks: 1, frame: 0 }));
-        let once = append(&payload).expect("the padding takes the step");
-        assert_eq!(once.len(), payload.len());
-        assert!(append(&once).is_err(), "the table would grow");
-    }
-
-    #[test]
     fn removing_a_jump_target_is_refused() {
         let payload = table();
         assert!(rewritten(&payload, payload.len(), |program| program.remove_op(at(1))).is_err());

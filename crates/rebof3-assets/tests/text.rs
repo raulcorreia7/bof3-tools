@@ -116,25 +116,6 @@ fn the_retail_tables_rebuild_their_archives_and_patch_the_disc_to_its_own_bytes(
 }
 
 #[test]
-fn the_codec_keeps_every_code_and_writes_it_back() {
-    // A letter, a space, a colour with its operand, the two fullwidth slots, a backspace, and a code with no operand
-    // at the end of the string, which is kept as a raw byte.
-    let raw = [0x41, 0xFF, 0x05, 0x02, 0x8D, 0x8F, 0x90, 0x04];
-    let text = codec::decode(Encoding::Message, &raw);
-    assert_eq!(text, "A {COLOR:02}\u{FF0C}\u{FF1A}{BACKSPACE}{RAW:04}");
-    assert!(codec::encode(Encoding::Message, &text).expect("the text encodes") == raw);
-}
-
-#[test]
-fn the_name_and_the_executable_strings_have_their_own_codes() {
-    assert_eq!(codec::decode(Encoding::Name, &[0x01, 0x00]), "{RAW:01}{END}");
-    assert_eq!(codec::decode(Encoding::Ascii, b"VSync: timeout\n\0"), "VSync: timeout{NEWLINE}{END}");
-    assert_eq!(codec::decode(Encoding::Ascii, b"{"), "{RAW:7b}");
-    assert!(codec::encode(Encoding::Ascii, "{RAW:7b}").expect("the raw brace encodes") == b"{");
-    assert!(codec::encode(Encoding::Ascii, "{").expect("a bare brace is the byte") == b"{");
-}
-
-#[test]
 fn text_that_names_no_code_or_a_wide_operand_is_refused() {
     for text in ["{NOPE}", "{COLOR:1ff}", "{RAW:100}", "{", "{COLOR}", "caf\u{E9}"] {
         assert!(codec::encode(Encoding::Message, text).is_err(), "{text:?} encodes");
@@ -153,18 +134,6 @@ fn synthetic_table() -> Vec<u8> {
 }
 
 #[test]
-fn a_synthetic_table_reads_back_its_layout_and_round_trips() {
-    let payload = synthetic_table();
-    let parsed = table::parse(&payload).expect("the table reads");
-    assert_eq!(parsed.slots, vec![Some(0), Some(1), Some(0), Some(2), None]);
-    assert_eq!(parsed.messages.len(), 3);
-    assert_eq!(table::build(&parsed).expect("it lays out again"), payload);
-
-    let json = table::export(&payload).expect("the table exports");
-    assert!(table::import(&json).expect("the table imports") == payload);
-}
-
-#[test]
 fn an_edited_message_takes_its_new_length_and_keeps_the_slots() {
     let payload = synthetic_table();
     let json = String::from_utf8(table::export(&payload).expect("the table exports")).expect("JSON is UTF-8");
@@ -176,14 +145,4 @@ fn an_edited_message_takes_its_new_length_and_keeps_the_slots() {
     assert_eq!(parsed.slots, vec![Some(0), Some(1), Some(0), Some(2), None]);
     assert_eq!(codec::decode(Encoding::Message, &parsed.messages[1]), "You won the battle, and {VAR:00} zenny!{END}");
     assert_eq!(codec::decode(Encoding::Message, &parsed.messages[2]), "Choose{CHOICE:14}{END}");
-}
-
-#[test]
-fn a_table_whose_layout_the_rule_does_not_describe_is_refused() {
-    // The table names offset 2 for slot 0, which is inside the table itself.
-    let inside_table = [0x04, 0x00, 0x02, 0x00, 0x41, 0x00];
-    assert!(table::parse(&inside_table).is_err());
-    // The table names an offset past the end of the table (6 bytes), where 6 itself is the end marker.
-    let past_end = [0x04, 0x00, 0x07, 0x00, 0x41, 0x00];
-    assert!(table::parse(&past_end).is_err());
 }

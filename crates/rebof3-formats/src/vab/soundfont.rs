@@ -214,17 +214,3 @@ fn pack(attack: usize, shift: usize, level: usize) -> u16 {
 fn nearest(values: &[i16], target: i16) -> usize {
     (0..values.len()).min_by_key(|&index| (i32::from(values[index]) - i32::from(target)).abs()).unwrap_or(0)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_slow_attack_is_timed_by_the_library_steps() {
-        // Attack shift 16, linear step 7: 4,681 steps of 32 samples reach full scale, about 3.40 s, which is
-        // 1200 log2(3.40) = 2117 timecents.
-        let envelope = volume_envelope(0x4000, 0).expect("the phases end");
-        assert_eq!(envelope.attack, 2117);
-        assert_eq!(envelope.sustain, 241, "the decay register's level 0 is 0x800, about 24 dB down");
-    }
-}

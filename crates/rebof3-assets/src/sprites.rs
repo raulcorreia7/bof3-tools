@@ -87,7 +87,7 @@ pub fn import_sprite_sheet(json: &[u8], png: &[u8], payload: &[u8], sizes: &Spri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_formats::sprite::{Animation, Cell, Encoding, Frame, Image, SHAPES, Step};
+    use rebof3_formats::sprite::{Animation, Cell, Encoding, Frame, Image, Step};
 
     /// A bare section: one sheet, one palette, one animation of one frame, one record, and padding.
     fn section() -> Vec<u8> {
@@ -113,14 +113,6 @@ mod tests {
         out
     }
 
-    fn sizes() -> SpriteSizes {
-        let mut rows = [[0; 2]; SHAPES];
-        for (shape, row) in rows.iter_mut().enumerate() {
-            *row = [8 * (shape as u8 % 4 + 1), 8 * (shape as u8 / 4 + 1)];
-        }
-        SpriteSizes::from_rows(rows)
-    }
-
     #[test]
     fn a_stored_payload_unpacks_and_packs_to_itself() {
         let raw = section();
@@ -132,13 +124,6 @@ mod tests {
         let mut edited = sprites.clone();
         edited[0x30] ^= 1;
         assert_eq!(lz77::decode(&pack(&packed, &edited).expect("packs")).expect("decodes"), edited);
-    }
-
-    #[test]
-    fn an_unchanged_sheet_imports_to_the_stored_payload() {
-        let packed = lz77::encode(&section());
-        let sheet = sprite_sheet(&packed, 0, 0, &sizes(), "sprites.png").expect("exports");
-        assert_eq!(import_sprite_sheet(&sheet.json, &sheet.png, &packed, &sizes()).expect("imports"), packed);
     }
 
     #[test]

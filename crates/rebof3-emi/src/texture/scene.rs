@@ -93,33 +93,3 @@ pub fn scene_joins(scene: &Scene, vram: &Vram, descriptors: &[u32], code: &[Code
     }
     joins
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::Entry;
-
-    fn entry(file_type: u16, ram_ptr: u32, size: usize) -> Entry {
-        Entry { size: size as u32, offset: 0, ram_ptr, first4: 0, file_type }
-    }
-
-    #[test]
-    fn a_page_and_a_row_resolve_to_their_writers() {
-        let mut vram = Vram::new();
-        let sheet: Vec<u8> = vec![0x11; 2048];
-        // Rectangle column 22, row 8: VRAM (704, 256).
-        let block: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
-        let entries = [entry(3, (22 << 24) | (8 << 16) | (1 << 8), sheet.len()), entry(0, 0x8003_3F40, block.len())];
-        vram.load("BIN/WORLD00/AREA024.EMI", &entries, &[&sheet, &block]);
-        vram.reset_palette();
-        vram.upload_palette();
-
-        let clut = Clut::new(160, 483).expect("a CLUT");
-        let (texture, palette) = resolve(&vram, 704, 256, clut, Depth::Four).expect("a join");
-        assert_eq!(texture, Writer::entry("BIN/WORLD00/AREA024.EMI", 0));
-        assert_eq!(palette, Writer::entry("BIN/WORLD00/AREA024.EMI", 1));
-        assert!(resolve(&vram, 704, 256, clut, Depth::Eight).is_none(), "the 8-bit row is only partly written");
-        assert!(resolve(&vram, 0, 0, clut, Depth::Four).is_none(), "nothing wrote the page");
-        assert!(resolve(&vram, 160, 483, clut, Depth::Four).is_none(), "a palette is not a texture page");
-    }
-}

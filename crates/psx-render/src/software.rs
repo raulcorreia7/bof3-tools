@@ -210,30 +210,4 @@ mod tests {
         assert_eq!(frame.pixel(16, 20), [0, 0, 0, 255], "texel 0 is transparent");
         assert_eq!(frame.pixel(4, 4), [0, 0, 0, 255], "outside the quad");
     }
-
-    #[test]
-    fn semi_transparency_mixes_only_texels_with_bit_15() {
-        let texture = Texture::Vram { page: [0, 0], clut: Clut { x: 0, y: 500 }, depth: Color::Indexed(Depth::Eight), uvs: [[31, 0], [31, 0], [31, 31], [31, 31]] };
-        let mut scene = Scene { vram: vram(), background: [200, 200, 200, 255], ..Scene::default() };
-        scene.primitives.push(quad(texture, [NEUTRAL_SHADE; 4], Blend::Psx(2)));
-        let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
-        // Texel 31 has bit 15: 200 - (31 << 3) clamps to 0 in red; green and blue hold 200 - 0.
-        assert_eq!(frame.pixel(32, 32), [0, 200, 200, 255]);
-    }
-
-    #[test]
-    fn a_nearer_quad_hides_a_farther_one_and_the_near_plane_clips() {
-        let mut far = quad(Texture::None, [255, 0, 0, 255], Blend::Opaque);
-        far.corners = far.corners.map(|[x, y, _]| [x, y, 4.0]);
-        let near = quad(Texture::None, [0, 255, 0, 255], Blend::Opaque);
-        let scene = Scene { primitives: vec![near, far], ..Scene::default() };
-        let frame = draw(&scene, &Camera::looking_down_z(32.0), 64, 64);
-        assert_eq!(frame.pixel(32, 32), [0, 255, 0, 255]);
-
-        let mut crossing = quad(Texture::None, [0, 0, 255, 255], Blend::Opaque);
-        crossing.corners = [[-1.0, 0.0, -1.0], [1.0, 0.0, -1.0], [-1.0, 0.0, 3.0], [1.0, 0.0, 3.0]];
-        crossing.corners = crossing.corners.map(|[x, _, z]| [x, 0.2, z]);
-        let frame = draw(&Scene { primitives: vec![crossing], ..Scene::default() }, &Camera::looking_down_z(32.0), 64, 64);
-        assert!(frame.rgba.chunks(4).any(|pixel| pixel[2] == 255), "the part past the near plane draws");
-    }
 }

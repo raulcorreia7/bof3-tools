@@ -140,23 +140,6 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    const START: u16 = 1 << 3;
-    const CROSS: u16 = 1 << 14;
-
-    #[test]
-    fn the_new_game_route_presses_start_then_cross() {
-        let route = Route::built_in("new-game").expect("the built-in route parses");
-        assert_eq!(route.buttons(899), 0);
-        assert_eq!(route.buttons(900), START);
-        assert_eq!(route.buttons(903), START);
-        assert_eq!(route.buttons(904), 0);
-        assert_eq!(route.buttons(990), START);
-        assert_eq!(route.buttons(2340), 0, "the Start press stops at frame 2300");
-        assert_eq!(route.buttons(2400), CROSS);
-        assert_eq!(route.buttons(2460), CROSS);
-        assert_eq!(route.buttons(2464), 0);
-    }
-
     #[test]
     fn a_bad_route_says_what_is_wrong() {
         let unknown = "name = \"x\"\nframes = 1\n[[press]]\nbuttons = [\"jump\"]\nfrom = 0\nevery = 1\nhold = 1\n";

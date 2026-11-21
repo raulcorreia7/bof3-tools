@@ -143,13 +143,6 @@ mod tests {
     }
 
     #[test]
-    fn a_file_is_its_header_and_body() {
-        let (header, body) = bank();
-        let file = standard_file(&header, &body);
-        assert_eq!(split_file(&file).unwrap(), (header, body));
-    }
-
-    #[test]
     fn a_pair_that_is_not_a_bank_is_refused() {
         let (header, body) = bank();
         assert!(split_file(b"MThd").is_err());

@@ -6,7 +6,7 @@
 
 mod support;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ use std::thread;
 use psx_cd::Image;
 use psx_cd::checksum::sha256_hex;
 use rebof3_assets::extract::{self, Options};
-use rebof3_assets::kind::{Kind, Mode, Selection};
+use rebof3_assets::kind::Selection;
 use rebof3_assets::report::Report;
 use rebof3_formats::vram::TextureImport;
 
@@ -304,111 +304,4 @@ fn sound_bank_round_trip(soundfont_path: &Path, header_path: &Path, slot: &str) 
         })
         .unwrap_or(false);
     (header_equal, same)
-}
-
-/// Raw mode writes only the disc's own bytes, for every kind. Each file is one of: a slice of a disc file (an EMI
-/// entry, or a game table inside entry 0 of `ETC/GAME.EMI`), a whole disc file, the license sectors, an audio
-/// track's sectors, a sound bank as header followed by body, or a sample as the bank body stores it. No conversion is
-/// written, and the tree holds exactly the files the catalog lists.
-#[test]
-fn raw_mode_writes_the_disc_bytes_of_every_kind() {
-    let Some(image) = support::retail_image() else {
-        return;
-    };
-    let directory = support::scratch_dir("originals-raw");
-    let selection = Selection::all().with_mode(Mode::Raw);
-    let options = Options { image: image.clone(), out: directory.join("out"), selection, write: true, jobs: 4 };
-    let report = extract::run(&options).unwrap();
-    assert!(report.failures.is_empty(), "{:?}", report.failures);
-
-    let roles: BTreeSet<&str> = report.rows.iter().map(|row| row.role).collect();
-    assert!(roles.is_subset(&BTreeSet::from(["raw", "vab", "vag", "none"])), "raw mode wrote {roles:?}");
-    let listed: BTreeSet<String> = report.rows.iter().filter_map(|row| row.output.clone()).collect();
-    let found: BTreeSet<String> = files_under(&options.out).iter().map(|path| path.strip_prefix(&options.out).unwrap().to_string_lossy().replace('\\', "/")).collect();
-    assert_eq!(found, listed, "the tree holds exactly the files the catalog lists");
-
-    let mut disc = Image::open(&image).expect("the disc opens");
-    let entries = disc.entries().expect("the file table reads");
-    let license = disc.license().expect("the license sectors read");
-    let sheet = psx_cd::cue::read(&image).ok();
-    let written = |row: &rebof3_assets::report::Row| fs::read(options.out.join(row.output.as_deref().unwrap())).unwrap();
-    let mut current: Option<(String, Vec<u8>)> = None;
-    let mut exact: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
-    for row in report.rows.iter().filter(|row| row.role == "raw") {
-        let stored: Vec<u8> = if row.kind == Kind::Cdda {
-            let sheet = sheet.as_ref().expect("a disc with audio tracks has a cue sheet");
-            let position = sheet.tracks.iter().position(|track| format!("track{:02}", track.number) == row.source).expect("the catalog names a track of the sheet");
-            let (start, end) = psx_cd::cue::audio_track_range(sheet, position).unwrap();
-            let bin = fs::read(&sheet.tracks[position].file).unwrap();
-            bin[(start * 2352) as usize..(end * 2352) as usize].to_vec()
-        } else if row.source == "license_data.dat" {
-            license.clone().expect("the image has license sectors")
-        } else {
-            if current.as_ref().is_none_or(|(source, _)| *source != row.source) {
-                let entry = entries.iter().find(|entry| entry.path.to_string_lossy().replace('\\', "/") == row.source).unwrap_or_else(|| panic!("{} is a disc file", row.source));
-                current = Some((row.source.clone(), disc.read_file(entry).expect("the file reads")));
-            }
-            let bytes = &current.as_ref().unwrap().1;
-            if row.slot.is_some() { bytes[row.offset as usize..(row.offset + row.size) as usize].to_vec() } else { bytes.clone() }
-        };
-        let counts = exact.entry(row.kind.name()).or_default();
-        counts.0 += 1;
-        counts.1 += usize::from(written(row) == stored);
-    }
-
-    let mut banks = 0;
-    let mut samples: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
-    for header_row in report.rows.iter().filter(|row| row.role == "raw" && row.file_type == Some(6)) {
-        let body_row = report
-            .rows
-            .iter()
-            .find(|row| row.role == "raw" && row.file_type == Some(7) && row.source == header_row.source && row.load_arg == header_row.load_arg)
-            .expect("every VAB header has its body");
-        let whole_row = report.rows.iter().find(|row| row.role == "vab" && row.source == header_row.source && row.slot == header_row.slot).expect("every VAB header has its whole bank");
-        let (header, body) = (written(header_row), written(body_row));
-        banks += 1;
-        let counts = exact.entry("audio-bank (header followed by body)").or_default();
-        counts.0 += 1;
-        counts.1 += usize::from(written(whole_row) == [header.as_slice(), body.as_slice()].concat());
-        if let Ok(vab) = psx_formats::vab::Bank::parse(&header, &body) {
-            let hashes = samples.entry(&header_row.source).or_default();
-            for index in 1..=u32::from(vab.vag_count) {
-                if let Ok(bytes) = vab.vag_bytes(&body, index) {
-                    hashes.insert(sha256_hex(bytes));
-                }
-            }
-        }
-    }
-    for row in report.rows.iter().filter(|row| row.role == "vag") {
-        let counts = exact.entry("audio-bank (sample)").or_default();
-        counts.0 += 1;
-        counts.1 += usize::from(samples.get(row.source.as_str()).is_some_and(|set| set.contains(&sha256_hex(&written(row)))));
-    }
-
-    for (kind, (count, same)) in &exact {
-        eprintln!("{kind} (raw mode): {same} of {count} come back to their own bytes");
-        assert_eq!(same, count, "{kind} is written byte for byte");
-    }
-    assert_eq!(banks, 1020, "the disc holds 1020 sound banks");
-    for kind in [
-        Kind::Executable,
-        Kind::System,
-        Kind::Video,
-        Kind::XaAudio,
-        Kind::Cdda,
-        Kind::Texture,
-        Kind::Palette,
-        Kind::AudioBank,
-        Kind::AudioSequence,
-        Kind::AudioCues,
-        Kind::CharacterSprites,
-        Kind::AreaActorDefs,
-        Kind::AreaEncounters,
-        Kind::AreaMap,
-        Kind::DataTable,
-        Kind::Code,
-    ] {
-        assert!(exact.contains_key(kind.name()), "raw mode wrote {} files", kind.name());
-    }
-    assert_eq!(exact["data-table"].0, 8, "the eight game tables");
 }

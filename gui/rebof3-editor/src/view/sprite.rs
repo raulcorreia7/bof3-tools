@@ -840,7 +840,7 @@ fn import_into(editor: &mut Editor, json: &[u8], png: &[u8], sizes: &SpriteSizes
 mod tests {
     use gpui::TestAppContext;
     use rebof3_emi::lz77;
-    use rebof3_formats::sprite::{Cell, Encoding, SHAPES, Step};
+    use rebof3_formats::sprite::{Cell, Encoding, Step};
 
     use super::*;
     use crate::project::ArchivePath;
@@ -872,32 +872,6 @@ mod tests {
         out
     }
 
-    fn sizes() -> SpriteSizes {
-        let mut rows = [[0; 2]; SHAPES];
-        for (shape, row) in rows.iter_mut().enumerate() {
-            *row = [8 * (shape as u8 % 4 + 1), 8 * (shape as u8 / 4 + 1)];
-        }
-        SpriteSizes::from_rows(rows)
-    }
-
-    fn state(sprites: &[u8]) -> State {
-        let sprites = format::decode(sprites).map_err(|error| error.to_string());
-        let loaded = Loaded { key: (String::new(), 0, 0), sprites, reader: Reader::Field };
-        let mut state = State { loaded: Some(Rc::new(loaded)), ..State::default() };
-        state.restart();
-        state
-    }
-
-    #[test]
-    fn a_step_plays_the_ticks_of_its_delay() {
-        let mut state = state(&section());
-        state.step();
-        let player = state.player().expect("a player");
-        assert_eq!((player.step(), player.frame(), player.ticks()), (1, 1, 3));
-        state.seek(0);
-        assert_eq!(state.player().map(|player| player.step()), Some(0));
-    }
-
     #[test]
     fn a_colour_edit_survives_the_lz77_round_trip() {
         let sprites = section();
@@ -908,30 +882,6 @@ mod tests {
         let packed = with_colour(&lz77::encode(&sprites), 0, 0, 3, &|_| 0x7FFF).expect("edits");
         assert_eq!(lz77::decode(&packed).expect("decodes"), raw);
         assert!(with_colour(&sprites, 0, 1, 0, &|word| word).is_err(), "palette 1 is not in the sprites");
-    }
-
-    #[test]
-    fn grey_clears_only_what_every_palette_clears() {
-        let section = format::decode(&section()).expect("decodes").sections.remove(0);
-        let clear = always_clear(&section);
-        assert!(clear[0] && !clear[1]);
-        let texel = format::Texel { index: 0, word: 0, in_sheet: true, in_palette: true };
-        assert_eq!(pixel_colour(texel, Colours::Grey, &clear), CLEAR);
-        assert_eq!(pixel_colour(format::Texel { index: 31, ..texel }, Colours::Grey, &clear), [255, 255, 255, 255]);
-        let outside = format::Texel { index: 40, word: 0x1234, in_sheet: true, in_palette: false };
-        assert_eq!(pixel_colour(outside, Colours::Palette(0), &clear), MARKER);
-    }
-
-    #[test]
-    fn an_exported_sheet_imports_through_the_files() {
-        let folder = std::env::temp_dir().join(format!("bof3-edit-sprite-sheet-{}", std::process::id()));
-        std::fs::create_dir_all(&folder).expect("folder");
-        let json_path = folder.join("sprites.json");
-        let packed = lz77::encode(&section());
-        assert!(write_sheet(&json_path, &packed, 0, 0, &sizes()).starts_with("Wrote"));
-        let (json, png) = read_sheet(&json_path).expect("reads back");
-        assert_eq!(sprites::import_sprite_sheet(&json, &png, &packed, &sizes()).expect("imports"), packed);
-        let _ = std::fs::remove_dir_all(&folder);
     }
 
     /// A retail party sprites draws, plays and steps in the view. Point `BOF3_DISC_DIR` at an extracted

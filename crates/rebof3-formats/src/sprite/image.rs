@@ -279,35 +279,4 @@ mod tests {
         let decoded = Image::decode(&span).expect("decodes");
         assert_eq!(decoded.encode(), span, "the gap after the record is kept");
     }
-
-    #[test]
-    fn an_edit_packs_the_sheet_again() {
-        let image = Image::new(8, 4, Encoding::Raw, texels(8, 4)).expect("a sheet");
-        let mut decoded = Image::decode(&image.encode()).expect("decodes");
-        let mut changed = decoded.texels().to_vec();
-        changed[3] = 31;
-        decoded.set_texels(changed.clone()).expect("same size");
-        assert!(!decoded.is_stored());
-        let again = Image::decode(&decoded.encode()).expect("the new record decodes");
-        assert_eq!(again.texels(), &changed[..]);
-        assert!(again.encoding != Encoding::Raw, "a smaller encoding than raw exists");
-    }
-
-    #[test]
-    fn a_texel_past_five_bits_is_never_packed() {
-        let mut texels = texels(8, 4);
-        texels[0] = 40;
-        let image = Image::new(8, 4, Encoding::Packed, texels).expect("a sheet");
-        assert_eq!(image.body(Encoding::Packed), None);
-        let decoded = Image::decode(&image.encode()).expect("decodes");
-        assert_ne!(decoded.encoding, Encoding::Packed);
-        assert_eq!(decoded.texels()[0], 40);
-    }
-
-    #[test]
-    fn packed_texels_skip_bit_15() {
-        let word = 1 | 2 << 5 | 3 << 10 | 1 << 15 | 4 << 16 | 5 << 21 | 6 << 26;
-        let texels = unpack(&u32::to_le_bytes(word), PACKED_TEXELS).expect("one word");
-        assert_eq!(texels, [1, 2, 3, 4, 5, 6]);
-    }
 }

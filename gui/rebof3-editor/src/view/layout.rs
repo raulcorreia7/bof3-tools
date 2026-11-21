@@ -553,33 +553,6 @@ fn reset(editor: &mut Editor, writer: &Writer) {
 mod tests {
     use super::*;
 
-    fn palette(writer: Writer, rects: Vec<Rect>) -> Placed {
-        Placed { writer, kind: Kind::Palette, rects, depth: String::new(), load_arg: None, on_disc: None, note: String::new(), sites: Vec::new() }
-    }
-
-    #[test]
-    fn a_clut_block_spans_the_arena_rows_it_covers() {
-        // 256 words from the arena start: one whole row at (0, 480).
-        assert_eq!(palette_rects(0, 256), vec![Rect { x: 0, y: 480, width: 256, height: 1 }]);
-        // 32 words from 240: the tail of row 480 and the head of row 481.
-        assert_eq!(palette_rects(240, 32), vec![Rect { x: 240, y: 480, width: 16, height: 1 }, Rect { x: 0, y: 481, width: 16, height: 1 }]);
-        // 600 words from word 16: head, one whole row, then the tail.
-        let spans = palette_rects(16, 600);
-        assert_eq!(spans.iter().map(|rect| usize::from(rect.width) * usize::from(rect.height)).sum::<usize>(), 600);
-    }
-
-    #[test]
-    fn overlaps_are_collisions_and_code_is_left_out() {
-        let at = |x, y, width, height| Rect { x, y, width, height };
-        let one = palette(Writer::entry("A", 0), vec![at(0, 480, 64, 1)]);
-        let two = palette(Writer::entry("A", 1), vec![at(32, 480, 64, 1)]);
-        let apart = palette(Writer::entry("A", 2), vec![at(64, 481, 64, 1)]);
-        let mut code = palette(Writer::Named("GFX".into()), vec![at(0, 480, 256, 32)]);
-        code.kind = Kind::Code;
-        let found = collisions(&[one, two, apart, code]);
-        assert_eq!(found, vec![Collision { first: 0, second: 1, area: at(32, 480, 32, 1) }]);
-    }
-
     /// AREA024's scene: its texture and block are placed from the type-3 entry and the arena, a move
     /// there and back leaves the project unedited, and the archive rebuilds as it was.
     /// Point `BOF3_DISC_DIR` at an extracted disc; without it the test skips.

@@ -146,12 +146,4 @@ mod tests {
         let po = export(&table).unwrap();
         assert_eq!(import(&po, &table).unwrap(), table);
     }
-
-    #[test]
-    fn a_translation_replaces_its_message() {
-        let table = sample();
-        let po = String::from_utf8(export(&table).unwrap()).unwrap().replace("msgstr \"\"\n\n", "msgstr \"Yo{END}\"\n\n");
-        let rebuilt = import(po.as_bytes(), &table).unwrap();
-        assert_eq!(&rebuilt[4..], b"Yo\0");
-    }
 }

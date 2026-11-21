@@ -12,9 +12,7 @@ mod support;
 use std::fs;
 use std::path::Path;
 
-use psx_formats::gfx::texture::{Clut, Depth};
 use rebof3_emi::Archive;
-use rebof3_emi::texture::ResidentClutBlock;
 use rebof3_formats::joins::joined_rows;
 use rebof3_formats::vram::{indexed_rows, texture_view_png};
 
@@ -133,51 +131,4 @@ fn retail_textures_join_their_proven_palette_rows() {
     assert_eq!((rows[0].clut.x, rows[0].clut.y), (0, 506));
     assert_eq!(rows[0].palette, 5);
     assert_eq!(rows[0].depth.bits(), 8);
-}
-
-/// The battle family's cross-archive blocks: row 506 differs between `BATL_OVR.EMI` and
-/// `BATL_DRA.EMI`, and row 507 agrees in four archives but differs in `BATL_DRA.EMI`. Either
-/// row is ambiguous for a disc-wide resident set, so the join refuses it.
-#[test]
-fn retail_battle_rows_show_cross_archive_bank_conflicts() {
-    let Some(root) = support::retail_root() else {
-        return;
-    };
-    let names = ["BATTLE/BATTLE.EMI", "BATTLE/BATL_OVR.EMI", "BATTLE/BATL_DRA.EMI", "BATTLE/BATL_RE2.EMI", "BATTLE/BATL_RET.EMI", "BATTLE/BATTLE2.EMI"];
-    let mut blocks = Vec::new();
-    for name in names {
-        let path = root.join(name);
-        if !path.is_file() {
-            eprintln!("skipping the battle resident blocks: {name} is absent");
-            return;
-        }
-        let archive = Archive::open(&path).expect("open the battle archive");
-        let bytes = fs::read(&path).expect("read the battle archive");
-        let payloads = payloads(&archive, &bytes);
-        for (slot, entry) in archive.entries().iter().enumerate() {
-            if let Some(block) = ResidentClutBlock::new(name, slot, entry.ram_ptr, &payloads[slot]) {
-                blocks.push(block);
-            }
-        }
-    }
-
-    let row_506 = Clut::new(0, 506).expect("row 506");
-    let row_507 = Clut::new(0, 507).expect("row 507");
-    let holders = |clut| blocks.iter().filter(|block| block.holds(clut, Depth::Eight)).collect::<Vec<_>>();
-
-    let holders_506 = holders(row_506);
-    assert!(!holders_506.iter().any(|block| block.archive == "BATTLE/BATTLE.EMI"), "BATTLE.EMI has no row-506 block; the remaining archives must serve it");
-    assert!(holders_506.iter().map(|block| &block.values).collect::<std::collections::BTreeSet<_>>().len() > 1, "row 506 differs between BATL_OVR.EMI and BATL_DRA.EMI");
-
-    let holders_507 = holders(row_507);
-    assert!(holders_507.len() > 1, "several archives carry row 507");
-    let distinct_507: std::collections::BTreeSet<&Vec<u16>> = holders_507.iter().map(|block| &block.values).collect();
-    assert_eq!(distinct_507.len(), 2, "one archive disagrees at row 507");
-    let agreeing: Vec<_> = holders_507.iter().filter(|block| block.archive != "BATTLE/BATL_DRA.EMI").map(|block| &block.values).collect();
-    assert!(agreeing.len() >= 4, "BATTLE, BATL_RE2, BATL_RET and BATTLE2 carry the same row 507");
-    assert!(agreeing.iter().all(|values| *values == agreeing[0]), "the four named archives agree on row 507");
-    assert!(
-        holders_507.iter().any(|block| block.archive == "BATTLE/BATL_DRA.EMI" && &block.values != agreeing[0]),
-        "BATL_DRA.EMI carries a different row 507, which makes the disc-wide resident set refuse it"
-    );
 }

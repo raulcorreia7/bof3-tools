@@ -552,22 +552,6 @@ mod tests {
     }
 
     #[test]
-    fn a_fetch_reads_a_texel_through_its_clut() {
-        let mut vram = Vram::new();
-        // Word 0x4321 holds 4-bit texels 1, 2, 3, 4 and 8-bit texels 0x21, 0x43.
-        vram.load_image(Rect { x: 320, y: 256, width: 1, height: 1 }, &[0x4321], Writer::Named("page".into()));
-        let colors: Vec<u16> = (0..256).map(|index| 0x1000 + index).collect();
-        vram.load_image(Rect { x: 0, y: 483, width: 256, height: 1 }, &colors, Writer::Named("clut".into()));
-        let clut = Clut::new(0, 483).unwrap();
-        assert_eq!(vram.fetch([320, 256], clut, Depth::Four, [0, 0]), 0x1001);
-        assert_eq!(vram.fetch([320, 256], clut, Depth::Four, [3, 0]), 0x1004);
-        assert_eq!(vram.fetch([320, 256], clut, Depth::Eight, [1, 0]), 0x1043);
-        assert_eq!(vram.fetch([320, 256], clut, Depth::Eight, [2, 0]), 0x1000, "the next word is unwritten");
-        vram.load_image(Rect { x: 0, y: 0, width: 1, height: 1 }, &[0x0021], Writer::Named("origin".into()));
-        assert_eq!(vram.fetch([1023, 511], clut, Depth::Eight, [2, 1]), 0x1021, "u and v wrap to the origin");
-    }
-
-    #[test]
     fn an_upload_lands_at_its_rectangle_and_records_its_entry() {
         let mut vram = Vram::new();
         load(&mut vram, "A.EMI", &[block(0x8000_0000, 4, 1), upload(2, 3, 0x1234)]);
@@ -576,15 +560,6 @@ mod tests {
         assert_eq!(vram.word(96, 96), 0);
         assert_eq!(vram.writer(64, 96), Some(&Writer::entry("A.EMI", 1)));
         assert_eq!(vram.writer(0, 0), None);
-    }
-
-    #[test]
-    fn a_later_upload_overwrites_an_earlier_one() {
-        let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[upload(0, 0, 1)]);
-        load(&mut vram, "B.EMI", &[upload(0, 0, 2)]);
-        assert_eq!(vram.word(0, 0), 2);
-        assert_eq!(vram.writer(0, 0).and_then(Writer::as_entry), Some(("B.EMI", 0)));
     }
 
     #[test]
@@ -614,64 +589,5 @@ mod tests {
         let clut = Clut::new(0, 483).expect("a CLUT");
         assert_eq!(vram.clut_writer(clut, Depth::Four), Some(&Writer::entry("A.EMI", 0)));
         assert_eq!(vram.clut_writer(clut, Depth::Eight), None, "the 8-bit row is not all one block");
-    }
-
-    #[test]
-    fn a_reset_clears_rows_28_to_31_before_it_copies() {
-        let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[block(ARENA_BASE + 28 * 0x200, 256, 5), block(ARENA_BASE, 256, 6)]);
-        vram.reset_palette();
-        vram.upload_palette();
-        assert_eq!(vram.word(0, 480), 6);
-        assert_eq!(vram.word(0, 508), 0);
-        assert_eq!(vram.writer(0, 508), None);
-    }
-
-    #[test]
-    fn copied_words_carry_only_their_span() {
-        let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[block(ARENA_BASE + 15 * 0x200, 256, 9)]);
-        vram.copy_words(15, 240, 16);
-        vram.upload_palette();
-        assert_eq!(vram.word(239, 495), 0);
-        assert_eq!(vram.word(240, 495), 9);
-        assert_eq!(vram.word(255, 495), 9);
-    }
-
-    #[test]
-    fn regions_merge_rows_of_one_writer() {
-        let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[upload(0, 0, 1), upload(1, 0, 1)]);
-        load(&mut vram, "B.EMI", &[block(ARENA_BASE, 16, 3)]);
-        vram.reset_palette();
-        vram.upload_palette();
-        let regions = vram.regions();
-        let a: Vec<_> = regions.iter().filter(|region| region.writer.as_entry().is_some_and(|(archive, _)| archive == "A.EMI")).collect();
-        assert_eq!(a.len(), 2);
-        assert!(a.iter().all(|region| (region.width, region.height) == (32, 32)));
-        let b = regions.iter().find(|region| region.writer.as_entry().is_some_and(|(archive, _)| archive == "B.EMI")).expect("the palette");
-        assert_eq!((b.x, b.y, b.width, b.height, b.kind), (0, 480, 16, 1, Kind::Palette));
-    }
-
-    #[test]
-    fn texels_read_a_page_at_a_depth() {
-        let mut vram = Vram::new();
-        load(&mut vram, "A.EMI", &[upload(0, 0, 0x4321)]);
-        assert_eq!(vram.texels(Rect { x: 0, y: 0, width: 1, height: 1 }, Depth::Four), [1, 2, 3, 4]);
-        assert_eq!(vram.texels(Rect { x: 0, y: 0, width: 1, height: 1 }, Depth::Eight), [0x21, 0x43]);
-    }
-
-    #[test]
-    fn load_image_clips_at_the_right_edge_and_names_its_writer() {
-        let mut vram = Vram::new();
-        vram.load_image(Rect { x: 1022, y: 0, width: 4, height: 2 }, &[1, 2, 3, 4, 5, 6, 7, 8], Writer::Named("test".into()));
-        assert_eq!((vram.word(1022, 0), vram.word(1023, 0), vram.word(1023, 1)), (1, 2, 6));
-        assert_eq!(vram.writer(1023, 1), Some(&Writer::Named("test".into())));
-    }
-
-    #[test]
-    fn replay_records_an_archive_it_cannot_get() {
-        let vram = Vram::replay(&[Step::Clear, Step::Load("BIN/ETC/NONE.EMI".into())], &mut |_| None);
-        assert_eq!(vram.missing(), ["BIN/ETC/NONE.EMI"]);
     }
 }

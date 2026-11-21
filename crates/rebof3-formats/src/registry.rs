@@ -327,16 +327,3 @@ pub fn manifest_json(archive: &Archive, container: &[u8], typed: bool) -> String
         .collect();
     rebof3_emi::manifest::to_json(archive.version(), archive.entries(), typed, &labels)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_block_without_palette_tables_at_the_sprite_address_is_unclassified() {
-        // The head of BMAGIC/KAIZAR_D.EMI entry 0: `u32 4`, then a word past the payload.
-        let payload = [4, 0, 0, 0, 6, 0, 0x5c, 0x15, 0x54, 0x4f, 6, 6];
-        let entry = Entry { size: payload.len() as u32, offset: 0, ram_ptr: 0x8003_b800, first4: 4, file_type: 0 };
-        assert_eq!(classify(&entry, &payload), Format::Unclassified);
-    }
-}

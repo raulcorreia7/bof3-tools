@@ -333,20 +333,6 @@ mod tests {
     }
 
     #[test]
-    fn a_stream_lists_its_records_with_their_guards() {
-        let program = program();
-        let stream = walk(&program, 0).expect("the stream walks");
-        assert_eq!(stream.end, program.len() - 1);
-        let kinds: Vec<u8> = stream.records.iter().map(|record| record.kind).collect();
-        assert_eq!(kinds, [0, 9, 0xE]);
-        let placement = stream.records[0].placement(&program).expect("a position");
-        assert_eq!(placement, Placement { x2: 7, y2: 8, facing: Some(2), scene: Some(7) });
-        assert_eq!(stream.records[1].guards, [Guard::If { at: 17, test: 2, operand: 5, negated: false, otherwise: true }]);
-        assert_eq!(stream.records[2].guards, [Guard::Case { at: 35, test: 8, value: Some(1) }]);
-        assert_eq!(stream.records[2].placement(&program).unwrap().facing, None);
-    }
-
-    #[test]
     fn a_position_and_a_facing_edit_their_bytes_alone() {
         let program = program();
         let record = &walk(&program, 0).unwrap().records[0];

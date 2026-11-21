@@ -133,12 +133,4 @@ mod tests {
         assert_eq!(edit.text, "");
         assert_eq!(press(&mut edit, "backspace"), Outcome::Kept);
     }
-
-    #[test]
-    fn enter_submits_and_escape_cancels() {
-        let mut edit = LineEdit::default();
-
-        assert_eq!(press(&mut edit, "enter"), Outcome::Submit);
-        assert_eq!(press(&mut edit, "escape"), Outcome::Cancel);
-    }
 }

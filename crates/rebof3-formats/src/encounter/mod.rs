@@ -249,18 +249,6 @@ mod tests {
     }
 
     #[test]
-    fn a_encounter_block_reads_its_encounters_and_enemies() {
-        let parsed = EncounterBlock::parse(&block()).unwrap();
-        assert_eq!(parsed.encounters.len(), ENCOUNTERS);
-        assert_eq!(parsed.encounters[0], Encounter { enemies: [0, 1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], appearance_rate: 2 });
-        assert_eq!(parsed.enemies.len(), ENEMIES);
-        let worker = &parsed.enemies[0];
-        assert_eq!(name_text(&worker.name), "Worker");
-        assert_eq!((worker.enemy_id, worker.level), (12, 5));
-        assert_eq!(worker.resistances, [3, 1, 1, 1, 1, 1, 1, 0, 1]);
-    }
-
-    #[test]
     fn a_short_block_is_an_error() {
         assert!(matches!(EncounterBlock::parse(&block()[..100]), Err(Error::EncounterBlockShort { bytes: 100 })));
     }

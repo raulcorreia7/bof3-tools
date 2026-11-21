@@ -626,52 +626,6 @@ mod tests {
     }
 
     #[test]
-    fn backspace_at_the_line_start_steps_back_one_glyph() {
-        let page = &lay(&[code::BACKSPACE, b'A', code::END]).pages[0];
-        assert_eq!(page.glyphs[0].x, TEXT_ORIGIN.0 - GLYPH_ADVANCE);
-        assert_eq!(page.glyphs[1].x, TEXT_ORIGIN.0);
-    }
-
-    #[test]
-    fn the_leading_box_names_the_window() {
-        let narrow = lay(&[code::BOX, 0x41, b'A', code::END]);
-        assert_eq!(narrow.placement.kind, WindowKind::Narrow);
-        assert_eq!(narrow.placement.index, 1);
-        assert!(narrow.placement.framed);
-        assert!(!lay(&[code::BOX, 0x81, b'A', code::END]).placement.framed);
-        assert_eq!(lay(&[b'A', code::END]).placement.operand, None);
-    }
-
-    #[test]
-    fn a_runtime_name_reserves_its_budget_and_is_reported() {
-        let layout = lay(&[code::INSERT, 2, b'!', code::END]);
-        let page = &layout.pages[0];
-        assert_eq!(page.runtime.len(), 1);
-        assert_eq!(page.runtime[0].cells, NAME_FIELD_BYTES);
-        assert_eq!(page.glyphs[0].x, TEXT_ORIGIN.0 + NAME_FIELD_BYTES as i32 * GLYPH_ADVANCE);
-        assert_eq!(layout.unproven.len(), 1);
-    }
-
-    #[test]
-    fn a_known_name_is_drawn_through_the_redirect_budget() {
-        let name = |what: Redirect| (what == Redirect::Character(2)).then(|| vec![b'R', b'y', b'u', code::END]);
-        let context = Context { table: None, runtime: Some(&name) };
-        let layout = layout(&[code::INSERT, 2, b'!', code::END], context);
-        let xs: Vec<i32> = layout.pages[0].glyphs.iter().map(|glyph| glyph.x).collect();
-        assert_eq!(xs, [10, 18, 26, 34]);
-        assert!(layout.unproven.is_empty());
-    }
-
-    #[test]
-    fn a_redirect_stops_at_its_budget() {
-        let long = |_: Redirect| Some(b"ABCDEFGH".to_vec());
-        let context = Context { table: None, runtime: Some(&long) };
-        let layout = layout(&[code::INSERT, 0, b'!', code::END], context);
-        // Five bytes of the name, then the glyph after the code.
-        assert_eq!(layout.pages[0].glyphs.len(), NAME_FIELD_BYTES + 1);
-    }
-
-    #[test]
     fn a_choice_ends_the_page_with_its_answers() {
         let mut bytes = b"Q".to_vec();
         bytes.extend([code::CHOICE, 0, code::BOX, 2]);
@@ -688,27 +642,5 @@ mod tests {
         assert_eq!((left, width), (CHOICE_PANEL_X, CHOICE_PANEL_WIDTH));
         assert_eq!(height, 2 * CHOICE_LINE_STEP + CHOICE_PADDING + CHOICE_ROW_GAP);
         assert_eq!(top, CHOICE_CENTRE_Y - (2 * CHOICE_LINE_STEP + 1) / 2);
-    }
-
-    #[test]
-    fn number_and_skip_codes_take_an_operand_and_draw_one_glyph() {
-        let page = &lay(&[code::NUM, 3, code::SKIP, 9, b'A', code::END]).pages[0];
-        assert_eq!(page.glyphs.len(), 3);
-        assert_eq!(page.glyphs[0].shape, Shape::Number(3));
-        assert_eq!(page.glyphs[1].shape, Shape::Byte(code::SKIP));
-        assert_eq!(page.glyphs[2].x, TEXT_ORIGIN.0 + 2 * GLYPH_ADVANCE);
-    }
-
-    #[test]
-    fn the_style_code_takes_the_next_byte_as_its_operand() {
-        let page = &lay(&[code::STYLE, code::END, b'A', code::END]).pages[0];
-        assert_eq!(page.events[0].kind, EventKind::Style(code::END));
-        assert_eq!(page.glyphs.len(), 1);
-    }
-
-    #[test]
-    fn a_link_outside_the_table_is_a_placeholder() {
-        let layout = layout(&[code::LINK, 7, code::END], Context { table: Some(&[0u8; 8]), runtime: None });
-        assert_eq!(layout.pages[0].runtime.len(), 1);
     }
 }

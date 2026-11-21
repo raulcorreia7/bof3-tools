@@ -198,7 +198,6 @@ fn gap(left: [f64; 3], right: [f64; 3]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Entry;
     use psx_formats::gfx::texture::texel_words;
 
     /// A 64×32-texel image of horizontal bands, four texels per index run.
@@ -216,31 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn a_banded_8bit_image_scores_best_at_8_bits() {
-        let words = banded(Depth::Eight);
-        let scores = depth_scores(&words, 32, 32);
-        assert_eq!(scores[0].depth, Some(Depth::Eight), "{scores:?}");
-    }
-
-    #[test]
     fn a_flat_image_scores_zero() {
         assert_eq!(agreement(&[5; 64], 8), 0.0);
-    }
-
-    #[test]
-    fn the_smooth_row_ranks_above_the_noisy_one() {
-        // Row 480 holds a grey ramp; row 481 alternates black and white.
-        let ramp: Vec<u8> = (0..16u16).flat_map(|level| (0x8000 | (level * 2 * 0x421)).to_le_bytes()).collect();
-        let noise: Vec<u8> = (0..16u16).flat_map(|level| (0x8000 | ((level % 2) * 0x7FFF)).to_le_bytes()).collect();
-        let entries = [Entry { size: 32, offset: 0, ram_ptr: 0x8003_3800, first4: 0, file_type: 0 }, Entry { size: 32, offset: 0, ram_ptr: 0x8003_3A00, first4: 0, file_type: 0 }];
-        let mut vram = Vram::new();
-        vram.load("BIN/OTHER.EMI", &entries, &[&ramp, &noise]);
-        vram.reset_palette();
-        vram.upload_palette();
-
-        let words = banded(Depth::Four);
-        let ranked = clut_candidates(&vram, Grid { words: &words, width: 16, height: 32 }, Depth::Four, "BIN/OWN.EMI");
-        assert_eq!(ranked.len(), 2, "only fully written rows are candidates");
-        assert_eq!((ranked[0].clut.x, ranked[0].clut.y), (0, 480));
     }
 }

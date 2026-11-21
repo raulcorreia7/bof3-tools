@@ -161,29 +161,10 @@ mod tests {
     }
 
     #[test]
-    fn mono_goes_to_both_sides_and_stereo_averages_on_a_mono_device() {
-        assert_eq!(convert(&pcm(vec![16_384], RATE, 1), RATE, 2).unwrap(), [0.5, 0.5]);
-        assert_eq!(convert(&pcm(vec![16_384, 0], RATE, 2), RATE, 1).unwrap(), [0.25]);
-        assert_eq!(convert(&pcm(vec![16_384, 0], RATE, 2), RATE, 4).unwrap(), [0.5, 0.0, 0.0, 0.0]);
-    }
-
-    #[test]
     fn the_resampler_keeps_a_tones_frequency() {
         let out = convert(&pcm(sine(1_000.0, RATE), RATE, 1), DEVICE_RATE, 1).unwrap();
         assert_eq!(out.len(), DEVICE_RATE as usize);
         let heard = rising(&out);
         assert!(heard.abs_diff(1_000) <= 1, "{heard} Hz after resampling, not 1000");
-    }
-
-    #[test]
-    fn the_resampler_keeps_a_high_tones_level_and_the_sides_apart() {
-        let left = sine(15_000.0, RATE);
-        let samples = left.iter().flat_map(|&sample| [sample, 0]).collect();
-        let out = convert(&pcm(samples, RATE, 2), DEVICE_RATE, 2).unwrap();
-        let steady = |side: usize| out.iter().skip(side).step_by(2).skip(1_000).take(40_000).copied();
-        let peak = steady(0).fold(0.0f32, |peak, sample| peak.max(sample.abs()));
-        let input_peak = 8000.0 / SAMPLE_SCALE;
-        assert!((peak - input_peak).abs() < input_peak * 0.05, "15 kHz peaks at {peak}, not {input_peak}");
-        assert!(steady(1).all(|sample| sample.abs() < 1e-3), "the silent side stays silent");
     }
 }

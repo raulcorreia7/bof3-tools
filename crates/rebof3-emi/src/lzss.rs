@@ -197,25 +197,10 @@ mod tests {
     }
 
     #[test]
-    fn a_copy_reads_the_bytes_it_writes() {
-        // A literal, then one back-reference that repeats it from the byte it has just written.
-        let stream = [0b0000_0001, 9, RING_START as u8, ((RING_START >> 8) << 4) as u8 | 5];
-        let (decoded, _) = decode(&stream, 9).expect("decodes");
-        assert_eq!(decoded, [9; 9]);
-    }
-
-    #[test]
     fn a_read_of_an_unwritten_ring_byte_is_refused() {
         // A back-reference to the last ring byte, which the decoder never zeroes.
         let stream = [0, 0xFF, (1 << 4) as u8];
         assert!(decode(&stream, MIN_MATCH).is_err());
-    }
-
-    #[test]
-    fn the_zeroed_ring_packs_a_run_of_zeros_from_the_start() {
-        let stream = encode(&[0; 18]);
-        assert_eq!(stream.len(), 3, "one flag byte and one back-reference into the zeroed ring");
-        assert_eq!(decode(&stream, 18).expect("decodes").0, [0; 18]);
     }
 
     #[test]

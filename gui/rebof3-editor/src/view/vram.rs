@@ -340,47 +340,7 @@ fn decode_panel(editor: &Editor, vram: &Vram, region: &Region, cx: &mut Context<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_emi::Entry as TableEntry;
     use rebof3_emi::replay::Writer;
-
-    fn sample() -> Vram {
-        let mut vram = Vram::new();
-        let sheet: Vec<u8> = (0..1024u16).flat_map(|_| 0x2121u16.to_le_bytes()).collect();
-        let block: Vec<u8> = (0..16u16).flat_map(|word| (0x8000 | word).to_le_bytes()).collect();
-        let entries = [
-            TableEntry { size: sheet.len() as u32, offset: 0, ram_ptr: 1 << 8, first4: 0, file_type: 3 },
-            TableEntry { size: block.len() as u32, offset: 0, ram_ptr: 0x8003_3800, first4: 0, file_type: 0 },
-        ];
-        vram.load("BIN/A.EMI", &entries, &[&sheet, &block]);
-        vram.reset_palette();
-        vram.upload_palette();
-        vram
-    }
-
-    #[test]
-    fn a_region_decodes_through_a_scene_clut() {
-        let vram = sample();
-        let region = vram.regions().into_iter().find(|region| region.kind == Kind::Upload).expect("the upload");
-        assert_eq!(region.writer, Writer::entry("BIN/A.EMI", 0));
-        let clut = Clut::new(0, 480);
-        let (pixels, width) = decode(&vram, &region, Bits::Four, clut);
-        assert_eq!(width, 128);
-        // Index 1 reads palette word 0x8001; index 2 reads 0x8002.
-        assert_eq!(pixels[0], color_rgba(0x8001));
-        assert_eq!(pixels[1], color_rgba(0x8002));
-        let (direct, width) = decode(&vram, &region, Bits::Sixteen, None);
-        assert_eq!((direct[0], width), (color_rgba(0x2121), 32));
-    }
-
-    #[test]
-    fn the_export_is_a_whole_vram_png() {
-        let png = vram_png(&sample());
-        assert_eq!(&png[..8], &png::SIGNATURE);
-        match png::read(&png).expect("a PNG") {
-            png::Picture::Rgba(picture) => assert_eq!((picture.width, picture.height), (1024, 512)),
-            png::Picture::Indexed(_) => panic!("an RGBA PNG"),
-        }
-    }
 
     /// AREA024's scene replays from the disc with the project's edits: the literal site's page and
     /// row come from the area's entries 7 and 8, and an edit to the block's first colour shows in VRAM

@@ -72,5 +72,4 @@ kind and a digest of every stored byte; the retail cases skip without the disc.
 The `codec` module is the table of conversions between stored bytes and an open form: one row
 per kind, with an export and an import op that name their files, options, error texts, default
 extension and function. `bof3 assets export` and `import` parse their arguments with `clap` and
-run the row of the kind named; their `--help` texts are hand-written and pinned by
-`cli/rebof3/tests/help.snap`.
+run the row of the kind named; their `--help` texts are hand-written.

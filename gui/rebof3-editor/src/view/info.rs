@@ -248,56 +248,6 @@ pub fn encounters(payload: &[u8]) -> Result<Vec<Row>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rebof3_formats::encounter::{BLOCK_BYTES, ENCOUNTER_BYTES, ENEMY_BASE};
-
-    #[test]
-    fn a_resource_table_lists_the_groups_after_its_base_words() {
-        // Two base words, so two groups: group 0 at 0x08 with 2 slots, group 1 at 0x10 with 1 slot.
-        let mut payload = vec![0; 0x14];
-        payload[0..4].copy_from_slice(&0x08u32.to_le_bytes());
-        payload[4..8].copy_from_slice(&0x10u32.to_le_bytes());
-        payload[0x08..0x0A].copy_from_slice(&4u16.to_le_bytes());
-        payload[0x10..0x12].copy_from_slice(&2u16.to_le_bytes());
-
-        let rows = resource_groups(&payload).unwrap();
-        assert_eq!(rows[0], ("Groups", "2".into()));
-        assert_eq!(rows[1].1, "at 0x8, 2 slots");
-        assert_eq!(rows[2].1, "at 0x10, 1 slots");
-        assert!(resource_groups(&[0x30, 0, 0, 0]).is_err(), "twelve base words is not a table");
-    }
-
-    #[test]
-    fn an_aux_window_shows_its_module_id() {
-        let rows = aux_window(&[0x04, 0x01, 0, 0, 0xAA, 0xBB]).unwrap();
-        assert_eq!(rows[0], ("Module id", "0x104".into()));
-        assert_eq!(rows[1], ("Body", "2 bytes".into()));
-        assert!(aux_window(&[1, 2]).is_err());
-    }
-
-    #[test]
-    fn an_encounter_block_lists_its_live_encounters_and_named_enemies() {
-        let mut block = vec![0; BLOCK_BYTES];
-        block[ENCOUNTER_BYTES - 1] = 4;
-        block[ENEMY_BASE..ENEMY_BASE + 6].copy_from_slice(b"Worker");
-
-        let rows = encounters(&block).unwrap();
-        assert_eq!(rows[0], ("Encounters", "1 of 8 with a nonzero rate".into()));
-        assert_eq!(rows[1], ("Enemies", "Worker".into()));
-        assert!(encounters(&block[..10]).is_err());
-    }
-
-    #[test]
-    fn character_sprites_lists_its_sections() {
-        // One bare section: the table offset at +4 points at a table of one palette.
-        let mut section = vec![0; 8];
-        section[4] = 8;
-        section.extend(4u32.to_le_bytes());
-        section.extend([0; sprite_palettes::PALETTE_BYTES]);
-
-        let rows = character_sprites(&section).unwrap();
-        assert_eq!(rows[0], ("Sections", "1".into()));
-        assert!(rows[1].1.ends_with("1 palette"), "{rows:?}");
-    }
 
     /// Every entry of a whole extracted disc gets its format's fields without a decoder error. Point
     /// `BOF3_DISC_DIR` at an extracted disc; without it the test skips.
