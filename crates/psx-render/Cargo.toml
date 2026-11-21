@@ -17,8 +17,8 @@ gles = ["dep:glow", "dep:khronos-egl"]
 
 [dependencies]
 psx-formats = { workspace = true, features = ["std"] }
-glow = { version = "0.18.0", optional = true }
-khronos-egl = { version = "6.0.0", optional = true, features = ["dynamic"] }
+glow = { workspace = true, optional = true }
+khronos-egl = { workspace = true, optional = true }
 
 [lints]
 workspace = true

@@ -27,11 +27,11 @@ rebof3-formats.workspace = true
 rebof3-assets.workspace = true
 
 [build-dependencies]
-cc = { version = "1", optional = true }
+cc = { workspace = true, optional = true }
 
 [dev-dependencies]
 # The committed header is generated and checked by the same cbindgen version.
-cbindgen = { version = "=0.29.4", default-features = false }
+cbindgen.workspace = true
 # A self dev-dependency turns the smoke feature on for the test build only.
 rebof3-capi = { path = ".", features = ["smoke"] }
 

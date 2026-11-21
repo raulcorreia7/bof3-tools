@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use gpui::{AnyElement, Context, Div, div, prelude::*, px};
 use psx_formats::VAB_SAMPLE_RATE;
 use psx_formats::sep::{Package, Sequence};
-use psx_formats::vab::{Bank, Tone};
+use psx_formats::vab::{Bank, Tone, Vag};
 use rebof3_assets::sound::sequence_pcm;
 use rebof3_editor::preview::{Keys, Note, note_pcm, sample_pcm};
 use rebof3_emi::entry::vab_body_index;
@@ -190,12 +190,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let title = format!("{}-{header_index}", stem(entry));
     let state = &editor.views.sound;
 
-    let mut top = div()
-        .flex()
-        .flex_none()
-        .items_center()
-        .gap(px(GAP))
-        .child(mono(format!("VAB id {}  {} programs  {} tones  {} samples  volume {}  pan {}", bank.id, bank.program_count, bank.tone_count, bank.vag_count, bank.master_vol, bank.master_pan)));
+    let mut top = div().flex().flex_none().items_center().gap(px(GAP)).child(mono(bank_summary(&bank)));
     let (soundfont_header, soundfont_body, soundfont_title) = (header.to_vec(), body.to_vec(), title.clone());
     top = top.child(button("soundfont", "Export SoundFont…", true).on_click(cx.listener(move |editor, _, _, cx| {
         let bytes = soundfont(&soundfont_header, &soundfont_body, &soundfont_title).map_err(|error| error.to_string());
@@ -211,7 +206,6 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
     let mut samples = div().flex().flex_col().font_family(fonts::mono());
     samples = samples.child(grid_row(["#", "bytes", "frames", "loop"].map(|heading| strong(heading).into_any_element()), false));
     for (at, vag) in bank.vags.iter().filter(|vag| !vag.is_empty()).enumerate() {
-        let looped = if vag.has_loop { format!("{}..{}", vag.loop_start_frame, vag.loop_end_frame) } else { "-".into() };
         let (sample, wave_name) = (vag.index, format!("{title}-{}.wav", vag.index));
 
         let play = button(("play", sample), "▶ Play", true).on_click(cx.listener(move |editor, _, _, cx| {
@@ -228,7 +222,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             import_sample(editor, header_index, body_index, sample, cx);
             cx.notify();
         }));
-        let cells = [text(vag.index), text(vag.size), text(vag.frames), text(looped), play.into_any_element(), wave.into_any_element(), replace.into_any_element()];
+        let cells = [text(vag.index), text(vag.size), text(vag.frames), text(loop_range(vag)), play.into_any_element(), wave.into_any_element(), replace.into_any_element()];
         samples = samples.child(grid_row(cells, at % 2 == 1));
     }
 
@@ -259,7 +253,7 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
             let cells = [
                 text(tone.program),
                 text(tone.vag),
-                text(format!("{}..{}", tone.min_note, tone.max_note)),
+                text(note_range(tone)),
                 text(tone.center_note),
                 text(tone.vol),
                 text(tone.pan),
@@ -288,6 +282,21 @@ pub fn show(editor: &Editor, entry: &Entry<'_>, cx: &mut Context<Editor>) -> Any
         .child(tones_title)
         .child(tones)
         .into_any_element()
+}
+
+/// The frames a sample loops over, or `-`.
+fn loop_range(vag: &Vag) -> String {
+    if vag.has_loop { format!("{}..{}", vag.loop_start_frame, vag.loop_end_frame) } else { "-".into() }
+}
+
+/// The one-line summary of a bank.
+fn bank_summary(bank: &Bank) -> String {
+    format!("VAB id {}  {} programs  {} tones  {} samples  volume {}  pan {}", bank.id, bank.program_count, bank.tone_count, bank.vag_count, bank.master_vol, bank.master_pan)
+}
+
+/// The notes a tone answers, as `low..high`.
+fn note_range(tone: &Tone) -> String {
+    format!("{}..{}", tone.min_note, tone.max_note)
 }
 
 /// The note a tone plays unless the user picks another: its centre note, inside the notes it answers.

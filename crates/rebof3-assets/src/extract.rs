@@ -85,6 +85,12 @@ struct Output<'a> {
     evidence: String,
 }
 
+/// One file a run writes, with the row that records it: the plan the shell applies.
+struct Planned<'a> {
+    row: Row,
+    output: Output<'a>,
+}
+
 /// Reads the disc and writes every selected kind the image holds; the `text` kind reads the
 /// extracted disc through [`crate::text::extract`].
 pub fn run(options: &Options) -> Result<Report> {
@@ -292,7 +298,7 @@ fn process(job: &Job, options: &Options, report: &mut Report, resident: &[Reside
 fn file_rows(job: &Job, kind: Kind, note: &str, options: &Options, report: &mut Report) -> Result<()> {
     let base = Row { size: job.bytes.len() as u64, note: note.to_string(), ..Row::new(job.source.clone(), FILE_FORMAT, kind, FILE_STATE, "raw") };
     let output = Output { role: "raw", path: format!("{}/{}", kind.name(), job.source), data: Cow::Borrowed(&job.bytes), evidence: String::new() };
-    write_output(&base, output, options, report)
+    commit(plan_output(&base, output, options), options, report)
 }
 
 /// Every selected slot of one container.
@@ -308,7 +314,7 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
         let format = classify(entry, payload);
         let kind = Kind::of_format(format);
         if slot == 0 && job.source == GAME_TABLES_SOURCE && options.selection.contains(Kind::DataTable) {
-            game_table_rows(job, entry, payload, options, report)?;
+            commit(plan_game_tables(job, entry, payload, options, report), options, report)?;
         }
         if !options.selection.contains(kind) {
             continue;
@@ -322,13 +328,18 @@ fn emi_rows(job: &Job, archive: &Archive, options: &Options, report: &mut Report
         }
         let site = Site { stem, slot, entries: archive.entries(), payloads: &payloads, rows: rows.get(&slot).map_or(&[], Vec::as_slice) };
         let (outputs, note) = slot_outputs(&site, format, entry, kind, options.write);
-        for (position, output) in outputs.into_iter().enumerate() {
-            let mut row = base.clone();
-            if position == 0 {
-                row.note.clone_from(&note);
-            }
-            write_output(&row, output, options, report)?;
-        }
+        let planned: Vec<_> = outputs
+            .into_iter()
+            .enumerate()
+            .filter_map(|(position, output)| {
+                let mut row = base.clone();
+                if position == 0 {
+                    row.note.clone_from(&note);
+                }
+                plan_output(&row, output, options)
+            })
+            .collect();
+        commit(planned, options, report)?;
     }
     Ok(())
 }
@@ -355,34 +366,29 @@ fn slot_outputs<'a>(site: &Site<'a>, format: Format, entry: &rebof3_emi::Entry, 
     (outputs, note)
 }
 
-/// Writes the fixed game tables of entry 0 of `ETC/GAME.EMI` as one JSON file per table. The entry
-/// itself stays a code image; its tables are outputs of it, not entries.
-fn game_table_rows(job: &Job, entry: &rebof3_emi::Entry, payload: &[u8], options: &Options, report: &mut Report) -> Result<()> {
-    let files = match rebof3_formats::game_tables::open::files(payload) {
-        Ok(files) => files,
+/// The fixed game tables of entry 0 of `ETC/GAME.EMI`, one JSON file per table. The entry itself stays a
+/// code image; its tables are outputs of it, not entries.
+fn plan_game_tables<'a>(job: &Job, entry: &rebof3_emi::Entry, payload: &'a [u8], options: &Options, report: &mut Report) -> Vec<Planned<'a>> {
+    let tables = rebof3_formats::game_tables::open::files(payload).and_then(|files| Ok((files, rebof3_formats::game_tables::open::stored(payload)?)));
+    let (files, stored) = match tables {
+        Ok(tables) => tables,
         Err(error) => {
             report.failures.push(Failure::GameTables { source: job.source.clone(), error });
-            return Ok(());
-        }
-    };
-    let stored = match rebof3_formats::game_tables::open::stored(payload) {
-        Ok(stored) => stored,
-        Err(error) => {
-            report.failures.push(Failure::GameTables { source: job.source.clone(), error });
-            return Ok(());
+            return Vec::new();
         }
     };
     let stem = job.source.strip_suffix(&format!(".{EMI_EXTENSION}")).unwrap_or(&job.source);
+    let mut planned = Vec::new();
     for ((name, data), (table, bytes)) in files.into_iter().zip(stored) {
         let base = Row::new(job.source.clone(), DERIVED_TABLE, Kind::DataTable, "codec", "json").at_slot(0, entry);
         // The stored bytes are the table's span of the disc file: `offset` and `size` locate them in the archive.
         let original = Row { offset: table.archive_offset as u64, size: bytes.len() as u64, ..base.clone() };
         let output = Output { role: "raw", path: format!("{}/{stem}/{name}.bin", Kind::DataTable.name()), data: Cow::Borrowed(bytes), evidence: String::new() };
-        write_output(&original, output, options, report)?;
+        planned.extend(plan_output(&original, output, options));
         let output = Output { role: "json", path: format!("{}/{stem}/{name}.json", Kind::DataTable.name()), data: Cow::Owned(data), evidence: TABLE_EVIDENCE.to_string() };
-        write_output(&base, output, options, report)?;
+        planned.extend(plan_output(&base, output, options));
     }
-    Ok(())
+    planned
 }
 
 /// Whether the asset a row belongs to has a conversion. Modern mode writes the original bytes of an asset that has
@@ -406,25 +412,34 @@ fn converts(base: &Row) -> bool {
     }
 }
 
-/// Hashes `output`, writes it unless the run only plans, and records its row.
-fn write_output(base: &Row, output: Output<'_>, options: &Options, report: &mut Report) -> Result<()> {
+/// The row and file of `output` when the mode writes it; the file is hashed when the run writes.
+fn plan_output<'a>(base: &Row, output: Output<'a>, options: &Options) -> Option<Planned<'a>> {
     if !options.selection.mode().writes(output.role, converts(base)) {
-        return Ok(());
+        return None;
     }
     let mut row = base.clone();
     row.role = output.role;
     row.bytes = output.data.len() as u64;
     row.output = Some(output.path.clone());
-    row.evidence = output.evidence;
+    row.evidence.clone_from(&output.evidence);
     if options.write {
         row.sha256 = sha256_hex(&output.data);
-        let path = options.out.join(&output.path);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&path, &output.data)?;
     }
-    report.rows.push(row);
+    Some(Planned { row, output })
+}
+
+/// Writes the planned files unless the run only plans, and records their rows.
+fn commit<'a>(planned: impl IntoIterator<Item = Planned<'a>>, options: &Options, report: &mut Report) -> Result<()> {
+    for Planned { row, output } in planned {
+        if options.write {
+            let path = options.out.join(&output.path);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(&path, &output.data)?;
+        }
+        report.rows.push(row);
+    }
     Ok(())
 }
 
@@ -445,18 +460,17 @@ fn sound_rows(image: &Path, options: &Options, report: &mut Report) -> Result<()
         options.jobs,
         |clip| {
             let base = Row::new(clip.source, RENDERED_ITEM, clip.kind, "codec", "raw");
-            let output = Output { role: clip.extension, path: clip.output.clone(), data: Cow::Owned(clip.bytes), evidence: clip.evidence.clone() };
-            write_output(&base, output, options, report)?;
+            let mut planned = Vec::new();
+            planned.extend(plan_output(&base, Output { role: clip.extension, path: clip.output.clone(), data: Cow::Owned(clip.bytes), evidence: clip.evidence.clone() }, options));
             if let Some(midi) = clip.midi {
-                let path = std::path::Path::new(&clip.output).with_extension("mid");
-                let output = Output { role: "midi", path: path.to_string_lossy().into_owned(), data: Cow::Owned(midi), evidence: clip.evidence };
-                write_output(&base, output, options, report)?;
+                let path = Path::new(&clip.output).with_extension("mid").to_string_lossy().into_owned();
+                planned.extend(plan_output(&base, Output { role: "midi", path, data: Cow::Owned(midi), evidence: clip.evidence }, options));
             }
             // A sample's original bytes: its waveform data, as the VAB body stores it.
             if let Some(original) = clip.original {
-                let output = Output { role: "vag", path: original.output, data: Cow::Owned(original.bytes), evidence: String::new() };
-                write_output(&base, output, options, report)?;
+                planned.extend(plan_output(&base, Output { role: "vag", path: original.output, data: Cow::Owned(original.bytes), evidence: String::new() }, options));
             }
+            commit(planned, options, report)?;
             Ok(())
         },
     )?;
