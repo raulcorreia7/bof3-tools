@@ -4893,7 +4893,6 @@ dependencies = [
  "rebof3-observe",
  "rebof3-render",
  "rubato",
- "serde",
  "serde_json",
 ]
 
