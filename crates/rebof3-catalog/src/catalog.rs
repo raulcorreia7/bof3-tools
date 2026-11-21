@@ -1,17 +1,5 @@
 //! The game catalog: every entry of every archive, filed the way the game's developers keep their
 //! source assets (characters, enemies, areas, battle, interface, audio, text, data tables).
-//!
-//! The grouping is derived, not listed per entry. An entry is placed by the first rule that matches:
-//!
-//! 1. a fixed game table: an entry that a [`schema`] sheet is bound to by archive and slot
-//!    (`ETC/GAME.EMI` entry 0, `ETC/START.EMI` entry 8) goes to [`Which::DataTables`];
-//! 2. its format, for the formats whose owner is not the archive that holds them (see [`RULES`]);
-//! 3. its archive's name, by the family rules of [`RULES`];
-//! 4. otherwise [`Which::Unsorted`], with the reason in the section title.
-//!
-//! Every row of [`RULES`] cites its source. Units (archives) sort in the disc's own order: the disc file
-//! list is in ascending name order within each folder, which is also the order of the slot ids in
-//! `include/sys/cd_format.h` (`EMI_SLOT_*`), and the numbered series count up (`ENEMY000`, `AREA105`).
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -102,13 +90,11 @@ struct Rule {
 /// The ETC programs by slot: `wiki: formats/emi#code-overlays`.
 const ETC: &str = "include/sys/cd_format.h ETC block; wiki: formats/emi";
 /// The reason for an archive that no row names.
-/// The section title of an archive no row names.
 pub const NO_ROW: &str = "no catalog row names this archive";
 
 /// The catalog table, in display order. A format row beats a family row; among family rows the first
 /// match wins.
 static RULES: &[Rule] = &[
-    // Characters: the party's field and battle archives.
     Rule {
         pick: Pick::Series("PL"),
         group: Which::Characters,
@@ -144,7 +130,6 @@ static RULES: &[Rule] = &[
         label: Label::Stem,
         source: "BPLCHAR holds the battle character sprites and forms; wiki: formats/disc",
     },
-    // Enemies and bosses.
     Rule {
         pick: Pick::Series("ENEMY"),
         group: Which::Enemies,
@@ -160,9 +145,7 @@ static RULES: &[Rule] = &[
         label: Label::Area,
         source: "the area encounter table is the formation data; rebof3_formats::encounter",
     },
-    // Areas and maps.
     Rule { pick: Pick::Series("AREA"), group: Which::Areas, section: "Areas", label: Label::Area, source: "EMI_SLOT_AREA: one archive per area, slot area + 0x2AB" },
-    // Battle.
     Rule {
         pick: Pick::Any(&["BATL_DRA", "BATL_END", "BATL_OVR", "BATL_RE2", "BATL_RET", "BATL_SE", "BATTLE", "BATTLE2", "COMN_SE"]),
         group: Which::Battle,
@@ -180,7 +163,6 @@ static RULES: &[Rule] = &[
     },
     Rule { pick: Pick::Any(&["SCE10EFF"]), group: Which::Battle, section: "Scenario effects", label: Label::Stem, source: "SCE10EFF, SCE15EF0-3 are effect controllers (wiki: formats/emi)" },
     Rule { pick: Pick::Series("SCE15EF"), group: Which::Battle, section: "Scenario effects", label: Label::Stem, source: "SCE10EFF, SCE15EF0-3 are effect controllers (wiki: formats/emi)" },
-    // Interface.
     Rule {
         pick: Pick::Format(Format::AreaAuxWindow),
         group: Which::Interface,
@@ -209,12 +191,10 @@ static RULES: &[Rule] = &[
         label: Label::Stem,
         source: "EMI_SLOT_GAME holds the resident program and the title overlay (wiki: concepts/architecture)",
     },
-    // Audio.
     Rule { pick: Pick::Series("BGM"), group: Which::Audio, section: "Music", label: Label::Stem, source: "EMI_SLOT_BGM" },
     Rule { pick: Pick::Series("BGMBAT"), group: Which::Audio, section: "Music", label: Label::Stem, source: "BGMBAT00-06 are the battle music files of the BGM folder" },
     Rule { pick: Pick::Any(&["BGMEND", "BGMOPN", "BGMSPC"]), group: Which::Audio, section: "Music", label: Label::Stem, source: "the BGM folder" },
     Rule { pick: Pick::Any(&["A085SE2", "A108SE2"]), group: Which::Audio, section: "Area sound effects", label: Label::Stem, source: "EMI_SLOT_A085SE2, EMI_SLOT_A108SE2; wiki: guides/sound" },
-    // Text.
     Rule {
         pick: Pick::Format(Format::SharedResourceTable),
         group: Which::Text,
@@ -229,12 +209,10 @@ static RULES: &[Rule] = &[
         label: Label::Stem,
         source: "AFLDKWA#0 is a shared resource table (wiki: guides/text)",
     },
-    // Movies and other.
     Rule { pick: Pick::Any(&["DEMO"]), group: Which::Other, section: "Demo", label: Label::Stem, source: "EMI_SLOT_DEMO" },
     Rule { pick: Pick::Series("SCENA"), group: Which::Other, section: "Scenario overlays", label: Label::Stem, source: "EMI_SLOT_SCENA: slot scenario_id + 661 (wiki: formats/disc)" },
     Rule { pick: Pick::Series("COMMU"), group: Which::Other, section: "ETC programs", label: Label::Stem, source: ETC },
     Rule { pick: Pick::Any(&["BATE", "SHISU", "SISYOU"]), group: Which::Other, section: "ETC programs", label: Label::Stem, source: ETC },
-    // Unsorted: placed by the table, but with no known place.
     Rule {
         pick: Pick::Any(&["MTEST", "RTEST"]),
         group: Which::Unsorted,

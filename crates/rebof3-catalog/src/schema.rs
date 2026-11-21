@@ -1,8 +1,4 @@
 //! Record layouts the editor shows as spreadsheet columns.
-//!
-//! Each column reads and writes the record bytes directly, at the offsets the decompilation's
-//! headers give (`include/game/item.h`, `ability.h`, `enemy.h` and `character.h`), so a column edit
-//! changes exactly the bytes it names and every byte no column names keeps its stored value.
 
 use rebof3_formats::Format;
 use rebof3_formats::encounter::{self, ENCOUNTER_BYTES, ENCOUNTER_ENEMIES, ENCOUNTERS, ENEMIES, ENEMY_BASE, ENEMY_BYTES};

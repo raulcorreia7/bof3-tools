@@ -1,13 +1,5 @@
 //! A project: a read-only disc folder, and a separate project folder that holds the edits and the
 //! rebuilt archives.
-//!
-//! The disc files are only ever read. An edit is the whole new payload of one entry, kept in memory and
-//! saved as `edits/<archive>/<index>.bin` in the project folder. A placement edit is a new load argument for
-//! one entry (where a texture or palette lands in VRAM), saved as `edits/<archive>/<index>.load` in hex.
-//! The edit store is [`Edits`]; this is its shell: the disc folder, the cache of read archives and the files of the
-//! project folder. Export rebuilds each edited archive with [`rebof3_emi::pack::rebuild_placed`] into `disc/<archive>` in
-//! the project folder and reads it back to prove the rebuild holds exactly the edited payloads and load
-//! arguments.
 
 use std::collections::BTreeMap;
 use std::fs;

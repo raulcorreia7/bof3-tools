@@ -1,8 +1,5 @@
 //! The edit store: the payloads and load arguments a project changes, kept in memory over the disc's
 //! archives, with undo steps and the plan that rebuilds each edited archive.
-//!
-//! An edit is the whole new payload of one entry. A placement edit is a new load argument for one entry
-//! (where a texture or palette lands in VRAM). Nothing here touches a file.
 
 use std::collections::BTreeMap;
 
