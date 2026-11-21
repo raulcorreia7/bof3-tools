@@ -749,7 +749,7 @@ dependencies = [
 [[package]]
 name = "bof3player"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "emi",
  "psx-audio",
@@ -1680,7 +1680,7 @@ dependencies = [
 [[package]]
 name = "emi"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "psx-formats",
  "serde",
@@ -1772,7 +1772,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4483,7 +4483,7 @@ dependencies = [
 [[package]]
 name = "psx-audio"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "flacenc",
  "psx-cd",
@@ -4494,7 +4494,7 @@ dependencies = [
 [[package]]
 name = "psx-cd"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "md-5 0.11.0",
  "psx-formats",
@@ -4507,7 +4507,7 @@ dependencies = [
 [[package]]
 name = "psx-formats"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "png 0.18.1",
  "serde",
@@ -4517,7 +4517,7 @@ dependencies = [
 [[package]]
 name = "psx-machine"
 version = "0.1.3"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "psx-cd",
 ]
@@ -4614,7 +4614,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5165,7 +5165,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5178,7 +5178,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5739,7 +5739,7 @@ dependencies = [
 [[package]]
 name = "stacksafe-macro"
 version = "0.1.4"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "proc-macro-error3",
  "quote",
@@ -6022,7 +6022,7 @@ dependencies = [
 [[package]]
 name = "taffy"
 version = "0.9.0"
-source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=a9e1452eac4f78ca188c013d4b0c3f7125d91f34#a9e1452eac4f78ca188c013d4b0c3f7125d91f34"
+source = "git+https://github.com/raulcorreia7/bof3-player.git?rev=3522051c8a0a8a6053a7ead984b3550ba654c8b2#3522051c8a0a8a6053a7ead984b3550ba654c8b2"
 dependencies = [
  "arrayvec",
  "grid",
@@ -6064,7 +6064,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7295,15 +7295,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
-dependencies = [
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
@@ -7540,7 +7531,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
 dependencies = [
  "cfg-if",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
